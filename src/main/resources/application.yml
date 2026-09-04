@@ -65,7 +65,7 @@ logging:
     org.mybatis: INFO
 
 app:
-  version: ${APP_VERSION:1.19.13}   # 发布语义版本(nav logo 下展示)· 发版时随 tag 同步
+  version: ${APP_VERSION:1.19.14}   # 发布语义版本(nav logo 下展示)· 发版时随 tag 同步
   upload-root: ${UPLOAD_ROOT:/tmp/finance-uploads}
   remember-me-key: ${REMEMBER_ME_KEY:dev-only-key-change-in-prod}
   remember-me-validity-seconds: 2592000  # 30 天

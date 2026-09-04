@@ -8138,6 +8138,56 @@ QA11913_AC="$RD/src/main/java/com/family/finance/web/admin/AiAccessController.ja
 #   而那正是 v1.19.12 刚修掉的病。
 { codeonly "$QA11913_AC" | grep -q 'msg.startsWith("upstream ")'   && codeonly "$QA11913_AC" | grep -q 'upstream ?' ; }   && log_ok "v11913-GUESS-ONLY-FOR-UPSTREAM(自家抛的错不再附上我们的猜测)"   || log_bad "v11913-GUESS-ONLY-FOR-UPSTREAM 又给自家错误配猜测了" "话已经说完还补一句「核对三个 ID」,是 v1.19.12 刚修掉的同一种误导"
 
+# ═══ v1.19.14 · 百炼会话链路:追加事件 → 独立 SSE 端点读答案 ═══
+QA11914_MA="$RD/src/main/java/com/family/finance/service/ask/runtime/ManagedAgentRuntime.java"
+
+# v11914-SESSION-FIELD-IS-AGENT · 建会话的字段名是 agent,不是 agent_id。
+#   百炼原话:Missing required field: 'agent'。而用户看到的只有「百炼返回了错误(400)」——
+#   最有用的那句话只进了日志。
+{ codeonly "$QA11914_MA" | grep -q 'Map.of("agent", agentId())' \
+  && ! codeonly "$QA11914_MA" | grep -q 'Map.of("agent_id", agentId())'; } \
+  && log_ok "v11914-SESSION-FIELD-IS-AGENT(建会话用 agent 字段)" \
+  || log_bad "v11914-SESSION-FIELD-IS-AGENT 建会话字段名又错了" "百炼回 400 Missing required field: 'agent',整个问答不可用"
+
+# v11914-EVENT-SHAPE · 追加事件的形状是百炼逐条纠正出来的:
+#   input 必须是**事件数组** · 每个事件带 type · content 必须是**内容块数组**(不是字符串)。
+{ codeonly "$QA11914_MA" | grep -q 'Map.of("input", List.of(event))' \
+  && codeonly "$QA11914_MA" | grep -q 'event.put("type", "message")' \
+  && codeonly "$QA11914_MA" | grep -q 'List.of(Map.of("type", "text", "text", question))'; } \
+  && log_ok "v11914-EVENT-SHAPE(input 是事件数组 · content 是内容块数组)" \
+  || log_bad "v11914-EVENT-SHAPE 追加事件的形状退回去了" "百炼会 400:'input' must be an array / 'content' must be a non-empty array"
+
+# v11914-ANSWER-FROM-STREAM-ENDPOINT · 答案要从独立的 SSE 端点读。
+#   POST /events 只是**追加**,它的 Content-Type 永远是 application/json ——
+#   连官方文档说的「加 Accept: text/event-stream 就流式」都不成立(实测)。
+#   把它当流读的结果是:一个字都读不到,还不报错。
+#   after_id 不是优化是正确性:这个流**默认重放全部历史**,而会话是跨轮复用的,
+#   不带它就会把前面每一轮的答案再吐一遍。
+{ codeonly "$QA11914_MA" | grep -q '/events/stream?after_id=' \
+  && codeonly "$QA11914_MA" | grep -q 'private void streamAfter(' \
+  && codeonly "$QA11914_MA" | grep -q 'appendUserMessage(sessionId, turn.question())'; } \
+  && log_ok "v11914-ANSWER-FROM-STREAM-ENDPOINT(答案走 /events/stream · 带 after_id 防重放)" \
+  || log_bad "v11914-ANSWER-FROM-STREAM-ENDPOINT 又把追加请求当成答案流读了" "读不到任何正文而且不报错;丢了 after_id 则会把历史每一轮重播一遍"
+
+# v11914-TERMINATE-ON-SESSION-STATUS · 终止信号在 content[].data.session_status。
+#   事件自己也有一个 status=completed(每条都有)—— 拿它当会话状态会在第一条事件就截断。
+#   两个纯函数必须有单测:猜错的表现分别是「挂到超时」和「答案是空的」,两种都不报错。
+{ codeonly "$QA11914_MA" | grep -q 'static String sessionStatus(' \
+  && codeonly "$QA11914_MA" | grep -q '"session_status", "status"' \
+  && codeonly "$QA11914_MA" | grep -qE '"idle"\.equals\(st\)' \
+  && [ -f "$RD/src/test/java/com/family/finance/service/ask/runtime/ManagedAgentEventParsingTest.java" ]; } \
+  && log_ok "v11914-TERMINATE-ON-SESSION-STATUS(终止读嵌套 session_status · 有单测)" \
+  || log_bad "v11914-TERMINATE-ON-SESSION-STATUS 终止判据错了" "读顶层 status 会在第一条事件就截断;完全不读则挂到超时"
+
+# v11914-UPSTREAM-WORDS-REACH-USER · 上游原话必须到用户眼前 —— 这个病第三次了。
+#   v1.19.4「识别失败,请重试」盖住额度耗尽;v1.19.11「upstream 400」盖住字段错;
+#   v1.19.14「百炼返回了错误(400)」盖住 Missing required field: 'agent'。
+#   每一次,那句被盖住的话都直接指出了 bug 在哪。
+{ codeonly "$QA11914_MA" | grep -q 'UpstreamException.brief(u.body)' \
+  && ! codeonly "$QA11914_MA" | grep -q '稍后再试试'; } \
+  && log_ok "v11914-UPSTREAM-WORDS-REACH-USER(问答报错带上百炼原话)" \
+  || log_bad "v11914-UPSTREAM-WORDS-REACH-USER 又把上游原话吞了" "同一个病第四次:用户只看到「返回了错误(400)」,而原因就在被丢掉的那句里"
+
 echo
 echo "═══════════════════════════════════════"
 echo " 总结: PASS=$PASS  FAIL=$FAIL  SKIP=$SKIP"

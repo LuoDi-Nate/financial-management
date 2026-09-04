@@ -100,42 +100,78 @@ public class ManagedAgentRuntime implements AgentRuntime {
                 sessionId = createSession();
                 turn.onProviderRef().accept(sessionId);
             }
-            streamEvents(sessionId, turn.question(), sink);
+            // 三步,缺一不可:追加事件 → 拿到它的 id → 从这个 id 之后读流。
+            // 「追加」和「读答案」是两个不同的请求,这是百炼这套接口的形状(见 appendUserMessage)。
+            String afterId = appendUserMessage(sessionId, turn.question());
+            streamAfter(sessionId, afterId, sink);
         } catch (Exception e) {
             log.warn("超级 Agent · 托管 agent 失败:{}", e.toString());
             sink.failed(humanError(e));
         }
     }
 
+    /**
+     * v1.19.14 · 建会话的字段名是 <b>{@code agent}</b>,不是 {@code agent_id}。
+     * 百炼原话:{@code Missing required field: 'agent'}。字符串和 {@code {"id":…}} 对象都收,这里用字符串。
+     */
     private String createSession() throws Exception {
-        JsonNode n = post(agentBase() + "/sessions", Map.of("agent_id", agentId()));
+        JsonNode n = post(agentBase() + "/sessions", Map.of("agent", agentId()));
         String id = firstText(n, "session_id", "sessionId", "id");
         if (id == null) throw new IllegalStateException("百炼没有返回 session_id");
         return id;
     }
 
     /**
-     * 提问并消费事件流。
+     * v1.19.14 · 把用户这句话作为一个 <b>message 事件</b>追加进会话,返回这个事件的 id。
+     *
+     * <p>形状是百炼逐条纠正出来的(每次它都明确说了缺什么):</p>
+     * <ol>
+     *   <li>{@code Field 'input' must be an array} —— {@code input} 是<b>事件数组</b>,不是单个对象</li>
+     *   <li>{@code type must be one of: define_outcome, function_call_output, interrupt, message,
+     *       tool_approval_response, tool_call_output} —— 每个事件要带 {@code type}</li>
+     *   <li>{@code 'content' must be a non-empty array} —— {@code content} 是
+     *       <b>内容块数组</b>({@code [{"type":"text","text":…}]}),不是字符串</li>
+     * </ol>
+     *
+     * <p><b>这个请求不产出答案。</b>它只把事件写进会话(响应体就是刚写进去的那条的回显)。
+     * 原来的代码把它当成流来读,而它的 {@code Content-Type} 始终是 {@code application/json} ——
+     * 就算按官方文档加上 {@code Accept: text/event-stream} 也一样(实测)。
+     * 答案要从 {@link #streamAfter} 那条独立的 SSE 端点读。</p>
+     */
+    private String appendUserMessage(String sessionId, String question) throws Exception {
+        Map<String, Object> event = new LinkedHashMap<>();
+        event.put("type", "message");
+        event.put("role", "user");
+        event.put("content", List.of(Map.of("type", "text", "text", question)));
+        JsonNode n = post(agentBase() + "/sessions/" + sessionId + "/events",
+                Map.of("input", List.of(event)));
+        String id = firstText(n.path("data").path(0), "id", "event_id");
+        if (id == null) throw new IllegalStateException("百炼没有回显刚追加的事件 id");
+        return id;
+    }
+
+    /**
+     * 消费事件流。
+     *
+     * <p>v1.19.14 · 走 <b>{@code GET /sessions/{id}/events/stream}</b> —— 这是唯一真的会
+     * 返回 {@code text/event-stream} 的端点。</p>
+     *
+     * <p><b>{@code after_id} 不是优化,是正确性</b>:这个流<b>默认重放会话的全部历史</b>。
+     * 而我们的会话是跨轮复用的(providerRef 存着它,这正是选托管路线的理由),
+     * 不带 {@code after_id} 就会把前面每一轮的答案重新吐一遍 —— 用户会看到答案里混进上一轮的话。
+     * 传刚追加的那条用户事件 id,就只拿本轮的新事件。</p>
      *
      * <p>事件里的工具调用是<b>百炼那边发起的</b>(它直连我们的 {@code /mcp}),
      * 我们只是从流里看到「它调了什么」,好把进度显示给用户。所以这里没有 dispatcher ——
      * 工具已经在 {@code /mcp} 那条路径上执行过,连同鉴权和审计。</p>
      */
-    private void streamEvents(String sessionId, String question, AskSink sink) throws Exception {
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("agent_id", agentId());
-        body.put("stream", true);
-        body.put("input", Map.of("role", "user", "content", question));
-
-        HttpRequest req = HttpRequest.newBuilder(
-                        URI.create(agentBase() + "/sessions/" + sessionId + "/events"))
+    private void streamAfter(String sessionId, String afterEventId, AskSink sink) throws Exception {
+        HttpRequest req = HttpRequest.newBuilder(URI.create(
+                        agentBase() + "/sessions/" + sessionId + "/events/stream?after_id=" + afterEventId))
                 .timeout(READ_TIMEOUT)
-                .header("Content-Type", "application/json")
                 .header("Authorization", "Bearer " + apiKey())
                 .header("Accept", "text/event-stream")
-                .POST(HttpRequest.BodyPublishers.ofString(
-                        json.writeValueAsString(body), StandardCharsets.UTF_8))
-                .build();
+                .GET().build();
 
         HttpResponse<java.io.InputStream> resp =
                 http.send(req, HttpResponse.BodyHandlers.ofInputStream());
@@ -144,12 +180,13 @@ public class ManagedAgentRuntime implements AgentRuntime {
                     new String(resp.body().readAllBytes(), StandardCharsets.UTF_8));
         }
 
+        boolean gotAnswer = false;
         try (BufferedReader r = new BufferedReader(
                 new InputStreamReader(resp.body(), StandardCharsets.UTF_8))) {
             String line;
             while ((line = r.readLine()) != null) {
                 if (sink.cancelled()) { sink.stopped(); return; }
-                if (!line.startsWith("data:")) continue;
+                if (!line.startsWith("data:")) continue;   // 还有 `id:` / `event:` / `:注释` 三种行
                 String payload = line.substring(5).trim();
                 if (payload.isEmpty() || "[DONE]".equals(payload)) continue;
 
@@ -157,27 +194,62 @@ public class ManagedAgentRuntime implements AgentRuntime {
                 String type = firstText(n, "type", "event", "object");
                 if (type == null) continue;
 
-                if (type.contains("tool")) {
+                if ("session_status".equals(type)) {
+                    // 终止信号藏在 content[].data.session_status 里(idle / terminated)。
+                    // 读不出来时**只在已经拿到答案后**才收 —— 不然多步工具调用会被截断;
+                    // 真卡住有 READ_TIMEOUT 兜底。
+                    String st = sessionStatus(n);
+                    if ("idle".equals(st) || "terminated".equals(st) || (st == null && gotAnswer)) break;
+                    continue;
+                }
+                if (type.contains("tool") || type.contains("function_call")) {
                     String tool = firstText(n.path("tool_call"), "name", "tool_name");
                     if (tool == null) tool = firstText(n, "name", "tool_name");
+                    if (tool == null) tool = firstText(n.path("content").path(0).path("data"), "name", "tool_name");
                     if (tool != null) {
                         String label = registry.displayName(tool);
-                        if (type.contains("done") || type.contains("completed") || type.contains("result")) {
+                        if (type.contains("output") || type.contains("done")
+                                || type.contains("completed") || type.contains("result")) {
                             sink.toolDone(tool, label, 0, true, null, Map.of());
                         } else {
                             sink.toolStart(tool, label, null);
                         }
                     }
+                } else if ("message".equals(type) && "assistant".equals(firstText(n, "role"))) {
+                    // 答案是**整条**发过来的(status=completed),不是逐字 delta
+                    String text = textOf(n.path("content"));
+                    if (!text.isEmpty()) { sink.textDelta(text); gotAnswer = true; }
                 } else if (type.contains("delta") || type.contains("output_text")) {
-                    String piece = firstText(n, "delta", "text", "content");
-                    if (piece != null && !piece.isEmpty()) sink.textDelta(piece);
+                    // 百炼哪天真给逐字增量了也能收 —— 多留这一支不花什么代价
+                    String piece = firstText(n, "delta", "text");
+                    if (piece != null && !piece.isEmpty()) { sink.textDelta(piece); gotAnswer = true; }
                 } else if (type.contains("error")) {
                     sink.failed("百炼那边报了个错:" + firstText(n, "message", "error"));
                     return;
                 }
+                // reasoning / model_request_start / model_request_end 是进度,正文里不展示
             }
         }
         sink.done();
+    }
+
+    /** {@code content: [{"type":"data","data":{"session_status":"idle", …}}]} */
+    static String sessionStatus(JsonNode event) {
+        for (JsonNode block : event.path("content")) {
+            String st = firstText(block.path("data"), "session_status", "status");
+            if (st != null) return st;
+        }
+        return firstText(event, "session_status");
+    }
+
+    /** {@code content: [{"type":"text","text":"…"}]} —— 把所有 text 块拼起来 */
+    static String textOf(JsonNode content) {
+        StringBuilder sb = new StringBuilder();
+        for (JsonNode block : content) {
+            String t = firstText(block, "text");
+            if (t != null) sb.append(t);
+        }
+        return sb.toString();
     }
 
     // ──────────────────────── Agent 生命周期(管理页触发) ────────────────────────
@@ -362,7 +434,11 @@ public class ManagedAgentRuntime implements AgentRuntime {
             if (u.status == 401 || u.status == 403) return "百炼那边说凭据不对或者没权限。检查 API Key 和业务空间 ID。";
             if (u.status == 404) return "百炼那边找不到这个 Agent。可能被删了 —— 在「AI 接入」页重新创建一个。";
             if (u.status == 429) return "问得太频繁,百炼限流了。等一会儿再问。";
-            return "百炼返回了错误(" + u.status + ")。稍后再试试。";
+            // v1.19.14 · 把百炼原话带出来。这是同一个病的**第三次**复发:
+            // v1.19.4 是「识别失败,请重试」盖住额度耗尽,v1.19.11 是「upstream 400」盖住字段错,
+            // 这次是「百炼返回了错误(400)」盖住 `Missing required field: 'agent'` ——
+            // 那句话直接指出了 bug 在哪,却只进了日志,用户看到的是一句无信息量的话。
+            return "百炼返回了错误(" + u.status + ")。原话:" + UpstreamException.brief(u.body);
         }
         if (e instanceof java.net.http.HttpTimeoutException) {
             return "等百炼回话超时了。这个问题可能有点大,拆小一点再问试试。";
@@ -391,7 +467,7 @@ public class ManagedAgentRuntime implements AgentRuntime {
             this.body = body;
         }
         /** 百炼的错误体是 JSON,里面那句 message 才是人能看懂的部分;取不出来就退回原文截断 */
-        private static String brief(String body) {
+        static String brief(String body) {
             try {
                 JsonNode n = new ObjectMapper().readTree(body);
                 JsonNode m = n.path("error").path("message");
