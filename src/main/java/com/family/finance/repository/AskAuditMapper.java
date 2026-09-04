@@ -46,6 +46,26 @@ public interface AskAuditMapper {
             """)
     List<Row> recent(@Param("familyId") long familyId, @Param("limit") int limit);
 
+    /**
+     * v1.19.15 · 从某个时刻起,<b>百炼那边</b>有没有访问过我们的 MCP 端点。
+     *
+     * <p>用来回答一个否则完全看不见的问题:「智能体到底连上我的账房了吗」。
+     * 连不上时百炼<b>不报错</b> —— 它只是让模型在没有工具的情况下回答,
+     * 模型于是说「我这边没有数据查询工具」。用户看到的是一段像模型犯傻的话,
+     * 而真因是 MCP 服务不在部署成功状态。</p>
+     *
+     * <p>判据用 {@code user_agent} 而不是 IP:百炼的出口 IP 会变(实测两个不同网段),
+     * 而它的 UA 一直是 {@code Bailian-MCP}。</p>
+     */
+    @Select("""
+            SELECT COUNT(*) FROM ask_access_audit
+             WHERE family_id = #{familyId}
+               AND created_at >= #{since}
+               AND user_agent LIKE '%Bailian%'
+            """)
+    int countUpstreamCallsSince(@Param("familyId") long familyId,
+                                @Param("since") LocalDateTime since);
+
     /** 换绑进度:该接入点最近是否还在用旧密钥 */
     @Select("""
             SELECT COUNT(*) FROM ask_access_audit

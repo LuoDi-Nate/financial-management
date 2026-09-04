@@ -373,6 +373,15 @@
                 th:text="${askAgentId != null and !#strings.isEmpty(askAgentId)} ? '更新百炼上的 Agent 模板' : '在百炼上创建 Agent'">创建</button>
         <span class="text-[11.5px] text-ink-subtle ml-3">上面几项填齐并保存之后再点</span>
       </form>
+
+      <!--/* v1.19.15 · 最后一个**看不见**的失败:会话建得起来、答案也回得来,但智能体说
+             「我这边没有数据查询工具」—— 百炼运行时连不上 MCP 服务时不报错,只是让模型
+             在没有工具的情况下作答。判据不问模型(它会编),看我们自己的入站审计。 */-->
+      <form th:if="${askRuntime == 'managed' and askAgentId != null and !#strings.isEmpty(askAgentId)}"
+            method="post" th:action="@{/admin/ai-access/test-mcp-link}" class="mt-3">
+        <button type="submit" class="btn-ghost text-sm">测一下百炼连没连上这个账房</button>
+        <span class="text-[11.5px] text-ink-subtle ml-3">会真问一句话,大约十几秒</span>
+      </form>
     </div>
 
     <!-- 风险:原样说,不美化。这一段是本页最重要的文字 -->

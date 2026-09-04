@@ -240,6 +240,24 @@ public class AiAccessController {
              + "也可以按顺序核对业务空间 ID / MCP 服务 ID / 公网地址。";
     }
 
+    /**
+     * v1.19.15 · 一键自检「百炼连上我的账房了吗」。
+     *
+     * <p>这是整条引导流程里最后一个<b>看不见</b>的失败:会话建得起来、答案也流得回来,
+     * 但智能体说「我这边没有数据查询工具」—— 因为百炼运行时连不上 MCP 服务时<b>不报错</b>,
+     * 只是让模型在没有工具的情况下作答。用户会以为是模型笨。</p>
+     */
+    @PostMapping("/admin/ai-access/test-mcp-link")
+    public String testMcpLink(@AuthenticationPrincipal MemberPrincipal me, RedirectAttributes ra) {
+        String verdict = managedAgentRuntime.testMcpLink();
+        boolean ok = verdict.startsWith("通了");
+        auditLogService.record(me.getFamilyId(), me.getMemberId(),
+                com.family.finance.domain.audit.AuditLogType.SYSTEM, "family", me.getFamilyId(),
+                "MCP 连通自检 · " + (ok ? "通" : "不通"));
+        ra.addFlashAttribute(ok ? "askNote" : "askError", verdict);
+        return "redirect:/admin/ai-access";
+    }
+
     private static String nz(String s) { return s == null ? "" : s.trim(); }
 
     /** 公网地址存的时候去掉尾斜杠 —— 拼 /mcp 时会多出一条 // 的路径,百炼那边可能就 404 了 */

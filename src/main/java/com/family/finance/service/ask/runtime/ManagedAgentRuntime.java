@@ -17,6 +17,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -53,6 +54,8 @@ public class ManagedAgentRuntime implements AgentRuntime {
 
     private final FamilyConfigService configService;
     private final AskToolRegistry registry;
+    /** v1.19.15 · 自检要看的是**我们自己的**入站记录,不是问模型 —— 模型会编 */
+    private final com.family.finance.repository.AskAuditMapper auditMapper;
     private final ObjectMapper json = new ObjectMapper();
 
     private final HttpClient http = HttpClient.newBuilder()
@@ -343,6 +346,67 @@ public class ManagedAgentRuntime implements AgentRuntime {
                 "百炼收下了(HTTP 200)但没存住:系统提示词" + (hasPrompt ? "在" : "是空的")
                 + " · MCP 引用" + (hasMcp ? "在" : "是空的")
                 + "。这通常意味着请求里的字段名和百炼当前的约定对不上 —— 它对不认识的字段是静默忽略的。");
+    }
+
+    /**
+     * v1.19.15 · 一键自检:<b>百炼到底连上我的账房了吗?</b>
+     *
+     * <p>加它的理由是一次真实的踩坑:整条链路全部打通(会话建得起来、答案流得回来),
+     * 但智能体说「我这边只有文件类工具,没有数据查询入口」。
+     * 百炼引用 MCP 服务这件事<b>是被校验的</b>(填个不存在的名字会直接
+     * {@code 400 MCP Server 校验失败}),所以引用是对的;可它<b>运行时连不上也不报错</b> ——
+     * 只是让模型在没有工具的情况下作答。用户看到的是一段像模型犯傻的话。</p>
+     *
+     * <p>判据不问模型(它会编),而是<b>看我们自己的审计表</b>:
+     * 这一问期间有没有来自百炼的入站调用。有 = 通了;没有 = 它根本没来过。</p>
+     *
+     * @return 给用户看的一句话结论
+     */
+    public String testMcpLink() {
+        if (agentId().isBlank()) return "还没创建 Agent,先点上面那个按钮。";
+        LocalDateTime since = LocalDateTime.now().minusSeconds(5);
+        StringBuilder answer = new StringBuilder();
+        boolean[] sawTool = {false};
+        try {
+            String sid = createSession();
+            String afterId = appendUserMessage(sid,
+                    "只做一件事:调用 capabilities 工具。然后只回工具名,不要别的,不要报任何金额。");
+            streamAfter(sid, afterId, new ProbeSink(answer, sawTool));
+        } catch (Exception e) {
+            log.warn("MCP 连通自检失败", e);
+            return "自检没跑完:" + humanError(e);
+        }
+        int inbound = auditMapper.countUpstreamCallsSince(FAMILY_ID, since);
+        if (inbound > 0) {
+            return "通了。这一问期间百炼访问了你的账房 " + inbound + " 次"
+                 + (sawTool[0] ? "(流里也看到了工具调用)" : "")
+                 + " —— 说明 MCP 那条线是活的。";
+        }
+        // flash 按纯文本渲染,文案里不能有 markdown 记号 —— 会原样显示成星号。
+        // v1.19.12 的 hint() 刚踩过一次,所以这条也进了护栏。
+        return "不通:这一问期间百炼一次都没有访问你的账房。"
+             + "会话建起来了、答案也回来了,所以不是凭据、地址或 Agent 的问题;"
+             + "MCP 引用也是对的 —— 名字填错百炼会直接拒绝创建 Agent。"
+             + "剩下的只有一处:那个 MCP 服务不在「部署成功」状态。"
+             + "去百炼「MCP 管理 → 自定义服务」看它的状态;改过配置的话必须"
+             + "「停止部署 → 重新部署」才生效。不要去动服务 ID。";
+    }
+
+    /** 自检用的最小 sink:只关心「有没有工具调用」和「答案回来了没有」 */
+    private record ProbeSink(StringBuilder text, boolean[] sawTool) implements AskSink {
+        @Override public void status(String t) { }
+        @Override public void toolStart(String toolName, String label, String args) { sawTool[0] = true; }
+        @Override public void toolDone(String toolName, String label, int durationMs, boolean ok,
+                                       String summary,
+                                       Map<String, com.family.finance.service.ask.AskToolResult.Cite> citable) {
+            sawTool[0] = true;
+        }
+        @Override public void textDelta(String delta) { text.append(delta); }
+        @Override public void rollback(String narration) { }
+        @Override public boolean cancelled() { return false; }
+        @Override public void done() { }
+        @Override public void stopped() { }
+        @Override public void failed(String humanMessage) { text.append("[失败] ").append(humanMessage); }
     }
 
     /** 给用户去百炼控制台粘贴的 MCP 配置 —— 明文口令只在生成那一屏出现一次 */

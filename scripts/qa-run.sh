@@ -8188,6 +8188,38 @@ QA11914_MA="$RD/src/main/java/com/family/finance/service/ask/runtime/ManagedAgen
   && log_ok "v11914-UPSTREAM-WORDS-REACH-USER(问答报错带上百炼原话)" \
   || log_bad "v11914-UPSTREAM-WORDS-REACH-USER 又把上游原话吞了" "同一个病第四次:用户只看到「返回了错误(400)」,而原因就在被丢掉的那句里"
 
+# ═══ v1.19.15 · 「百炼连没连上」要能一键问出来 ═══
+QA11915_MA="$RD/src/main/java/com/family/finance/service/ask/runtime/ManagedAgentRuntime.java"
+QA11915_AC="$RD/src/main/java/com/family/finance/web/admin/AiAccessController.java"
+QA11915_AA="$RD/src/main/resources/templates/admin/ai-access.html"
+QA11915_AU="$RD/src/main/java/com/family/finance/repository/AskAuditMapper.java"
+
+# v11915-LINK-SELFTEST-EXISTS · 引导流程里最后一个**看不见**的失败必须有一键判据。
+#   实测:会话建得起来、答案也流得回来,但智能体说「我这边没有数据查询工具」——
+#   百炼运行时连不上 MCP 服务时**不报错**,只是让模型在没有工具的情况下作答。
+#   用户看到的是一段像模型犯傻的话,而真因在百炼控制台的服务状态里。
+{ codeonly "$QA11915_MA" | grep -q 'public String testMcpLink()' \
+  && codeonly "$QA11915_AC" | grep -q '/admin/ai-access/test-mcp-link' \
+  && grep -q 'test-mcp-link' "$QA11915_AA"; } \
+  && log_ok "v11915-LINK-SELFTEST-EXISTS(有「测一下百炼连没连上」入口 · 端点+页面都在)" \
+  || log_bad "v11915-LINK-SELFTEST-EXISTS 连通自检没了" "MCP 连不上时百炼不报错,没有这个入口用户只会以为模型笨"
+
+# v11915-SELFTEST-ASKS-OUR-AUDIT-NOT-THE-MODEL · 判据看**我们自己的入站审计**,不问模型。
+#   问模型「你有哪些工具」得到的是它的自述 —— 它会编,也会把「我没看到」说成「不可用」。
+#   而入站审计是事实:百炼来过就有记录,没来过就没有。
+{ codeonly "$QA11915_AU" | grep -q 'countUpstreamCallsSince' \
+  && codeonly "$QA11915_AU" | grep -q "user_agent LIKE '%Bailian%'" \
+  && codeonly "$QA11915_MA" | grep -q 'auditMapper.countUpstreamCallsSince'; } \
+  && log_ok "v11915-SELFTEST-ASKS-OUR-AUDIT-NOT-THE-MODEL(判据=入站审计 · 按 UA 不按 IP)" \
+  || log_bad "v11915-SELFTEST-ASKS-OUR-AUDIT-NOT-THE-MODEL 自检又去问模型了" "模型的自述不是证据;而百炼出口 IP 会变,判据只能用 UA"
+
+# v11915-VERDICT-IS-PLAIN-TEXT · flash 是纯文本,文案里不许有 markdown 星号。
+#   同一个坑 v1.19.12 的 hint() 已经踩过一次(写了 **…** 渲染成字面星号)。
+{ ! codeonly "$QA11915_MA" | grep -qE '(return|\+) *"[^"]*\*\*' \
+  && ! codeonly "$QA11915_AC" | grep -qE '(return|\+) *"[^"]*\*\*'; } \
+  && log_ok "v11915-VERDICT-IS-PLAIN-TEXT(面向用户的结论文案无 markdown 星号)" \
+  || log_bad "v11915-VERDICT-IS-PLAIN-TEXT 文案里又出现 ** 了" "flash 按纯文本渲染,星号会原样显示"
+
 echo
 echo "═══════════════════════════════════════"
 echo " 总结: PASS=$PASS  FAIL=$FAIL  SKIP=$SKIP"

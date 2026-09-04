@@ -930,9 +930,15 @@ case "$STOPR" in *'"ok":false'*) ok "超级 Agent · 没有在跑的轮次时停
 
 # ⑮ 有历史的会话:折叠活动区 + 复制/重来 + 引用卡都在
 #    取一段真有回答的会话(e2e 不调模型,所以只在库里已有时才验 —— 没有就跳过并说明)
-HIST="$(db "SELECT conversation_id FROM ask_message WHERE role='assistant' AND content_text<>''
-            AND conversation_id IN (SELECT id FROM ask_conversation WHERE family_id=$FAM)
-            ORDER BY id DESC LIMIT 1")"
+# 2026-09-04:原来取的是「最新那条有回答的会话」,而这条断言要看的是**活动区**——
+#   一轮如果压根没调工具就没有活动区可折叠,断言必然红,而那不是回归。
+#   (当天就撞上了:联调百炼时 MCP 没连上,那几轮一个工具都没调,于是最新会话没有活动区。)
+#   判据改成「取一条**真有工具调用**的会话」,守的才是「有活动时默认折叠」这个设计意图。
+HIST="$(db "SELECT m.conversation_id FROM ask_message m
+              JOIN ask_tool_call t ON t.message_id = m.id
+             WHERE m.role='assistant' AND m.content_text<>''
+               AND m.conversation_id IN (SELECT id FROM ask_conversation WHERE family_id=$FAM)
+             ORDER BY m.id DESC LIMIT 1")"
 if [ -n "$HIST" ]; then
   HP="$(GET "/ask?conv=$HIST")"
   case "$HP" in *'ask-acts'*) ok "超级 Agent · 历史里活动区默认折叠(details)" ;;
