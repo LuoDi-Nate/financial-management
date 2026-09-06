@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>v1.20 Preview · 别让一次改动悄悄推翻上一次的确认</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,ital,wght@9..144,0,300..700;9..144,1,300..600&family=JetBrains+Mono:wght@300;400;500&family=Noto+Serif+SC:wght@300;400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,300;8..60,400;8..60,500;8..60,600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="../assets/style.css">
+<style>
+  .eyebrow{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-subtle)}
+  .mono{font-family:'JetBrains Mono',monospace;font-feature-settings:"tnum" 1}
+  h1,h2,h3,h4{font-family:'Fraunces','Noto Serif SC',Georgia,serif}
+  .wrap{max-width:1000px;margin:0 auto;padding:0 20px}
+  .note{font-size:11.5px;color:var(--ink-subtle);line-height:1.75}
+  .card{border:1px solid var(--rule);background:var(--card);padding:18px}
+  .badge{font-family:'JetBrains Mono',monospace;font-size:9px;padding:2px 7px;border:1px solid var(--rule);color:var(--ink-soft);white-space:nowrap}
+  .badge.ok{border-color:var(--forest);color:var(--forest);background:rgba(79,107,71,.10)}
+  .badge.risk{border-color:var(--rust);color:var(--rust);background:rgba(156,74,42,.08)}
+  .badge.wait{border-color:var(--brass-deep);color:var(--brass-deep);background:rgba(160,124,58,.08)}
+
+  .zone{margin-top:44px}
+  .zone-head{display:flex;align-items:baseline;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+  .zone-no{font-family:'JetBrains Mono',monospace;font-size:20px;color:var(--paper);background:var(--brass-deep);line-height:1;padding:5px 9px}
+  .zone-t{font-family:'Fraunces',serif;font-size:20px}
+  .zone-sub{font-size:11.5px;color:var(--ink-subtle)}
+  .zone-line{height:2px;background:var(--brass-deep);opacity:.35;margin:10px 0 18px}
+
+  /* 填报行 */
+  .erow{border:1px solid var(--rule);background:var(--card);padding:13px 15px}
+  .erow + .erow{border-top:none}
+  .ehead{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+  .ename{font-size:14px}
+  .eval{font-family:'JetBrains Mono',monospace;font-size:15px;margin-left:auto;font-feature-settings:"tnum" 1}
+  .cal{font-family:'JetBrains Mono',monospace;font-size:9.5px;padding:2px 7px;border:1px solid var(--forest);color:var(--forest);background:rgba(79,107,71,.09);white-space:nowrap}
+  .cal.none{border-color:var(--rule);color:var(--ink-subtle);background:transparent}
+
+  /* 提示条 —— 本版最重的部件 */
+  .guard{border-left:3px solid var(--brass-deep);background:var(--card-soft);padding:11px 14px;margin-top:10px}
+  .guard.warn{border-left-color:var(--rust);background:rgba(156,74,42,.05)}
+  .guard-t{font-size:12.5px;line-height:1.8}
+  .guard-acts{display:flex;gap:8px;margin-top:9px;flex-wrap:wrap}
+  .btn{font-size:11.5px;padding:6px 12px;border:1px solid var(--rule);background:var(--card);white-space:nowrap}
+  .btn.primary{border-color:var(--brass-deep);background:var(--brass-deep);color:var(--card)}
+  .delta{font-family:'JetBrains Mono',monospace;font-size:11.5px}
+  .pos{color:var(--forest)} .neg{color:var(--rust)}
+
+  /* 开关 */
+  .toggle{display:flex;align-items:flex-start;gap:12px;border:1px solid var(--rule);background:var(--card);padding:14px 16px}
+  .sw{width:38px;height:21px;border:1px solid var(--rule);background:var(--paper-soft);position:relative;flex:none;margin-top:2px}
+  .sw i{position:absolute;top:2px;left:2px;width:15px;height:15px;background:var(--ink-subtle)}
+  .sw.on{border-color:var(--brass-deep);background:var(--brass-soft)}
+  .sw.on i{left:auto;right:2px;background:var(--brass-deep)}
+
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:720px){ .split{grid-template-columns:1fr} }
+  .col-h{font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-subtle);margin-bottom:7px}
+
+  table.mini{width:100%;border-collapse:collapse;font-size:12px}
+  table.mini td{padding:6px 8px;border-bottom:1px solid var(--rule-soft)}
+  table.mini td:last-child{text-align:right;font-family:'JetBrains Mono',monospace}
+
+  .ask{border:1px solid var(--rule);background:var(--card);padding:18px}
+  .ask-q{font-size:13px;line-height:1.9}
+  .flag{border-left:3px solid var(--rust);background:rgba(156,74,42,.05);padding:9px 13px;font-size:11.5px;color:var(--ink-soft);line-height:1.8;margin-top:10px}
+</style>
+</head>
+<body>
+<div class="wrap" style="padding-top:38px;padding-bottom:80px">
+
+  <div class="eyebrow">v 1 . 2 0 &nbsp;·&nbsp; p r e v i e w</div>
+  <h1 style="font-size:34px;margin:8px 0 6px">别让一次改动悄悄推翻上一次的确认</h1>
+  <p class="note" style="max-width:780px">
+    三条诉求来自
+    <a href="https://github.com/LuoDi-Nate/financial-management/issues/17" target="_blank" rel="noopener">issue #17</a>
+    ——一位连续用满两个月的用户。看起来不相干,底下是同一件事:<b>系统自己知道、但没告诉用户的东西</b>。
+    <br>每一屏标了它守 PRD 的哪条 FR;<b>标红的是我认为最容易做错、也最想听你意见的地方</b>。
+  </p>
+
+  <!-- ════════ 1 ════════ -->
+  <div class="zone">
+    <div class="zone-head"><span class="zone-no">1</span><span class="zone-t">改收入的那一刻,就说清它动了什么</span>
+      <span class="badge">FR-450 / FR-451 / FR-452</span></div>
+    <div class="zone-sub">
+      提交者原话:「校验后的余额……<b>稳定性比收入的录入要高</b>」。他说得对 ——
+      而实际情况比他描述的更重:那笔余额不是「失效」,是<b>被直接改掉了</b>,页面零提示。
+    </div>
+    <div class="zone-line"></div>
+
+    <div class="erow">
+      <div class="ehead">
+        <span class="ename">招行储蓄卡 · 工资</span>
+        <span class="cal">本月已校准 · 09-02</span>
+        <span class="eval">¥ 31,861.00</span>
+      </div>
+      <div class="guard">
+        <div class="guard-t">
+          你正在删掉这个账户下的一笔收入(工资 <span class="mono">¥1,000</span>)。
+          这个账户的余额<b>在 09-02 校准过</b>,删掉之后它会变成
+          <span class="mono">¥30,861.00</span>
+          <span class="delta neg">(−¥1,000)</span>。
+        </div>
+        <div class="guard-acts">
+          <span class="btn primary">知道了,余额按新值走</span>
+          <span class="btn">去重新校准这个账户</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="erow" style="margin-top:16px">
+      <div class="ehead">
+        <span class="ename">支付宝 · 余额宝</span>
+        <span class="cal none">本月还没校准</span>
+        <span class="eval" style="color:var(--ink-subtle)">—</span>
+      </div>
+      <div class="guard warn">
+        <div class="guard-t">
+          这个账户<b>本月还没填余额</b>,所以这笔改动
+          <b>不会反映到「本期净资产变化」上</b> —— 那个数字对比的是「上月末 → 本月末」,
+          而这个账户的本月末还是空的。
+        </div>
+        <div class="guard-acts"><span class="btn primary">顺手把本月余额填了</span><span class="btn">先不填</span></div>
+      </div>
+    </div>
+
+    <div class="flag">
+      <b>想听你意见的地方 ①:提示是「信息」还是「拦截」?</b><br>
+      我的取向是<b>不拦截</b> —— 说清楚,然后放行,不弹二次确认。理由:这个 app 的用户是家里人,不是审批流,
+      而这个操作本身完全合法。但代价是:提示可能被当成噪声划过去。
+      <br><b>想听你意见的地方 ②:第二种情况(本月未校准)要不要也提示?</b>
+      它不是「你改坏了什么」,而是「你改的这个东西暂时看不见效果」——
+      这正是提交者说「改了却不动」的真实来源,但提示多了会烦。
+    </div>
+  </div>
+
+  <!-- ════════ 2 ════════ -->
+  <div class="zone">
+    <div class="zone-head"><span class="zone-no">2</span><span class="zone-t">填报页上一眼看出「这个月确认过没有」</span>
+      <span class="badge">FR-452</span></div>
+    <div class="zone-sub">不用点进去 —— 校准状态就写在账户名旁边,和金额同一行。</div>
+    <div class="zone-line"></div>
+
+    <div class="erow"><div class="ehead"><span class="ename">招行储蓄卡 · 工资</span><span class="cal">本月已校准 · 09-02</span><span class="eval">¥ 31,861.00</span></div></div>
+    <div class="erow"><div class="ehead"><span class="ename">支付宝 · 余额宝</span><span class="cal none">本月还没校准</span><span class="eval" style="color:var(--ink-subtle)">—</span></div></div>
+    <div class="erow"><div class="ehead"><span class="ename">微信零钱</span><span class="cal">本月已校准 · 09-01</span><span class="eval">¥ 2,140.00</span></div></div>
+    <div class="erow"><div class="ehead"><span class="ename">华泰证券 · A股</span><span class="cal">本月已校准 · 09-03</span><span class="eval">¥ 128,400.00</span></div></div>
+    <p class="note" style="margin-top:10px">
+      灰色的「本月还没校准」同时也是 FR-453 的锚点:它解释了为什么这个账户上的改动暂时不进「本期净资产变化」。
+    </p>
+  </div>
+
+  <!-- ════════ 3 ════════ -->
+  <div class="zone">
+    <div class="zone-head"><span class="zone-no">3</span><span class="zone-t">活期账户可以合起来看 —— 但必须你自己开</span>
+      <span class="badge">FR-460 ~ FR-465</span></div>
+    <div class="zone-sub">
+      提交者原话:「<b>录入时仍然按账户录入,但在最终统计收益、计算等场景下汇总展示</b>……
+      这跟把所有支出仅记录到一个总额在一定程度上是一个道理。」这个类比是准的。
+    </div>
+    <div class="zone-line"></div>
+
+    <div class="toggle">
+      <span class="sw"><i></i></span>
+      <div>
+        <div style="font-size:13.5px">把活期账户合并统计 <span class="badge" style="margin-left:6px">默认关闭</span></div>
+        <p class="note" style="margin-top:5px">
+          开启后,标为「随时可取」的账户在<b>收益计算 / 归因 / 透视 / 分布</b>里合并成一个。
+          <b>录入完全不变</b>,你仍然按账户填余额。<b>随时可关,关掉立刻恢复。</b>
+        </p>
+      </div>
+    </div>
+
+    <div class="split" style="margin-top:16px">
+      <div>
+        <div class="col-h">关闭(今天的样子 · 默认)</div>
+        <div class="card">
+          <table class="mini">
+            <tr><td>招行储蓄卡 · 工资</td><td>+¥1,000</td></tr>
+            <tr><td>支付宝 · 余额宝</td><td class="neg">−¥1,000</td></tr>
+            <tr><td>微信零钱</td><td>+¥300</td></tr>
+            <tr><td>建行储蓄卡 · 房贷</td><td class="neg">−¥300</td></tr>
+            <tr><td><b>合计</b></td><td><b>¥0</b></td></tr>
+          </table>
+          <p class="note" style="margin-top:9px">
+            四笔全是<b>账户之间的划转</b>,家里一分钱没多也没少 ——
+            但归因里它们是四条噪声,盖住了真正有意义的变化。
+          </p>
+        </div>
+      </div>
+      <div>
+        <div class="col-h">开启</div>
+        <div class="card">
+          <table class="mini">
+            <tr><td>随时可取(合并 4 个账户)</td><td>¥0</td></tr>
+            <tr><td>华泰证券 · A股</td><td class="neg">−¥11,300</td></tr>
+            <tr><td>币安钱包</td><td class="pos">+¥8,379</td></tr>
+            <tr><td><b>合计</b></td><td><b class="neg">−¥2,921</b></td></tr>
+          </table>
+          <p class="note" style="margin-top:9px">
+            划转自然消失了,剩下的每一行都是<b>真的赚了或亏了</b>。
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="guard warn" style="margin-top:14px">
+      <div class="guard-t">
+        <b>代价要写在开关旁边(FR-465):</b>合并之后,这 4 个活期账户<b>各自的收益差异看不到了</b>,
+        单账户归因也没有了。如果你在比较「哪张卡的货基收益更好」,就不该开这个。
+      </div>
+    </div>
+
+    <div class="flag">
+      <b>想听你意见的地方 ③:「哪些账户算活期」谁说了算?</b><br>
+      我的取向是<b>复用现有的「随时可取」流动性分层</b>,不新造概念,并且在开关旁边直接列出
+      「当前会被合并的是这 4 个账户」+ 一个「改一下」入口。
+      不做自动判定 —— 猜错了用户根本发现不了,而这是会影响收益口径的判定。
+    </div>
+  </div>
+
+  <!-- ════════ 4 ════════ -->
+  <div class="zone">
+    <div class="zone-head"><span class="zone-no">4</span><span class="zone-t">归因的空态,要能自己看懂</span>
+      <span class="badge">FR-470 / FR-471</span></div>
+    <div class="zone-sub">
+      提交者原话:「这个归因确实没搞明白怎么修改或者怎么玩。反正看着<b>显示没有录入</b>,也不知道怎么改。」
+      一个需要看文档才会用的功能,等于没做。
+    </div>
+    <div class="zone-line"></div>
+
+    <div class="split">
+      <div>
+        <div class="col-h">现在</div>
+        <div class="ask" style="min-height:150px">
+          <div class="eyebrow">归 · 因</div>
+          <p class="note" style="margin-top:22px;text-align:center">没有录入</p>
+        </div>
+        <p class="note" style="margin-top:8px">没说它是干嘛的,没说为什么空,没说下一步。</p>
+      </div>
+      <div>
+        <div class="col-h">改后</div>
+        <div class="ask">
+          <div class="eyebrow">归 · 因</div>
+          <p class="ask-q" style="margin-top:8px">
+            <b>这块在回答一个问题:这个月家里的钱变了多少,分别是哪些账户、哪类资产造成的。</b>
+          </p>
+          <p class="note" style="margin-top:9px">
+            现在还算不出来,因为<b>本月还没有填过任何余额</b> ——
+            归因要对比「上月末 → 本月末」,缺了本月末这一头就没法拆。
+          </p>
+          <div class="guard-acts" style="margin-top:11px">
+            <span class="btn primary">去填本月余额</span>
+            <span class="btn">看看上个月的归因</span>
+          </div>
+        </div>
+        <p class="note" style="margin-top:8px">
+          三件事都说了:<b>它在回答什么</b> · <b>为什么现在是空的</b> · <b>下一步做什么</b>。
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════ 5 ════════ -->
+  <div class="zone">
+    <div class="zone-head"><span class="zone-no">5</span><span class="zone-t">重开账期时,说清会重算什么</span>
+      <span class="badge">FR-454</span></div>
+    <div class="zone-sub">现在的文案是「确认重开?会重算之后所有指标。」——「所有指标」等于什么都没说。</div>
+    <div class="zone-line"></div>
+
+    <div class="card">
+      <div style="font-size:13.5px">重新打开 <span class="mono">2026-08</span>?</div>
+      <p class="note" style="margin-top:8px">这一期会回到可编辑状态。下面这些会在你再次关账时<b>重新计算</b>:</p>
+      <table class="mini" style="margin-top:6px">
+        <tr><td>该期的账户分类定格(资产类型 / 行业 / 平台等)</td><td class="mono" style="color:var(--ink-subtle)">重新定格</td></tr>
+        <tr><td>该期的 AI 月度复盘解读</td><td class="mono" style="color:var(--ink-subtle)">清掉重生成</td></tr>
+        <tr><td>该期之后每一期的净资产变化 / 收益率 / 归因</td><td class="mono" style="color:var(--ink-subtle)">重算</td></tr>
+        <tr><td>填报完成状态(家人需要重新签收)</td><td class="mono" style="color:var(--ink-subtle)">清空</td></tr>
+      </table>
+      <div class="guard-acts" style="margin-top:12px">
+        <span class="btn primary">重新打开</span><span class="btn">算了</span>
+      </div>
+      <p class="note" style="margin-top:9px">
+        「AI 月度复盘解读」那一行是 <b>v1.19.16</b> 已经修掉的行为 —— 这里只是把它<b>说出来</b>。
+      </p>
+    </div>
+  </div>
+
+  <!-- 边界 -->
+  <div class="zone">
+    <div class="zone-head"><span class="zone-no">·</span><span class="zone-t">这一版不做什么</span></div>
+    <div class="zone-line"></div>
+    <div class="card">
+      <p class="note" style="line-height:2">
+        <b>不做自定义支出分类 / 支出报表</b> —— 已拆到
+        <a href="https://github.com/LuoDi-Nate/financial-management/issues/18" target="_blank" rel="noopener">#18</a> 独立设计。<br>
+        <b>不改默认口径</b> —— 第 3 屏的全部行为都在开关后面,不开就一个像素都不变。<br>
+        <b>不加二次确认弹窗</b> —— 第 1 屏是提示,不是审批。<br>
+        <b>不做账户间划转的逐笔录入</b> —— 那正是提交者说「不可行」的东西。
+      </p>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
