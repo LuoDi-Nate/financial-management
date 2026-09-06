@@ -43,9 +43,24 @@ public class ReviewInsightService {
 
     public record Review(String text, String vendor, boolean cached) {}
 
+    /**
+     * @param periodClosed 这一期是否已关账。<b>没关账就完全不碰缓存</b> —— 既不读也不写。
+     *
+     * <p>v1.19.16 · 以前不分状态一律缓存,于是有两种「数字变了、解读没变」:</p>
+     * <ol>
+     *   <li><b>重开改数据</b> —— 缓存没人清(见 {@code ReviewAiCacheMapper.deleteByPeriod} 的注释);</li>
+     *   <li><b>进行中的期</b> —— 月中点一次复盘就把当时的结论存住了,之后每天录入,
+     *       再点还是那句话。更糟的是这一期关账之后,那份<b>月中生成</b>的解读会被当成
+     *       「本期定论」端出来。</li>
+     * </ol>
+     *
+     * <p>不写的代价是进行中的期每点一次就调一次模型 —— 可接受:它是用户主动点的,
+     * 而且他点的本意就是「按现在的数给我讲讲」。</p>
+     */
     public Review review(long familyId, long periodId, String periodLabel, String dim,
-                         AttributionEngine.Result attr, LinkedHashMap<String, BigDecimal> grouped, boolean force) {
-        if (!force) {
+                         AttributionEngine.Result attr, LinkedHashMap<String, BigDecimal> grouped,
+                         boolean periodClosed, boolean force) {
+        if (periodClosed && !force) {
             ReviewAiCacheMapper.Row hit = cacheMapper.find(familyId, periodId, dim);
             if (hit != null) return new Review(hit.text(), hit.vendor(), true);
         }
@@ -61,7 +76,8 @@ public class ReviewInsightService {
                 只输出要点行,不要标题、开场白、markdown。""";
         return llmRouter.invoke(familyId, system, facts, (inv, raw, ms) -> {
             String out = raw.trim();
-            cacheMapper.upsert(familyId, periodId, dim, out, inv.badge());
+            // 只有已关账的期才落缓存 —— 进行中的期数据还在动,存下来必然过期
+            if (periodClosed) cacheMapper.upsert(familyId, periodId, dim, out, inv.badge());
             return new Review(out, inv.badge(), false);
         });
     }

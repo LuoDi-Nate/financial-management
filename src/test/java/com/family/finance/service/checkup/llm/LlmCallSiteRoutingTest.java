@@ -162,7 +162,9 @@ class LlmCallSiteRoutingTest {
         var attr = new AttributionEngine.Result(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
                 BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, List.of());
         var review = new ReviewInsightService(router, members, cache)
-                .review(1L, 7L, "2026-08", "account", attr, new LinkedHashMap<>(), true);
+                // v1.19.16 · 多了一个 periodClosed 参数(未关账的期不碰缓存)。
+                // 这里传「已关账 + force」——force 本来就是这条用例的意思:一定要真打一次模型。
+                .review(1L, 7L, "2026-08", "account", attr, new LinkedHashMap<>(), true, true);
 
         assertThat(log).as("复盘没有按配置的主选先打").containsExactly(LlmCatalog.P_DEEPSEEK);
         assertThat(review.vendor()).as("徽记要说出真正回答的是谁(而不是写死第一家)")

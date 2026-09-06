@@ -39,6 +39,8 @@ public class PeriodService {
     private final com.family.finance.repository.SnapshotMapper snapshotMapperRef;
     // v1.12 FR-350 · 关账时把账户的分类属性一并定格 / 重开时删掉定格行
     private final com.family.finance.repository.PeriodAccountAttrMapper periodAccountAttrMapper;
+    /** v1.19.16 · 重开时要连它一起清 —— 这张表以前没有任何失效入口 */
+    private final com.family.finance.repository.ReviewAiCacheMapper reviewAiCacheMapper;
     private final AuditLogService auditLogService;
     private final MetricsRecomputeJob metricsRecomputeJob;
 
@@ -197,6 +199,13 @@ public class PeriodService {
         // v1.12 FR-350 · 删掉该期的分类属性定格行 → 这期又跟着当前设置走(和「未关账 = 实时」一致),
         // 而「重开后再关账 = 重新定格」变成**结构上必然**的,不需要额外标志位或版本号。
         periodAccountAttrMapper.deleteByPeriod(periodId);
+        // v1.19.16 · AI 月度复盘缓存也要一起清。
+        //   它按 (family, period, dim) 存,而这里以前只清了填报完成态和定格行 ——
+        //   于是「重开 → 改数据 → 重新关账」之后,复盘还是重开前那份结论。
+        //   线上用户(issue #17)撞到的就是这个:数字都更新了,只有这段解读没动,
+        //   而它旁边写着「关账后结果缓存可回看」,读起来就是本期定论。
+        //   放在重开这一刻而不是再次关账:解读在数据被动的那一秒就作废了。
+        reviewAiCacheMapper.deleteByPeriod(period.getFamilyId(), periodId);
         String safeReason = reason == null || reason.isBlank() ? "(未填写)" : reason;
         // PRD FR-12 验收:写入 period_reopen_log 专表
         periodReopenLogMapper.insert(periodId, actorMemberId, safeReason);

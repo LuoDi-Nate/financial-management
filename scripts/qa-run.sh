@@ -8220,6 +8220,31 @@ QA11915_AU="$RD/src/main/java/com/family/finance/repository/AskAuditMapper.java"
   && log_ok "v11915-VERDICT-IS-PLAIN-TEXT(面向用户的结论文案无 markdown 星号)" \
   || log_bad "v11915-VERDICT-IS-PLAIN-TEXT 文案里又出现 ** 了" "flash 按纯文本渲染,星号会原样显示"
 
+# ═══ v1.19.16 · AI 月度复盘缓存的失效 ═══
+QA11916_PS="$RD/src/main/java/com/family/finance/service/PeriodService.java"
+QA11916_MP="$RD/src/main/java/com/family/finance/repository/ReviewAiCacheMapper.java"
+QA11916_RS="$RD/src/main/java/com/family/finance/service/review/ReviewInsightService.java"
+QA11916_RC="$RD/src/main/java/com/family/finance/web/review/ReviewController.java"
+
+# v11916-REOPEN-CLEARS-REVIEW-CACHE · 重开账期必须连 AI 复盘缓存一起清。
+#   线上 issue #17:用户重开上月、改数据、重新关账,数字全更新了,**只有这段 AI 解读没动** ——
+#   review_ai_cache 按 (family,period,dim) 存,而全仓**没有任何地方失效过它**
+#   (Mapper 里连 delete 方法都没有)。页面上还写着「关账后结果缓存可回看」,
+#   读起来就是本期定论。数字对、解读错、不报错 —— 这类失败最贵。
+{ codeonly "$QA11916_MP" | grep -q 'deleteByPeriod' \
+  && codeonly "$QA11916_PS" | grep -q 'reviewAiCacheMapper.deleteByPeriod' \
+  && [ -f "$RD/src/test/java/com/family/finance/service/review/ReviewCacheStalenessTest.java" ]; } \
+  && log_ok "v11916-REOPEN-CLEARS-REVIEW-CACHE(重开时清该期复盘缓存 · 有单测)" \
+  || log_bad "v11916-REOPEN-CLEARS-REVIEW-CACHE 重开又不清复盘缓存了" "改完数据 AI 解读还是旧的,而页面写着「关账后结果缓存可回看」"
+
+# v11916-NO-CACHE-FOR-OPEN-PERIOD · 进行中的期一律不碰缓存(既不读也不写)。
+#   写了更糟:这一期关账之后,那份**月中生成**的解读会被当成「本期定论」端出来。
+{ codeonly "$QA11916_RS" | grep -q 'periodClosed && !force' \
+  && codeonly "$QA11916_RS" | grep -q 'if (periodClosed) cacheMapper.upsert' \
+  && codeonly "$QA11916_RC" | grep -q 'PeriodStatus.CLOSED'; } \
+  && log_ok "v11916-NO-CACHE-FOR-OPEN-PERIOD(未关账的期不读也不写复盘缓存)" \
+  || log_bad "v11916-NO-CACHE-FOR-OPEN-PERIOD 进行中的期又缓存了" "月中点一次就定死;关账后还会把月中的解读当成本期定论"
+
 echo
 echo "═══════════════════════════════════════"
 echo " 总结: PASS=$PASS  FAIL=$FAIL  SKIP=$SKIP"

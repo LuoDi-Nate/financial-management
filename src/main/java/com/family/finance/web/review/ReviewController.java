@@ -75,8 +75,10 @@ public class ReviewController {
                 kpis.netWorthDelta(), human, kpis.openingBaselineLast());
         LinkedHashMap<String, BigDecimal> grouped =
                 AttributionEngine.groupBy(attr, "acct".equals(dim) ? null : dim);
+        // v1.19.16 · 把「这一期关没关账」传下去:没关账就不碰缓存(既不读也不写)
+        boolean closed = anchor.getStatus() == com.family.finance.domain.period.PeriodStatus.CLOSED;
         ReviewInsightService.Review r = reviewInsightService.review(me.getFamilyId(), anchor.getId(),
-                anchor.getPeriodStart().toString().substring(0, 7), dim, attr, grouped, req.force());
+                anchor.getPeriodStart().toString().substring(0, 7), dim, attr, grouped, closed, req.force());
         return r == null ? Map.of("ok", false, "text", "AI 服务暂时不可用,稍后再试")
                          : Map.of("ok", true, "text", r.text(), "vendor", r.vendor(), "cached", r.cached());
     }
