@@ -56,6 +56,8 @@ public class EntryController {
     /** v1.8 · 读家庭的支出录入方式(总额 / 逐笔) */
     private final com.family.finance.service.expense.ExpenseLedgerService expenseLedger;
     private final com.family.finance.repository.CashFlowMapper cashFlowMapper;
+    /** v1.20 FR-450~453 · 改动之后如实告诉用户它动了什么 */
+    private final com.family.finance.service.entry.BalanceGuardService balanceGuard;
     /** v0.4.22 · /entry 一键拉取股价按钮 · 三件套依赖 */
     private final StockPriceScheduler stockScheduler;
     private final AccountValuationService valuationService;
@@ -324,17 +326,38 @@ public class EntryController {
                                @RequestParam long accountId,
                                @RequestParam String categoryCode,
                                @RequestParam BigDecimal amount,
-                               @RequestParam(required = false) String note) {
+                               @RequestParam(required = false) String note,
+                               org.springframework.web.servlet.mvc.support.RedirectAttributes ra) {
+        var before = balanceGuard.snapshot(accountId, periodId);
         entryService.recordIncome(me.getFamilyId(), me.getMemberId(), periodId, accountId, categoryCode, amount, note);
+        guardNote(ra, before, periodId);
         return "redirect:/entry?period=" + periodId;
+    }
+
+    /**
+     * v1.20 · 改动之后把「它动了什么」如实说一句(FR-450/453)。
+     *
+     * <p>放在改动<b>之后</b>是刻意的:提示是信息不是拦截 —— 零额外点击,
+     * 而且数字是实际值不是预测值。见 tech-design v1.20 §二 选型四。</p>
+     */
+    private void guardNote(org.springframework.web.servlet.mvc.support.RedirectAttributes ra,
+                           com.family.finance.service.entry.BalanceGuardService.Before before, long periodId) {
+        String note = balanceGuard.afterNote(before, periodId);
+        if (note != null) ra.addFlashAttribute("balanceGuard", note);
     }
 
     /** v0.12 FR-145/148 · 删一笔收入 = 软删该 cash_flow + 冲回账户余额(股票+股数冲回股数 / 股票现金冲回现金行);账户明细同步。 */
     @PostMapping("/entry/income/{id}/delete")
     public String deleteIncome(@AuthenticationPrincipal MemberPrincipal me,
                                @PathVariable("id") long cashFlowId,
-                               @RequestParam long periodId) {
+                               @RequestParam long periodId,
+                               org.springframework.web.servlet.mvc.support.RedirectAttributes ra) {
+        // 账户要在删之前取 —— 删完就查不到这笔了
+        Long guardAccountId = cashFlowMapper.findById(cashFlowId)
+                .map(com.family.finance.domain.flow.CashFlow::getAccountId).orElse(null);
+        var before = balanceGuard.snapshot(guardAccountId, periodId);
         entryService.softDeleteCashFlow(me.getFamilyId(), me.getMemberId(), cashFlowId);
+        guardNote(ra, before, periodId);
         return "redirect:/entry?period=" + periodId;
     }
 

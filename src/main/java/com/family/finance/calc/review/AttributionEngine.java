@@ -62,8 +62,12 @@ public final class AttributionEngine {
     public static LinkedHashMap<String, BigDecimal> groupBy(Result r, String dimKey) {
         LinkedHashMap<String, BigDecimal> acc = new LinkedHashMap<>();
         for (AcctSlice s : r.slices()) {
-            String key = dimKey == null ? s.accountName()
-                    : (s.labels().get(dimKey) == null ? "未分类" : s.labels().get(dimKey));
+            // v1.20 · 账户不再是特例。它和别的维度一样有标签(已分组=组名 / 未分组=账户名),
+            // 由 AccountGroupingResolver 统一给。dimKey==null 的老调用回落到 accountName,
+            // 保证没有传标签的调用方(测试/历史代码)行为不变。
+            String labeled = dimKey == null ? null : s.labels().get(dimKey);
+            String key = labeled != null ? labeled
+                    : (dimKey == null || "acct".equals(dimKey) ? s.accountName() : "未分类");
             acc.merge(key, s.pnlBase(), BigDecimal::add);
         }
         // 按绝对值排序 · 未分类沉底

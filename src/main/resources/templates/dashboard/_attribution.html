@@ -32,11 +32,36 @@
       </p>
     </div>
 
-    <div id="attrWaterfall" style="width:100%;height:280px"></div>
+    <!--/* v1.20 FR-480/481 · 空态要说清三件事:它在回答什么 · 为什么现在是空的 · 下一步做什么。
+           线上用户(issue #17)原话:「反正看着显示没有录入,也不知道怎么改」——
+           一个需要看文档才会用的功能,等于没做。 */-->
+    <div th:if="${#lists.isEmpty(attr.slices())}" data-attr-empty
+         class="border border-rule bg-card-soft px-4 py-5 mb-2">
+      <p class="text-[13px] text-ink leading-relaxed">
+        <b>这块在回答一个问题:这个月家里的钱变了多少,分别是哪些账户、哪类资产造成的。</b>
+      </p>
+      <p class="text-[12px] text-ink-soft leading-relaxed mt-2"
+         th:if="${attrFilingInProgress}">
+        现在还算不出来,因为<b>本月还没有填过余额</b> ——
+        归因要对比「上月末 → 本月末」,缺了本月末这一头就没法拆。
+      </p>
+      <p class="text-[12px] text-ink-soft leading-relaxed mt-2"
+         th:unless="${attrFilingInProgress}">
+        这一期没有任何账户产生变化,所以没有可拆的东西 —— 不是出错了。
+      </p>
+      <div class="flex items-center gap-2 mt-3 flex-wrap">
+        <a th:href="@{/entry}" class="btn-ink text-sm no-underline">去填本月余额</a>
+        <a th:href="@{/reports}" class="btn-ghost text-sm no-underline">看已关账月份的口径</a>
+      </div>
+    </div>
+
+    <div th:unless="${#lists.isEmpty(attr.slices())}" id="attrWaterfall" style="width:100%;height:280px"></div>
     <p class="font-mono text-[10px] text-ink-subtle mt-1">基准(期初)→ 人赚 → 钱赚(按当前维度 · TopN)→ 开账基线 → 本期净变化 · 恒等闭合,算不平显「未归因」</p>
 
     <div class="grid md:grid-cols-2 gap-4 mt-4">
       <div>
+        <!--/* v1.20 FR-465 · 建了组之后,这里的维值可能是一个组 —— 给它一个点开的入口。
+               默认折叠是刻意的:不折叠就违背了 issue #17 的原始诉求。 */-->
         <div class="eyebrow mb-2">赚得最多</div>
         <div id="attrWinners" class="space-y-1.5 text-sm"></div>
       </div>

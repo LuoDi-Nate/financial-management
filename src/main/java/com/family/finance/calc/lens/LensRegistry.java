@@ -35,6 +35,10 @@ public final class LensRegistry {
         dim("platform",   "平台",   false, Position::platform);
         dim("industry",   "行业",   true,  Position::industry);
         dim("owner",      "主理人", false, Position::owner);
+        /* v1.20 · 账户组。透视里账户本来就不是维度,所以这不是「折叠账户」而是【新增一维】——
+           已分组的账户按组名归并,未分组的按账户名各占一行。
+           没建任何组时,每个账户的取值就是自己的名字 → 输出与 v1.19.16 逐字一致。 */
+        dim("group",      "账户组", false, Position::group);
         dim("purpose",    "用途",   false, Position::purpose);
         /* v1.19 · 托管形式:「谁在替你做决定,数字由谁产生」。
            派生自账户类型 + 是否现金行 + 流动性标记,【零新增录入】——

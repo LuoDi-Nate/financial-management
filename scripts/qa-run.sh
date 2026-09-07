@@ -8245,6 +8245,88 @@ QA11916_RC="$RD/src/main/java/com/family/finance/web/review/ReviewController.jav
   && log_ok "v11916-NO-CACHE-FOR-OPEN-PERIOD(未关账的期不读也不写复盘缓存)" \
   || log_bad "v11916-NO-CACHE-FOR-OPEN-PERIOD 进行中的期又缓存了" "月中点一次就定死;关账后还会把月中的解读当成本期定论"
 
+# ═══ v1.20 · 账户组 + 改动保护 ═══
+QA1200_RES="$RD/src/main/java/com/family/finance/service/group/AccountGroupingResolver.java"
+QA1200_SVC="$RD/src/main/java/com/family/finance/service/group/AccountGroupService.java"
+QA1200_PS="$RD/src/main/java/com/family/finance/service/PeriodService.java"
+QA1200_ATTR="$RD/src/main/java/com/family/finance/service/review/AttributionService.java"
+QA1200_ENG="$RD/src/main/java/com/family/finance/calc/review/AttributionEngine.java"
+QA1200_LENS="$RD/src/main/java/com/family/finance/service/lens/LensQueryService.java"
+QA1200_GUARD="$RD/src/main/java/com/family/finance/service/entry/BalanceGuardService.java"
+QA1200_MIG="$RD/db/migration/V58__account_group.sql"
+
+# v1200-SINGLE-GROUP-MEMBERSHIP · 单属靠 **DB** 保证,不靠应用层校验。
+#   归因有恒等式「基准 + 人赚 + 钱赚 + 开账基线 = 本期净变化」,一个账户进两个组会双计,
+#   而差额会被**静默吸进「未归因」**—— 数字看着平了,错误藏起来了。这类失败只能在存储层拦。
+{ grep -qE 'PRIMARY KEY *\( *`?account_id`? *\)' "$QA1200_MIG" \
+  && ! grep -qiE 'PRIMARY KEY *\( *`?group_id`?, *`?account_id`?' "$QA1200_MIG"; } \
+  && log_ok "v1200-SINGLE-GROUP-MEMBERSHIP(account_id 单独为主键 = 一个账户最多属一个组)" \
+  || log_bad "v1200-SINGLE-GROUP-MEMBERSHIP 单属没落到 DB 上" "联合主键(group_id,account_id)允许同一账户进多个组 → 双计,差额被静默吸进「未归因」"
+
+# v1200-ONE-RESOLVER · 聚合路径共用同一个维值解析器,**没有旁路**。
+#   判据刻意**不数路径条数** —— 数数量就是第五次「护栏绑在偶然事实上」
+#   (前四次:v08-NAV-1 绑单路径 · v181-FLOAT-DOCK / v1617-FIVE 绑三按钮数组 ·
+#    v11911 数「出现两次」把收口误判成退化)。这里守的是「有没有人绕过解析器」。
+{ codeonly "$QA1200_ATTR" | grep -q 'groupingResolver.valuesFor' \
+  && codeonly "$QA1200_LENS" | grep -q 'groupingResolver.valuesFor' \
+  && ! codeonly "$QA1200_ENG" | grep -qE 'dimKey == null \? s.accountName\(\)$'; } \
+  && log_ok "v1200-ONE-RESOLVER(归因与镜头都过解析器 · 账户不再是聚合里的特例)" \
+  || log_bad "v1200-ONE-RESOLVER 有聚合路径绕过了解析器" "绕过的那条会照旧按账户展开,页面正常渲染、只是没折叠 —— 不报错"
+
+# v1200-SUM-NOT-RECOMPUTE · 组的值 = 【成员值求和】,不是另起一套计算。
+#   这条同时保证了两件事:
+#     ① 组内流转自动抵消 —— A→B 组内,两端的贡献在求和时相消;A→C 组外则不消。
+#        不需要任何对手方识别,是求和的副产品。
+#     ② 不产生第二条求和路径 —— 本项目已有 pivot 与 period_summary 两条无共用求和逻辑的
+#        路径差 0.01 的前科,再多一条只会更糟。
+#   判据钉在**行为**上(merge + add 求和),不钉在注释里 ——
+#   第一版判据 grep 的是解析器的文档注释,而 codeonly 会把注释剥掉:
+#   它守的是一句话,不是行为,写完当场就红了。
+{ codeonly "$QA1200_ENG" | grep -qE 'acc.merge\(key, s.pnlBase\(\), BigDecimal::add\)' \
+  && ! codeonly "$QA1200_RES" | grep -qiE '(sum|total|add)\(' ; } \
+  && log_ok "v1200-SUM-NOT-RECOMPUTE(组值=成员值求和 · 解析器只给标签不做求和)" \
+  || log_bad "v1200-SUM-NOT-RECOMPUTE 组的值不是成员求和了" "要么组内流转不再自动抵消,要么多出了第二条求和路径"
+
+# v1200-FROZEN-NOT-LIVE · 历史读定格,不读当前成员关系。
+#   读当前的话,今天挪一个账户出组,近 12 期趋势图会全变 —— 每个数字自身都对,
+#   但用户会当成算错了。这类错误不报错、不降级。
+{ codeonly "$QA1200_RES" | grep -q 'frozenMapper.findByPeriod' \
+  && codeonly "$QA1200_ATTR" | grep -q 'groupingResolver.valuesFor(familyId, pid' \
+  && [ -f "$RD/src/test/java/com/family/finance/service/group/AccountGroupingResolverTest.java" ]; } \
+  && log_ok "v1200-FROZEN-NOT-LIVE(有定格就读定格 · 趋势每期各读各的 · 有单测)" \
+  || log_bad "v1200-FROZEN-NOT-LIVE 历史又按当前分组重画了" "改一次组成员,12 期趋势图跟着全变"
+
+# v1200-REOPEN-CLEARS-GROUP · reopen() 是「该期所有派生物的失效点」。
+#   已有:分类属性定格(v1.12)· AI 复盘缓存(v1.19.16)· 分组定格(v1.20)。
+#   新增任何「关账时定格 / 关账后缓存」的东西,都要回到这里加一行。
+{ codeonly "$QA1200_PS" | grep -q 'periodAccountAttrMapper.deleteByPeriod' \
+  && codeonly "$QA1200_PS" | grep -q 'reviewAiCacheMapper.deleteByPeriod' \
+  && codeonly "$QA1200_PS" | grep -q 'periodAccountGroupMapper.deleteByPeriod' \
+  && codeonly "$QA1200_PS" | grep -q 'periodAccountGroupMapper.freezeByPeriod'; } \
+  && log_ok "v1200-REOPEN-CLEARS-GROUP(重开清三样派生物 · 关账定格分组)" \
+  || log_bad "v1200-REOPEN-CLEARS-GROUP 重开漏清了某样派生物" "改完数据后那一样还是旧的,而且不报错(v1.19.16 就是这么出的)"
+
+# v1200-DELETE-IS-A-REAL-UNDO · 删组是这一版唯一的退路,必须退干净。
+#   不删历史定格的话,历史里会永远留着一个已经不存在的组名,而用户没有办法退回去 ——
+#   那不是「可逆」,是陷阱。PRD FR-463 承诺的是「页面回到未分组的样子」。
+{ codeonly "$QA1200_SVC" | grep -q 'frozenMapper.deleteByGroup'; } \
+  && log_ok "v1200-DELETE-IS-A-REAL-UNDO(删组连历史定格一起清)" \
+  || log_bad "v1200-DELETE-IS-A-REAL-UNDO 删组之后历史里还留着这个组" "用户没有任何办法退回按账户看 —— 不是可逆,是陷阱"
+
+# v1200-GUARD-NARROW-AND-PLAIN · 改动提示的触发条件要窄,文案要是纯文本。
+#   提示一多就会被当噪声划过去,那这一版就白做了。正反两面都要有单测。
+{ codeonly "$QA1200_GUARD" | grep -q 'calibratedAt() != null && changed' \
+  && codeonly "$QA1200_GUARD" | grep -q '本期净资产变化' \
+  && ! codeonly "$QA1200_GUARD" | grep -qE '(return|\+) *"[^"]*\*\*' \
+  && [ -f "$RD/src/test/java/com/family/finance/service/entry/BalanceGuardServiceTest.java" ]; } \
+  && log_ok "v1200-GUARD-NARROW-AND-PLAIN(触发条件窄 · 未填余额另有话术 · 纯文本 · 有正反单测)" \
+  || log_bad "v1200-GUARD-NARROW-AND-PLAIN 提示条件放宽或文案带了 markdown" "提示变噪声,用户三天后就开始无视它"
+
+# v1200-NO-N-PLUS-1 · 解析器不许在循环里调。
+{ ! codeonly "$QA1200_LENS" | grep -A3 -E 'for *\(Account' | grep -q 'groupingResolver.valuesFor'; } \
+  && log_ok "v1200-NO-N-PLUS-1(维值映射一次取回,不在账户循环里查)" \
+  || log_bad "v1200-NO-N-PLUS-1 解析器被放进循环了" "N+1 查询"
+
 echo
 echo "═══════════════════════════════════════"
 echo " 总结: PASS=$PASS  FAIL=$FAIL  SKIP=$SKIP"

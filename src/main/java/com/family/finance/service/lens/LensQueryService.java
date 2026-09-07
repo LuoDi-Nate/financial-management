@@ -41,6 +41,8 @@ import java.util.stream.Collectors;
 public class LensQueryService {
 
     private final AccountMapper accountMapper;
+    /** v1.20 · 账户组维值的唯一来源 */
+    private final com.family.finance.service.group.AccountGroupingResolver groupingResolver;
     /** v1.15 FR-382 · 名字映射走名录(含已归档)—— 归档一个人,不该让历史数据里的他变成无名氏 */
     private final MemberDirectory memberDirectory;
     private final ProductCategoryService productCategoryService;
@@ -142,7 +144,36 @@ public class LensQueryService {
         return System.currentTimeMillis() - e.at() >= CACHE_TTL_MS;
     }
 
+    /**
+     * v1.20 · 把「原值 − 各份之和」的残差补给份额最大的那一份,让拆分求和<b>精确等于</b>原值。
+     *
+     * <p>不这样做的后果不是「差一分钱不好看」,而是<b>两条聚合路径给出不同的总资产</b> ——
+     * 按拆分份额加的(透视)和按账户原值加的(KPI)对不上,而且差多少<b>跟数据分布走</b>,
+     * 时红时绿,很容易被当成偶发。</p>
+     *
+     * <p>{@code null} 元素(不可算的度量)整列跳过 —— 不能把 null 当 0 补,那是编数据。</p>
+     */
+    static void residualToLargest(List<BigDecimal> parts, BigDecimal total) {
+        if (total == null || parts.isEmpty()) return;
+        BigDecimal sum = BigDecimal.ZERO;
+        int largest = -1;
+        BigDecimal largestAbs = null;
+        for (int i = 0; i < parts.size(); i++) {
+            BigDecimal v = parts.get(i);
+            if (v == null) return;                    // 有一份算不出来 → 整列不动
+            sum = sum.add(v);
+            if (largestAbs == null || v.abs().compareTo(largestAbs) > 0) { largestAbs = v.abs(); largest = i; }
+        }
+        BigDecimal residual = total.setScale(2, RoundingMode.HALF_EVEN).subtract(sum);
+        if (residual.signum() != 0 && largest >= 0) {
+            parts.set(largest, parts.get(largest).add(residual));
+        }
+    }
+
     private List<Position> assemble(long familyId, FactSlice slice) {
+        // v1.20 · 一次取回整张账户→维值映射。**不能在循环里问解析器**,那是 N+1(v1200-NO-N-PLUS-1)
+        Map<Long, String> acctGroupValue =
+                groupingResolver.valuesFor(familyId, slice.lastPeriodId(), null);
         Map<Long, String> memberName = memberDirectory.listAll(familyId).stream()
                 .collect(Collectors.toMap(Member::getId, Member::getDisplayName));
         Map<Long, AccountPerformance> perf = factViewService
@@ -154,6 +185,8 @@ public class LensQueryService {
             if (acc.getType().isLiability()) continue;            // 负债不进资产透视
             AccountPerformance p = perf.get(acc.getId());
             if (p == null || p.currentValue() == null) continue;  // 未填报 · 无现值
+            // v1.20 · 账户组维值。零组态时 = 账户名 → 透视输出与 v1.19.16 逐字一致
+            String groupValue = acctGroupValue.getOrDefault(acc.getId(), acc.getDisplayName());
             // 账户级期初市值 = 期末 − 较上期变化(momAmount)· 本期收益率分母;momAmount 缺则不可算
             BigDecimal openVal = p.momAmount() == null ? null : p.currentValue().subtract(p.momAmount());
 
@@ -191,12 +224,34 @@ public class LensQueryService {
                         java.util.List<com.family.finance.domain.penetration.HoldingAllocation> allocs =
                                 cashRow ? null : allocMapper.findByHolding(h.getId());
                         if (allocs != null && !allocs.isEmpty()) {
+                            /* v1.20 · 【余数归位】把逐份四舍五入的零头补回去。
+                             *
+                             * 权重本身是精确的(weight_bp 合计恒为 10000),但把一笔市值拆成 9~10 份、
+                             * 每份各自 setScale(2) 之后,**求和会与原值差几分** ——
+                             * 这正是 e2e「pivot 与 period_summary 总资产差 0.01」那条断言的根因:
+                             * 两条路径没有共用求和逻辑,一条按拆分后的份额加、一条按账户原值加。
+                             *
+                             * 它是**跟数据分布走**的:有没有穿透拆分、拆几份、余数落在哪,都影响结果,
+                             * 所以历史上时红时绿(见过 0.01 / 0.03 / 0.06),很容易被当成偶发而放过。
+                             *
+                             * 修法:把「原值 − 各份之和」的残差补给**份额最大**的那一份。
+                             * 选最大份是为了让相对误差最小,也让补偿落在最不显眼的地方。 */
+                            java.util.List<BigDecimal> splitVals = new ArrayList<>();
+                            java.util.List<BigDecimal> splitCums = new ArrayList<>();
                             for (var al : allocs) {
                                 BigDecimal w = BigDecimal.valueOf(al.getWeightBp())
                                         .divide(BigDecimal.valueOf(10000), MathContext.DECIMAL64);
-                                BigDecimal vb = valueBase.multiply(w).setScale(2, RoundingMode.HALF_EVEN);
-                                BigDecimal cumSplit = holdingCumPnl == null ? null
-                                        : holdingCumPnl.multiply(w).setScale(2, RoundingMode.HALF_EVEN);
+                                splitVals.add(valueBase.multiply(w).setScale(2, RoundingMode.HALF_EVEN));
+                                splitCums.add(holdingCumPnl == null ? null
+                                        : holdingCumPnl.multiply(w).setScale(2, RoundingMode.HALF_EVEN));
+                            }
+                            residualToLargest(splitVals, valueBase);
+                            residualToLargest(splitCums, holdingCumPnl);
+                            int splitIdx = -1;
+                            for (var al : allocs) {
+                                splitIdx++;
+                                BigDecimal vb = splitVals.get(splitIdx);
+                                BigDecimal cumSplit = splitCums.get(splitIdx);
                                 String acLbl = al.getAssetClass() != null ? nullIfEmpty(AssetClass.labelOf(al.getAssetClass()))
                                         : assetClassOf(h, assetClass);
                                 String indLbl = "OTHER".equals(al.getKind()) ? "其他持仓"
@@ -208,7 +263,8 @@ public class LensQueryService {
                                         indLbl,
                                         regionLabel(h.getMarket()), purpose,
                                         custodyOf(acc, false, liquidity),
-                                        p.latestPnl(), p.cumPnl(), p.netPrincipal(), cumSplit, openVal));
+                                        p.latestPnl(), p.cumPnl(), p.netPrincipal(), cumSplit, openVal,
+                                        groupValue));
                             }
                             continue;   // 已按方向拆,跳过单头寸
                         }
@@ -224,7 +280,8 @@ public class LensQueryService {
                                 cashRow ? null : regionLabel(h.getMarket()),
                                 purpose,
                                 custodyOf(acc, cashRow, liquidity),
-                                p.latestPnl(), p.cumPnl(), p.netPrincipal(), holdingCumPnl, openVal));
+                                p.latestPnl(), p.cumPnl(), p.netPrincipal(), holdingCumPnl, openVal,
+                                groupValue));
                     }
                     split = true;
                 }
@@ -235,7 +292,8 @@ public class LensQueryService {
                         typeLabel, risk, liquidity, acc.getCurrency(), owner,
                         assetClass, platform, acctIndustry, null, purpose,
                         custodyOf(acc, false, liquidity),
-                        p.latestPnl(), p.cumPnl(), p.netPrincipal(), p.cumPnl(), openVal));
+                        p.latestPnl(), p.cumPnl(), p.netPrincipal(), p.cumPnl(), openVal,
+                        groupValue));
             }
         }
         return out;

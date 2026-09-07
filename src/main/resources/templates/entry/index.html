@@ -203,6 +203,12 @@
              用 rust 而不是全站 flash 的 forest:那是成功色,这里是被拦下来了。 -->
         <div th:if="${flashError}" data-entry-flash-error
              class="border border-rust bg-rust/[0.06] px-4 py-2 text-sm mb-3" th:text="${flashError}">出错了</div>
+        <!--/* v1.20 FR-450/453 · 改动之后如实说一句「它动了什么」。
+               用 brass 不用 rust:这不是错误,是告知 —— 而且刻意**不拦截**,
+               改动已经生效了,这条只是让你知情(tech-design v1.20 §二 选型四)。 */-->
+        <div th:if="${balanceGuard}" data-balance-guard
+             class="border-l-2 border-brass-deep bg-brass-soft/40 px-4 py-2.5 text-[13px] leading-relaxed mb-3"
+             th:text="${balanceGuard}">这次改动动了已校准的余额。</div>
 
         <form th:action="@{/entry/expense}" method="post" class="flex flex-wrap items-end gap-2 mb-1">
           <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">

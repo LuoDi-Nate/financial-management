@@ -41,6 +41,8 @@ public class PeriodService {
     private final com.family.finance.repository.PeriodAccountAttrMapper periodAccountAttrMapper;
     /** v1.19.16 · 重开时要连它一起清 —— 这张表以前没有任何失效入口 */
     private final com.family.finance.repository.ReviewAiCacheMapper reviewAiCacheMapper;
+    /** v1.20 · 该期分组定格。与分类属性定格、AI 复盘缓存同属「该期派生物」 */
+    private final com.family.finance.repository.PeriodAccountGroupMapper periodAccountGroupMapper;
     private final AuditLogService auditLogService;
     private final MetricsRecomputeJob metricsRecomputeJob;
 
@@ -206,6 +208,10 @@ public class PeriodService {
         //   而它旁边写着「关账后结果缓存可回看」,读起来就是本期定论。
         //   放在重开这一刻而不是再次关账:解读在数据被动的那一秒就作废了。
         reviewAiCacheMapper.deleteByPeriod(period.getFamilyId(), periodId);
+        // v1.20 · 分组定格同样作废。reopen() 至此已是「该期所有派生物的失效点」——
+        //   分类属性定格(v1.12)· AI 复盘缓存(v1.19.16)· 分组定格(本版)。
+        //   新增任何「关账时定格 / 关账后缓存」的东西,都要回到这里加一行。
+        periodAccountGroupMapper.deleteByPeriod(periodId);
         String safeReason = reason == null || reason.isBlank() ? "(未填写)" : reason;
         // PRD FR-12 验收:写入 period_reopen_log 专表
         periodReopenLogMapper.insert(periodId, actorMemberId, safeReason);
@@ -225,6 +231,9 @@ public class PeriodService {
         //   · 与下面三段非阻塞钩子(FIRE 重算 / 再平衡归档 / AI 月报)的区别:那三段是**衍生产物**,
         //     失败可重跑;定格是**这一刻才存在的事实**,过了就没了,不能降级。
         periodAccountAttrMapper.freezeByPeriod(periodId);
+        // v1.20 · 分组也一起定格,理由同上一行:没有它,今天挪一个账户出组,
+        //   近 12 期趋势图会全变 —— 每个数字自身都对,但用户会当成算错了。
+        periodAccountGroupMapper.freezeByPeriod(period.getFamilyId(), periodId);
         auditLogService.record(period.getFamilyId(), actorMemberId, AuditLogType.PERIOD_CLOSE,
                 "period", periodId, summary);
         runMetricsAfterCommit(periodId);

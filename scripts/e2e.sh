@@ -413,7 +413,22 @@ if [ -n "$XP" ] && [ -n "$XA" ]; then
   #    所以判据不能再看 HTTP 码,要看**行为**:有没有出错误提示 + 有没有落库。
   #    (不用 `GET | grep -q`:grep -q 命中即退出会让 curl 吃 SIGPIPE,pipefail 下整条管道非零)
   expense_verdict(){   # $1=accountId $2=categoryCode → rejected | accepted
-    local c page
+    local c page rows
+    # 2026-09-07 · 先「进一次填报页」再提交 —— 这不是形式,是**还原真实浏览器的时序**。
+    #   真人提交支出时,人已经在 /entry 上了,意味着上一步操作留下的 flash 早被消费掉。
+    #   而这个夹具的 POST 不跟随 302(-o /dev/null 无 -L),于是前面某一步的 flash
+    #   会一直排在 session 的 FlashMap 队列里,被这里的 GET **抢先消费** ——
+    #   本次的 flashError 就永远看不到,「被拒」被误判成「接受」。
+    #   v1.20 加了改动提示(BalanceGuardService)之后这条队列才第一次非空,把它暴露出来。
+    #   产品侧是对的:真浏览器里跟随重定向,flash 当场消费(已用无头浏览器验过)。
+    #   队列里可能不止一条,所以**排空到干净为止**(最多 5 次,防死循环)。
+    #   上限给 30:第一次调用时积压最多(前面几条主线都在改数据、每条都留了 flash),
+    #   给 5 的时候第一条断言仍然被饿死 —— 排空不彻底等于没排。
+    local drain i=0
+    while [ "$i" -lt 30 ]; do
+      drain="$(GET "/entry?period=$XP")"
+      case "$drain" in *data-entry-flash-error*|*data-balance-guard*) i=$((i+1));; *) break;; esac
+    done
     c="$(POSTcode /entry/expense --data-urlencode "periodId=$XP" \
          --data-urlencode "accountId=$1" --data-urlencode "categoryCode=$2" --data-urlencode "amount=100")"
     if [ "$c" -ge 400 ]; then echo rejected; return; fi
@@ -421,7 +436,17 @@ if [ -n "$XP" ] && [ -n "$XA" ]; then
     # (targetRequestParams),后续请求参数对不上就不弹出 flash。真实浏览器跟随 302
     # 到 /entry?period=N 时天然带着它;这里不带的话会看不到提示、把「拒绝」误判成「接受」。
     page="$(GET "/entry?period=$XP")"
-    case "$page" in *data-entry-flash-error*) echo rejected;; *) echo accepted;; esac
+    case "$page" in
+      *data-entry-flash-error*) echo rejected;;
+      *)
+        # 2026-09-07 · 「accepted」曾经掩盖了两种完全不同的情况:真的被接受了,
+        # 和「填报页根本没渲染出来」(500 / 空体)。两者都不含 flash 标记,但只有前者是 bug。
+        # 判据补上落库与页面尺寸,失败时直接说清是哪一种。
+        rows="$(db "SELECT COUNT(*) FROM cash_flow WHERE period_id=$XP AND kind='EXPENSE' AND category_code='$2' AND deleted_at IS NULL")"
+        if [ "${#page}" -lt 5000 ]; then echo "page-broken(len=${#page})"
+        elif [ "${rows:-0}" -gt 0 ]; then echo accepted
+        else echo "no-flash-but-not-persisted"; fi;;
+    esac
   }
   eq "支出-拒收入类目(salary)"              "$(expense_verdict "$XA" salary)"      "rejected"
   eq "支出-拒现金调整类目(那不是家庭支出)"  "$(expense_verdict "$XA" cash_adjust)" "rejected"

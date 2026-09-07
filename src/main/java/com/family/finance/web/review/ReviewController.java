@@ -72,9 +72,10 @@ public class ReviewController {
                 : nz(cf.income()).subtract(nz(cf.expense()));
         AttributionEngine.Result attr = attributionService.attribute(me.getFamilyId(),
                 slice.byPeriod().getOrDefault(attrPeriodId, List.of()),
-                kpis.netWorthDelta(), human, kpis.openingBaselineLast());
+                kpis.netWorthDelta(), human, kpis.openingBaselineLast(),
+                attrPeriodId, null);   // v1.20 · AI 复盘看的是折叠后的口径,与页面一致
         LinkedHashMap<String, BigDecimal> grouped =
-                AttributionEngine.groupBy(attr, "acct".equals(dim) ? null : dim);
+                AttributionEngine.groupBy(attr, dim);   // v1.20 · acct 也走标签,不再是特例
         // v1.19.16 · 把「这一期关没关账」传下去:没关账就不碰缓存(既不读也不写)
         boolean closed = anchor.getStatus() == com.family.finance.domain.period.PeriodStatus.CLOSED;
         ReviewInsightService.Review r = reviewInsightService.review(me.getFamilyId(), anchor.getId(),

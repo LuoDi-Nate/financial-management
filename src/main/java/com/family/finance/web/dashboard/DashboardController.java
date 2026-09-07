@@ -63,6 +63,7 @@ public class DashboardController {
     private final com.family.finance.service.config.FamilyConfigService configService;
     private final com.family.finance.service.explain.MetricExplainService metricExplain; // v0.5.3 口径真实数值
     private final com.family.finance.service.review.AttributionService attributionService; // v1.2 归因复盘
+    private final com.family.finance.service.group.AccountGroupingResolver groupingResolver; // v1.20 账户维值
     private final com.family.finance.service.review.RebalancePlanService rebalancePlanService; // v1.2 计划进度 pill
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
     private final com.family.finance.service.insight.AssetInsightService assetInsightService; // v0.6 资产洞察速览
@@ -98,6 +99,8 @@ public class DashboardController {
                               @org.springframework.web.bind.annotation.RequestParam(defaultValue = "acct") String dim,
                               @org.springframework.web.bind.annotation.RequestParam(required = false) String currency,
                               @org.springframework.web.bind.annotation.RequestParam(value = "accounts", required = false) String accountsCsv,
+                              // v1.20 FR-465 · 下钻:把这个组展开成成员账户。null = 全部折叠(默认)
+                              @org.springframework.web.bind.annotation.RequestParam(value = "expand", required = false) Long expandGroupId,
                               Model model) throws Exception {
         Family family = familyService.require(me.getFamilyId());
         List<Period> allPeriods = periodMapper.findAllByFamily(me.getFamilyId());
@@ -133,9 +136,10 @@ public class DashboardController {
         // 数字看着平了,错误其实藏进了兜底项。这条不因锚点变化而改变。
         var result = attributionService.attribute(me.getFamilyId(),
                 slice.byPeriod().getOrDefault(attrPeriodId, List.of()),
-                kpis.netWorthDelta(), human, kpis.openingBaselineLast());
-        var grouped = com.family.finance.calc.review.AttributionEngine.groupBy(result, "acct".equals(dim) ? null : dim);
-        var trend = attributionService.trend(me.getFamilyId(), slice, dim, 12);
+                kpis.netWorthDelta(), human, kpis.openingBaselineLast(),
+                attrPeriodId, expandGroupId);
+        var grouped = com.family.finance.calc.review.AttributionEngine.groupBy(result, dim);   // v1.20 · acct 也走标签
+        var trend = attributionService.trend(me.getFamilyId(), slice, dim, 12, expandGroupId);
         model.addAttribute("attr", result);
         model.addAttribute("attrGroupedJson", objectMapper.writeValueAsString(grouped));
         model.addAttribute("attrTrendJson", objectMapper.writeValueAsString(
@@ -152,6 +156,14 @@ public class DashboardController {
         model.addAttribute("attrLiveExpense", kpis.liveExpense());
         model.addAttribute("attrCurrency", viewCurrency);
         model.addAttribute("attrAccountsCsv", accountsCsv == null ? "" : accountsCsv);
+        // v1.20 · 页面要知道:这一期有哪些维值是「组」(可以点开)、当前点开的是谁
+        model.addAttribute("attrGroups", groupingResolver.labelsFor(me.getFamilyId(), attrPeriodId, expandGroupId)
+                .values().stream().filter(com.family.finance.service.group.AccountGroupingResolver.Label::grouped)
+                .collect(java.util.stream.Collectors.toMap(
+                        com.family.finance.service.group.AccountGroupingResolver.Label::value,
+                        com.family.finance.service.group.AccountGroupingResolver.Label::groupId,
+                        (x, y) -> x)));
+        model.addAttribute("attrExpand", expandGroupId);
         model.addAttribute("anchorPeriod", anchor);
         return "dashboard/_attribution :: section";
     }
