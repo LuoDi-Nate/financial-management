@@ -77,10 +77,10 @@
 判定量级:**新 FR / 新页面 / 新表 / 多文件 = 功能级**,走全流程;纯 bug fix / 文案 / 单文件小改可直接做(仍守第 7、8 节)。不确定先问。
 
 ```
-1. PRD        prd/vX.Y.md(用户视角 FR · 目标/非目标/验收标准)
+1. PRD        prd/vX.Y.md(用户视角 FR · 目标/非目标/验收标准)· **照 prd/_TEMPLATE.md 的骨架写**
    + preview  preview/vX.Y/<feature>.html(静态 mockup · 复用 ../assets/style.css + 晚清账册骨架)
    → ★ 用户评审(停,等明确通过)
-2. TDD        tech-design/vX.Y.md(每个关键决策:2-3 备选 + 取舍 + 选定理由 + 为什么不选)
+2. TDD        tech-design/vX.Y.md(每个关键决策:2-3 备选 + 取舍 + 选定理由 + 为什么不选)· **照 tech-design/_TEMPLATE.md 的骨架写**
    → ★ 用户评审(停,等明确通过)
 3. 代码 + QA  实现 + 单测 + docs/qa-cases.md 用例 + scripts/qa-run.sh 守护 + scripts/e2e.sh 主线
 4. 自测       mvn -o test(全绿) · bash scripts/qa-run.sh(静态守护) · bash scripts/e2e.sh(端到端真验收) · 无头截图视觉验收
@@ -105,6 +105,8 @@
 
 | 路径 | 用途 | 用法 |
 |---|---|---|
+| `prd/_TEMPLATE.md` | **PRD 骨架** | 大厂模板按本项目裁过;**按版本大小分档**(补丁 4 节 / 大版本 12 节)· 不适用的节写「不适用 · 理由」而不是删 |
+| `tech-design/_TEMPLATE.md` | **TDD 骨架** | 同上;选型对比只写在这边,PRD 不重复 |
 | `prd/vX.Y.md` | 需求(用户视角 FR) | 新版本新建;v0.1 已封板别改 |
 | `tech-design/vX.Y.md` | 技术方案(选型+取舍) | 实施权威源 |
 | `preview/vX.Y/<f>.html` | PRD 阶段交互预览 | 复用 `preview/assets/style.css` + 4 字体 + `kpi/pill/paper-card/eyebrow/btn-ink` 类;**别用废弃 `preview/pages/`** |
