@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>v1.20 Preview · 别让一次改动悄悄推翻上一次的确认</title>
+<title>v1.20 Preview · 别让一次改动悄悄推翻上一次的确认 · 账户组</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,ital,wght@9..144,0,300..700;9..144,1,300..600&family=JetBrains+Mono:wght@300;400;500&family=Noto+Serif+SC:wght@300;400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,300;8..60,400;8..60,500;8..60,600&display=swap" rel="stylesheet">
@@ -64,6 +64,14 @@
 
   .ask{border:1px solid var(--rule);background:var(--card);padding:18px}
   .ask-q{font-size:13px;line-height:1.9}
+  .pick{display:flex;align-items:center;gap:9px;padding:7px 10px;border-bottom:1px solid var(--rule-soft);font-size:12.5px}
+  .pick:last-child{border-bottom:none}
+  .box{width:14px;height:14px;border:1px solid var(--brass-deep);background:var(--brass-soft);flex:none;position:relative}
+  .box.off{border-color:var(--rule);background:transparent}
+  .box.on:after{content:'';position:absolute;left:4px;top:1px;width:4px;height:8px;border:solid var(--brass-deep);border-width:0 2px 2px 0;transform:rotate(45deg)}
+  .grp{font-family:'JetBrains Mono',monospace;font-size:9px;padding:1px 6px;border:1px solid var(--brass-deep);color:var(--brass-deep);background:rgba(160,124,58,.08);white-space:nowrap}
+  .fold{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--brass-deep);width:14px;display:inline-block}
+  .sub td:first-child{padding-left:26px;color:var(--ink-soft)}
   .flag{border-left:3px solid var(--rust);background:rgba(156,74,42,.05);padding:9px 13px;font-size:11.5px;color:var(--ink-soft);line-height:1.8;margin-top:10px}
 </style>
 </head>
@@ -71,7 +79,7 @@
 <div class="wrap" style="padding-top:38px;padding-bottom:80px">
 
   <div class="eyebrow">v 1 . 2 0 &nbsp;·&nbsp; p r e v i e w</div>
-  <h1 style="font-size:34px;margin:8px 0 6px">别让一次改动悄悄推翻上一次的确认</h1>
+  <h1 style="font-size:34px;margin:8px 0 6px">别让一次改动悄悄推翻上一次的确认 · 账户组</h1>
   <p class="note" style="max-width:780px">
     三条诉求来自
     <a href="https://github.com/LuoDi-Nate/financial-management/issues/17" target="_blank" rel="noopener">issue #17</a>
@@ -153,77 +161,139 @@
 
   <!-- ════════ 3 ════════ -->
   <div class="zone">
-    <div class="zone-head"><span class="zone-no">3</span><span class="zone-t">活期账户可以合起来看 —— 但必须你自己开</span>
-      <span class="badge">FR-460 ~ FR-465</span></div>
+    <div class="zone-head"><span class="zone-no">3</span><span class="zone-t">账户组 —— 「活期」只是其中一个</span>
+      <span class="badge">FR-460 ~ FR-470</span></div>
     <div class="zone-sub">
-      提交者原话:「<b>录入时仍然按账户录入,但在最终统计收益、计算等场景下汇总展示</b>……
-      这跟把所有支出仅记录到一个总额在一定程度上是一个道理。」这个类比是准的。
+      提交者要的是「<b>录入时仍然按账户录入,统计时汇总展示</b>」。
+      评审时把它抽象成<b>账户组</b>:一个组含 1..N 个账户,「活期」只是一个推荐分组,
+      贷款类同样可以归到一起 —— 只要你愿意。
     </div>
     <div class="zone-line"></div>
 
-    <div class="toggle">
-      <span class="sw"><i></i></span>
+    <div class="split">
       <div>
-        <div style="font-size:13.5px">把活期账户合并统计 <span class="badge" style="margin-left:6px">默认关闭</span></div>
-        <p class="note" style="margin-top:5px">
-          开启后,标为「随时可取」的账户在<b>收益计算 / 归因 / 透视 / 分布</b>里合并成一个。
-          <b>录入完全不变</b>,你仍然按账户填余额。<b>随时可关,关掉立刻恢复。</b>
-        </p>
+        <div class="col-h">建组:系统只推荐,不自动建</div>
+        <div class="card">
+          <div style="font-size:13.5px;margin-bottom:4px">新建账户组</div>
+          <p class="note" style="margin-bottom:10px">名称 <span class="mono">随时可取</span> ·
+             系统按「流动性 = 随时可取」预勾了 5 个,<b>你可以取消任意一个</b>。</p>
+          <div style="border:1px solid var(--rule)">
+            <div class="pick"><span class="box on"></span>招行储蓄卡 · 工资</div>
+            <div class="pick"><span class="box on"></span>支付宝 · 余额宝</div>
+            <div class="pick"><span class="box on"></span>微信零钱</div>
+            <div class="pick"><span class="box on"></span>建行储蓄卡 · 房贷</div>
+            <div class="pick"><span class="box off"></span>招行储蓄卡 · 专款
+              <span class="note" style="margin-left:auto">留在外面单独看</span></div>
+          </div>
+          <div class="guard-acts"><span class="btn primary">建这个组</span><span class="btn">取消</span></div>
+          <p class="note" style="margin-top:8px">
+            另外推荐:<span class="grp">负债</span>(按账户类型)。
+            <b>推荐 ≠ 自动创建</b> —— 不点就不会有任何组。
+          </p>
+        </div>
+      </div>
+      <div>
+        <div class="col-h">跨类型也可以,但要说清代价</div>
+        <div class="card">
+          <div class="pick" style="border:none;padding-left:0"><span class="box on"></span>华泰证券 · A股</div>
+          <div class="pick" style="border:none;padding-left:0"><span class="box on"></span>支付宝 · 余额宝</div>
+          <div class="guard warn" style="margin-top:6px">
+            <div class="guard-t">
+              这个组里既有<b>股票</b>又有<b>现金</b> —— 它的<b>收益率会混口径</b>:
+              现金几乎不产生收益,会把股票那部分的年化摊薄。<br>
+              还是可以建,只是你得知道这个数该怎么读。
+            </div>
+          </div>
+          <p class="note" style="margin-top:8px">
+            <b>不拦</b> —— 限制用户的东西我们经常猜错。但不告知代价是另一回事。
+          </p>
+        </div>
       </div>
     </div>
 
-    <div class="split" style="margin-top:16px">
+    <div class="zone-sub" style="margin-top:22px">
+      <b>建组之后,账户维度按组折叠 —— 默认折叠,可以点开下钻。</b>
+    </div>
+
+    <div class="split" style="margin-top:10px">
       <div>
-        <div class="col-h">关闭(今天的样子 · 默认)</div>
+        <div class="col-h">没建任何组(默认 · 与今天逐字一致)</div>
         <div class="card">
           <table class="mini">
-            <tr><td>招行储蓄卡 · 工资</td><td>+¥1,000</td></tr>
+            <tr><td>招行储蓄卡 · 工资</td><td class="pos">+¥1,000</td></tr>
             <tr><td>支付宝 · 余额宝</td><td class="neg">−¥1,000</td></tr>
-            <tr><td>微信零钱</td><td>+¥300</td></tr>
+            <tr><td>微信零钱</td><td class="pos">+¥300</td></tr>
             <tr><td>建行储蓄卡 · 房贷</td><td class="neg">−¥300</td></tr>
-            <tr><td><b>合计</b></td><td><b>¥0</b></td></tr>
+            <tr><td>华泰证券 · A股</td><td class="neg">−¥11,300</td></tr>
+            <tr><td><b>合计</b></td><td><b class="neg">−¥11,300</b></td></tr>
           </table>
           <p class="note" style="margin-top:9px">
-            四笔全是<b>账户之间的划转</b>,家里一分钱没多也没少 ——
-            但归因里它们是四条噪声,盖住了真正有意义的变化。
+            前四行全是<b>账户之间的划转</b>,家里一分钱没多没少 ——
+            但它们盖住了唯一有意义的那一行。
           </p>
         </div>
       </div>
       <div>
-        <div class="col-h">开启</div>
+        <div class="col-h">建了「随时可取」组之后</div>
         <div class="card">
           <table class="mini">
-            <tr><td>随时可取(合并 4 个账户)</td><td>¥0</td></tr>
+            <tr><td><span class="fold">▸</span>随时可取 <span class="grp">组 · 4 个账户</span></td><td>¥0</td></tr>
             <tr><td>华泰证券 · A股</td><td class="neg">−¥11,300</td></tr>
-            <tr><td>币安钱包</td><td class="pos">+¥8,379</td></tr>
-            <tr><td><b>合计</b></td><td><b class="neg">−¥2,921</b></td></tr>
+            <tr><td>招行储蓄卡 · 专款 <span class="note">(未分组)</span></td><td>¥0</td></tr>
+            <tr><td><b>合计</b></td><td><b class="neg">−¥11,300</b></td></tr>
           </table>
           <p class="note" style="margin-top:9px">
-            划转自然消失了,剩下的每一行都是<b>真的赚了或亏了</b>。
+            <b>合计一分不差</b> —— 折叠只改「怎么显示」,不改「有多少钱」。
+            未分组的账户和组<b>并列</b>出现,不会被吞掉。
           </p>
+          <div style="margin-top:12px;border-top:1px dashed var(--rule);padding-top:10px">
+            <p class="note" style="margin-bottom:6px">点开「随时可取」↓</p>
+            <table class="mini">
+              <tr><td><span class="fold">▾</span>随时可取 <span class="grp">组 · 4 个账户</span></td><td>¥0</td></tr>
+              <tr class="sub"><td>招行储蓄卡 · 工资</td><td class="pos">+¥1,000</td></tr>
+              <tr class="sub"><td>支付宝 · 余额宝</td><td class="neg">−¥1,000</td></tr>
+              <tr class="sub"><td>微信零钱</td><td class="pos">+¥300</td></tr>
+              <tr class="sub"><td>建行储蓄卡 · 房贷</td><td class="neg">−¥300</td></tr>
+            </table>
+          </div>
         </div>
       </div>
     </div>
 
-    <div class="guard warn" style="margin-top:14px">
+    <div class="guard" style="margin-top:16px">
       <div class="guard-t">
-        <b>代价要写在开关旁边(FR-465):</b>合并之后,这 4 个活期账户<b>各自的收益差异看不到了</b>,
-        单账户归因也没有了。如果你在比较「哪张卡的货基收益更好」,就不该开这个。
+        <b>组内互相转账,不算这个组赚了或亏了。</b>
+        这不是「把几行加起来」,而是一条严格定义:<b>两端都在组内 → 内部搬钱,不计入该组现金流;
+        一端在组外 → 照算</b>。<br>
+        今天划转的抵消只有两档 —— 单账户(全算外部流,所以满屏噪声)和全家(全抵消,看不到结构)。
+        <b>账户组补的就是中间那一档</b>,它让「这个组的收益率」第一次有了确切含义。
+      </div>
+    </div>
+
+    <div class="guard warn" style="margin-top:12px">
+      <div class="guard-t">
+        <b>记账完全不变。</b>你仍然按账户填余额、记收支、导截图 ——
+        <b>组不是一个能记账的东西</b>。<br>
+        这一条是刻意的:截图导入天然是「一个 APP 一张图」= 一个账户,
+        真把账户合并掉会直接打断它。
       </div>
     </div>
 
     <div class="flag">
-      <b>想听你意见的地方 ③:「哪些账户算活期」谁说了算?</b><br>
-      我的取向是<b>复用现有的「随时可取」流动性分层</b>,不新造概念,并且在开关旁边直接列出
-      「当前会被合并的是这 4 个账户」+ 一个「改一下」入口。
-      不做自动判定 —— 猜错了用户根本发现不了,而这是会影响收益口径的判定。
+      <b>已定的三条硬约束:</b><br>
+      <b>① 一个账户最多属于一个组。</b>归因有恒等式「基准 + 人赚 + 钱赚 + 开账基线 = 本期净变化」,
+      一个账户进两个组就双计,恒等式当场崩 —— 这是硬的,不是偏好。<br>
+      <b>② 组不是账户的属性。</b>账户默认<b>不属于任何组</b>;没建组时所有页面与今天<b>逐字一致</b> ——
+      所以<b>不需要开关</b>,「有没有建组」本身就是开关。<br>
+      <b>③ 改了组成员,历史不会变。</b>组成员关系<b>跟账期定格</b>:已关账月份的数字一字不动,
+      只有重开该月再关账才按新分组重算(和「重开后再关账 = 重新定格」同一条规则)。
     </div>
   </div>
 
   <!-- ════════ 4 ════════ -->
   <div class="zone">
     <div class="zone-head"><span class="zone-no">4</span><span class="zone-t">归因的空态,要能自己看懂</span>
-      <span class="badge">FR-470 / FR-471</span></div>
+      <span class="badge">FR-480 / FR-481</span></div>
     <div class="zone-sub">
       提交者原话:「这个归因确实没搞明白怎么修改或者怎么玩。反正看着<b>显示没有录入</b>,也不知道怎么改。」
       一个需要看文档才会用的功能,等于没做。
@@ -295,7 +365,11 @@
       <p class="note" style="line-height:2">
         <b>不做自定义支出分类 / 支出报表</b> —— 已拆到
         <a href="https://github.com/LuoDi-Nate/financial-management/issues/18" target="_blank" rel="noopener">#18</a> 独立设计。<br>
-        <b>不改默认口径</b> —— 第 3 屏的全部行为都在开关后面,不开就一个像素都不变。<br>
+        <b>组不是记账实体</b> —— 不能对着组填余额、记收支、导截图。
+        「真合并成一个可记账的账户」评审时已否:它会打断截图导入(截图天然按 APP = 按账户)、
+        不可逆,而且提交者要的也不是它。<br>
+        <b>不做「填一个总数按比例分摊」</b> —— 那是<b>编数据</b>。<br>
+        <b>不做多套分组方案</b>(账户属多个组 / 多套并行镜头)—— 留到有真实需求。<br>
         <b>不加二次确认弹窗</b> —— 第 1 屏是提示,不是审批。<br>
         <b>不做账户间划转的逐笔录入</b> —— 那正是提交者说「不可行」的东西。
       </p>
