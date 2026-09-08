@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('账户分组 · 家庭账房')}"></head>
+<body class="min-h-screen relative">
+<div class="fixed top-0 left-0 right-0 h-1 bg-ink z-40"></div>
+<header th:replace="~{fragments/nav :: nav('accounts', ${me}, ${nav})}"></header>
+<main class="max-w-[1100px] mx-auto px-4 sm:px-6 lg:px-10 py-5 sm:py-10 relative z-10">
+
+  <div class="mb-6 flex items-end justify-between flex-wrap gap-3">
+    <div>
+      <div class="eyebrow mb-2">账 · 户 · 分 · 组</div>
+      <h1 class="font-display text-3xl sm:text-4xl font-medium"
+          th:text="${#lists.isEmpty(groups)} ? '还没有分组' : |${#lists.size(groups)} 个分组|">还没有分组</h1>
+    </div>
+    <a th:href="@{/accounts}" class="btn-ghost text-sm no-underline">← 回账户列表</a>
+  </div>
+
+  <p class="text-ink-soft text-sm leading-relaxed max-w-[720px] mb-5">
+    把几个账户归成一组,<b>统计与归因里它们并成一行</b> —— 账户之间的来回划转就不再是十几条互相抵消的噪声。
+    <br><b>记账完全不变</b>:仍然按账户填余额、记收支、导截图。组不是一个能记账的东西。
+  </p>
+
+  <div th:if="${groupNote}" class="border-l-2 border-brass-deep bg-brass-soft/40 px-4 py-3 mb-5">
+    <p class="text-[13px] text-ink leading-relaxed" th:text="${groupNote}">已建。</p>
+  </div>
+  <div th:if="${groupError}" class="border-l-2 border-rust bg-rust/[0.05] px-4 py-3 mb-5">
+    <p class="text-[13px] text-ink leading-relaxed" th:text="${groupError}">出错了。</p>
+  </div>
+
+  <!--/* 搜索:分组名 或 成员账户名。都在前端过滤 —— 分组数量是个位数、账户几十个,
+         走一趟服务端不值得,而且本地过滤能做到边打边筛。 */-->
+  <div class="flex items-center gap-3 mb-4 flex-wrap">
+    <input id="groupSearch" type="search" placeholder="搜分组名 或 账户名…"
+           class="field-input" style="max-width:280px"
+           oninput="filterGroups(this.value)">
+    <span id="searchHint" class="font-mono text-[10px] text-ink-subtle"></span>
+    <span style="flex:1"></span>
+    <button type="button" onclick="toggleAll(true)" class="font-mono text-[10px] text-brass-deep hover:underline bg-transparent border-0 cursor-pointer">全部展开</button>
+    <button type="button" onclick="toggleAll(false)" class="font-mono text-[10px] text-ink-subtle hover:underline bg-transparent border-0 cursor-pointer">全部收起</button>
+  </div>
+
+  <!-- ═══ 已有分组:默认折叠,点开看成员 ═══ -->
+  <div id="groupList">
+    <details th:each="g : ${groups}" class="paper-card mb-3 group-card"
+             th:attr="data-name=${g.name},data-members=${#strings.listJoin(g.names, ' ')}">
+      <summary class="px-4 py-3 cursor-pointer flex items-baseline gap-3 flex-wrap">
+        <span class="font-display text-lg" th:text="${g.name}">随时可取</span>
+        <span class="font-mono text-[10px] text-ink-subtle" th:text="|${#lists.size(g.accountIds)} 个账户|">4 个账户</span>
+        <span class="text-[11.5px] text-ink-subtle truncate" style="max-width:420px"
+              th:text="${#strings.listJoin(g.names, ' · ')}">招行 · 支付宝</span>
+      </summary>
+
+      <div class="px-4 pb-4 pt-1 border-t border-rule-soft">
+        <form method="post" th:action="@{/accounts/groups/{id}/update(id=${g.id})}">
+          <div class="flex items-baseline gap-3 mb-3 flex-wrap">
+            <label class="text-[11.5px] text-ink-soft">组名
+              <input type="text" name="name" th:value="${g.name}" class="field-input ml-2" style="max-width:200px"></label>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1 mb-3">
+            <label th:each="a : ${accounts}"
+                   th:with="taken=${occupied.get(a.id)},mine=${#lists.contains(g.accountIds, a.id)}"
+                   class="flex items-center gap-2 text-[12.5px] py-1"
+                   th:classappend="${taken != null and !mine} ? 'opacity-45' : ''">
+              <!--/* 已被别的组占用 → 置灰 + 禁选 + 说清被谁占了。
+                     第一版这里是可选的,勾上会**悄悄**把账户从原组搬走,页面一个字不说 ——
+                     静默改掉用户没打算改的东西,比报错更糟。 */-->
+              <input type="checkbox" name="accountIds" th:value="${a.id}"
+                     th:checked="${mine}" th:disabled="${taken != null and !mine}">
+              <span th:text="${a.displayName}">账户</span>
+              <span th:if="${taken != null and !mine}"
+                    class="font-mono text-[9px] text-brass-deep border border-brass-deep px-1 whitespace-nowrap"
+                    th:text="'已在「' + ${taken} + '」'">已在别的组</span>
+            </label>
+          </div>
+          <div class="flex items-center gap-3 flex-wrap">
+            <button type="submit" class="btn-ink text-sm">保存</button>
+            <span class="text-[11px] text-ink-subtle">
+              想把置灰的账户挪过来:先去它所在的那个分组里取消勾选
+            </span>
+          </div>
+        </form>
+        <form method="post" th:action="@{/accounts/groups/{id}/delete(id=${g.id})}" class="mt-3 pt-3 border-t border-rule-soft"
+              onsubmit="return confirm('删掉这个分组?账户回到未分组,数据一行不动,页面回到没建组的样子。')">
+          <button type="submit" class="font-mono text-[10px] text-rust hover:underline bg-transparent border-0 cursor-pointer">删除这个分组</button>
+        </form>
+      </div>
+    </details>
+  </div>
+
+  <!--/* 没建组时这一页必须自己解释「建了会怎样、代价是什么」——
+         因为在建之前,页面上任何地方都看不出区别(这正是零影响设计的代价)。 */-->
+  <div th:if="${#lists.isEmpty(groups)}" class="paper-card p-5 mb-6">
+    <div class="eyebrow mb-2">建 · 之 · 前 · 先 · 知 · 道</div>
+    <ul class="text-[13px] text-ink leading-relaxed ml-4 list-disc space-y-1">
+      <li><b>不建就一个像素都不变。</b>没有开关 ——「有没有建组」本身就是开关。</li>
+      <li><b>随时可删。</b>删组之后账户回到未分组,数据一行不动。</li>
+      <li><b>历史不会被追改。</b>已关账月份的数字不会因为你今天改了分组而变;
+          只有重开那一期再关账,才会按新分组重算。</li>
+      <li><b>代价</b>:组里几个账户<b>各自</b>的收益差异、单账户归因就看不到了。</li>
+    </ul>
+  </div>
+
+  <!-- ═══ 推荐 ═══ -->
+  <div th:if="${!#lists.isEmpty(suggestions)}" class="mt-8 mb-6">
+    <div class="eyebrow mb-2">推 · 荐</div>
+    <p class="text-[11.5px] text-ink-subtle mb-3">
+      按你账户上<b>已有的属性</b>给的建议,不是猜的。<b>推荐 ≠ 自动创建</b> —— 不点就不会有任何组。
+    </p>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <form th:each="s : ${suggestions}" method="post" th:action="@{/accounts/groups/create}" class="paper-card p-4">
+        <input type="hidden" name="name" th:value="${s.name}">
+        <div class="flex items-baseline gap-2 mb-1">
+          <span class="font-display text-lg" th:text="${s.name}">随时可取</span>
+          <span class="font-mono text-[10px] text-ink-subtle" th:text="|${#lists.size(s.accountIds)} 个账户|">5 个</span>
+        </div>
+        <p class="text-[11.5px] text-ink-subtle mb-2" th:text="${s.why}">依据</p>
+        <div class="space-y-1 mb-3">
+          <label th:each="aid : ${s.accountIds}" th:with="taken=${occupied.get(aid)}"
+                 class="flex items-center gap-2 text-[12.5px]"
+                 th:classappend="${taken != null} ? 'opacity-45' : ''">
+            <input type="checkbox" name="accountIds" th:value="${aid}"
+                   th:checked="${taken == null}" th:disabled="${taken != null}">
+            <span th:text="${accountName.get(aid)}">账户</span>
+            <span th:if="${taken != null}" class="font-mono text-[9px] text-brass-deep border border-brass-deep px-1"
+                  th:text="'已在「' + ${taken} + '」'">已被占</span>
+          </label>
+        </div>
+        <p class="text-[11px] text-ink-subtle mb-2">默认全选 · 不想并进来的取消勾选即可</p>
+        <button type="submit" class="btn-ink text-sm">建这个分组</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ═══ 自建 ═══ -->
+  <details class="paper-card p-5 mt-6">
+    <summary class="cursor-pointer font-display text-lg">自己建一个分组</summary>
+    <form method="post" th:action="@{/accounts/groups/create}" class="mt-4">
+      <label class="block mb-3" style="max-width:280px">
+        <span class="block text-[11.5px] text-ink-soft mb-1">组名(不能和已有的重名)</span>
+        <input type="text" name="name" placeholder="比如:日常周转 / 孩子教育金" class="field-input w-full" required>
+      </label>
+      <p class="text-[11.5px] text-ink-soft mb-2">选账户(可以跨类型 —— 我们不拦,但会告诉你代价)</p>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1 mb-4">
+        <label th:each="a : ${accounts}" th:with="taken=${occupied.get(a.id)}"
+               class="flex items-center gap-2 text-[12.5px] py-1"
+               th:classappend="${taken != null} ? 'opacity-45' : ''">
+          <input type="checkbox" name="accountIds" th:value="${a.id}" th:disabled="${taken != null}">
+          <span th:text="${a.displayName}">账户</span>
+          <span th:if="${taken != null}" class="font-mono text-[9px] text-brass-deep border border-brass-deep px-1"
+                th:text="'已在「' + ${taken} + '」'">已被占</span>
+        </label>
+      </div>
+      <button type="submit" class="btn-primary">建这个分组</button>
+    </form>
+  </details>
+
+</main>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+<script>
+  // 搜索:分组名 或 成员账户名。命中就展开,方便一眼看到是谁匹配上的。
+  function filterGroups(kw) {
+    var k = (kw || '').trim().toLowerCase();
+    var cards = document.querySelectorAll('#groupList .group-card');
+    var hit = 0;
+    cards.forEach(function (c) {
+      var hay = ((c.dataset.name || '') + ' ' + (c.dataset.members || '')).toLowerCase();
+      var ok = !k || hay.indexOf(k) >= 0;
+      c.style.display = ok ? '' : 'none';
+      if (ok) { hit++; if (k) c.open = true; }
+    });
+    var hint = document.getElementById('searchHint');
+    hint.textContent = k ? ('匹配 ' + hit + ' / ' + cards.length + ' 个分组') : '';
+  }
+  function toggleAll(open) {
+    document.querySelectorAll('#groupList .group-card').forEach(function (c) {
+      if (c.style.display !== 'none') c.open = open;
+    });
+  }
+</script>
+</body>
+</html>

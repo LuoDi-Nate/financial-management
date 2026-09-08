@@ -33,6 +33,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 public class AccountController {
 
     private final AccountService accountService;
+    /** v1.20 · 账户所属分组(展示用) */
+    private final com.family.finance.service.group.AccountGroupService accountGroupService;
     private final AccountTemplateService accountTemplateService;
     /** 仅活跃:新建账户向导的主理人下拉 —— 新账户不该挂到已归档的人身上 */
     private final MemberMapper memberMapper;
@@ -51,6 +53,9 @@ public class AccountController {
                         @RequestParam(value = "type", required = false) String typeFilter,
                         Model model) {
         addModel(me, model, includeArchived, false);
+        // v1.20 · 「这个账户属于哪个分组」—— 从账户看分组的那一侧。
+        //   第一版只做了分组管理页,账户这边一个字都没提,用户只有恰好翻到管理页才知道有这能力。
+        model.addAttribute("accountGroupName", accountGroupService.occupiedBy(me.getFamilyId(), null));
         // 用户视角的"按类型筛选"(CASH / STOCK / WEALTH / PROPERTY / LOAN / OTHER / ALL)
         com.family.finance.domain.account.AccountType normalized = null;
         if (typeFilter != null && !typeFilter.isBlank() && !"ALL".equalsIgnoreCase(typeFilter)) {
@@ -157,6 +162,9 @@ public class AccountController {
         // v0.17 · 保险账户带保单登记(非保险为 null,详情页不渲染保单段)
         model.addAttribute("insurancePolicy",
                 insurancePolicyMapper.findByAccount(accountId).orElse(null));
+        // v1.20 · 这个账户属于哪个分组(null = 未分组)· 顺带给出去管理的入口
+        model.addAttribute("accountGroupName",
+                accountGroupService.occupiedBy(me.getFamilyId(), null).get(accountId));
         return "accounts/detail";
     }
 

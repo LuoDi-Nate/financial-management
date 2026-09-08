@@ -83,19 +83,80 @@ public class AccountGroupService {
         return notes.isEmpty() ? null : String.join(";", notes) + "。还是可以建,只是你得知道这个数该怎么读。";
     }
 
+    /**
+     * 业务异常 —— 用户能看懂、且<b>是他自己能纠正</b>的问题。
+     *
+     * <p>与它相对的是 {@code SQLIntegrityConstraintViolationException} 冒成 500 白页:
+     * 那种页面除了「出错了」什么都没说,用户既不知道哪里错了,也不知道该改什么。
+     * v1.20 第一版就是这样 —— 组名重一次就白页(维护者验收时当场撞上)。</p>
+     */
+    public static class GroupConflictException extends RuntimeException {
+        public GroupConflictException(String message) { super(message); }
+    }
+
     @Transactional
     public AccountGroup create(long familyId, Long memberId, String name, String note, List<Long> accountIds) {
         String safe = name == null || name.isBlank() ? "未命名分组" : name.trim();
+        requireNameFree(familyId, safe, null);
+        requireAccountsFree(familyId, accountIds, null);
         AccountGroup g = AccountGroup.builder()
                 .familyId(familyId).name(safe).note(note).createdBy(memberId).build();
         groupMapper.insert(g);
         if (accountIds != null) {
-            // addMember 是 ON DUPLICATE KEY UPDATE group_id —— 账户已在别的组里就是**搬过来**。
-            // 这正是「一个账户最多属一个组」在写入侧的自然表达,不需要先查再判。
             for (Long id : accountIds) groupMapper.addMember(g.getId(), id);
         }
         backfillFreeze(familyId);
         return g;
+    }
+
+    /** 组名不许重 —— 重了 DB 会抛唯一约束,那是 500 白页,不是给用户看的东西 */
+    private void requireNameFree(long familyId, String name, Long selfId) {
+        for (AccountGroup g : groupMapper.findByFamily(familyId)) {
+            if (g.getName().equals(name) && (selfId == null || !g.getId().equals(selfId))) {
+                throw new GroupConflictException("已经有一个叫「" + name + "」的分组了,换个名字。");
+            }
+        }
+    }
+
+    /**
+     * 账户不许被两个组同时选中。
+     *
+     * <p><b>为什么是「拒绝」而不是「搬过来」</b>:第一版用 {@code ON DUPLICATE KEY UPDATE}
+     * 实现成了搬家语义 —— 于是在新组里勾一个已属别组的账户,系统会<b>悄悄把它从原组挪走</b>,
+     * 页面一个字都不说。原组的收益口径当场就变了,而用户不知道。
+     * <b>静默地改掉用户没打算改的东西,比报错更糟。</b></p>
+     *
+     * <p>界面上这类账户是置灰的;能走到这里说明是绕过界面直接调的接口 ——
+     * 那也该得到一句人话,而不是一串约束名。</p>
+     */
+    private void requireAccountsFree(long familyId, List<Long> accountIds, Long selfId) {
+        if (accountIds == null || accountIds.isEmpty()) return;
+        Map<Long, String> owner = occupiedBy(familyId, selfId);
+        for (Long id : accountIds) {
+            String by = owner.get(id);
+            if (by != null) {
+                String name = accountMapper.findById(id).map(Account::getDisplayName).orElse("账户#" + id);
+                throw new GroupConflictException(
+                        "「" + name + "」已经在分组「" + by + "」里了。一个账户只能属于一个分组 —— "
+                        + "要把它挪过来,先去「" + by + "」里把它取消勾选。");
+            }
+        }
+    }
+
+    /**
+     * 已被占用的账户 → 占用它的分组名。
+     *
+     * @param exceptGroupId 编辑某个组时把它自己排除掉,否则它自己的成员会被判成「被占用」
+     */
+    public Map<Long, String> occupiedBy(long familyId, Long exceptGroupId) {
+        Map<Long, String> groupName = new LinkedHashMap<>();
+        groupMapper.findByFamily(familyId).forEach(g -> groupName.put(g.getId(), g.getName()));
+        Map<Long, String> out = new LinkedHashMap<>();
+        for (var m : groupMapper.findMembersByFamily(familyId)) {
+            if (exceptGroupId != null && exceptGroupId.equals(m.groupId())) continue;
+            out.put(m.accountId(), groupName.getOrDefault(m.groupId(), "别的分组"));
+        }
+        return out;
     }
 
     /**
@@ -117,6 +178,8 @@ public class AccountGroupService {
     public void updateMembers(long familyId, long groupId, String name, List<Long> accountIds) {
         AccountGroup g = groupMapper.findById(familyId, groupId);
         if (g == null) throw new IllegalArgumentException("分组不存在");
+        if (name != null && !name.isBlank()) requireNameFree(familyId, name.trim(), groupId);
+        requireAccountsFree(familyId, accountIds, groupId);
         if (name != null && !name.isBlank()) {
             g.setName(name.trim());
             groupMapper.rename(g);

@@ -8254,6 +8254,10 @@ QA1200_ENG="$RD/src/main/java/com/family/finance/calc/review/AttributionEngine.j
 QA1200_LENS="$RD/src/main/java/com/family/finance/service/lens/LensQueryService.java"
 QA1200_GUARD="$RD/src/main/java/com/family/finance/service/entry/BalanceGuardService.java"
 QA1200_MIG="$RD/db/migration/V58__account_group.sql"
+QA1200_CTL="$RD/src/main/java/com/family/finance/web/admin/AccountGroupController.java"
+QA1200_ACL="$RD/src/main/resources/templates/accounts/index.html"
+QA1200_ADT="$RD/src/main/resources/templates/accounts/detail.html"
+QA1200_GPG="$RD/src/main/resources/templates/accounts/groups.html"
 
 # v1200-SINGLE-GROUP-MEMBERSHIP · 单属靠 **DB** 保证,不靠应用层校验。
 #   归因有恒等式「基准 + 人赚 + 钱赚 + 开账基线 = 本期净变化」,一个账户进两个组会双计,
@@ -8326,6 +8330,49 @@ QA1200_MIG="$RD/db/migration/V58__account_group.sql"
 { ! codeonly "$QA1200_LENS" | grep -A3 -E 'for *\(Account' | grep -q 'groupingResolver.valuesFor'; } \
   && log_ok "v1200-NO-N-PLUS-1(维值映射一次取回,不在账户循环里查)" \
   || log_bad "v1200-NO-N-PLUS-1 解析器被放进循环了" "N+1 查询"
+
+# ═══ v1.20 验收后补:分组的可发现性与冲突处理 ═══
+
+# v1200-GROUPS-DISCOVERABLE · 分组必须能从【账户】那一侧走到。
+#   第一版只做了一个独立管理页,账户列表与详情页一个字都没提 ——
+#   用户只有恰好翻到管理页才知道有这能力(维护者验收当场点出来的)。
+#   分组回答的是「这些账户合起来看」,和账户列表是同一件事的两个方向。
+{ grep -q '/accounts/groups' "$QA1200_ACL" \
+  && grep -q '/accounts/groups' "$QA1200_ADT" \
+  && grep -q 'accountGroupName' "$QA1200_ACL" \
+  && grep -q 'accountGroupName' "$QA1200_ADT"; } \
+  && log_ok "v1200-GROUPS-DISCOVERABLE(账户列表与详情页都显示所属分组且能点进去)" \
+  || log_bad "v1200-GROUPS-DISCOVERABLE 账户那一侧又看不到分组了" "用户只有恰好翻到管理页才知道有这个能力"
+
+# v1200-CONFLICT-IS-BUSINESS-ERROR · 冲突要给人话,不能让 DB 约束冒成 500。
+#   验收实测:组名重一次 → Duplicate entry '1-组A' for key 'uk_group_family_name' → 500 白页。
+#   那种页面除了「出错了」什么都没说,用户既不知道错在哪也不知道该改什么。
+{ codeonly "$QA1200_SVC" | grep -q 'class GroupConflictException' \
+  && codeonly "$QA1200_SVC" | grep -q 'requireNameFree' \
+  && codeonly "$QA1200_SVC" | grep -q 'requireAccountsFree' \
+  && codeonly "$QA1200_CTL" | grep -q 'catch (AccountGroupService.GroupConflictException' \
+  && [ -f "$RD/src/test/java/com/family/finance/service/group/AccountGroupConflictTest.java" ]; } \
+  && log_ok "v1200-CONFLICT-IS-BUSINESS-ERROR(重名与占用都给人话 · 控制器接住 · 有单测)" \
+  || log_bad "v1200-CONFLICT-IS-BUSINESS-ERROR 冲突又变成 500 了" "SQL 约束名冒到用户脸上,他不知道错在哪也不知道怎么改"
+
+# v1200-NO-SILENT-STEAL · 账户被两个组选中时不许「悄悄搬走」。
+#   第一版 addMember 是 ON DUPLICATE KEY UPDATE = 搬家语义:在新组勾一个已属别组的账户,
+#   系统会把它从原组挪走而页面一个字不说 —— 原组的收益口径当场变了,用户不知道。
+#   **静默改掉用户没打算改的东西,比报错更糟。**
+#   界面侧同时要置灰并标出占用者,别让用户走到那一步才被拒。
+{ codeonly "$QA1200_SVC" | grep -q 'occupiedBy' \
+  && grep -q 'th:disabled' "$QA1200_GPG" \
+  && grep -q '已在「' "$QA1200_GPG"; } \
+  && log_ok "v1200-NO-SILENT-STEAL(被占用的账户置灰+标出占用者 · 后端也拒)" \
+  || log_bad "v1200-NO-SILENT-STEAL 又会把账户从别的组悄悄搬走了" "原组的收益口径当场变,而页面一个字不说"
+
+# v1200-GROUPS-PAGE-USABLE · 分组页要能用:折叠列表 + 搜索,而不是把所有账户平铺 N 遍。
+#   第一版每个分组都渲染全部账户的 checkbox(19 账户 × N 组),维护者原话「交互怎么这么奇怪」。
+{ grep -q 'id="groupSearch"' "$QA1200_GPG" \
+  && grep -q 'group-card' "$QA1200_GPG" \
+  && grep -qE '<details[^>]*class="paper-card mb-3 group-card"' "$QA1200_GPG"; } \
+  && log_ok "v1200-GROUPS-PAGE-USABLE(分组列表默认折叠 · 可按组名/账户名搜索)" \
+  || log_bad "v1200-GROUPS-PAGE-USABLE 分组页又变成平铺全部账户了" "N 个组 × 全部账户的 checkbox,没法用"
 
 echo
 echo "═══════════════════════════════════════"

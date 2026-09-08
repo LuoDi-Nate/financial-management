@@ -25,6 +25,19 @@
         <span class="pill"
               th:classappend="${detail.account.type.name() == 'LOAN' ? ' pill-rust' : (detail.account.type.name() == 'WEALTH' ? ' pill-forest' : (detail.account.type.name() == 'STOCK' ? ' pill-brass' : (detail.account.type.name() == 'INSURANCE' ? ' pill-slate' : '')))}"
               th:text="${detail.account.type.label} + ' (' + ${detail.account.type.name()} + ')'">现金 (CASH)</span>
+        <!--/* v1.20 · 所属分组 + 去管理的入口。和类目 pill 同级 ——
+               「这个账户属于哪个分组」和「它是什么类目」是同一类信息。 */-->
+        <a th:href="@{/accounts/groups}" class="pill inline-flex items-center gap-1 no-underline"
+           th:classappend="${accountGroupName != null} ? '' : 'text-ink-subtle'"
+           th:style="${accountGroupName != null} ? 'background:rgba(160,124,58,.10);border-color:var(--brass-deep);color:var(--brass-deep)' : ''"
+           th:title="${accountGroupName != null} ? '点开管理账户分组' : '这个账户还没有分组 · 点开去管理'">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+            <rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/>
+          </svg>
+          <span th:text="${accountGroupName != null} ? '分组:' + ${accountGroupName} : '未分组 · 管理分组'">未分组</span>
+        </a>
         <span class="pill inline-flex items-center gap-1" th:if="${detail.category != null}"
               style="background:rgba(122,90,57,.10);border-color:var(--brass-deep);color:var(--brass-deep)">
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

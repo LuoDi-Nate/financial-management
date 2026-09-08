@@ -17,6 +17,7 @@
       </p>
     </div>
     <div class="flex items-center gap-3">
+      <a th:href="@{/accounts/groups}" class="btn-paper no-underline whitespace-nowrap">账户分组</a>
       <a th:href="@{/lens/tags}" class="btn-paper no-underline whitespace-nowrap">资产打标</a>
       <a th:href="@{/accounts/new}" class="btn-ink no-underline whitespace-nowrap">+ 添加账户(开向导)</a>
     </div>
@@ -77,6 +78,10 @@
         <th>类型</th>
         <th>币种</th>
         <th>主理人</th>
+        <!--/* v1.20 · 分组是「从账户看它属于哪个组」这一侧的入口。
+               第一版只做了分组管理页,账户这边一个字都没提 ——
+               于是用户只有恰好翻到管理页才会知道有这个能力(维护者验收时点出来的)。 */-->
+        <th>分组</th>
         <th>默认还款来源</th>
         <th class="num">本期末余额</th>
         <th class="num">操作</th>
@@ -144,6 +149,14 @@
         <td class="font-mono text-xs" th:text="${row.account.currency}">CNY</td>
         <!-- v1.6 UED(review B3-4)· 列宽不足时中文被挤成竖排("王二狗"渲染成三行)→ nowrap -->
         <td class="text-ink-soft nowrap" th:text="${row.ownerName}">Alice</td>
+        <td class="nowrap" th:with="grp=${accountGroupName != null ? accountGroupName.get(row.account.id) : null}">
+          <a th:if="${grp != null}" th:href="@{/accounts/groups}"
+             class="font-mono text-[10px] px-1.5 py-0.5 border no-underline whitespace-nowrap"
+             style="border-color:var(--brass-deep);color:var(--brass-deep);background:rgba(160,124,58,.08)"
+             th:text="${grp}">随时可取</a>
+          <a th:unless="${grp != null}" th:href="@{/accounts/groups}"
+             class="font-mono text-[10px] text-ink-subtle no-underline hover:underline">未分组</a>
+        </td>
         <td class="text-ink-subtle nowrap" th:text="${row.paymentSourceName}">—</td>
         <td class="num" th:classappend="${row.account.type.name() == 'LOAN' ? ' num-neg' : ''}" data-priv th:text="${row.balanceLabel}">¥73,200</td>
         <td class="text-right whitespace-nowrap">
