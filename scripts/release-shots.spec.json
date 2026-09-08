@@ -1,51 +1,70 @@
 {
-  "_comment": "v1.19.0 · 超级 Agent。PC 用 selector 裁掉导航与留白只留对话卡;手机整屏不裁。",
+  "_comment": "v1.20.0 · 账户组。PC 用 selector 裁掉导航与留白只留本次改动的那块;手机整屏不裁。核心叙事:①分组页(建组入口)②新建弹窗(推荐+类型+主理人)③账户列表折叠成一行 ④按账户分布图长尾变短。",
   "pc": [
     {
-      "path": "/ask?conv=26",
-      "name": "ask-conv",
-      "wait": 2000,
-      "waitFor": ".ask-chart canvas",
-      "selector": ".ask-shell"
-    },
-    {
-      "path": "/ask?conv=26",
-      "name": "ask-think",
-      "wait": 2000,
-      "waitFor": ".ask-acts",
-      "eval": "document.querySelectorAll('details.ask-acts').forEach(d=>d.open=true);const t=document.querySelector('.ask-turn'); if(t) t.id='shot-target';",
-      "selector": "#shot-target"
-    },
-    {
-      "path": "/ask",
-      "name": "ask-empty",
+      "path": "/accounts/groups",
+      "name": "groups-list",
       "wait": 900,
-      "waitFor": ".ask-empty",
-      "selector": ".ask-shell"
+      "waitFor": ".group-card",
+      "eval": "document.querySelectorAll('.group-card').forEach(d=>d.open=true);",
+      "selector": "main"
     },
     {
-      "path": "/admin/ai-access",
-      "name": "ask-admin",
-      "wait": 900,
-      "waitFor": ".paper-card",
-      "eval": "const c=document.querySelectorAll('.paper-card'); if(c.length) c[c.length-1].id='shot-target';const p=[...document.querySelectorAll('.paper-card')].find(x=>x.innerText.includes('跑 在 哪 里'));if(p) p.id='shot-target';",
-      "selector": "#shot-target"
+      "path": "/accounts/groups",
+      "name": "groups-new",
+      "wait": 1200,
+      "waitFor": "main",
+      "eval": "const d=document.getElementById('newGroupDlg'); d.showModal(); const c=[...d.querySelectorAll('.pill')].find(x=>x.dataset.pickIds||x.dataset.ids); if(c) c.click();",
+      "selector": "#newGroupDlg"
+    },
+    {
+      "path": "/dashboard",
+      "name": "acct-list-folded",
+      "wait": 2200,
+      "waitFor": "#dash-list table tbody tr",
+      "selector": "#dash-list",
+      "eval": "document.querySelectorAll('header,[class*=fixed],.toc-rail,[id*=agent],[class*=agent-fab]').forEach(function(e){var p=getComputedStyle(e).position;if(p==='fixed'||p==='sticky'||e.tagName==='HEADER')e.style.display='none';});"
+    },
+    {
+      "path": "/dashboard",
+      "name": "acct-list-open",
+      "wait": 2200,
+      "waitFor": "#dash-list .acct-toggle",
+      "eval": "document.querySelectorAll('header,[class*=fixed],.toc-rail,[id*=agent],[class*=agent-fab]').forEach(function(e){var p=getComputedStyle(e).position;if(p==='fixed'||p==='sticky'||e.tagName==='HEADER')e.style.display='none';});const b=document.querySelector('#dash-list .acct-toggle'); if(b) b.click();",
+      "selector": "#dash-list"
+    },
+    {
+      "path": "/dashboard",
+      "name": "dist-chart",
+      "wait": 2600,
+      "waitFor": "#accountDivergeChart",
+      "selector": "#dash-dist",
+      "eval": "document.querySelectorAll('header,[class*=fixed],.toc-rail,[id*=agent],[class*=agent-fab]').forEach(function(e){var p=getComputedStyle(e).position;if(p==='fixed'||p==='sticky'||e.tagName==='HEADER')e.style.display='none';});"
     }
   ],
   "mobile": [
     {
-      "path": "/ask?conv=26",
-      "name": "ask-conv",
-      "wait": 2000,
+      "path": "/dashboard",
+      "name": "acct-list",
+      "wait": 2400,
       "full": false,
-      "waitFor": ".ask-chart canvas"
+      "waitFor": "#dash-list details",
+      "eval": "const s=document.getElementById('dash-list'); if(s) s.scrollIntoView();"
     },
     {
-      "path": "/ask",
-      "name": "ask-empty",
-      "wait": 900,
+      "path": "/accounts/groups",
+      "name": "groups-list",
+      "wait": 1000,
       "full": false,
-      "waitFor": ".ask-empty"
+      "waitFor": ".group-card"
+    },
+    {
+      "path": "/reports",
+      "name": "acct-return",
+      "wait": 2600,
+      "full": false,
+      "waitFor": "#sec-accounts",
+      "eval": "const s=document.getElementById('sec-accounts'); if(s) s.scrollIntoView();"
     }
   ]
 }
