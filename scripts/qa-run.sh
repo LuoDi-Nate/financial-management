@@ -8536,6 +8536,41 @@ QA1201_AAT="$RD/src/main/resources/templates/admin/ai-access.html"
   && log_ok "v1202-DIAGNOSIS-MUST-SAY-WHEN(自检结论带上次成功时间 · 区分「曾经好过」与「从没成功」)" \
   || log_bad "v1202-DIAGNOSIS-MUST-SAY-WHEN 自检又变回一句无从下手的猜测" "用户只能反复去控制台翻,而我们无法证伪自己的结论"
 
+# v1202-NO-CROSS-ENV-AGENT-OVERWRITE · 更新 Agent 前必须确认它是本机的。
+#   测试环境与生产环境常常共用一个百炼业务空间。如果两边的 ask_ma_agent_id 指到同一个 agent
+#   (复制配置、或两边的库从同一份备份起),那么在测试机上点一下「创建 Agent」
+#   就会把生产那个 agent【全量替换】掉 —— 而两边页面都显示「成功」,没有任何地方报错。
+#   判据用 mcp_servers:它引用的服务必须是本机配的那一个。
+QA1202_MA="$RD/src/main/java/com/family/finance/service/ask/runtime/ManagedAgentRuntime.java"
+{ codeonly "$QA1202_MA" | grep -q 'assertAgentIsOurs()'   && codeonly "$QA1202_MA" | grep -A3 'public void updateAgent' | grep -q 'assertAgentIsOurs()'   && codeonly "$QA1202_MA" | grep -q 'body.put("name", agentName())'   && codeonly "$QA1202_MA" | grep -q 'K_ASK_PUBLIC_BASE_URL'; } \
+  && log_ok "v1202-NO-CROSS-ENV-AGENT-OVERWRITE(更新前校验 agent 归属 · 名字带域名可区分环境)" \
+  || log_bad "v1202-NO-CROSS-ENV-AGENT-OVERWRITE 又能在测试机上静默覆盖生产的 Agent 了" "两边都显示成功,没有任何地方报错"
+
+# v1202-MCP-TOOLKIT-MUST-BE-MOUNTED · 【卡了好几天的那个 bug】
+#   mcp_servers 只是「声明有这个服务器」,它不会把服务器的工具挂到 agent 上。
+#   挂工具要另外给 tools:[{type:mcp_toolkit, mcp_server_name, configs:[逐个工具名]}]。
+#
+#   为什么必须机器守:这个失败的每一步都是成功的 ——
+#     · MCP 服务在控制台部署成功
+#     · 部署校验时百炼真的连到了我们的 /mcp(入站审计里有 initialize + tools/list 全 OK)
+#     · 创建 agent 返回 200,回读 mcp_servers 引用也在
+#     · 而 agent 在真实对话里说「我只有 mark_artifacts」,一次 tools/call 都不发
+#   于是排查方向被带到「MCP 服务是不是没部署成功」上,而它明明部署成功了。
+#
+#   最反直觉的一条:default_config:{enabled:true} 一个人【不够】,
+#   必须在 configs 里把每个工具名逐个列出来。名字叫 default_config 却不是「默认全开」。
+QA1202_MA="$RD/src/main/java/com/family/finance/service/ask/runtime/ManagedAgentRuntime.java"
+{ codeonly "$QA1202_MA" | grep -q '"mcp_toolkit"'   && codeonly "$QA1202_MA" | grep -q '"mcp_server_name", mcpServerId()'   && codeonly "$QA1202_MA" | grep -q 'toolkit.put("configs", perTool)'   && codeonly "$QA1202_MA" | grep -q 'registry.all().stream()'   && codeonly "$QA1202_MA" | grep -q 'body.put("tools", List.of(toolkit))'; } \
+  && log_ok "v1202-MCP-TOOLKIT-MUST-BE-MOUNTED(agent 同时给 mcp_servers 与 tools/mcp_toolkit · configs 逐个列工具)" \
+  || log_bad "v1202-MCP-TOOLKIT-MUST-BE-MOUNTED agent 又只声明服务器、不挂工具了" "每一步都 200,而 agent 说自己只有「标记交付物」一个工具 —— 不报错的那种坏"
+
+# v1202-VERIFY-READS-TOOLS-BACK · 回读必须把 tools 一起查。
+#   只查 mcp_servers 的话,「服务器声明了、工具一个没挂」会被判成成功 ——
+#   而那正是线上卡住的形状。「上游收下了」不等于「上游存住了」,更不等于「存对了」。
+{ codeonly "$QA1202_MA" | grep -A12 'private void verifyTemplate' | grep -q 'hasToolkit'   && codeonly "$QA1202_MA" | grep -q 'hasPrompt && hasMcp && hasToolkit'   && codeonly "$QA1202_MA" | grep -q 'MCP 服务引用在、但工具没挂上'; } \
+  && log_ok "v1202-VERIFY-READS-TOOLS-BACK(创建/更新后回读 tools · 失败提示点名「引用在但工具没挂」)" \
+  || log_bad "v1202-VERIFY-READS-TOOLS-BACK 回读不查 tools 了" "空壳 agent 会被判成创建成功"
+
 echo
 echo "═══════════════════════════════════════"
 echo " 总结: PASS=$PASS  FAIL=$FAIL  SKIP=$SKIP"

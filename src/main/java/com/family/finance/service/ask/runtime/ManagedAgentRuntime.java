@@ -272,6 +272,22 @@ public class ManagedAgentRuntime implements AgentRuntime {
     private static final String AGENT_NAME = "家庭资产超级 Agent";
 
     /**
+     * v1.20.2 · Agent 名字<b>带上这台机器的域名</b>。
+     *
+     * <p>踩到的坑:测试环境与生产环境<b>共用一个业务空间</b>,而两边的
+     * {@code ask_ma_agent_id} 存的是<b>同一个 agent</b> —— 于是在测试机上点一下
+     * 「创建 Agent」,走的是 {@code POST /agents/{id}}(<b>更新</b>),
+     * 把生产那个 agent 全量替换掉了,<b>而且两边页面都显示成功</b>。
+     *
+     * <p>名字里带域名之后,百炼控制台的 agent 列表上一眼能看出哪个是哪个环境的。
+     */
+    private String agentName() {
+        String base = configService.getString(FAMILY_ID, K_ASK_PUBLIC_BASE_URL, "");
+        String host = base.replaceFirst("^https?://", "").replaceAll("/.*$", "");
+        return host.isBlank() ? AGENT_NAME : AGENT_NAME + " · " + host;
+    }
+
+    /**
      * 创建与更新共用的请求体。
      *
      * <p>合成一份是必须的:百炼的更新是<b>全量替换</b>(缺省字段视为清空),
@@ -282,7 +298,7 @@ public class ManagedAgentRuntime implements AgentRuntime {
      */
     private Map<String, Object> agentBody(String systemPrompt, String model) {
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("name", AGENT_NAME);
+        body.put("name", agentName());
         // v1.19.11 · model 是**对象**不是字符串。百炼原话:
         //   Cannot construct instance of `DashModelConfigDTO` … from String value ('qwen-plus')
         //   (through reference chain: DashCreateAgentRequest["model"])
@@ -291,6 +307,39 @@ public class ManagedAgentRuntime implements AgentRuntime {
         // v1.19.11 · type 是 **customer** 不是 custom。百炼直接给了合法值:
         //   mcpServers[0].type 取值非法: custom,合法值: [official, customer]
         body.put("mcp_servers", List.of(Map.of("type", "customer", "name", mcpServerId())));
+
+        /* ══════════════════════════════════════════════════════════════════════
+         * v1.20.2 · 【这一版真正的 bug】mcp_servers 只是「声明有这个服务器」,
+         *            它<b>不会把服务器的工具挂到 agent 上</b>。挂工具要另外给 tools。
+         *
+         * 症状极难定位,因为每一步看起来都成功了:
+         *   · MCP 服务在百炼控制台部署成功
+         *   · 部署校验时百炼真的连到了我们的 /mcp,initialize + tools/list 全 200
+         *     (我们自己的入站审计表里躺着这几条 OK 记录)
+         *   · 创建 agent 返回 200,回读 mcp_servers 引用也在
+         *   · 而 agent 在真实对话里说「我只有 mark_artifacts」,一次 tools/call 都不发
+         *
+         * 于是排查方向被带到了「MCP 服务是不是没部署成功」上 —— 而它明明部署成功了。
+         *
+         * 形状是百炼逐条报错逼出来的:
+         *   ① tools[0].type 取值非法: mcp,合法值: [builtin_toolkit, mcp_toolkit]
+         *   ② mcp_toolkit 必须指定 mcpServerName        (字段名用 snake:mcp_server_name)
+         *   ③ mcp_toolkit 引用的 mcpServerName 不在 mcpServers 列表中
+         *      —— 也就是说 mcp_servers 和 tools <b>必须同时给</b>,前者声明、后者启用
+         *
+         * 【最关键、也最反直觉的一条】default_config:{enabled:true} <b>一个人不够</b>:
+         * 只给它,agent 依旧只有 mark_artifacts;必须在 configs 里把每个工具名<b>逐个列出来</b>。
+         * 名字叫 default_config 却不是「默认全开」—— 实测如此,别再想当然。
+         * ══════════════════════════════════════════════════════════════════════ */
+        List<Map<String, Object>> perTool = registry.all().stream()
+                .map(t -> Map.<String, Object>of("name", t.name(), "enabled", true))
+                .toList();
+        Map<String, Object> toolkit = new LinkedHashMap<>();
+        toolkit.put("type", "mcp_toolkit");
+        toolkit.put("mcp_server_name", mcpServerId());
+        toolkit.put("default_config", Map.of("enabled", true));
+        toolkit.put("configs", perTool);
+        body.put("tools", List.of(toolkit));
         return body;
     }
 
@@ -322,12 +371,38 @@ public class ManagedAgentRuntime implements AgentRuntime {
      * <p>已存在的会话<b>锁定创建时的 version</b>,不受本次更新影响。</p>
      */
     public void updateAgent(String systemPrompt, String model) throws Exception {
+        assertAgentIsOurs();
         Map<String, Object> body = agentBody(systemPrompt, model);
         body.put("version", configService.getString(FAMILY_ID, K_ASK_MA_AGENT_VERSION, "1"));
         JsonNode n = post(agentBase() + "/agents/" + agentId(), body);
         String ver = firstText(n, "version", "agent_version");
         if (ver != null) configService.set(FAMILY_ID, K_ASK_MA_AGENT_VERSION, ver);
         verifyTemplate(agentId());
+    }
+
+    /**
+     * v1.20.2 · 更新之前先确认<b>这个 agent 是我这台机器的</b>。
+     *
+     * <p>更新是<b>全量替换</b>。而测试环境与生产环境常常共用一个百炼业务空间,
+     * 如果两边的 {@code ask_ma_agent_id} 指到了同一个 agent(复制配置、或从同一份备份起的库),
+     * 那么在测试机上点一下「创建 Agent」<b>就会把生产那个 agent 覆盖掉</b> ——
+     * 而两边页面都显示「成功」,没有任何地方会报错。
+     *
+     * <p>判据用 {@code mcp_servers}:它引用的 MCP 服务必须是<b>我这台机器配的那一个</b>。
+     * 不是的话就别动它 —— 宁可让用户手动清一次 id,也不能静默改掉另一套环境。
+     */
+    private void assertAgentIsOurs() throws Exception {
+        JsonNode a = get(agentBase() + "/agents/" + agentId());
+        JsonNode servers = a.path("mcp_servers");
+        if (!servers.isArray() || servers.isEmpty()) return;   // 拿不到就不拦,避免误伤
+        String remote = servers.path(0).path("name").asText("");
+        String mine = mcpServerId();
+        if (remote.isBlank() || mine.isBlank() || remote.equals(mine)) return;
+        throw new IllegalStateException(
+                "这个 Agent(" + a.path("name").asText("?") + ")引用的 MCP 服务是 " + remote
+                + ",不是你这台机器配的 " + mine + " —— 它大概属于另一套环境。"
+                + "更新是全量替换,继续下去会把那一套改掉。"
+                + "如果你确实想让这台机器有自己的 Agent,先把「AI 接入」页里的 Agent ID 清空再点创建。");
     }
 
     /**
@@ -341,11 +416,26 @@ public class ManagedAgentRuntime implements AgentRuntime {
         JsonNode a = get(agentBase() + "/agents/" + id);
         boolean hasPrompt = !a.path(PROMPT_FIELD).asText("").isBlank();
         boolean hasMcp = a.path("mcp_servers").isArray() && !a.path("mcp_servers").isEmpty();
-        if (hasPrompt && hasMcp) return;
+        /* v1.20.2 · tools 也必须回读。
+         * 只查 mcp_servers 的话,「服务器声明了、工具一个没挂」这种状态会被判成成功 ——
+         * 而那正是线上卡了好几天的形状:每一步都 200,agent 却说自己只有 mark_artifacts。 */
+        JsonNode tools = a.path("tools");
+        boolean hasToolkit = false;
+        for (JsonNode t : tools) {
+            if (!"mcp_toolkit".equals(t.path("type").asText())) continue;
+            hasToolkit = t.path("configs").isArray() && !t.path("configs").isEmpty();
+            if (hasToolkit) break;
+        }
+        if (hasPrompt && hasMcp && hasToolkit) return;
         throw new IllegalStateException(
                 "百炼收下了(HTTP 200)但没存住:系统提示词" + (hasPrompt ? "在" : "是空的")
-                + " · MCP 引用" + (hasMcp ? "在" : "是空的")
-                + "。这通常意味着请求里的字段名和百炼当前的约定对不上 —— 它对不认识的字段是静默忽略的。");
+                + " · MCP 服务引用" + (hasMcp ? "在" : "是空的")
+                + " · 工具挂载(mcp_toolkit)" + (hasToolkit ? "在" : "是空的")
+                + "。这通常意味着请求里的字段名和百炼当前的约定对不上 —— 它对不认识的字段是静默忽略的。"
+                + (hasMcp && !hasToolkit
+                   ? "注意最后一项:MCP 服务引用在、但工具没挂上 —— 这个状态下 agent 会说自己只有"
+                     + "「标记交付物」一个工具,而每一步都不报错。"
+                   : ""));
     }
 
     /**
