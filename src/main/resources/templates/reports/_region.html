@@ -185,15 +185,25 @@
          主行/次行都用 justify-between,保证有 pill 与没 pill 的卡片结构一致、右侧不参差
          (memory:并列同类元素必须同尺寸同样式)。 -->
     <div class="sm:hidden space-y-2">
-      <details th:each="account : ${accountRows}" class="paper-card px-3 py-2.5"
-               th:with="bm=${benchmarkByAccount.get(account.accountId)},pc=${pcNameByAccount.get(account.accountId)}">
+      <details th:each="account : ${accountRowsFlat}" class="paper-card px-3 py-2.5"
+               th:with="bm=${benchmarkByAccount.get(account.accountId)},pc=${pcNameByAccount.get(account.accountId)}"
+               th:attr="data-member-of=${account.memberOf},data-group-id=${account.groupId}"
+               th:classappend="${account.memberOf != null} ? 'acct-member ml-4' : ''"
+               th:style="${account.memberOf != null} ? 'display:none' : ''">
         <summary class="cursor-pointer list-none">
           <div class="flex items-center justify-between gap-2">
             <div class="flex items-center gap-1.5 min-w-0">
               <!-- 类型 pill 前置 + 固定宽度(与 PC 表 / 仪表盘手机卡一致 · 防「现金」折行) -->
               <span class="pill text-center shrink-0 whitespace-nowrap" style="min-width:3.4em"
-                    th:text="${account.accountType.label}">现金</span>
-              <a th:href="@{/accounts/{id}(id=${account.accountId})}"
+                    th:text="${account.accountType == null ? '组' : account.accountType.label}">现金</span>
+              <button th:if="${account.grouped}" type="button"
+                      class="acct-toggle font-display text-sm hover:text-brass-deep truncate bg-transparent border-0 cursor-pointer p-0 text-left"
+                      th:attr="data-toggle-group=${account.groupId}">
+                <span th:text="${account.accountName}">日常周转</span>
+                <span class="font-mono text-[9px] text-ink-subtle ml-1"
+                      th:text="'· ' + ${account.memberCount} + ' 个 ▾'">· 5 个 ▾</span>
+              </button>
+              <a th:unless="${account.grouped}" th:href="@{/accounts/{id}(id=${account.accountId})}"
                  class="font-display text-sm hover:text-brass-deep no-underline truncate"
                  th:text="${account.accountName}">账户</a>
             </div>
@@ -275,14 +285,31 @@
         </tr>
         </thead>
         <tbody>
-        <tr th:each="account : ${accountRows}" th:with="bm=${benchmarkByAccount.get(account.accountId)},pc=${pcNameByAccount.get(account.accountId)}">
-          <td class="acct-sticky"><a th:href="@{/accounts/{id}(id=${account.accountId})}" class="font-display hover:text-brass-deep no-underline" th:text="${account.accountName}">账户</a></td>
+        <!--/* v1.20 FR-483 · 与仪表盘同一套范式:迭代扁平列表,组行 + 隐藏成员行。
+               bm / pc 按【真账户 id】取 —— 组行 accountId=null 取不到,自然渲染「—」。
+               这是对的:组行的 xirr 本来就是 null,没有东西可以和基准比。 */-->
+        <tr th:each="account : ${accountRowsFlat}" th:with="bm=${benchmarkByAccount.get(account.accountId)},pc=${pcNameByAccount.get(account.accountId)}"
+            th:attr="data-member-of=${account.memberOf},data-group-id=${account.groupId}"
+            th:classappend="${account.memberOf != null} ? 'acct-member' : ''"
+            th:style="${account.memberOf != null} ? 'display:none' : ''">
+          <td class="acct-sticky">
+            <button th:if="${account.grouped}" type="button"
+                    class="acct-toggle font-display hover:text-brass-deep bg-transparent border-0 cursor-pointer p-0"
+                    th:attr="data-toggle-group=${account.groupId}">
+              <span th:text="${account.accountName}">日常周转</span>
+              <span class="font-mono text-[9px] text-ink-subtle ml-1"
+                    th:text="'· ' + ${account.memberCount} + ' 个 ▾'">· 5 个 ▾</span>
+            </button>
+            <a th:unless="${account.grouped}" th:href="@{/accounts/{id}(id=${account.accountId})}"
+               th:classappend="${account.memberOf != null} ? 'ml-4' : ''"
+               class="font-display hover:text-brass-deep no-underline" th:text="${account.accountName}">账户</a>
+          </td>
           <!-- v1.9.3 · 必须 whitespace-nowrap。这张表 17 列、自然宽 ~1768px 远超容器,
                table-layout:auto 会把**能折行的中文列压到 min-content**(1 字/行)再把宽度让给数字列 ——
                于是「现金」竖成两行、「贵金属」三行,行高从 54px 涨到 71px。
                min-width/justify-center 与仪表盘账户表的类型 pill 对齐(那边是 3.4em 居中)。 -->
           <td><span class="pill whitespace-nowrap justify-center" style="min-width:3.4em"
-                    th:text="${account.accountType.label}">现金</span></td>
+                    th:text="${account.accountType == null ? '组' : account.accountType.label}">现金</span></td>
           <td><span class="pill text-[9px] whitespace-nowrap" th:if="${pc != null}" th:text="${pc}">—</span>
               <span th:if="${pc == null}" class="text-ink-subtle text-[10px]">未设</span></td>
           <td class="num" data-priv

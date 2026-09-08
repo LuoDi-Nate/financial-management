@@ -54,6 +54,7 @@ public class SealedPeriodService {
     private final SnapshotMapper snapshotMapper;
     /** v1.15 FR-382 · 名字映射走名录(含已归档)—— 归档一个人,不该让历史数据里的他变成无名氏 */
     private final MemberDirectory memberDirectory;
+    private final com.family.finance.service.group.AccountGroupingResolver groupingResolver;  // v1.20 FR-484
 
     /**
      * 载入一个封板期的完整快照。
@@ -110,7 +111,7 @@ public class SealedPeriodService {
         SealedSnapshot.Concentration concentration = buildConcentration(window, anchor.getId(),
                 prev == null ? null : buildConcentration(window, prev.getId(), null));
         SealedSnapshot.LiquidityTiers liquidity = buildLiquidity(window, anchor.getId(), kpi.avgExpense());
-        SealedSnapshot.Attribution attribution = buildAttribution(window, anchor.getId(), prev, anchorFlow);
+        SealedSnapshot.Attribution attribution = buildAttribution(familyId, window, anchor.getId(), prev, anchorFlow);
 
         return new SealedSnapshot(
                 anchor, true,
@@ -400,26 +401,55 @@ public class SealedPeriodService {
      * <p><b>本期首次出现的账户不进正贡献</b> —— 否则"补录一个存量账户"会显示成本月大赚。
      * 同理本期归档的不进负贡献。两类单列。</p>
      */
-    SealedSnapshot.Attribution buildAttribution(FactSlice slice, Long periodId, Period prev, PeriodFlow flow) {
+    /** 账户余额按维值标签汇总(未分组的标签就是账户名 → 零组态下逐字一致) */
+    private static java.util.Map<String, BigDecimal> foldByLabel(
+            java.util.Map<Long, BigDecimal> byAccount, java.util.function.Function<Long, String> labelOf) {
+        java.util.Map<String, BigDecimal> out = new java.util.LinkedHashMap<>();
+        byAccount.forEach((id, v) -> out.merge(labelOf.apply(id), nz(v), BigDecimal::add));
+        return out;
+    }
+
+    SealedSnapshot.Attribution buildAttribution(long familyId, FactSlice slice, Long periodId,
+                                                Period prev, PeriodFlow flow) {
         if (prev == null || flow == null) {
             return null;
         }
-        java.util.Map<Long, BigDecimal> cur = endByAccount(slice, periodId);
-        java.util.Map<Long, BigDecimal> before = endByAccount(slice, prev.getId());
+        java.util.Map<Long, BigDecimal> curAcct = endByAccount(slice, periodId);
+        java.util.Map<Long, BigDecimal> beforeAcct = endByAccount(slice, prev.getId());
         java.util.Map<Long, String> names = slice.rows().stream()
                 .collect(java.util.stream.Collectors.toMap(
                         com.family.finance.factview.AccountPeriodFact::accountId,
                         com.family.finance.factview.AccountPeriodFact::accountName, (a, b) -> a));
+
+        /* v1.20 FR-484 · 贡献者按【组】折叠 —— 组内划转在这里自动抵消,正是 issue #17 要的效果。
+         *
+         * 两个必须做对的细节:
+         *  ① 【本期】和【上期】都要用本期的分组关系折叠。用各自期的关系会让「改了分组」
+         *     长得和「钱动了」一模一样 —— 差额凭空冒出来又说不清是哪来的。
+         *  ② periodId 传给 resolver = 已关账期读 period_account_group 的【该期定格】。
+         *     读当前成员关系的话,今天挪一个账户,历史封板页的贡献者列表会跟着变。
+         *
+         * 折叠放在【逐账户算完 delta 之前】:先把余额按标签汇总,再走原来那套 isNew/isGone 判定,
+         * 于是「组是不是本期新开的」自然等于「组里所有成员上期都没余额」—— 一行额外逻辑都不用写。 */
+        java.util.Map<Long, com.family.finance.service.group.AccountGroupingResolver.Label> labels =
+                groupingResolver.labelsFor(familyId, periodId, null);
+        java.util.function.Function<Long, String> labelOf = id -> {
+            var lb = labels.get(id);
+            return lb != null ? lb.value() : names.getOrDefault(id, "#" + id);
+        };
+        java.util.Map<String, BigDecimal> cur = foldByLabel(curAcct, labelOf);
+        java.util.Map<String, BigDecimal> before = foldByLabel(beforeAcct, labelOf);
+
         BigDecimal delta = nz(flow.nwDelta());
         List<SealedSnapshot.Contribution> pos = new ArrayList<>();
         List<SealedSnapshot.Contribution> neg = new ArrayList<>();
         List<SealedSnapshot.Contribution> opened = new ArrayList<>();
         List<SealedSnapshot.Contribution> archived = new ArrayList<>();
-        for (Long id : new java.util.TreeSet<>(union(cur.keySet(), before.keySet()))) {
+        for (String id : new java.util.TreeSet<>(union(cur.keySet(), before.keySet()))) {
             boolean isNew = !before.containsKey(id) && cur.containsKey(id);
             boolean isGone = before.containsKey(id) && !cur.containsKey(id);
             BigDecimal d = nz(cur.get(id)).subtract(nz(before.get(id)));
-            var c = new SealedSnapshot.Contribution(names.getOrDefault(id, "#" + id),
+            var c = new SealedSnapshot.Contribution(id,
                     d.setScale(2, java.math.RoundingMode.HALF_EVEN), share(d, delta));
             if (isNew) {
                 opened.add(c);
@@ -438,8 +468,9 @@ public class SealedPeriodService {
                 opened, archived, delta.setScale(2, java.math.RoundingMode.HALF_EVEN));
     }
 
-    private static java.util.Set<Long> union(java.util.Set<Long> a, java.util.Set<Long> b) {
-        java.util.Set<Long> s = new java.util.HashSet<>(a);
+    /* v1.20 · 泛型化:贡献者折叠之后键从 accountId(Long)变成维值标签(String) */
+    private static <T> java.util.Set<T> union(java.util.Set<T> a, java.util.Set<T> b) {
+        java.util.Set<T> s = new java.util.HashSet<>(a);
         s.addAll(b);
         return s;
     }

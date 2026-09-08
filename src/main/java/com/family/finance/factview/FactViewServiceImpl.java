@@ -851,29 +851,11 @@ public class FactViewServiceImpl implements FactViewService {
         return v == null ? BigDecimal.ZERO : v;
     }
 
-    /** 把月末余额序列归一化成 viewBox 0 0 80 22 的 polyline points;<2 点返回 null(模板降级)。 */
-    private static String sparkPoints(List<TrendPoint> spark) {
-        if (spark == null || spark.size() < 2) return null;
-        double min = spark.stream().mapToDouble(p -> p.value().doubleValue()).min().orElse(0);
-        double max = spark.stream().mapToDouble(p -> p.value().doubleValue()).max().orElse(0);
-        double range = max - min;
-        int n = spark.size();
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < n; i++) {
-            long x = Math.round(80.0 * i / (n - 1));
-            double norm = range == 0 ? 0.5 : (spark.get(i).value().doubleValue() - min) / range;
-            long y = Math.round(20.0 - norm * 18.0);   // 值越高 y 越小(视觉向上)
-            if (i > 0) sb.append(' ');
-            sb.append(x).append(',').append(y);
-        }
-        return sb.toString();
-    }
+    /* v1.20 · 归一化搬到 {@link Sparkline} —— 账户组的组行要在【合并后的时序】上重算同一件事,
+     * 抄一份的下场是两条曲线的 viewBox / 基准会漂,而且没有任何测试会失败。 */
+    private static String sparkPoints(List<TrendPoint> spark) { return Sparkline.points(spark); }
 
-    private static String sparkTrend(List<TrendPoint> spark) {
-        if (spark == null || spark.size() < 2) return "none";
-        int c = spark.get(spark.size() - 1).value().compareTo(spark.get(0).value());
-        return c > 0 ? "up" : c < 0 ? "down" : "flat";
-    }
+    private static String sparkTrend(List<TrendPoint> spark) { return Sparkline.trend(spark); }
 
     private BigDecimal xirrForAccountRows(List<AccountPeriodFact> rows) {
         if (rows.size() < 2) {

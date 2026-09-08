@@ -41,6 +41,7 @@ public class AccountGroupController {
     private final AccountMapper accountMapper;
     private final NavService navService;
     private final AuditLogService auditLogService;
+    private final com.family.finance.service.member.MemberDirectory memberDirectory;   // v1.20 · 勾选列表要显示主理人
 
     @GetMapping("/accounts/groups")
     public String page(@AuthenticationPrincipal MemberPrincipal me,
@@ -55,6 +56,16 @@ public class AccountGroupController {
         Map<Long, String> accountName = new LinkedHashMap<>();
         accounts.forEach(a -> accountName.put(a.getId(), a.getDisplayName()));
         model.addAttribute("accountName", accountName);
+        /* v1.20 验收补 · 勾选列表只有账户名不够辨别 —— 家里两张卡都叫「招行」是常事,
+         * 而「哪张是我的、哪张是老婆的」恰恰是决定要不要放进同一个组的依据。
+         * 主理人用【含已归档成员】的目录:账户不会因为主理人被归档就换主人,
+         * 用仅活跃列表会让名字变成「成员#7」(v1.15 FR-382 同一个坑)。 */
+        java.util.Map<Long, String> memberName = memberDirectory.nameMap(fam);
+        java.util.Map<Long, String> ownerOf = new java.util.LinkedHashMap<>();
+        accounts.forEach(a -> ownerOf.put(a.getId(),
+                a.getPrimaryOwnerMemberId() == null ? "共同"
+                        : memberName.getOrDefault(a.getPrimaryOwnerMemberId(), "成员#" + a.getPrimaryOwnerMemberId())));
+        model.addAttribute("ownerOf", ownerOf);
 
         var groups = groupService.list(fam);
         var members = groupService.membersByGroup(fam);

@@ -46,6 +46,7 @@
   <script th:src="@{/js/searchable-select.js(v=${buildVersion})}" defer></script>
   <!-- v0.4.13 · KPI 口径说明 tooltip(点击 ? 展开说明) -->
   <script th:src="@{/js/kpi-info.js(v=${buildVersion})}" defer></script>
+  <script th:src="@{/js/account-group-toggle.js(v=${buildVersion})}" defer></script>  <!--/* v1.20 · 账户组行展开(dashboard + reports 共用) */-->
   <script th:inline="javascript">
     /* v1.6.7 · 断点必须同时看「短边」,不能只看宽度 ————————————————————————
        手机横屏是 844×390:只判宽度 → 844 被当成宽屏设备 → 模板里 453 处

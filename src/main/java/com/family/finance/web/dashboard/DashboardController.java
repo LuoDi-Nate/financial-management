@@ -67,6 +67,7 @@ public class DashboardController {
     private final com.family.finance.service.review.RebalancePlanService rebalancePlanService; // v1.2 计划进度 pill
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
     private final com.family.finance.service.insight.AssetInsightService assetInsightService; // v0.6 资产洞察速览
+    private final com.family.finance.service.group.AccountRowGrouper accountRowGrouper;       // v1.20 账户组折叠
     private final com.family.finance.service.lens.LensMetaService lensMetaService; // v1.1 资产透视内嵌
 
     @GetMapping("/dashboard")
@@ -342,7 +343,17 @@ public class DashboardController {
         // v1.18.7 · 洞察条改吃【这一页的切片】—— 此前它自己 loadDefault(本位币/全账户/按今天),
         //   于是切币种、筛账户、选历史 as-of 时,上面 KPI 变了、洞察条一动不动。
         model.addAttribute("insight", assetInsightService.compute(me.getFamilyId(), slice));
-        model.addAttribute("accountRows", accountRows);
+        /* v1.20 FR-482/483 · 账户级指标行按组折叠。
+         * 这一处同时修好三个组件:「按账户分布」横条图(它吃同一份 JSON,一行 JS 都不用动)、
+         * dashboard 账户列表、reports 账户级收益表。
+         * 注意【原始 accountRows 仍要留着】给上面两个调用方:
+         *   · metricExplain —— 解释的是账户级怎么算出来的
+         *   · computeMemberAllocation —— 按主理人聚合,而组行的 accountId 是 null,
+         *     传折叠后的进去会让组里的钱【从成员饼图里整片消失】。「按成员分布」本就不该跟组走。 */
+        var foldedRows = accountRowGrouper.fold(me.getFamilyId(), anchor.getId(), null, accountRows);
+        model.addAttribute("accountRows", foldedRows);                              // 顶层:图 + 计数
+        model.addAttribute("accountRowsFlat", accountRowGrouper.flatten(foldedRows)); // 表:组行 + 隐藏成员行
+        model.addAttribute("hasGroups", groupingResolver.hasAnyGroup(me.getFamilyId()));
         model.addAttribute("fxFallback", fxFallback);
         model.addAttribute("requestedCurrency", requestedCurrency);
 

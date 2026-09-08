@@ -8379,6 +8379,113 @@ QA1200_GPG="$RD/src/main/resources/templates/accounts/groups.html"
   && log_ok "v1200-GROUPS-PAGE-USABLE(主页面只有列表+搜索 · 新建走弹窗 · 推荐只预填、组名可改)" \
   || log_bad "v1200-GROUPS-PAGE-USABLE 分组页的形态又退回去了" "推荐占住主页面 / 没有新建弹窗 / 组名不可改"
 
+# ═══ v1.20 逐组件盘查后补:哪些跟分组走、哪些【刻意】不跟 ═══
+
+QA1200_ROWV="$RD/src/main/java/com/family/finance/service/group/AccountRowView.java"
+QA1200_FOLD="$RD/src/main/java/com/family/finance/service/group/AccountRowGrouper.java"
+QA1200_DREG="$RD/src/main/resources/templates/dashboard/_region.html"
+QA1200_RREG="$RD/src/main/resources/templates/reports/_region.html"
+QA1200_SEAL="$RD/src/main/java/com/family/finance/service/report/SealedPeriodService.java"
+QA1200_SEALT="$RD/src/main/resources/templates/reports/_sealed.html"
+
+# v1200-GROUP-RATIO-IS-NULL · 【这一版最危险的一处】组行的比率类必须是 null。
+#   XIRR 是资金加权年化:不能相加,加权平均也没有数学意义。
+#   拿「累计损益÷净投入」顶替更糟 —— 那是另一个口径,填进「收益率」列 = 口径悄悄换了。
+#   一个错的收益率比没有收益率危险得多:它看起来完全合理,没人会去质疑它。
+#   所以这里钉的是「有没有真的给 null」,不是「算得对不对」。
+{ codeonly "$QA1200_FOLD" | grep -qE 'null, *$|null, +//'   && codeonly "$QA1200_FOLD" | grep -c 'null,' | awk '{exit !($1>=5)}'   && ! codeonly "$QA1200_FOLD" | grep -qE 'xirr\(\)[^;]*(add|multiply|divide|average)'   && ! codeonly "$QA1200_FOLD" | grep -qE 'cumPnl[^;]*divide[^;]*netPrincipal'   && [ -f "$RD/src/test/java/com/family/finance/service/group/AccountRowGrouperTest.java" ]   && grep -q 'groupNullsOutRatios' "$RD/src/test/java/com/family/finance/service/group/AccountRowGrouperTest.java"; } \
+  && log_ok "v1200-GROUP-RATIO-IS-NULL(组行不给收益率/回撤/预实 · 也没拿累计收益率冒充 XIRR · 有单测)" \
+  || log_bad "v1200-GROUP-RATIO-IS-NULL 组行开始给比率了" "会得到一个看起来合理、实际没有数学意义的收益率 —— 没人会质疑它"
+
+# v1200-CHART-TOPLEVEL-ONLY · 横条图只吃【顶层折叠行】,不能吃扁平列表。
+#   扁平列表里组行后面跟着成员行;混进图里 = 组里的钱被算两遍,
+#   而图仍然画得出来、总额也仍然「看着差不多」—— 不报错的那种错。
+{ grep -q 'memberOf == null' "$QA1200_DREG"   && grep -q 'accountRows: \[\[${accountRows}\]\]' "$QA1200_DREG"; } \
+  && log_ok "v1200-CHART-TOPLEVEL-ONLY(按账户分布图只吃顶层行 · 显式挡掉成员行)" \
+  || log_bad "v1200-CHART-TOPLEVEL-ONLY 分布图可能把成员行也画进去了" "组里的钱算两遍,图照画不报错"
+
+# v1200-ONE-TABLE-MARKUP · 账户表的 11 个指标格只有【一份】标记。
+#   组行与成员行走同一个 th:each(扁平列表),不是嵌套两层循环各写一份 ——
+#   抄第二份的下场是以后改一处忘另一处,而且没有测试会红。
+{ grep -q 'accountRowsFlat' "$QA1200_DREG"   && grep -q 'accountRowsFlat' "$QA1200_RREG"   && [ "$(grep -c 'data-mcol="xirr"' "$QA1200_DREG")" -le 3 ]; } \
+  && log_ok "v1200-ONE-TABLE-MARKUP(组行与成员行共用同一份单元格标记)" \
+  || log_bad "v1200-ONE-TABLE-MARKUP 账户表的单元格标记被抄成了两份" "改一处忘另一处,PC 与手机/组行与账户行开始不一致"
+
+# v1200-RISK-NOT-FOLDED · 集中度是【风险度量】,必须按真账户算。
+#   HHI = Σ(份额²):5 个各占 4% 的账户 → 0.008;合成一个占 20% 的组 → 0.04,翻 5 倍。
+#   指标会说「你的集中度暴增」,而用户什么都没做,只是换了个看法。
+#   存款保险 50 万上限按【银行】算,不按用户的分组习惯算。
+{ ! codeonly "$QA1200_SEAL" | grep -A6 'buildConcentration\|record Share' | grep -q 'labelOf\|groupingResolver'   && grep -q 'hasGroups' "$QA1200_SEALT"   && grep -q '不按你的分组折叠' "$QA1200_SEALT"; } \
+  && log_ok "v1200-RISK-NOT-FOLDED(集中度按真账户算 · 且在页面上说明了为什么)" \
+  || log_bad "v1200-RISK-NOT-FOLDED 集中度跟着分组折叠了,或没说明为什么不折叠" "用户会以为自己的风险暴增(其实什么都没变),或以为这里漏算了"
+
+# v1200-MOVERS-READ-FROZEN · 封板贡献者按组折叠,但必须读【该期定格】的分组。
+#   读当前成员关系的话,今天挪一个账户,历史封板页的贡献者列表会跟着变。
+#   另一个坑:本期与上期必须用【同一份】分组关系折叠 ——
+#   否则「改了分组」长得和「钱动了」一模一样,差额凭空冒出来还说不清哪来的。
+{ codeonly "$QA1200_SEAL" | grep -q 'groupingResolver.labelsFor(familyId, periodId, null)'   && codeonly "$QA1200_SEAL" | grep -q 'foldByLabel(curAcct, labelOf)'   && codeonly "$QA1200_SEAL" | grep -q 'foldByLabel(beforeAcct, labelOf)'; } \
+  && log_ok "v1200-MOVERS-READ-FROZEN(封板贡献者按组折叠 · 读该期定格 · 前后期同一份关系)" \
+  || log_bad "v1200-MOVERS-READ-FROZEN 封板贡献者读了当前分组或前后期用了不同关系" "历史封板会随今天改分组而变;或「改分组」被显示成「钱动了」"
+
+# v1200-ACTION-STAYS-ACCOUNT · 「做」类组件不许跟组:组不是一个能记账的东西。
+#   完整性检查是待办清单(合并了不知道去填谁)· 调仓下拉要落到能转账的地方 ·
+#   体检是逐账户诊断。三处都要在【建过组时】说明为什么,不然用户以为是 bug。
+{ grep -q '余额逐个账户填,这里不按分组折叠' "$QA1200_SEALT"   && grep -q '划转得落到能记账的地方' "$RD/src/main/resources/templates/reports/_rebalance-plan.html"   && grep -q '体检是逐账户的' "$QA1200_DREG"   && grep -q 'th:unless="${account.grouped}"' "$QA1200_DREG"; } \
+  && log_ok "v1200-ACTION-STAYS-ACCOUNT(完整性/调仓/体检仍是账户级 · 且都说明了为什么)" \
+  || log_bad "v1200-ACTION-STAYS-ACCOUNT 操作类入口跟着组折叠了,或没说明为什么没折叠" "给出一个点不进去、转不了账的组名 = 把功能变没"
+
+# v1200-TOGGLE-SHARED-AND-DELEGATED · 展开逻辑一份 + 事件委托。
+#   两页用同一张表,内联两份一定会漂;而表在指标 chip 切换时整块重绘,
+#   直接绑按钮的话重绘一次就全掉了(和归因区「点开」踩的是同一个坑)。
+{ [ -f "$RD/src/main/resources/static/js/account-group-toggle.js" ]   && grep -q "document.addEventListener('click'" "$RD/src/main/resources/static/js/account-group-toggle.js"   && grep -q 'account-group-toggle.js' "$RD/src/main/resources/templates/fragments/layout.html"   && ! grep -q "closest('.acct-toggle')" "$QA1200_DREG"   && ! grep -q "closest('.acct-toggle')" "$QA1200_RREG"; } \
+  && log_ok "v1200-TOGGLE-SHARED-AND-DELEGATED(展开逻辑只有一份 · 事件委托 · 两页共用)" \
+  || log_bad "v1200-TOGGLE-SHARED-AND-DELEGATED 展开逻辑被抄回页面内联,或改成了直接绑按钮" "两份实现会漂;直接绑的话表一重绘展开就失效"
+
+# v1200-SPARKLINE-ONE-IMPL · 归一化只有一份实现。
+#   组行要在【合并后的时序】上重算同一件事。抄一份的下场:两条曲线用不同基准,
+#   在同一张表里并排显示、视觉上完全不可比,而且没有任何测试会失败。
+{ [ -f "$RD/src/main/java/com/family/finance/factview/Sparkline.java" ]   && codeonly "$RD/src/main/java/com/family/finance/factview/FactViewServiceImpl.java" | grep -q 'Sparkline.points(spark)'   && codeonly "$QA1200_FOLD" | grep -q 'Sparkline.points(spark)'   && [ "$(codeonly "$RD/src/main/java/com/family/finance/factview/FactViewServiceImpl.java" | grep -c 'viewBox 0 0 80 22')" -eq 0 ]; } \
+  && log_ok "v1200-SPARKLINE-ONE-IMPL(归一化只有 Sparkline 一份 · 两个调用方都委托给它)" \
+  || log_bad "v1200-SPARKLINE-ONE-IMPL 归一化被抄成了两份" "两条曲线基准不同 → 并排显示不可比,而且没有测试会红"
+
+# v1200-NO-PHANTOM-BTN-CLASS · 模板不许用 CSS 里【根本不存在】的按钮类。
+#   v1.20 验收发现「建这个分组」不像按钮 —— 因为我写了 class="btn-primary",
+#   而这个类全项目从没定义过(只有 btn-ink / btn-paper / btn-ghost)。
+#   浏览器对不存在的 class 完全不吭声,于是它静静渲染成一行纯文字,
+#   编译、单测、qa-run 全绿 —— 只有人眼能发现。这条就是把人眼那一步机械化。
+#
+#   第一版判据太粗,自己先误报了两条(诚实记下来,免得下次又踩):
+#     · holdings.html 的「btn-」其实来自【注释】里的 `btn-* 全带 uppercase`
+#       → 只从 class="…" 属性里取,且要求 btn- 后面至少一个字符
+#     · how-to-use.html 的 .btn-run 是定义在【该模板自己的 <style> 块】里的
+#       → 定义处除了 style.css,还要认同文件内联样式
+{ phantom=""
+  for f in $(grep -rl 'class="[^"]*btn-[a-z0-9]' "$RD/src/main/resources/templates" 2>/dev/null); do
+    for c in $(grep -o 'class="[^"]*"' "$f" | grep -o 'btn-[a-z0-9][a-z0-9-]*' | sort -u); do
+      grep -q "\.$c *[,{[]" "$RD/src/main/resources/static/css/style.css" && continue   # 全站样式表里有
+      grep -q "\.$c *[,{[]" "$f" && continue                                            # 或该模板自己的 <style> 里有
+      phantom="$phantom $c($(basename "$f"))"
+    done
+  done
+  [ -z "$phantom" ]; } \
+  && log_ok "v1200-NO-PHANTOM-BTN-CLASS(模板 class 属性里的 btn-* 都能找到定义)" \
+  || log_bad "v1200-NO-PHANTOM-BTN-CLASS 模板用了不存在的按钮类:$phantom" "浏览器对不存在的 class 不吭声 → 按钮静静渲染成纯文字,所有自动化都是绿的"
+
+# v1200-DAILY-TURNOVER-SUGGESTED · 推荐里必须有 issue #17 提出者真正要的那一组。
+#   他要的是「银行卡 / 微信 / 支付宝这些互相转账的钱包」= CASH 类型;
+#   而「随时可取」是流动性分层(LIQUID),把货币基金类理财也算进来了 —— 不是一回事。
+#   两个都留着让用户挑,判据写在卡片上。
+{ codeonly "$QA1200_SVC" | grep -q 'AccountType.CASH'   && codeonly "$QA1200_SVC" | grep -q '"日常周转"'   && codeonly "$QA1200_SVC" | grep -q '"随时可取"'; } \
+  && log_ok "v1200-DAILY-TURNOVER-SUGGESTED(「日常周转」按 CASH 推荐 · 与「随时可取」并存)" \
+  || log_bad "v1200-DAILY-TURNOVER-SUGGESTED 少了 issue #17 提出者真正要的那组推荐" "他要的是互相转账的钱包,不是流动性分层"
+
+# v1200-PICKER-SHOWS-TYPE-AND-OWNER · 勾选账户时光有名字不够辨别。
+#   家里两张卡都叫「招行」是常事,而「哪张是我的、哪张是老婆的」
+#   恰恰是决定要不要放进同一个组的依据。
+{ grep -q 'ownerOf.get(a.id)' "$QA1200_GPG"   && [ "$(grep -c 'ownerOf.get(a.id)' "$QA1200_GPG")" -ge 2 ]   && grep -q 'a.type.label' "$QA1200_GPG"   && grep -q 'memberDirectory.nameMap' "$QA1200_CTL"; } \
+  && log_ok "v1200-PICKER-SHOWS-TYPE-AND-OWNER(新建与编辑两处勾选列表都显示类型+主理人)" \
+  || log_bad "v1200-PICKER-SHOWS-TYPE-AND-OWNER 勾选列表又只剩账户名了" "同名账户分不清谁是谁,选错了要等到统计出错才发现"
+
 echo
 echo "═══════════════════════════════════════"
 echo " 总结: PASS=$PASS  FAIL=$FAIL  SKIP=$SKIP"

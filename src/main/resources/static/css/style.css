@@ -2098,3 +2098,20 @@ html.privacy .ask-artifact iframe{ filter:blur(6px); }
 }
 /* 出处行:比 note 再弱一档,它是给想自己核对的人看的 */
 .ask-how-src{ border-left-color:var(--rule) !important; color:var(--ink-subtle); }
+
+/* ═══ v1.20 · 账户组:组行与成员行的层级 ═══
+   展开之后如果两者长得一样,用户看不出「这 5 行是属于上面那一行的」——
+   而这正是分组唯一想表达的关系。所以成员行给一条左引导线 + 略淡的底,
+   组行加粗;不是装饰,是把从属关系画出来。 */
+tr.acct-member > td:first-child,
+details.acct-member { border-left: 2px solid var(--brass-deep); }
+tr.acct-member { background: rgba(167, 123, 53, .035); }
+tr.acct-member > td { padding-left: .35rem; }
+.acct-toggle { font-weight: 500; }
+
+/* 组行:与成员区连成一块,靠上边一条实线把它和上一个无关账户隔开 */
+tr:has(> td .acct-toggle) { border-top: 1px solid var(--rule); }
+tr:has(> td .acct-toggle) > td { font-weight: 500; }
+
+/* 弹窗要有遮罩 —— 没有遮罩的模态读起来像「卡住的面板」,而不是「需要先处理的东西」 */
+dialog::backdrop { background: rgba(26, 23, 20, .38); }

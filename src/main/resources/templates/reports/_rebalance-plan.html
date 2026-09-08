@@ -54,6 +54,11 @@
         <select name="toAccountId" class="h-9 border border-rule bg-card px-2 text-xs">
           <option th:each="a : ${planAccounts}" th:value="${a.id}" th:text="${a.displayName}">账户</option>
         </select></label>
+      <!--/* v1.20 FR-485 · 下拉里只有真账户 —— 划转要落到具体账户上,组不是一个能转账的东西。
+             建过组的人会找不到自己的分组,所以说一句;没建组的不显示。 */-->
+      <p th:if="${hasGroups}" class="col-span-full font-mono text-[10px] text-ink-subtle -mt-1">
+        选的是<b>具体账户</b>,不是分组 —— 划转得落到能记账的地方
+      </p>
       <label class="block"><span class="font-mono text-[10px] uppercase text-ink-subtle block mb-1">金额 ¥</span>
         <input name="amount" type="number" step="0.01" min="0.01" required class="w-32 h-9 border border-rule bg-card px-2 font-mono text-xs text-right"></label>
       <label class="block flex-1 min-w-[140px]"><span class="font-mono text-[10px] uppercase text-ink-subtle block mb-1">备注(选填)</span>

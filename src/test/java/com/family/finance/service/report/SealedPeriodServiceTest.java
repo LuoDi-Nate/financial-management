@@ -20,7 +20,9 @@ import java.time.LocalDate;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 /**
  * v1.10 · 封板快照的计算口径。
@@ -35,9 +37,21 @@ class SealedPeriodServiceTest {
     private static final BigDecimal Z = BigDecimal.ZERO;
 
     private SealedPeriodService svc() {
+        /* v1.20 · 归因贡献者改成按【账户组】折叠,所以多了一个 AccountGroupingResolver 依赖。
+         * 这里给一个「没建任何组」的真实 resolver(不是 mock)—— 于是每个账户的维值就是它自己的账户名,
+         * 下面所有既有断言的期望值【一个字都不用改】。
+         * 这本身就是一条断言:零组态必须与 v1.19.16 逐字一致。 */
+        var am = mock(com.family.finance.repository.AccountMapper.class);
+        var gm = mock(com.family.finance.repository.AccountGroupMapper.class);
+        var pm = mock(com.family.finance.repository.PeriodAccountGroupMapper.class);
+        when(am.findAllByFamily(anyLong())).thenReturn(List.of());
+        when(gm.findByFamily(anyLong())).thenReturn(List.of());
+        when(gm.findMembersByFamily(anyLong())).thenReturn(List.of());
+        when(pm.findByPeriod(anyLong())).thenReturn(List.of());
         return new SealedPeriodService(mock(FactViewService.class), mock(PeriodMapper.class),
                 mock(FamilyMapper.class), mock(com.family.finance.repository.SnapshotMapper.class),
-                mock(com.family.finance.service.member.MemberDirectory.class));
+                mock(com.family.finance.service.member.MemberDirectory.class),
+                new com.family.finance.service.group.AccountGroupingResolver(am, gm, pm));
     }
 
     private AccountPeriodFact row(long accId, String name, long periodId, int month,
@@ -181,7 +195,7 @@ class SealedPeriodServiceTest {
         Period prev = new Period();
         prev.setId(10L);
         prev.setPeriodStart(LocalDate.of(2026, 1, 1));
-        var a = svc().buildAttribution(slice(rows, List.of(10L, 20L)), 20L, prev,
+        var a = svc().buildAttribution(1L, slice(rows, List.of(10L, 20L)), 20L, prev,
                 flow("100000", "610000", "0", "500000"));
         assertThat(a.positives()).extracting(SealedSnapshot.Contribution::accountName).containsExactly("A");
         assertThat(a.opened()).extracting(SealedSnapshot.Contribution::accountName).containsExactly("B");
@@ -191,7 +205,7 @@ class SealedPeriodServiceTest {
     @Test
     void 没有上期时归因返回null而不是把全部当成正贡献() {
         var rows = List.of(row(1, "A", 10L, 1, "100000", AccountClass.ASSET, AccountLiquidity.LIQUID, AccountType.CASH));
-        assertThat(svc().buildAttribution(slice(rows, List.of(10L)), 10L, null,
+        assertThat(svc().buildAttribution(1L, slice(rows, List.of(10L)), 10L, null,
                 flow("0", "100000", "0", "100000"))).isNull();
     }
 

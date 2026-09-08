@@ -61,6 +61,10 @@
                     + ${cp.missingCount() > 3 ? ' 等 ' + cp.missingCount() + ' 个' : ''}">未填</a>
         <span class="pill whitespace-nowrap"
               th:text="'估值 · 自动 ' + ${cp.autoValued()} + ' · 手填 ' + ${cp.manualValued()}">估值</span>
+        <!--/* v1.20 FR-485 · 完整性是一张【待办清单】,合并了就不知道该去填谁 */-->
+        <span th:if="${hasGroups}" class="font-mono text-[10px] text-ink-subtle">
+          · 余额逐个账户填,这里不按分组折叠
+        </span>
         <span class="pill whitespace-nowrap" th:if="${cp.fxDate() != null}"
               th:text="'汇率日期 ' + ${#temporals.format(cp.fxDate(),'yyyy-MM-dd')}">汇率</span>
       </div>
@@ -320,6 +324,12 @@
       <h3 class="font-display text-xl font-medium">集中度</h3>
       <p class="text-xs text-ink-subtle mt-1 mb-3">
         风险等级分布看得出结构,但月月对比不了 —— 集中度得是<b>数字</b>。淡色是上期,一眼看出在升还是在降。
+      </p>
+      <!--/* v1.20 FR-485 · 只在这家建过组时才出现。没建组的用户不该看到一句多余的话。
+             不说的话,建了组的人会以为这里漏算了 —— 而它是【故意】不跟组的。 */-->
+      <p th:if="${hasGroups}" class="text-[11px] text-ink-subtle mb-3 border-l-2 border-rule-soft pl-2">
+        这里按<b>真实账户</b>算,<b>不按你的分组折叠</b>。分组是你的看法,不改变钱实际存在哪家机构 ——
+        5 张不同银行的卡合成一组,并不会让它们变成一家银行。
       </p>
       <div class="conc">
         <div class="conc-row">

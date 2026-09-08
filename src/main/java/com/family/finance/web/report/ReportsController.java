@@ -52,6 +52,8 @@ public class ReportsController {
     private static final DecimalFormat MONEY = new DecimalFormat("#,##0");
 
     private final FactViewService factViewService;
+    private final com.family.finance.service.group.AccountRowGrouper accountRowGrouper;              // v1.20 账户组折叠
+    private final com.family.finance.service.group.AccountGroupingResolver groupingResolver;        // v1.20
     private final FamilyService familyService;
     private final PeriodMapper periodMapper;
     private final AccountMapper accountMapper;
@@ -461,7 +463,13 @@ public class ReportsController {
         model.addAttribute("decomposition", decomposition);
         model.addAttribute("debtTrend", debtTrend);
         // v0.11.4 · 账户表复用管理页指标配置:注入全字段 accountRows + 指标启用集 + 基准索引 + 类目索引
-        model.addAttribute("accountRows", accountRows);
+        /* v1.20 FR-483 · 与 dashboard 同一份折叠(共用 AccountRowGrouper,不是各算各的)。
+         * benchmarkByAccount 仍按【真账户 id】建索引 —— 组行 accountId=null 取不到基准,
+         * 模板渲染「—」。这是对的:组行的 xirr 本来就是 null,拿什么去和基准比? */
+        var foldedRows = accountRowGrouper.fold(me.getFamilyId(), anchor.getId(), null, accountRows);
+        model.addAttribute("accountRows", foldedRows);                              // 顶层:图 + 计数
+        model.addAttribute("accountRowsFlat", accountRowGrouper.flatten(foldedRows)); // 表:组行 + 隐藏成员行
+        model.addAttribute("hasGroups", groupingResolver.hasAnyGroup(me.getFamilyId()));
         model.addAttribute("acctMetrics", acctMetrics);
         model.addAttribute("benchmarkByAccount", benchmarkByAccount);
         model.addAttribute("pcCodeByAccount", pcCodeByAccountId);

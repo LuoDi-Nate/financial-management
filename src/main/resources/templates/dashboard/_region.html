@@ -466,7 +466,7 @@
   <section id="dash-list" class="mb-10" style="scroll-margin-top:80px">
     <div class="flex items-baseline justify-between mb-3">
       <h2 class="font-display text-2xl font-medium">账户列表</h2>
-      <span class="font-mono text-[10px] text-ink-subtle" th:text="${#lists.size(accountRows)} + ' 个账户'">11 个账户</span>
+      <span class="font-mono text-[10px] text-ink-subtle" th:text="${#lists.size(accountRows)} + (${hasGroups} ? ' 行 · 分组已合并为一行,点组名展开' : ' 个账户')">11 个账户</span>
     </div>
 
     <!-- v0.10.4 · 指标筛选 chips:点选即时切列显隐 · localStorage 记住 · 仅 PC 表;
@@ -500,13 +500,32 @@
           <th class="text-right pr-3">操作</th>
         </tr></thead>
         <tbody>
-        <tr th:each="account : ${accountRows}" class="hover:bg-card-soft transition">
+        <!--/* v1.20 FR-483 · 迭代【扁平列表】:组行 + 紧随其后的成员行(默认隐藏)。
+               11 个指标格一份不变 —— 只有「账户名」和「操作」两格需要分支。 */-->
+        <tr th:each="account : ${accountRowsFlat}" class="hover:bg-card-soft transition"
+            th:attr="data-member-of=${account.memberOf},data-group-id=${account.groupId}"
+            th:classappend="${account.memberOf != null} ? 'acct-member' : ''"
+            th:style="${account.memberOf != null} ? 'display:none' : ''">
           <td class="acct-sticky" th:attr="data-val=${account.accountName}">
-            <span class="pill align-middle inline-block text-center mr-2" style="min-width:3.4em"
-                  th:text="${account.accountType.label}">现金</span>
-            <a th:href="@{/accounts/{id}(id=${account.accountId})}"
-               class="font-display hover:text-brass-deep no-underline text-xs sm:text-sm align-middle"
-               th:text="${account.accountName}">账户</a>
+            <!--/* 组行:不是链接(组点不进账户详情 —— 它不是一个账户),而是一个展开开关 */-->
+            <th:block th:if="${account.grouped}">
+              <span class="pill align-middle inline-block text-center mr-2" style="min-width:3.4em"
+                    th:text="${account.accountType == null ? '组' : account.accountType.label}">组</span>
+              <button type="button" class="acct-toggle font-display hover:text-brass-deep text-xs sm:text-sm align-middle bg-transparent border-0 cursor-pointer p-0"
+                      th:attr="data-toggle-group=${account.groupId}">
+                <span th:text="${account.accountName}">日常周转</span>
+                <span class="font-mono text-[9px] text-ink-subtle ml-1"
+                      th:text="'· ' + ${account.memberCount} + ' 个 ▾'">· 5 个 ▾</span>
+              </button>
+            </th:block>
+            <th:block th:unless="${account.grouped}">
+              <span class="pill align-middle inline-block text-center mr-2" style="min-width:3.4em"
+                    th:classappend="${account.memberOf != null} ? 'ml-4' : ''"
+                    th:text="${account.accountType.label}">现金</span>
+              <a th:href="@{/accounts/{id}(id=${account.accountId})}"
+                 class="font-display hover:text-brass-deep no-underline text-xs sm:text-sm align-middle"
+                 th:text="${account.accountName}">账户</a>
+            </th:block>
           </td>
           <td class="num text-xs sm:text-sm" th:attr="data-val=${account.currentValue}"
               data-priv th:text="${account.currentValue == null ? '—' : #numbers.formatInteger(account.currentValue, 1, 'COMMA')}">0</td>
@@ -550,7 +569,10 @@
             <span th:if="${account.sparklinePoints == null}" class="font-mono text-[10px] text-ink-subtle">—</span>
           </td>
           <td class="text-right pr-3 whitespace-nowrap font-mono text-[10px] tracking-wider" data-sort-skip>
-            <a th:href="@{/checkup(account=${account.accountId})}" class="text-brass-deep hover:underline no-underline">体检</a>
+            <!--/* 组行没有「体检」:体检是逐账户诊断,组不是一个能被体检的东西。展开看成员各自的。 */-->
+            <a th:unless="${account.grouped}" th:href="@{/checkup(account=${account.accountId})}"
+               class="text-brass-deep hover:underline no-underline">体检</a>
+            <span th:if="${account.grouped}" class="text-ink-subtle">展开看成员</span>
           </td>
         </tr>
         </tbody>
@@ -559,14 +581,25 @@
 
     <!-- 手机:可展开卡片(首屏 4 指标 + 名 + 迷你近况;点开看全集)-->
     <div class="sm:hidden space-y-2">
-      <details th:each="account : ${accountRows}" class="paper-card px-3 py-2.5">
+      <details th:each="account : ${accountRowsFlat}" class="paper-card px-3 py-2.5"
+               th:attr="data-member-of=${account.memberOf},data-group-id=${account.groupId}"
+               th:classappend="${account.memberOf != null} ? 'acct-member ml-4' : ''"
+               th:style="${account.memberOf != null} ? 'display:none' : ''">
         <summary class="flex items-center justify-between gap-2 cursor-pointer list-none">
           <div class="min-w-0">
             <!-- v0.8:类型标签放账户名前 + 固定宽度对齐(与 PC 表一致 min-width:3.4em) -->
             <div class="flex items-center gap-1.5 min-w-0">
               <span class="pill text-center shrink-0" style="min-width:3.4em"
-                    th:text="${account.accountType.label}">现金</span>
-              <a th:href="@{/accounts/{id}(id=${account.accountId})}"
+                    th:text="${account.accountType == null ? '组' : account.accountType.label}">现金</span>
+              <!--/* 组行:名字是展开开关,不是链接 —— 组点不进账户详情 */-->
+              <button th:if="${account.grouped}" type="button"
+                      class="acct-toggle font-display text-sm hover:text-brass-deep truncate bg-transparent border-0 cursor-pointer p-0 text-left"
+                      th:attr="data-toggle-group=${account.groupId}">
+                <span th:text="${account.accountName}">日常周转</span>
+                <span class="font-mono text-[9px] text-ink-subtle ml-1"
+                      th:text="'· ' + ${account.memberCount} + ' 个 ▾'">· 5 个 ▾</span>
+              </button>
+              <a th:unless="${account.grouped}" th:href="@{/accounts/{id}(id=${account.accountId})}"
                  class="font-display text-sm hover:text-brass-deep no-underline truncate"
                  th:text="${account.accountName}">账户</a>
             </div>
@@ -602,7 +635,8 @@
                 th:text="${account.planActualDiffPct == null ? '数据不足' : ((account.planActualDiffPct.signum() &gt; 0 ? '+' : '') + #numbers.formatDecimal(account.planActualDiffPct,1,2) + 'pp')}">—</dd></div>
         </dl>
         <div class="mt-2 text-right">
-          <a th:href="@{/checkup(account=${account.accountId})}" class="font-mono text-[10px] tracking-wider text-brass-deep hover:underline no-underline">查看体检 →</a>
+          <a th:unless="${account.grouped}" th:href="@{/checkup(account=${account.accountId})}" class="font-mono text-[10px] tracking-wider text-brass-deep hover:underline no-underline">查看体检 →</a>
+          <span th:if="${account.grouped}" class="font-mono text-[10px] text-ink-subtle">体检是逐账户的 · 点组名展开成员</span>
         </div>
       </details>
     </div>
@@ -966,7 +1000,10 @@
 
       // v0.2(2026-05-10)· 按账户分布:横向 bar,资产 → 右,LOAN → 左,0 居中
       const divCanvas = document.getElementById('accountDivergeChart');
-      const rows = (data.accountRows || []).filter(r => r.currentValue != null);
+      // v1.20 · data.accountRows 是【顶层折叠后】的列表(不含展开用的成员行)——
+      //   成员行若混进来会把组里的钱算两遍。这里再挡一道,免得以后谁把数据源换成 flat 版。
+      const rows = (data.accountRows || [])
+        .filter(r => r.currentValue != null && r.memberOf == null);
       if (divCanvas && rows.length) {
         // 按 abs(currentValue) DESC 排
         rows.sort((a, b) => Math.abs(Number(b.currentValue || 0)) - Math.abs(Number(a.currentValue || 0)));

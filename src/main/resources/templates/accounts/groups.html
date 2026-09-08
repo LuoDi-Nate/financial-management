@@ -62,7 +62,11 @@
                      静默改掉用户没打算改的东西,比报错更糟。 */-->
               <input type="checkbox" name="accountIds" th:value="${a.id}"
                      th:checked="${mine}" th:disabled="${taken != null and !mine}">
-              <span th:text="${a.displayName}">账户</span>
+              <span class="pill text-[9px] text-center shrink-0 whitespace-nowrap" style="min-width:3.2em"
+                    th:text="${a.type.label}">现金</span>
+              <span class="truncate" th:text="${a.displayName}">账户</span>
+              <span class="font-mono text-[9px] text-ink-subtle whitespace-nowrap"
+                    th:text="${ownerOf.get(a.id)}">共同</span>
               <span th:if="${taken != null and !mine}"
                     class="font-mono text-[9px] text-brass-deep border border-brass-deep px-1 whitespace-nowrap"
                     th:text="'已在「' + ${taken} + '」'">已在别的组</span>
@@ -94,7 +98,7 @@
       <li><b>历史不会被追改。</b>已关账月份的数字不会因为你今天改分组而变;只有重开那一期再关账才重算。</li>
       <li><b>代价</b>:组里几个账户<b>各自</b>的收益差异会看不到(归因里可以点开下钻)。</li>
     </ul>
-    <button type="button" class="btn-primary" onclick="openNewGroup()">+ 新建第一个分组</button>
+    <button type="button" class="btn-ink" onclick="openNewGroup()">+ 新建第一个分组</button>
   </div>
 
   <!-- ═══ 新建:弹窗 ═══ -->
@@ -133,12 +137,19 @@
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-1 mb-2"
              style="max-height:300px;overflow-y:auto">
+          <!--/* v1.20 验收补 · 光有账户名不够辨别:家里两张卡都叫「招行」是常事,
+                 而「哪张是我的、哪张是老婆的」恰恰是决定要不要放进同一个组的依据。
+                 所以每行给【类型 + 主理人】。 */-->
           <label th:each="a : ${accounts}" th:with="taken=${occupied.get(a.id)}"
                  class="flex items-center gap-2 text-[12.5px] py-1"
                  th:classappend="${taken != null} ? 'opacity-45' : ''">
             <input type="checkbox" name="accountIds" th:value="${a.id}" th:disabled="${taken != null}"
                    class="ng-acct">
-            <span th:text="${a.displayName}">账户</span>
+            <span class="pill text-[9px] text-center shrink-0 whitespace-nowrap" style="min-width:3.2em"
+                  th:text="${a.type.label}">现金</span>
+            <span class="truncate" th:text="${a.displayName}">账户</span>
+            <span class="font-mono text-[9px] text-ink-subtle whitespace-nowrap"
+                  th:text="${ownerOf.get(a.id)}">共同</span>
             <span th:if="${taken != null}" class="font-mono text-[9px] text-brass-deep border border-brass-deep px-1 whitespace-nowrap"
                   th:text="'已在「' + ${taken} + '」'">已被占</span>
           </label>
@@ -147,7 +158,7 @@
       </div>
 
       <div class="px-5 py-4 border-t border-rule-soft flex items-center gap-3">
-        <button type="submit" class="btn-primary">建这个分组</button>
+        <button type="submit" class="btn-ink">建这个分组</button>
         <button type="button" class="btn-ghost text-sm"
                 onclick="document.getElementById('newGroupDlg').close()">取消</button>
       </div>

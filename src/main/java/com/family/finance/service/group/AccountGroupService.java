@@ -42,12 +42,30 @@ public class AccountGroupService {
     public List<Suggestion> suggestions(long familyId) {
         List<Long> liquid = new ArrayList<>();
         List<Long> liability = new ArrayList<>();
+        List<Long> cash = new ArrayList<>();
         for (Account a : accountMapper.findActiveByFamily(familyId)) {
             if (a.getType() != null && a.getType().isLiability()) { liability.add(a.getId()); continue; }
+            if (a.getType() == com.family.finance.domain.account.AccountType.CASH) cash.add(a.getId());
             if (a.getLiquidity() == AccountLiquidity.LIQUID) liquid.add(a.getId());
         }
         List<Suggestion> out = new ArrayList<>();
-        if (liquid.size() >= 2) out.add(new Suggestion("随时可取", "流动性分层已判定为「随时可取」", liquid));
+        /* v1.20 · 「日常周转」放第一个 —— 这才是 issue #17 提出者真正要的那一组。
+         *
+         * 他的原话:「我实际有非常多个活期账户,有不同银行卡的、有微信的、有支付宝的,
+         *   经常会需要在这些不同的活期账户中转账……不可能把这些划转全部有效地输入进去」。
+         *
+         * 为什么不用「随时可取」顶替:那是**流动性分层**(LIQUID),把货币基金类理财也算进来了 ——
+         * 而他说的「活期账户」指的是**互相转账的那些钱包**:银行卡 / 微信 / 支付宝。
+         * 货基和它们之间很少来回划转,并进来只会让这个组的收益口径变糊。
+         * 两个都留着,让用户自己挑;判据都写在卡片上。 */
+        if (cash.size() >= 2) {
+            out.add(new Suggestion("日常周转",
+                    "银行卡 / 微信 / 支付宝这类互相转账频繁的现金账户 —— 划转在组内自动抵消,不再是噪声", cash));
+        }
+        if (liquid.size() >= 2) {
+            out.add(new Suggestion("随时可取",
+                    "流动性分层判定为「随时可取」(比「日常周转」多含货币基金类理财)", liquid));
+        }
         if (liability.size() >= 2) out.add(new Suggestion("负债", "账户类型属于负债类", liability));
         return out;
     }
