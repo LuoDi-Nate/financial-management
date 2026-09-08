@@ -54,6 +54,7 @@ public class AiAccessController {
     private static final int AUDIT_LIMIT = 50;
 
     private final AccessTokenService tokenService;
+    private final com.family.finance.repository.AskAuditMapper askAuditMapper;   // v1.20.1 入站记录
     private final AskAuditMapper auditMapper;
     private final AskUnmetNeedMapper unmetMapper;
     private final AskToolRegistry registry;
@@ -113,6 +114,13 @@ public class AiAccessController {
         model.addAttribute("askRuntime", askConversations.runtime().code());
         model.addAttribute("askBlocked", askConversations.blockedReason(fam));
         model.addAttribute("askPublicBaseUrl", configService.getString(fam, K_ASK_PUBLIC_BASE_URL, ""));
+        /* v1.20.1 · 入站访问记录端到页面。
+         * 「百炼来没来过」以前只能靠推测,而【来过但鉴权失败】和【根本没来过】
+         * 是两个完全不同的病因,在页面上却长得一模一样(都是「智能体说没有工具」)。 */
+        var inbound = askAuditMapper.recentInbound(fam, 20);
+        model.addAttribute("inboundRows", inbound);
+        model.addAttribute("inboundExternal", inbound.stream().filter(r -> r.fromOutside()).count());
+        model.addAttribute("inboundBailian", inbound.stream().filter(r -> r.looksBailian()).count());
         model.addAttribute("askWorkspaceId", configService.getString(fam, K_ASK_MA_WORKSPACE, ""));
         model.addAttribute("askMcpServerId", configService.getString(fam, K_ASK_MA_MCP_SERVER, ""));
         model.addAttribute("askModel", configService.getString(fam, K_ASK_MA_MODEL, ASK_MA_MODEL_DEFAULT));
@@ -121,7 +129,7 @@ public class AiAccessController {
         // 手拼那版有个不显眼的 bug:Thymeleaf 字符串字面量里的 \n 不是换行,
         // 渲染出来是带字面 \n 的一行,用户照抄进百炼就是一段无效 JSON。
         model.addAttribute("mcpConfigSample",
-                managedAgentRuntime.mcpConfigJson(guessBaseUrl(req), "你的口令"));
+                managedAgentRuntime.mcpConfigJson(mcpBaseUrl(req, fam), "你的口令"));
         // v1.19.7 · 自测用的 curl —— 百炼排障文档建议的第一步就是「用 curl 直连下游服务」,
         // 它能立刻分清「百炼那边没配对」和「你的服务根本不通」。同样由 Java 拼,
         // 理由和上面那段一样:模板里的 \n 不是换行。
@@ -261,8 +269,17 @@ public class AiAccessController {
     private static String nz(String s) { return s == null ? "" : s.trim(); }
 
     /** 公网地址存的时候去掉尾斜杠 —— 拼 /mcp 时会多出一条 // 的路径,百炼那边可能就 404 了 */
+    /**
+     * 归一化「本站公网地址」:去掉末尾斜杠,<b>并去掉用户顺手带上的 {@code /mcp}</b>。
+     *
+     * <p>这个字段要的是<b>站点根地址</b>,而生成配置时会自己拼 {@code /mcp}。
+     * 线上实际填成了 {@code https://xxx/mcp} —— 字段名叫「本站公网地址」,
+     * 而旁边示例又是一串 MCP 配置,填错太容易了。与其怪用户,不如这里收干净。</p>
+     */
     private static String trimSlash(String s) {
         String v = nz(s);
+        while (v.endsWith("/")) v = v.substring(0, v.length() - 1);
+        if (v.endsWith("/mcp")) v = v.substring(0, v.length() - 4);
         while (v.endsWith("/")) v = v.substring(0, v.length() - 1);
         return v;
     }
@@ -286,7 +303,7 @@ public class AiAccessController {
         ra.addFlashAttribute("freshIsRotation", false);
         // 明文只经这一次 flash;配置 JSON 同源生成,保证用户复制走的是**能用的**那一份
         ra.addFlashAttribute("freshMcpConfig",
-                managedAgentRuntime.mcpConfigJson(guessBaseUrl(req), issued.plaintext()));
+                managedAgentRuntime.mcpConfigJson(mcpBaseUrl(req, me.getFamilyId()), issued.plaintext()));
         return "redirect:/admin/ai-access";
     }
 
@@ -343,6 +360,22 @@ public class AiAccessController {
     }
 
     /** 猜一个对外可用的 base url 填进配置示例 —— 猜错也没关系,页面允许用户自己改 */
+    /**
+     * 给百炼粘贴的那份配置里,url 用<b>哪个地址</b>。
+     *
+     * <p>v1.20.1 修:原来只看<b>请求头</b>(你打开这一页时用的域名)。于是在测试机上打开管理页,
+     * 生成出来的就是 {@code http://<内网或IP>:20000/mcp} —— 百炼<b>连不上</b>,
+     * 而页面上「本站公网地址」那个字段填得再对也没用,它当时<b>只参与校验、不参与生成</b>。
+     * 用户看到的现象是:配置照抄了,智能体却说「我这边没有数据查询工具」。</p>
+     *
+     * <p>现在<b>优先用用户明确填的公网地址</b>,填了才最有资格代表「百炼该访问哪里」;
+     * 没填才回落到请求头。</p>
+     */
+    private String mcpBaseUrl(HttpServletRequest req, long familyId) {
+        String configured = configService.getString(familyId, K_ASK_PUBLIC_BASE_URL, "");
+        return configured.isBlank() ? guessBaseUrl(req) : configured;
+    }
+
     private static String guessBaseUrl(HttpServletRequest req) {
         String proto = req.getHeader("X-Forwarded-Proto");
         String host = req.getHeader("X-Forwarded-Host");

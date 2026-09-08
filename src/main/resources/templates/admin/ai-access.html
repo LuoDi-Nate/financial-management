@@ -382,6 +382,60 @@
         <button type="submit" class="btn-ghost text-sm">测一下百炼连没连上这个账房</button>
         <span class="text-[11.5px] text-ink-subtle ml-3">会真问一句话,大约十几秒</span>
       </form>
+
+      <!--/* v1.20.1 · 入站访问记录。
+             加它的理由是一段很长的瞎猜:智能体说「我这边没有数据查询工具」,而页面上
+             【看不出百炼到底有没有来过】—— 于是只能反复推测「大概是 MCP 服务没部署成功」,
+             把查证推给用户去控制台翻。
+             其实这两种情况的病因完全不同、修法也完全不同:
+               · 来过、但 result=INVALID  → 口令过期或贴错了
+               · 一条记录都没有            → 它根本没来,问题在百炼那边的服务状态
+             而它们在页面上长得一模一样。现在把事实摆出来,不用再猜。 */-->
+      <details class="mt-4 border-t border-rule-soft pt-3">
+        <summary class="cursor-pointer text-[12.5px] text-ink-soft">
+          谁访问过这个账房 · 最近 20 条
+          <span class="font-mono text-[10px] ml-2"
+                th:classappend="${inboundExternal > 0} ? 'text-brass-deep' : 'text-ink-subtle'"
+                th:text="${inboundExternal > 0}
+                         ? ('外部来源 ' + ${inboundExternal} + ' 条' + (${inboundBailian} > 0 ? ' · 其中百炼 ' + ${inboundBailian} + ' 条' : ''))
+                         : '还没有任何外部访问'">还没有任何外部访问</span>
+        </summary>
+
+        <p th:if="${inboundExternal == 0}" class="text-[11.5px] text-ink-soft leading-relaxed mt-2 mb-3">
+          下面这些全是<b>本机</b>发起的(联调用),说明<b>百炼一次都没有连过来</b>。
+          这种情况不是口令的问题 —— 口令不对会留下一条 <span class="font-mono">INVALID</span> 记录、
+          并且来源是外部 IP。一条外部记录都没有,只可能是百炼那边的 MCP 服务没有真的在跑。
+        </p>
+
+        <div th:if="${#lists.isEmpty(inboundRows)}" class="text-[12px] text-ink-subtle mt-2">
+          还没有任何访问记录。
+        </div>
+        <div th:unless="${#lists.isEmpty(inboundRows)}" class="overflow-x-auto mt-2">
+          <table class="w-full text-[11.5px]">
+            <thead><tr class="text-ink-subtle font-mono text-[10px] text-left">
+              <th class="py-1 pr-3">时间</th><th class="pr-3">来源</th><th class="pr-3">口令</th>
+              <th class="pr-3">调用</th><th class="pr-3">结果</th><th>客户端</th>
+            </tr></thead>
+            <tbody>
+              <tr th:each="r : ${inboundRows}" class="border-t border-rule-soft">
+                <td class="py-1 pr-3 font-mono text-[10px] whitespace-nowrap"
+                    th:text="${#temporals.format(r.createdAt, 'MM-dd HH:mm')}">09-08 17:46</td>
+                <td class="pr-3 font-mono text-[10px]">
+                  <span th:if="${r.fromOutside}" class="pill text-[9px]" th:text="${r.srcIp}">1.2.3.4</span>
+                  <span th:unless="${r.fromOutside}" class="text-ink-subtle">本机</span>
+                </td>
+                <td class="pr-3 font-mono text-[10px] text-ink-subtle" th:text="${r.tokenPrefix}">fmk_…</td>
+                <td class="pr-3 font-mono text-[10px]" th:text="${r.toolName}">tools/list</td>
+                <td class="pr-3 font-mono text-[10px]"
+                    th:classappend="${r.result == 'OK'} ? 'text-forest' : 'text-rust'"
+                    th:text="${r.result}">OK</td>
+                <td class="font-mono text-[10px] text-ink-subtle truncate" style="max-width:190px"
+                    th:text="${r.userAgent}">curl</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </details>
     </div>
 
     <!-- 风险:原样说,不美化。这一段是本页最重要的文字 -->

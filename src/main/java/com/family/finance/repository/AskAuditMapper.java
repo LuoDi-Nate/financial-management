@@ -66,6 +66,45 @@ public interface AskAuditMapper {
     int countUpstreamCallsSince(@Param("familyId") long familyId,
                                 @Param("since") LocalDateTime since);
 
+    /**
+     * v1.20.1 · 最近的<b>入站</b>访问记录,给管理页直接看。
+     *
+     * <p>加它的理由是一次长时间的瞎猜:线上智能体说「我这边没有数据查询工具」,
+     * 而我们<b>没有任何地方能看出百炼到底有没有来过</b> ——
+     * 于是只能反复推测「大概是 MCP 服务没部署成功」,把查证推给用户去控制台翻。
+     *
+     * <p>其实答案一直躺在这张表里:<b>来过但鉴权失败</b>(有记录、result=INVALID)
+     * 与<b>根本没来过</b>(一条记录都没有)是两个完全不同的病因,
+     * 而它们在页面上长得一模一样 —— 都是「智能体说没有工具」。
+     *
+     * <p>不按 UA 过滤:要能看见「来了、但 UA 不是百炼」这种情况。
+     */
+    @Select("""
+            SELECT created_at, token_prefix, tool_name, result, src_ip, user_agent
+              FROM ask_access_audit
+             WHERE family_id IN (#{familyId}, 0)
+             ORDER BY id DESC
+             LIMIT #{limit}
+            """)
+    List<InboundRow> recentInbound(@Param("familyId") long familyId, @Param("limit") int limit);
+
+    /** 一条入站记录(family_id=0 表示鉴权就没过,认不出是哪一家) */
+    record InboundRow(LocalDateTime createdAt, String tokenPrefix, String toolName,
+                      String result, String srcIp, String userAgent) {
+
+        /** 本机 curl 联调 vs 真的从外面来的 —— 这一栏是判断「百炼来没来过」的关键 */
+        public boolean fromOutside() {
+            if (srcIp == null || srcIp.isBlank()) return false;
+            return !(srcIp.startsWith("127.") || srcIp.equals("::1")
+                     || srcIp.equals("0:0:0:0:0:0:0:1") || srcIp.startsWith("192.168.")
+                     || srcIp.startsWith("10.") || srcIp.equals("localhost"));
+        }
+
+        public boolean looksBailian() {
+            return userAgent != null && userAgent.toLowerCase().contains("bailian");
+        }
+    }
+
     /** 换绑进度:该接入点最近是否还在用旧密钥 */
     @Select("""
             SELECT COUNT(*) FROM ask_access_audit

@@ -8503,6 +8503,29 @@ QA1200_SEALT="$RD/src/main/resources/templates/reports/_sealed.html"
   && log_ok "v1200-MEMBER-CHART-RAW-ROWS(按成员分布仍吃原始账户行 · 组行 accountId=null 不会吞掉整组)" \
   || log_bad "v1200-MEMBER-CHART-RAW-ROWS 成员饼图被喂了折叠后的行" "组行 accountId=null → 反查不到 Account → 整组的钱从饼图里消失,而且不报错"
 
+# v1201-MCP-URL-FROM-CONFIG · 给百炼粘贴的配置,url 必须用【用户填的公网地址】。
+#   原来只看请求头(你打开这一页时用的域名)→ 在测试机上打开就生成一个内网地址,
+#   百炼连不上,而页面上「本站公网地址」那个字段填得再对也没用(它当时只参与校验)。
+#   用户看到的现象是「配置照抄了,智能体却说没有数据查询工具」——
+#   一个不报错、只是不工作的失败。
+QA1201_AAC="$RD/src/main/java/com/family/finance/web/admin/AiAccessController.java"
+{ codeonly "$QA1201_AAC" | grep -q 'mcpConfigJson(mcpBaseUrl('   && ! codeonly "$QA1201_AAC" | grep -q 'mcpConfigJson(guessBaseUrl('   && codeonly "$QA1201_AAC" | grep -q 'K_ASK_PUBLIC_BASE_URL'   && codeonly "$QA1201_AAC" | grep -q 'endsWith("/mcp")'; } \
+  && log_ok "v1201-MCP-URL-FROM-CONFIG(粘贴配置用用户填的公网地址 · 且容错末尾多带的 /mcp)" \
+  || log_bad "v1201-MCP-URL-FROM-CONFIG 配置 URL 又回去用请求域名了" "在测试机上打开管理页会生成一个百炼连不上的地址,而且不报错"
+
+# v1201-INBOUND-VISIBLE · 「百炼来没来过」必须在页面上看得见。
+#   这条护栏守的不是一个功能,是一段【很长的瞎猜】:线上智能体说「我这边没有数据查询工具」,
+#   而页面上看不出百炼到底有没有来过 —— 于是只能反复推测「大概是 MCP 服务没部署成功」,
+#   把查证推给用户去控制台翻。
+#   而这两种情况病因完全不同、修法也完全不同:
+#     · 来过但 result=INVALID → 口令过期或贴错
+#     · 一条记录都没有        → 它根本没来,问题在百炼那边
+#   它们在页面上却长得一模一样。
+QA1201_AAT="$RD/src/main/resources/templates/admin/ai-access.html"
+{ codeonly "$RD/src/main/java/com/family/finance/repository/AskAuditMapper.java" | grep -q 'recentInbound'   && codeonly "$RD/src/main/java/com/family/finance/repository/AskAuditMapper.java" | grep -q 'fromOutside'   && grep -q 'inboundRows' "$QA1201_AAT"   && grep -q 'inboundExternal' "$QA1201_AAT"   && grep -q '还没有任何外部访问' "$QA1201_AAT"; } \
+  && log_ok "v1201-INBOUND-VISIBLE(管理页能看到谁访问过 · 区分本机与外部 · 零外部访问时直说)" \
+  || log_bad "v1201-INBOUND-VISIBLE 入站访问记录从页面上消失了" "「来过但鉴权失败」和「根本没来过」又变得无法区分,只能靠猜"
+
 echo
 echo "═══════════════════════════════════════"
 echo " 总结: PASS=$PASS  FAIL=$FAIL  SKIP=$SKIP"
