@@ -88,6 +88,21 @@ public interface AskAuditMapper {
             """)
     List<InboundRow> recentInbound(@Param("familyId") long familyId, @Param("limit") int limit);
 
+    /**
+     * v1.20.2 · 百炼<b>最后一次</b>成功访问是什么时候。
+     *
+     * <p>「去控制台看看服务状态」这种提示没法让人动手,因为它不告诉你<b>什么时候坏的</b>。
+     * 而「上次成功是 09-03 15:24,之后再没有」立刻就能对上「我那天改了什么」——
+     * 这一条把一个无从下手的结论变成一个可查的线索。</p>
+     */
+    @Select("""
+            SELECT MAX(created_at) FROM ask_access_audit
+             WHERE family_id = #{familyId}
+               AND result = 'OK'
+               AND user_agent LIKE '%Bailian%'
+            """)
+    LocalDateTime lastBailianOkAt(@Param("familyId") long familyId);
+
     /** 一条入站记录(family_id=0 表示鉴权就没过,认不出是哪一家) */
     record InboundRow(LocalDateTime createdAt, String tokenPrefix, String toolName,
                       String result, String srcIp, String userAgent) {

@@ -8526,6 +8526,16 @@ QA1201_AAT="$RD/src/main/resources/templates/admin/ai-access.html"
   && log_ok "v1201-INBOUND-VISIBLE(管理页能看到谁访问过 · 区分本机与外部 · 零外部访问时直说)" \
   || log_bad "v1201-INBOUND-VISIBLE 入站访问记录从页面上消失了" "「来过但鉴权失败」和「根本没来过」又变得无法区分,只能靠猜"
 
+# v1202-DIAGNOSIS-MUST-SAY-WHEN · 「不通」的结论必须带上【上次什么时候还好着】。
+#   上一版这条提示只说「大概是服务没部署成功,去控制台看看」——
+#   那是一个【用户无从下手、我们自己也无法证伪】的结论(百炼没有查 MCP 服务状态的公开 API),
+#   于是每一轮都变成「你去看 → 还不行 → 我再猜一个」。
+#   实测真因确实在那边,但让人能动手的是【什么时候坏的】:
+#   知道「上次成功是 09-03 15:24」,用户立刻能对上「我那天改了什么」。
+{ codeonly "$RD/src/main/java/com/family/finance/repository/AskAuditMapper.java" | grep -q 'lastBailianOkAt'   && codeonly "$RD/src/main/java/com/family/finance/service/ask/runtime/ManagedAgentRuntime.java" | grep -q 'lastBailianOkAt(FAMILY_ID)'   && codeonly "$RD/src/main/java/com/family/finance/service/ask/runtime/ManagedAgentRuntime.java" | grep -q '曾经是好的'   && codeonly "$RD/src/main/java/com/family/finance/service/ask/runtime/ManagedAgentRuntime.java" | grep -q '一次都没真正跑起来'; } \
+  && log_ok "v1202-DIAGNOSIS-MUST-SAY-WHEN(自检结论带上次成功时间 · 区分「曾经好过」与「从没成功」)" \
+  || log_bad "v1202-DIAGNOSIS-MUST-SAY-WHEN 自检又变回一句无从下手的猜测" "用户只能反复去控制台翻,而我们无法证伪自己的结论"
+
 echo
 echo "═══════════════════════════════════════"
 echo " 总结: PASS=$PASS  FAIL=$FAIL  SKIP=$SKIP"
