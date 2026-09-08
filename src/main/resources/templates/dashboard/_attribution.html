@@ -55,6 +55,19 @@
       </div>
     </div>
 
+    <!--/* v1.20 FR-465 · 下钻的落地形态。
+           以前只有 ?expand=组ID 这个 query,页面上没有任何入口 ——
+           等于「做了但没人找得到」,和第一版把分组藏进管理页是同一个毛病。 */-->
+    <div th:if="${attrExpand != null}" class="border-l-2 border-brass-deep bg-brass-soft/40 px-3 py-2 mb-2 flex items-center gap-3 flex-wrap">
+      <span class="font-mono text-[10px] text-ink-soft tracking-wider">
+        已展开分组 —— 下面按<b>成员账户</b>拆开;其它分组仍是折叠的
+      </span>
+      <span style="flex:1"></span>
+      <button type="button" class="pill text-[10px] whitespace-nowrap"
+              th:attr="hx-get=@{/dashboard/attribution(asof=${attrAsof},dim=${attrDim},currency=${attrCurrency},accounts=${attrAccountsCsv})}"
+              hx-target="#attribution-section" hx-swap="outerHTML">收起</button>
+    </div>
+
     <div th:unless="${#lists.isEmpty(attr.slices())}" id="attrWaterfall" style="width:100%;height:280px"></div>
     <p class="font-mono text-[10px] text-ink-subtle mt-1">基准(期初)→ 人赚 → 钱赚(按当前维度 · TopN)→ 开账基线 → 本期净变化 · 恒等闭合,算不平显「未归因」</p>
 
@@ -95,6 +108,10 @@
 
   <script th:inline="javascript">
   (function () {
+    // v1.20 · 哪些维值是「分组」(可以点开),以及点开要打的地址。
+    //   维值是组名时才给「点开」——未分组的账户本来就是最细粒度,点了也没有下一层。
+    var GROUPS = /*[[${attrGroups}]]*/ {};
+    var EXPAND_BASE = /*[[@{/dashboard/attribution(asof=${attrAsof},dim=${attrDim},currency=${attrCurrency},accounts=${attrAccountsCsv})}]]*/ '';
     var DELTA = /*[[${attr.delta()}]]*/ 0;
     var HUMAN = /*[[${attr.humanEarned()}]]*/ 0;
     var OPENING = /*[[${attr.opening()}]]*/ 0;
@@ -167,12 +184,30 @@
       function rows(list, cls) {
         if (!list.length) return '<p class="text-xs text-ink-subtle">无</p>';
         return list.map(function (e) {
-          return '<div class="flex justify-between items-baseline gap-2"><span class="truncate">' + esc(e[0]) + '</span>' +
-            '<span class="font-mono tnum ' + cls + ' shrink-0" data-priv>' + fmtShort(e[1]) + '</span></div>';
+          var gid = GROUPS ? GROUPS[e[0]] : null;
+          // 维值是分组 → 给一个「点开」;是账户 → 不给(它已经是最细的了,点了没有下一层)
+          var open = gid ? '<button type="button" class="attr-expand font-mono text-[10px] text-brass-deep bg-transparent border-0 cursor-pointer px-1 shrink-0"'
+                         + ' data-gid="' + gid + '" title="展开这个分组的成员账户">点开</button>' : '';
+          return '<div class="flex justify-between items-baseline gap-2">'
+            + '<span class="truncate">' + esc(e[0]) + '</span>' + open
+            + '<span class="font-mono tnum ' + cls + ' shrink-0" data-priv>' + fmtShort(e[1]) + '</span></div>';
         }).join('');
       }
       document.getElementById('attrWinners').innerHTML = rows(winners, 'num-pos');
       document.getElementById('attrLosers').innerHTML = rows(losers, 'num-neg') + fxNote;
+      // 事件委托:这两块是 innerHTML 重绘出来的,直接绑在元素上会在下次重绘时丢掉
+      ['attrWinners', 'attrLosers'].forEach(function (id) {
+        var box = document.getElementById(id);
+        if (!box) return;
+        box.addEventListener('click', function (ev) {
+          var btn = ev.target.closest('.attr-expand');
+          if (!btn) return;
+          var url = EXPAND_BASE + (EXPAND_BASE.indexOf('?') >= 0 ? '&' : '?') + 'expand=' + btn.dataset.gid;
+          // 复用维度切换那条路:换掉整个 #attribution-section 片段
+          if (window.htmx) htmx.ajax('GET', url, {target: '#attribution-section', swap: 'outerHTML'});
+          else window.location.href = url;
+        });
+      });
 
       var keys = {};
       TREND.forEach(function (t) { Object.keys(t.g || {}).forEach(function (k) { keys[k] = (keys[k] || 0) + Math.abs(Number(t.g[k])); }); });

@@ -8368,11 +8368,16 @@ QA1200_GPG="$RD/src/main/resources/templates/accounts/groups.html"
 
 # v1200-GROUPS-PAGE-USABLE · 分组页要能用:折叠列表 + 搜索,而不是把所有账户平铺 N 遍。
 #   第一版每个分组都渲染全部账户的 checkbox(19 账户 × N 组),维护者原话「交互怎么这么奇怪」。
+#   二次验收又改了一轮:主页面**只有列表**,推荐收进「新建」弹窗 ——
+#   推荐是「建的时候的快捷方式」,不是常驻区块;而且它只**预填**,组名和成员都还能改
+#   (维护者:「分组名也要允许用户自己维护」)。
 { grep -q 'id="groupSearch"' "$QA1200_GPG" \
-  && grep -q 'group-card' "$QA1200_GPG" \
-  && grep -qE '<details[^>]*class="paper-card mb-3 group-card"' "$QA1200_GPG"; } \
-  && log_ok "v1200-GROUPS-PAGE-USABLE(分组列表默认折叠 · 可按组名/账户名搜索)" \
-  || log_bad "v1200-GROUPS-PAGE-USABLE 分组页又变成平铺全部账户了" "N 个组 × 全部账户的 checkbox,没法用"
+  && grep -qE '<details[^>]*class="paper-card mb-3 group-card"' "$QA1200_GPG" \
+  && grep -q '<dialog id="newGroupDlg"' "$QA1200_GPG" \
+  && grep -q 'applySuggestion' "$QA1200_GPG" \
+  && grep -q 'id="ngName"' "$QA1200_GPG"; } \
+  && log_ok "v1200-GROUPS-PAGE-USABLE(主页面只有列表+搜索 · 新建走弹窗 · 推荐只预填、组名可改)" \
+  || log_bad "v1200-GROUPS-PAGE-USABLE 分组页的形态又退回去了" "推荐占住主页面 / 没有新建弹窗 / 组名不可改"
 
 echo
 echo "═══════════════════════════════════════"
