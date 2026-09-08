@@ -8486,6 +8486,23 @@ QA1200_SEALT="$RD/src/main/resources/templates/reports/_sealed.html"
   && log_ok "v1200-PICKER-SHOWS-TYPE-AND-OWNER(新建与编辑两处勾选列表都显示类型+主理人)" \
   || log_bad "v1200-PICKER-SHOWS-TYPE-AND-OWNER 勾选列表又只剩账户名了" "同名账户分不清谁是谁,选错了要等到统计出错才发现"
 
+# v1200-FILTER-GROUP-PICK · 筛选器的分组快选:只帮你勾,不改筛选语义。
+#   这个组件是【复核组件清单时才发现漏了的】—— 它是个 <details> 表单、不在长文目录里,
+#   第一遍按目录列清单时整个没看见。教训写在 PRD §6.1.0。
+#   实现上刻意不加 groups= 参数:筛选器的语义是「哪些【账户】参与计算」,
+#   组不是账户,塞进来会让口径变糊,而收益只有「少点几下」。
+{ grep -q 'pickGroupAccounts' "$QA1200_DREG"   && grep -q 'groupPicks' "$QA1200_DREG"   && ! grep -qE 'name="groups"|RequestParam.*"groups"' "$QA1200_DREG"   && ! codeonly "$RD/src/main/java/com/family/finance/web/dashboard/DashboardController.java" | grep -q '"groups"'; } \
+  && log_ok "v1200-FILTER-GROUP-PICK(筛选器有分组快选 · 且没往查询语义里加 groups 参数)" \
+  || log_bad "v1200-FILTER-GROUP-PICK 快选没了,或者组被塞进了筛选语义" "筛选器的语义是「哪些账户参与计算」;混入组会让口径变糊"
+
+# v1200-MEMBER-CHART-RAW-ROWS · 「按成员分布」必须吃【原始】账户行,不能吃折叠后的。
+#   computeMemberAllocation 要用 accountId 反查 Account 拿 primary_owner_member_id,
+#   而组行的 accountId 是 null → 整组的钱会【从成员饼图里整片消失】,
+#   饼图照画、不报错,只是少了一大块。这是复核时逐条找数据源证据才钉住的。
+{ codeonly "$RD/src/main/java/com/family/finance/web/dashboard/DashboardController.java"     | grep -q 'computeMemberAllocation('   && ! codeonly "$RD/src/main/java/com/family/finance/web/dashboard/DashboardController.java"     | grep -qE 'computeMemberAllocation\([^)]*(foldedRows|accountRowsFlat)'; } \
+  && log_ok "v1200-MEMBER-CHART-RAW-ROWS(按成员分布仍吃原始账户行 · 组行 accountId=null 不会吞掉整组)" \
+  || log_bad "v1200-MEMBER-CHART-RAW-ROWS 成员饼图被喂了折叠后的行" "组行 accountId=null → 反查不到 Account → 整组的钱从饼图里消失,而且不报错"
+
 echo
 echo "═══════════════════════════════════════"
 echo " 总结: PASS=$PASS  FAIL=$FAIL  SKIP=$SKIP"

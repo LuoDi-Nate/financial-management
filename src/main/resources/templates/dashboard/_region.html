@@ -121,6 +121,17 @@
       <form method="get" th:action="@{/dashboard}" class="mt-4">
         <input type="hidden" name="range" th:value="${range}"/>
         <input type="hidden" name="currency" th:value="${currency}"/>
+        <!--/* v1.20 FR-486 · 按分组快选。
+               只是【帮你勾】—— 点一下把该组成员勾上,提交出去仍然是 accounts=1,2,3…
+               不把组塞进「哪些账户参与计算」这个语义里:组不是账户,混进来会让口径变糊。 */-->
+        <div th:if="${!#lists.isEmpty(groupPicks)}" class="flex items-center gap-2 flex-wrap mb-3 pb-3 border-b border-rule-soft">
+          <span class="font-mono text-[10px] text-ink-subtle">按分组快选</span>
+          <button th:each="gp : ${groupPicks}" type="button" class="pill text-[10px] whitespace-nowrap"
+                  th:attr="data-pick-ids=${#strings.listJoin(gp.ids, ',')}"
+                  th:text="${gp.name} + ' · ' + ${#lists.size(gp.ids)} + ' 个'"
+                  onclick="pickGroupAccounts(this)">日常周转 · 5 个</button>
+          <span class="font-mono text-[9px] text-ink-subtle">· 勾上该组的账户,还能再手动加减</span>
+        </div>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1">
           <label th:each="account : ${allAccounts}"
                  class="flex items-center gap-3 py-1.5 hover:bg-paper px-2 -mx-2 cursor-pointer">
@@ -986,6 +997,14 @@
           Object.assign(donutConfig(memLabels, data.memberAllocationValues,
             '按成员分布 · ' + data.currency, MEM_PAL), { plugins: [ChartDataLabels] }));
       }
+
+      /* v1.20 FR-486 · 按分组快选:只操作 checkbox,不改表单语义。
+         先全清再勾该组 —— 「快选」的语义是「就看这一组」,不是「往已有选择上叠加」。 */
+      window.pickGroupAccounts = function (btn) {
+        var want = (btn.getAttribute('data-pick-ids') || '').split(',').filter(Boolean);
+        var boxes = btn.closest('form').querySelectorAll('input[name=accounts]');
+        boxes.forEach(function (cb) { cb.checked = want.indexOf(cb.value) >= 0; });
+      };
 
       const donut = document.getElementById('allocationChart');
       if (donut) {

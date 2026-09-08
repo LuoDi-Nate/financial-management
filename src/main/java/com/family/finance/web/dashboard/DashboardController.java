@@ -68,6 +68,7 @@ public class DashboardController {
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
     private final com.family.finance.service.insight.AssetInsightService assetInsightService; // v0.6 资产洞察速览
     private final com.family.finance.service.group.AccountRowGrouper accountRowGrouper;       // v1.20 账户组折叠
+    private final com.family.finance.service.group.AccountGroupService accountGroupService;   // v1.20 FR-486 筛选器快选
     private final com.family.finance.service.lens.LensMetaService lensMetaService; // v1.1 资产透视内嵌
 
     @GetMapping("/dashboard")
@@ -354,6 +355,19 @@ public class DashboardController {
         model.addAttribute("accountRows", foldedRows);                              // 顶层:图 + 计数
         model.addAttribute("accountRowsFlat", accountRowGrouper.flatten(foldedRows)); // 表:组行 + 隐藏成员行
         model.addAttribute("hasGroups", groupingResolver.hasAnyGroup(me.getFamilyId()));
+        /* v1.20 FR-486 · 账户多选筛选器的「按分组快选」。
+         * 复查组件清单时发现漏了这个组件 —— 它不在长文目录里,所以第一遍整个没看见。
+         * 建了「日常周转」之后,想「只看这一组」得手动勾 5 个,账户一多就会勾错。
+         * 【刻意只做前端快选,不改筛选语义】:点一下把该组成员勾上,URL 仍是 accounts=1,2,3…
+         * 组不是账户,把它塞进「哪些账户参与计算」的语义里只会让口径变糊。 */
+        var groupPicks = new java.util.ArrayList<java.util.Map<String, Object>>();
+        var gMembers = accountGroupService.membersByGroup(me.getFamilyId());
+        for (var g : accountGroupService.list(me.getFamilyId())) {
+            java.util.List<Long> ids = gMembers.getOrDefault(g.getId(), java.util.List.of());
+            if (ids.isEmpty()) continue;
+            groupPicks.add(java.util.Map.of("name", g.getName(), "ids", ids));
+        }
+        model.addAttribute("groupPicks", groupPicks);
         model.addAttribute("fxFallback", fxFallback);
         model.addAttribute("requestedCurrency", requestedCurrency);
 
