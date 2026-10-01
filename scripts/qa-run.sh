@@ -11029,6 +11029,28 @@ QA1282_P="$RD/src/main/resources/templates/admin/product-categories.html"
   && log_ok "v1282-MONEY-FUND-LINK(链接写「货币基金的风险与参考收益」· 直达 #cat-MONEY_FUND 高亮 · 不撞填报页 .cat-row · flow 37 在)" \
   || log_bad "v1282-MONEY-FUND-LINK 提示条链接 / 产品类目行锚点缺了" "see dashboard/_region.html · admin/product-categories.html"
 
+section "v1.28.3 · issue #25 第二轮:logo 上传(任何浏览器)· 关账节奏选中态"
+# v1283-LOGO-ANY-BROWSER · WebKit 编不出 WebP → 前端认 blob 真实类型、后端按魔数认三种格式;文件名带内容指纹(换图不显示旧图)
+QA1283_LC="$RD/src/main/java/com/family/finance/web/admin/LogoUploadController.java"
+QA1283_FH="$RD/src/main/resources/templates/admin/family.html"
+{ grep -q 'static String sniffExtension(byte\[\] head)' "$QA1283_LC" \
+  && grep -q '"logo-" + fingerprint(bytes) + "." + ext' "$QA1283_LC" \
+  && ! grep -q 'body("must be image/webp")' "$QA1283_LC" \
+  && grep -q "blob.type !== 'image/webp'" "$QA1283_FH" \
+  && ! grep -q "fd.append('logo', blob, 'logo.webp')" "$QA1283_FH" \
+  && [ -f "$RD/src/test/java/com/family/finance/web/admin/LogoSniffTest.java" ]; } \
+  && log_ok "v1283-LOGO-ANY-BROWSER(按文件头认 WebP / PNG / JPEG · 前端不信 toBlob 的类型参数 · 文件名带指纹)" \
+  || log_bad "v1283-LOGO-ANY-BROWSER logo 上传又只认 WebP / 又写死 logo.webp" "see LogoUploadController / admin/family.html"
+
+# v1283-RHYTHM-PICKED · 关账节奏点了就高亮 + 「还没保存」提示
+QA1283_PH="$RD/src/main/resources/templates/admin/periods.html"
+{ grep -q '.rhythm-opt:has(input:checked)' "$QA1283_PH" \
+  && grep -q 'id="rhythm-dirty"' "$QA1283_PH" \
+  && grep -q "l.classList.toggle('rhythm-on', l.contains(e.target))" "$QA1283_PH" \
+  && [ -f "$RD/scripts/e2e/flows/38-logo-rhythm.cjs" ]; } \
+  && log_ok "v1283-RHYTHM-PICKED(点卡片即高亮 · 选中 ≠ 已保存时提示「还没保存」· flow 38 在)" \
+  || log_bad "v1283-RHYTHM-PICKED 关账节奏选中态又只在保存后才变" "see admin/periods.html"
+
 echo
 echo "═══════════════════════════════════════"
 echo " 总结: PASS=$PASS  FAIL=$FAIL  SKIP=$SKIP"

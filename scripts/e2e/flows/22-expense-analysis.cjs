@@ -15,6 +15,8 @@
 const db = require('../lib/db.cjs');
 const fx = require('../lib/fixture.cjs');
 
+const SEED22 = 'e2e-22 · 跨月前置';
+
 module.exports = {
   name: '22-expense-analysis',
   title: 'v1.24 · 支出分析:三分 / 归因 / 常态月均 / 两块合并',
@@ -122,6 +124,23 @@ module.exports = {
     // ── 4.5 · dashboard 上的即时块要【找得到】────────────────────────────
     report.section('4.5 · dashboard 本月支出分析(维护者追加)');
 
+    /* 前置:这一块只在「本月至今有逐笔支出」时出现。beta 跨月之后(10-01 实际撞上)新的一期一笔都没有,
+       这一节就整段红 —— 那是数据不是代码(在已发布 v1.28.2 上同样红)。没有的话补一笔(不动余额),cleanup 删掉。 */
+    const cur = fx.currentPeriod();
+    const has = db.num(`SELECT COUNT(*) FROM cash_flow c JOIN account a ON a.id=c.account_id
+                         WHERE a.family_id=${fx.FAM} AND c.period_id=${cur} AND c.kind='EXPENSE' AND c.deleted_at IS NULL`);
+    if (has === 0) {
+      db.raw(`INSERT INTO cash_flow(period_id, account_id, kind, category_code, amount, occurred_at, note, submitted_by,
+                                    is_adjustment, source_tag, expense_category_id, affects_balance, one_off)
+              SELECT ${cur}, c.account_id, c.kind, c.category_code, 123.45, CURDATE(), '${SEED22}', c.submitted_by,
+                     0, c.source_tag, c.expense_category_id, 0, 0
+                FROM cash_flow c JOIN account a ON a.id=c.account_id
+               WHERE a.family_id=${fx.FAM} AND c.kind='EXPENSE' AND c.deleted_at IS NULL AND c.is_adjustment=0
+                 AND c.expense_category_id IS NOT NULL
+               ORDER BY c.id DESC LIMIT 1`);
+      report.info('前置:本期还没有逐笔支出(刚跨月)· 补了一笔不动余额的,cleanup 删掉');
+    }
+
     await ui.goto('/dashboard');
     await ui.rendered('仪表盘');
     /* 【必须是个有标题的整宽块】——
@@ -192,6 +211,7 @@ module.exports = {
    * 整段还原被跳过,beta 被留在中间状态里 —— 下一个人跑别的回归会莫名其妙。
    */
   async cleanup() {
+    db.raw(`DELETE FROM cash_flow WHERE note='${SEED22}'`);
     // 终态:支出分析开着(删掉这条配置 = 回到代码默认的「开」)
     db.raw(`DELETE FROM family_runtime_config
              WHERE family_id=${fx.FAM} AND key_name='expense_analysis_enabled'`);

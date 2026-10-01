@@ -54,8 +54,30 @@
             </div>
           </label>
         </div>
-        <button class="btn-ink mt-4 text-xs">保存关账节奏</button>
+        <div class="flex items-center gap-3 flex-wrap mt-4">
+          <button class="btn-ink text-xs">保存关账节奏</button>
+          <!--/* v1.28.3 · issue #25 · 点了一张卡之后要看得出「选中了、还没保存」 */-->
+          <span id="rhythm-dirty" class="font-mono text-[11px] text-brass-deep" hidden>已选「<b></b>」· 还没保存</span>
+        </div>
       </form>
+      <script>
+      (function () {
+        var form = document.getElementById('rhythm-form');
+        if (!form) return;
+        var saved = (form.querySelector('input[name=rhythm]:checked') || {}).value;
+        var tip = document.getElementById('rhythm-dirty');
+        form.addEventListener('change', function (e) {
+          if (e.target.name !== 'rhythm') return;
+          // :has() 不认的老浏览器靠这个 class;认的话两者一致
+          form.querySelectorAll('.rhythm-opt').forEach(function (l) {
+            l.classList.toggle('rhythm-on', l.contains(e.target));
+          });
+          var dirty = e.target.value !== saved;
+          tip.hidden = !dirty;
+          if (dirty) tip.querySelector('b').textContent = e.target.closest('.rhythm-opt').querySelector('.font-display').textContent.trim();
+        });
+      })();
+      </script>
     </div>
     <style>
       /* 四个档位必须**逐像素同尺寸同样式**(feedback_sibling_uniform_selfcheck)。
@@ -64,6 +86,10 @@
       .rhythm-opt { border-width: 2px; box-sizing: border-box; }
       .rhythm-opt:hover { border-color: var(--brass-deep); }
       .rhythm-opt.rhythm-on { border-color: var(--brass-deep); background: rgba(160,124,58,.07); }
+      /* v1.28.3 · issue #25 · 选中态原来只在服务端渲染(保存之后才变),点了没反应。
+         点卡片 = 选中隐藏的 radio → 跟着 :checked 走;键盘 Tab 过来也要看得见焦点。 */
+      .rhythm-opt:has(input:checked) { border-color: var(--brass-deep); background: rgba(160,124,58,.07); }
+      .rhythm-opt:has(input:focus-visible) { outline: 2px solid var(--brass-deep); outline-offset: 2px; }
       /* 「代价」那条虚线要落在同一水平线上。不给高度的话它被上面 flex-1 的说明文字推着走 ——
          实测四张卡的虚线在 455/440/455/441,差 15px,一眼看得出不齐。 */
       .rhythm-opt > div:last-child { min-height: 44px; }
