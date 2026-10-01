@@ -108,6 +108,11 @@ bash deploy/restore.sh          # 列出可用备份 → 选一个 → 自动停
 **备份节奏**:Docker 是备份容器每 24 小时一次(`finance-*.sql.gz`);systemd 直装是 `finance-backup.timer` 每天 03:30
 (`/var/backup/finance/dump-*.sql.gz`)。重要操作前建议自己先备一份:`bash deploy/backup-now.sh`。
 
+**备份容器是不是在正常干活**:`docker compose ps` 里 backup 那一行显示 `healthy`,就是最近 26 小时内有一份**校验通过**的备份
+(能解压、里面有建表语句)。刚启动时显示 `starting` 属正常,第一份备好就变 `healthy`;一天都没备上才会变 `unhealthy`。
+日志(`docker compose logs backup`)每次写一行:成功是「✓ 文件 · N 字节 · M 张表」,失败写的是数据库自己报的原因,
+并在 5 分钟后重试(最多 12 次)。v1.28.3 之前备份容器会一直显示 unhealthy —— 那是它误用了 app 的健康检查,不代表备份坏了。
+
 想手工来也可以:
 ```bash
 # Docker:把某个备份灌回 db 容器

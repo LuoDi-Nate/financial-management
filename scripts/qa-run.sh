@@ -11051,6 +11051,20 @@ QA1283_PH="$RD/src/main/resources/templates/admin/periods.html"
   && log_ok "v1283-RHYTHM-PICKED(点卡片即高亮 · 选中 ≠ 已保存时提示「还没保存」· flow 38 在)" \
   || log_bad "v1283-RHYTHM-PICKED 关账节奏选中态又只在保存后才变" "see admin/periods.html"
 
+# v1283-BACKUP-SIDECAR · 备份容器不继承 app 的健康检查;失败真的稍后重试;成功要校验;健康看 .last-ok
+QA1283_BK="$RD/docker/backup.sh"; QA1283_DC="$RD/docker-compose.yml"
+QA1283_BKSVC="$(awk '/^  backup:/{f=1;print;next} f&&/^  [a-z]/{exit} f{print}' "$QA1283_DC")"
+{ bash -n "$QA1283_BK" \
+  && printf '%s' "$QA1283_BKSVC" | grep -q 'healthcheck:' \
+  && printf '%s' "$QA1283_BKSVC" | grep -q '/data/backups/.last-ok' \
+  && ! printf '%s' "$QA1283_BKSVC" | grep -v '^ *#' | grep -q '20000/health' \
+  && grep -qF 'touch "${BACKUP_DIR}/.last-ok"' "$QA1283_BK" \
+  && grep -qF 'sleep "$RETRY_INTERVAL"' "$QA1283_BK" \
+  && grep -q "gunzip -t" "$QA1283_BK" && grep -q "CREATE TABLE" "$QA1283_BK" \
+  && ! grep -q '2>/dev/null | gzip' "$QA1283_BK"; } \
+  && log_ok "v1283-BACKUP-SIDECAR(备份容器健康看 .last-ok 不继承 app 的 curl · 失败 5 分钟重试 · 能解压有建表才算成功 · 报错不吞)" \
+  || log_bad "v1283-BACKUP-SIDECAR 备份 sidecar 又会假 unhealthy / 失败不重试 / 成功不校验" "see docker/backup.sh · docker-compose.yml backup 服务"
+
 echo
 echo "═══════════════════════════════════════"
 echo " 总结: PASS=$PASS  FAIL=$FAIL  SKIP=$SKIP"
