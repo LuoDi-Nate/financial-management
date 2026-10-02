@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>v1.29 Preview · IBKR 同步带上期权</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..700&family=JetBrains+Mono:wght@300;400;500&family=Noto+Serif+SC:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/style.css">
+<style>
+  body{background:var(--paper-deep,#e9e2d4);margin:0}
+  .wrap{max-width:1180px;margin:0 auto;padding:28px 20px 60px}
+  .eyebrow{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-subtle)}
+  h1,h2,h3{font-family:'Fraunces','Noto Serif SC',serif;font-weight:500}
+  .note{font-size:12px;color:var(--ink-subtle);line-height:1.75}
+  .zone{margin-top:40px}
+  .zone-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+  .zone-no{font-family:'JetBrains Mono',monospace;font-size:20px;color:var(--paper);background:var(--brass-deep);line-height:1;padding:5px 10px}
+  .zone-t{font-family:'Fraunces','Noto Serif SC',serif;font-size:20px}
+  .zone-line{height:2px;background:var(--brass-deep);opacity:.35;margin:10px 0 18px}
+  .card{border:1px solid var(--rule);background:var(--card);padding:18px 20px}
+  .mono{font-family:'JetBrains Mono',monospace;font-feature-settings:"tnum" 1}
+  .pill{font-family:'JetBrains Mono',monospace;font-size:9.5px;padding:2px 7px;border:1px solid var(--rule);color:var(--ink-soft);white-space:nowrap;letter-spacing:.06em}
+  .p-auto{background:rgba(47,93,80,.12);color:var(--forest);border-color:var(--forest)}
+  .p-sync{background:rgba(180,138,58,.12);color:var(--brass-deep);border-color:var(--brass-deep)}
+  .p-opt{background:rgba(110,76,120,.10);color:var(--plum,#6e4c78);border-color:var(--plum,#6e4c78)}
+  .p-due{background:rgba(159,74,58,.10);color:var(--rust);border-color:var(--rust)}
+  .row{border:1px solid var(--rule);background:var(--card);padding:16px 20px;margin-bottom:10px;display:grid;grid-template-columns:1fr auto;gap:16px;align-items:center}
+  .row .t{font-family:'Fraunces','Noto Serif SC',serif;font-size:19px}
+  .row .sub{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink-soft);margin-top:6px}
+  .val{text-align:right}
+  .val b{font-family:'Fraunces',serif;font-size:22px;font-weight:500}
+  .neg{color:var(--rust)}
+  .breakdown{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+  .breakdown .lbl{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ink-subtle)}
+  .breakdown .v{font-family:'Fraunces',serif;font-size:18px;margin-top:2px}
+  .flash{border-left:4px solid var(--forest);background:rgba(47,93,80,.06);padding:10px 14px;font-size:13px}
+  .flash.warn{border-left-color:var(--rust);background:rgba(159,74,58,.05)}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:6px 18px;font-size:13px}
+  .kv .k{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink-subtle)}
+  .phone{width:390px;max-width:100%;border:10px solid #1c1a17;border-radius:40px;padding:20px 12px;background:var(--paper)}
+  .phone .row{grid-template-columns:1fr;gap:8px}
+  .phone .val{text-align:left}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+  .two > *{min-width:0}
+  @media (max-width:900px){.two{grid-template-columns:1fr}.breakdown{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">v1.29 · preview · 待评审 · issue #26</div>
+  <h1 style="font-size:28px;margin:6px 0 4px">IBKR 同步带上期权持仓</h1>
+  <p class="note" style="max-width:900px">期权按盈透报表里的持仓市值记(已含每张 100 股的乘数),一张合约一行;卖出的期权是负数,从账户余额里减去。
+    账户余额 = 现金 + 股票 + 期权,和盈透那边对得上。金额都是编的。</p>
+
+  <!-- ① 持仓页 -->
+  <section class="zone">
+    <div class="zone-head"><span class="zone-no">1</span><span class="zone-t">持仓页 · 盈透账户</span>
+      <span class="note">期权一行写人话:标的 · 看涨 / 看跌 · 行权价 · 到期日 · 买入 / 卖出几张</span></div>
+    <div class="zone-line"></div>
+
+    <div class="card" style="margin-bottom:14px">
+      <div class="eyebrow" style="color:var(--forest);margin-bottom:8px">估 · 值 · 分 · 解</div>
+      <div class="breakdown">
+        <div><div class="lbl">股票(自动拉价)</div><div class="v mono">USD 42,180</div></div>
+        <div><div class="lbl">期权(按盈透报表)</div><div class="v mono">USD 640</div></div>
+        <div><div class="lbl">现金</div><div class="v mono">USD 8,350</div></div>
+        <div><div class="lbl">账户余额</div><div class="v mono"><b>USD 51,170</b></div></div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="t">苹果</span><span class="pill">AAPL</span><span class="pill">US</span><span class="pill p-auto">自动估值</span><span class="pill p-sync">券商同步</span></div>
+        <div class="sub">120 股 · 现价 $228.40</div></div>
+      <div class="val"><b class="mono">$27,408</b></div>
+    </div>
+
+    <div class="row" title="按盈透报表的持仓市值记(已含每张 100 股的乘数);卖出的期权是负数,从账户余额里减去">
+      <div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="t">AAPL · 看涨 · 行权价 250 · 2026-12-18 到期</span><span class="pill p-opt">期权</span><span class="pill p-sync">券商同步</span></div>
+        <div class="sub">买入 1 张 · 盈透标记价 $9.80 × 100</div></div>
+      <div class="val"><b class="mono">$980</b></div>
+    </div>
+
+    <div class="row" title="按盈透报表的持仓市值记(已含每张 100 股的乘数);卖出的期权是负数,从账户余额里减去">
+      <div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="t">SPY · 看跌 · 行权价 560 · 2026-10-09 到期</span><span class="pill p-opt">期权</span><span class="pill p-due">7 天内到期</span><span class="pill p-sync">券商同步</span></div>
+        <div class="sub"><span class="neg">卖出 2 张</span> · 盈透标记价 $1.70 × 100</div></div>
+      <div class="val"><b class="mono neg">−$340</b><div class="note">卖出的期权从余额里减去</div></div>
+    </div>
+  </section>
+
+  <!-- ② 同步结果 + 测试连接 -->
+  <section class="zone">
+    <div class="zone-head"><span class="zone-no">2</span><span class="zone-t">券商同步页 · 同步结果和测试连接</span></div>
+    <div class="zone-line"></div>
+    <div class="two">
+      <div>
+        <div class="flash">同步 · 新增 2 · 更新 5 · 归档 1 · <b>期权 3 张合约 · 市值 $640</b> · 跳过期货 / 债券 1</div>
+        <div class="flash" style="margin-top:8px;border-left-color:var(--brass-deep);background:rgba(180,138,58,.07)">
+          期权首次计入:这次同步让账户余额 <b>+$640</b> —— 是以前没记的部分。这个月的「钱赚」会包含它,报表里会标明来源(怎么记见 PRD §13 ②)。</div>
+        <div class="flash warn" style="margin-top:8px">TSLA 2026-11-20 300 看涨:报表里缺持仓市值,这一行没有同步 —— 其余照常。</div>
+      </div>
+      <div class="card">
+        <div class="eyebrow" style="margin-bottom:8px">测试连接 · 报表里能同步的</div>
+        <div class="kv">
+          <span class="k">现金</span><span>USD 8,350 · HKD 1,200</span>
+          <span class="k">股票 / ETF</span><span>6 只</span>
+          <span class="k">期权</span><span><b>3 张合约</b>(买入 1 · 卖出 2)</span>
+          <span class="k">不同步</span><span>期货 / 债券 1 笔</span>
+        </div>
+        <label style="display:flex;gap:8px;align-items:center;margin-top:14px;font-size:13px"><input type="checkbox" checked> 同步期权持仓
+          <span class="note">(关掉 = 和以前一样只同步现金和股票)</span></label>
+      </div>
+    </div>
+  </section>
+
+  <!-- ③ 手机 -->
+  <section class="zone">
+    <div class="zone-head"><span class="zone-no">3</span><span class="zone-t">手机(390px)</span><span class="note">标题换行、金额放下面,不挤</span></div>
+    <div class="zone-line"></div>
+    <div class="phone">
+      <div class="row" style="margin:0 0 10px">
+        <div><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span class="t" style="font-size:16px">AAPL · 看涨 · 行权价 250 · 2026-12-18 到期</span></div>
+          <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap"><span class="pill p-opt">期权</span><span class="pill p-sync">券商同步</span></div>
+          <div class="sub">买入 1 张 · 标记价 $9.80 × 100</div></div>
+        <div class="val"><b class="mono" style="font-size:19px">$980</b></div>
+      </div>
+      <div class="row" style="margin:0">
+        <div><span class="t" style="font-size:16px">SPY · 看跌 · 行权价 560 · 2026-10-09 到期</span>
+          <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap"><span class="pill p-opt">期权</span><span class="pill p-due">7 天内到期</span><span class="pill p-sync">券商同步</span></div>
+          <div class="sub"><span class="neg">卖出 2 张</span> · 标记价 $1.70 × 100</div></div>
+        <div class="val"><b class="mono neg" style="font-size:19px">−$340</b></div>
+      </div>
+    </div>
+  </section>
+</div>
+</body>
+</html>
