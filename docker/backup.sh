@@ -2,7 +2,7 @@
 # 家庭账房 · v0.7 备份 sidecar:每日 mysqldump 到 backups 卷 + 按保留天数清理。
 # 复用 app 镜像(自带 mysql client),compose 里覆盖 entrypoint 跑这个。
 #
-# v1.28.3 · issue #25(Docker 用户反馈:备份容器一直 starting / unhealthy,日志里「失败(库未就绪?稍后重试)」)
+# v1.28.3 · issue #29(拆自 #25 · Docker 用户反馈:备份容器一直 starting / unhealthy,日志里「失败(库未就绪?稍后重试)」)
 #   ① 「稍后重试」是假话:失败之后照样 sleep 24 小时 —— 一次没备上就是一整天没有备份。
 #      现在失败后每 5 分钟重试,最多 12 次,还不行才等下一个周期。
 #   ② 失败原因被 2>/dev/null 吞掉了,日志里只能猜「库未就绪?」。现在打出 mysqldump 自己那句报错(不含密码)。

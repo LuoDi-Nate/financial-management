@@ -22,7 +22,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 
 /**
- * Logo 上传 · v0.1 简化版 · v1.28.3 修两处(issue #25)。
+ * Logo 上传 · v0.1 简化版 · v1.28.3 修两处(issue #27,拆自 #25)。
  *
  * 前端 Canvas 先把图缩到 256px 再编码,后端只做 4 件事:
  *  1. 按<b>文件头魔数</b>认格式:WebP(RIFF…WEBP)/ PNG / JPEG —— 不信浏览器报的 Content-Type

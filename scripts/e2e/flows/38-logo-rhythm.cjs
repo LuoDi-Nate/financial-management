@@ -1,5 +1,5 @@
 /**
- * flow · v1.28.3 · issue #25(第二轮)· 品牌 logo 上传 + 关账节奏选中态
+ * flow · v1.28.3 · issue #27 + #28(拆自 #25)· 品牌 logo 上传 + 关账节奏选中态
  *
  * ① 提交者:png / webp / jpg 都试了,经常「上传失败 400 must be image/webp」,或者上传成功却变回以前设过的那张;
  *    换浏览器还是 400。
@@ -37,7 +37,7 @@ async function upload(ui, page, file, label) {
 
 module.exports = {
   name: '38-logo-rhythm',
-  title: 'v1.28.3 · issue #25 · Safari / iPhone 上传 logo 不再 400、换图不再显示旧图 · 关账节奏点了就看得出选中',
+  title: 'v1.28.3 · #27 · #28 · Safari / iPhone 上传 logo 不再 400、换图不再显示旧图 · 关账节奏点了就看得出选中',
 
   async run(ui, report) {
     ui.flow = this.name;

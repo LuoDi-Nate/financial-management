@@ -69,7 +69,7 @@ services:
       db:
         condition: service_healthy
     entrypoint: ["bash", "/app/backup.sh"]
-    # v1.28.3 · issue #25 · 不写这段就会继承 app 镜像的健康检查(curl localhost:20000/health)——
+    # v1.28.3 · issue #29(拆自 #25)· 不写这段就会继承 app 镜像的健康检查(curl localhost:20000/health)——
     #   备份容器里根本没跑 app,于是永远 starting → unhealthy,看着像坏了,真坏了反而分不出来。
     #   改成看「最近一次校验通过的备份」(backup.sh 成功时刷新 .last-ok)是不是 26 小时内的:
     #   一天没备上才 unhealthy。首次启动最多重试 12 次 × 5 分钟,所以起步宽限 70 分钟。

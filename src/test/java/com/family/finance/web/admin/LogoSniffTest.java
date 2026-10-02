@@ -5,7 +5,7 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * v1.28.3 · issue #25 · Logo 按文件头认格式,不信浏览器报的 Content-Type。
+ * v1.28.3 · issue #27 · Logo 按文件头认格式,不信浏览器报的 Content-Type。
  *
  * <p>Safari 与 iPhone / iPad 上的浏览器不会把 Canvas 编码成 WebP,会悄悄给 PNG ——
  * 原来只收 WebP,这些浏览器上传永远 400。</p>

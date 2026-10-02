@@ -173,7 +173,7 @@ if (logoFile) {
     c.width  = Math.round(img.width  * r);
     c.height = Math.round(img.height * r);
     c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-    // v1.28.3 · issue #25 · Safari 和 iPhone / iPad 上的所有浏览器不会编码 WebP:toBlob 不报错,悄悄给 PNG。
+    // v1.28.3 · issue #27 · Safari 和 iPhone / iPad 上的所有浏览器不会编码 WebP:toBlob 不报错,悄悄给 PNG。
     //   以前照样当 WebP 传上去,后端一律 400。现在认 blob 的真实类型,不是 WebP 就用 PNG(大了再退 JPEG)。
     const enc = (type, q) => new Promise(res => c.toBlob(res, type, q));
     let blob = await enc('image/webp', 0.82);

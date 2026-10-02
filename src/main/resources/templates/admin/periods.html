@@ -56,7 +56,7 @@
         </div>
         <div class="flex items-center gap-3 flex-wrap mt-4">
           <button class="btn-ink text-xs">保存关账节奏</button>
-          <!--/* v1.28.3 · issue #25 · 点了一张卡之后要看得出「选中了、还没保存」 */-->
+          <!--/* v1.28.3 · issue #28 · 点了一张卡之后要看得出「选中了、还没保存」 */-->
           <span id="rhythm-dirty" class="font-mono text-[11px] text-brass-deep" hidden>已选「<b></b>」· 还没保存</span>
         </div>
       </form>
@@ -86,7 +86,7 @@
       .rhythm-opt { border-width: 2px; box-sizing: border-box; }
       .rhythm-opt:hover { border-color: var(--brass-deep); }
       .rhythm-opt.rhythm-on { border-color: var(--brass-deep); background: rgba(160,124,58,.07); }
-      /* v1.28.3 · issue #25 · 选中态原来只在服务端渲染(保存之后才变),点了没反应。
+      /* v1.28.3 · issue #28 · 选中态原来只在服务端渲染(保存之后才变),点了没反应。
          点卡片 = 选中隐藏的 radio → 跟着 :checked 走;键盘 Tab 过来也要看得见焦点。 */
       .rhythm-opt:has(input:checked) { border-color: var(--brass-deep); background: rgba(160,124,58,.07); }
       .rhythm-opt:has(input:focus-visible) { outline: 2px solid var(--brass-deep); outline-offset: 2px; }

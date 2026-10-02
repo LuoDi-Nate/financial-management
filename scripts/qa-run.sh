@@ -11029,7 +11029,7 @@ QA1282_P="$RD/src/main/resources/templates/admin/product-categories.html"
   && log_ok "v1282-MONEY-FUND-LINK(链接写「货币基金的风险与参考收益」· 直达 #cat-MONEY_FUND 高亮 · 不撞填报页 .cat-row · flow 37 在)" \
   || log_bad "v1282-MONEY-FUND-LINK 提示条链接 / 产品类目行锚点缺了" "see dashboard/_region.html · admin/product-categories.html"
 
-section "v1.28.3 · issue #25 第二轮:logo 上传(任何浏览器)· 关账节奏选中态"
+section "v1.28.3 · issue #27 / #28 / #29(拆自 #25):logo 上传(任何浏览器)· 关账节奏选中态 · Docker 备份容器"
 # v1283-LOGO-ANY-BROWSER · WebKit 编不出 WebP → 前端认 blob 真实类型、后端按魔数认三种格式;文件名带内容指纹(换图不显示旧图)
 QA1283_LC="$RD/src/main/java/com/family/finance/web/admin/LogoUploadController.java"
 QA1283_FH="$RD/src/main/resources/templates/admin/family.html"
