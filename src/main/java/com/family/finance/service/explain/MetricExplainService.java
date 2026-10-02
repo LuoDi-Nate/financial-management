@@ -267,14 +267,20 @@ public class MetricExplainService {
 
     private String totalLiabilitiesCalc(String ccy, List<AccountPerformance> accountRows, BigDecimal total) {
         if (accountRows != null && !accountRows.isEmpty()) {
-            String items = accountRows.stream()
+            List<AccountPerformance> liab = accountRows.stream()
                     .filter(a -> a.accountType() != null
                             && FactProjector.classOf(a.accountType()) == AccountClass.LIABILITY
                             && a.currentValue() != null && a.currentValue().signum() != 0)
+                    .toList();
+            String items = liab.stream()
                     .map(a -> a.accountName() + " " + money(ccy, a.currentValue().abs()))
                     .collect(Collectors.joining(" · "));
             if (!items.isEmpty()) {
-                return items + "\n合计 = " + money(ccy, total);
+                // v1.28.4 · issue #34 · 明细加起来必须等于合计;对不上就把差额照实写出来,不让用户自己去猜
+                BigDecimal listed = liab.stream().map(a -> a.currentValue().abs()).reduce(BigDecimal.ZERO, BigDecimal::add);
+                String gap = total == null || total.subtract(listed).abs().compareTo(BigDecimal.ONE) < 0 ? ""
+                        : "\n另有 " + money(ccy, total.subtract(listed).abs()) + " 没能逐个列出(请反馈)";
+                return items + gap + "\n合计 = " + money(ccy, total);
             }
         }
         return "仅 LOAN 类型账户期末余额绝对值合计 = " + money(ccy, total);

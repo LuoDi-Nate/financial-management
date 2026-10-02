@@ -831,8 +831,14 @@ public class FactViewServiceImpl implements FactViewService {
         BigDecimal planActualDiff = com.family.finance.calc.BenchmarkAggregator
                 .displayedDiffPercentPoints(xirr.get(first.accountId()), expectedPct, filled.size());
 
+        // v1.28.4 · issue #34 · 类型取【锚期那一行】(rows 按期升序,最后一行就是锚期),不取第一行。
+        //   类型是按期定格的(已关账期用关账那一刻的类型):账户在窗口里改过类型时,第一行是老类型、
+        //   锚期是新类型 —— 而「总负债 / 总资产」这些 KPI 按锚期那一行的类型归类。原来这里取第一行,
+        //   于是 KPI 算进了某个账户、旁边「怎么算的」的明细却没列它(或反过来),明细加起来对不上合计。
+        //   没改过类型的账户第一行和最后一行相同,结果逐字不变(零差异基线守着)。
+        AccountPeriodFact anchorRow = rows.getLast();
         return new AccountPerformance(
-                first.accountId(), first.accountName(), first.accountType(), first.accountCurrency(),
+                first.accountId(), first.accountName(), anchorRow.accountType(), first.accountCurrency(),
                 currentValue, xirr.get(first.accountId()), spark,
                 cumPnl, netPrincipal, latestPnl, momAmount, momPct, sharePct, maxDrawdownPct,
                 filled.size(), sparkPoints(spark), sparkTrend(spark),
