@@ -202,6 +202,9 @@ module.exports = {
     await ui.assert(p1.row && p1.col, '首页账户表里有这个账户、有「本期损益」列', JSON.stringify(p1));
     await ui.assert(Math.abs(Number(p1.val || 0)) < 0.01, '新账户第一次同步:期权等都算开账时就有的,本期损益 = 0', JSON.stringify(p1));
 
+    // 给维护者在 beta 上留一份可点的现场(E2E_KEEP=1 E2E_41_DEMO=1):停在「新账户刚同步完」,不往上一期补快照、不归档
+    if (process.env.E2E_41_DEMO === '1') { report.info('演示模式:停在第 4 段,留现场'); return; }
+
     // ── 5 · 已经在记的账户:那一跳算当月收益 ─────────────────────────
     report.section('5 · 已经在记的账户:上个月只有现金 + 股票 → 这个月期权等第一次被算进来 → 计入本期损益');
     const S = Math.round((end - D) * 100) / 100;
