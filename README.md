@@ -96,8 +96,8 @@
 
 > 完整发布记录与截图见 [Releases](https://github.com/LuoDi-Nate/financial-management/releases)(本段每版只留 2–4 行,细节不搬过来)。
 
-**[v1.28.0](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.28.0) – [v1.28.3](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.28.3) · 看 AI 收到了什么**
-每个 AI 结果旁一个「>_ 查看 prompt」,点开是终端,逐字显示那一次发给大模型的内容,你的范围 / 模板 / 偏好带进去的段落标色写来源。账户名也换成代号再发出去;服务器日志不再写提示词正文;隐私模式也糊 AI 正文里的金额。v1.28.1 修了「新开账户从老账户转钱进去被算成亏损」,以及账户页、首页的三处问题([#25](https://github.com/LuoDi-Nate/financial-management/issues/25));v1.28.2 首页「超额闲置」提示的链接改成人话;v1.28.3 修了 Safari / iPhone 上传 logo、关账节奏选中态、Docker 备份容器假 unhealthy([#27](https://github.com/LuoDi-Nate/financial-management/issues/27) [#28](https://github.com/LuoDi-Nate/financial-management/issues/28) [#29](https://github.com/LuoDi-Nate/financial-management/issues/29))。
+**[v1.28.0](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.28.0) – [v1.28.4](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.28.4) · 看 AI 收到了什么**
+每个 AI 结果旁一个「>_ 查看 prompt」,点开是终端,逐字显示那一次发给大模型的内容,你的范围 / 模板 / 偏好带进去的段落标色写来源。账户名也换成代号再发出去;服务器日志不再写提示词正文;隐私模式也糊 AI 正文里的金额。v1.28.1 修了「新开账户从老账户转钱进去被算成亏损」,以及账户页、首页的三处问题([#25](https://github.com/LuoDi-Nate/financial-management/issues/25));v1.28.2 首页「超额闲置」提示的链接改成人话;v1.28.3 修了 Safari / iPhone 上传 logo、关账节奏选中态、Docker 备份容器假 unhealthy([#27](https://github.com/LuoDi-Nate/financial-management/issues/27) [#28](https://github.com/LuoDi-Nate/financial-management/issues/28) [#29](https://github.com/LuoDi-Nate/financial-management/issues/29))。v1.28.4 修了仪表盘「总负债」明细加起来对不上合计([#34](https://github.com/LuoDi-Nate/financial-management/issues/34))。
 
 **[v1.27.0](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.27.0) – [v1.27.1](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.27.1) · 只分析你想管的那部分钱**
 体检、报表配置对照和 AI 可以只看「金融资产」,或去掉你标过「不参与配置分析」的账户(比如自住房);净资产、收益、流动性照常按全部资产算。AI 的角度可以从五个内置模板里挑,或基于模板定制;家里的忌讳写成分析偏好,所有 AI 都会读到([#23](https://github.com/LuoDi-Nate/financial-management/issues/23))。v1.27.1 起定制模板时,范围和配置锚每一项都写明「什么情况选它、对你家去掉了谁」。
