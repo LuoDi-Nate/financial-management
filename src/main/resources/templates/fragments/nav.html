@@ -17,10 +17,14 @@
              alt="logo" class="w-7 h-7 object-contain"/>
         </a>
         <span class="nav-brandtext flex flex-col leading-none">
-          <a th:href="@{/}" class="no-underline flex items-baseline gap-2">
+          <!--/* v1.28.5 · issue #31 · 原来是「№ + 家庭名第一个字」,用户以为是显示不下被截断了。
+                 维护者定:换成一个和钱有关的小图标 —— 选了古钱(外圆内方),和「账房」的账册风一致。
+                 家庭名不丢:悬停图标看得到(title),读屏读得到(aria-label)。 */-->
+          <a th:href="@{/}" class="no-underline flex items-center gap-2">
             <span class="font-display text-xl font-medium" th:text="${state.family.brandText}">账房</span>
-            <span class="font-mono text-[10px] tracking-[0.2em] text-ink-subtle"
-                  th:text="'№ ' + ${#strings.substring(state.family.name, 0, 1)}">№ 张</span>
+            <svg class="nav-coin shrink-0 text-brass-deep" width="15" height="15" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"
+                 role="img" th:attr="aria-label=${state.family.name}"><title th:text="${state.family.name}">家</title><circle cx="12" cy="12" r="9"/><rect x="9" y="9" width="6" height="6" rx=".5"/></svg>
           </a>
           <!-- 版本号(账册「版次」标记 · brass 细线徽记)· 来源 app.version
                v1.9:可点 → 管理页版本卡;有新版时右上角一个 5px 描边圆点。

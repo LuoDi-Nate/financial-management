@@ -11077,6 +11077,18 @@ QA1284_ME="$RD/src/main/java/com/family/finance/service/explain/MetricExplainSer
   && log_ok "v1284-LIAB-BREAKDOWN(账户类型取锚期那一行 · 明细之和对不上合计时写出差额 · flow 39 在)" \
   || log_bad "v1284-LIAB-BREAKDOWN 明细又按最早一行的类型归类 / 差额兜底没了" "see FactViewServiceImpl.buildAccountPerformance · MetricExplainService.totalLiabilitiesCalc"
 
+section "v1.28.5 · issue #31:左上角换成古钱小图标"
+# v1285-NAV-COIN · 顶栏不再拼「№ + 家庭名首字」;古钱图标带完整家庭名的 title / aria-label
+QA1285_NAV="$RD/src/main/resources/templates/fragments/nav.html"
+{ ! grep -q "'№ ' + \${#strings.substring(state.family.name" "$QA1285_NAV" \
+  && grep -q 'class="nav-coin' "$QA1285_NAV" \
+  && grep -q 'aria-label=${state.family.name}' "$QA1285_NAV" \
+  && grep -q '<title th:text="${state.family.name}">' "$QA1285_NAV" \
+  && ! grep -q '№ 张' "$RD/src/main/resources/templates/error.html" \
+  && [ -f "$RD/scripts/e2e/flows/40-nav-coin.cjs" ]; } \
+  && log_ok "v1285-NAV-COIN(顶栏古钱图标 · 家庭名在 title / aria-label · 错误页同步 · flow 40 在)" \
+  || log_bad "v1285-NAV-COIN 顶栏又出现「№ + 首字」或图标丢了家庭名" "see fragments/nav.html · error.html"
+
 echo
 echo "═══════════════════════════════════════"
 echo " 总结: PASS=$PASS  FAIL=$FAIL  SKIP=$SKIP"
