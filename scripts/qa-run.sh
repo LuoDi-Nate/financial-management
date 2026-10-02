@@ -11065,6 +11065,18 @@ QA1283_BKSVC="$(awk '/^  backup:/{f=1;print;next} f&&/^  [a-z]/{exit} f{print}' 
   && log_ok "v1283-BACKUP-SIDECAR(备份容器健康看 .last-ok 不继承 app 的 curl · 失败 5 分钟重试 · 能解压有建表才算成功 · 报错不吞)" \
   || log_bad "v1283-BACKUP-SIDECAR 备份 sidecar 又会假 unhealthy / 失败不重试 / 成功不校验" "see docker/backup.sh · docker-compose.yml backup 服务"
 
+section "v1.28.4 · issue #34:总负债的明细加起来等于合计"
+# v1284-LIAB-BREAKDOWN · AccountPerformance 的类型取锚期那一行(与 KPI 同口径);明细对不上合计时写出差额
+QA1284_FV="$RD/src/main/java/com/family/finance/factview/FactViewServiceImpl.java"
+QA1284_ME="$RD/src/main/java/com/family/finance/service/explain/MetricExplainService.java"
+{ grep -q 'AccountPeriodFact anchorRow = rows.getLast();' "$QA1284_FV" \
+  && grep -q 'first.accountId(), first.accountName(), anchorRow.accountType(), first.accountCurrency(),' "$QA1284_FV" \
+  && ! grep -q 'first.accountId(), first.accountName(), first.accountType(),' "$QA1284_FV" \
+  && grep -q '没能逐个列出' "$QA1284_ME" \
+  && [ -f "$RD/scripts/e2e/flows/39-liab-breakdown.cjs" ]; } \
+  && log_ok "v1284-LIAB-BREAKDOWN(账户类型取锚期那一行 · 明细之和对不上合计时写出差额 · flow 39 在)" \
+  || log_bad "v1284-LIAB-BREAKDOWN 明细又按最早一行的类型归类 / 差额兜底没了" "see FactViewServiceImpl.buildAccountPerformance · MetricExplainService.totalLiabilitiesCalc"
+
 echo
 echo "═══════════════════════════════════════"
 echo " 总结: PASS=$PASS  FAIL=$FAIL  SKIP=$SKIP"
