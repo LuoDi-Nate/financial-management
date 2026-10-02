@@ -52,13 +52,13 @@
               <img th:src="@{|/uploads/${family.logoPath}|}"
                    onerror="this.onerror=null;this.src='/img/default-logo.svg'"
                    alt="logo" class="w-32 h-32 object-contain mx-auto"/>
-              <div class="font-mono text-[10px] text-ink-subtle tracking-wider mt-2">currently · webp(仅 web 头部)</div>
+              <div class="font-mono text-[10px] text-ink-subtle tracking-wider mt-2">当前 · 仅网页头部</div>
             </div>
             <div th:if="${family.logoPath == null}" class="text-center"
                  th:with="preset=${family.logoPreset != null ? family.logoPreset : 'icon2'}">
               <img th:src="@{/img/presets/{p}-192.png(p=${preset},v=${buildVersion})}"
                    th:alt="${preset}" class="w-32 h-32 object-contain mx-auto"/>
-              <div class="font-mono text-[10px] text-ink-subtle tracking-wider mt-2">currently · 预设 <span th:text="${preset}">icon2</span></div>
+              <div class="font-mono text-[10px] text-ink-subtle tracking-wider mt-2">当前 · 预设 <span th:text="${preset}">icon2</span></div>
             </div>
             <label class="absolute inset-0 bg-ink/70 opacity-0 hover:opacity-100 flex items-center justify-center cursor-pointer transition">
               <span class="font-mono text-xs text-paper tracking-widest">↑ 上传图片</span>
@@ -68,8 +68,8 @@
 
           <p class="font-mono text-[10px] text-ink-subtle mt-3 leading-relaxed tracking-wider">
             JPEG / PNG / WebP · 上限 5 MB<br/>
-            前端自动压缩为 256×256 WebP 后上传<br/>
-            ≈ 8-12 KB · 存于服务器本地
+            自动缩到 256×256 再上传(能存 WebP 就存 WebP,<br/>
+            Safari / iPhone 上存 PNG)· 存于服务器本地
           </p>
 
           <div class="mt-3" th:if="${family.logoPath != null}">
@@ -173,10 +173,18 @@ if (logoFile) {
     c.width  = Math.round(img.width  * r);
     c.height = Math.round(img.height * r);
     c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-    const blob = await new Promise(res => c.toBlob(res, 'image/webp', 0.82));
-    if (!blob) { alert('浏览器不支持 WebP 编码,请换 Chrome/Edge'); return; }
+    // v1.28.3 · issue #27 · Safari 和 iPhone / iPad 上的所有浏览器不会编码 WebP:toBlob 不报错,悄悄给 PNG。
+    //   以前照样当 WebP 传上去,后端一律 400。现在认 blob 的真实类型,不是 WebP 就用 PNG(大了再退 JPEG)。
+    const enc = (type, q) => new Promise(res => c.toBlob(res, type, q));
+    let blob = await enc('image/webp', 0.82);
+    if (!blob || blob.type !== 'image/webp') {
+      blob = await enc('image/png');
+      if (blob && blob.size > 190 * 1024) blob = await enc('image/jpeg', 0.85);
+    }
+    if (!blob) { alert('这个浏览器压缩不了图片,换一个浏览器试试'); return; }
+    const ext = blob.type === 'image/webp' ? 'webp' : blob.type === 'image/png' ? 'png' : 'jpg';
     const fd = new FormData();
-    fd.append('logo', blob, 'logo.webp');
+    fd.append('logo', blob, 'logo.' + ext);
     const resp = await fetch(/*[[@{/admin/family/logo}]]*/'/admin/family/logo', {
       method: 'POST', body: fd, headers: { [csrfHeader]: csrfToken }
     });
