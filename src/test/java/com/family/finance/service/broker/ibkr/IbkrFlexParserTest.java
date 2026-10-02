@@ -76,7 +76,7 @@ class IbkrFlexParserTest {
     }
 
     @Test
-    void 持仓_按交易所归一_LOT明细不重复算_期权计数不同步() throws IOException {
+    void 持仓_按交易所归一_LOT明细不重复算_期权单列() throws IOException {
         BrokerDtos.Snapshot s = IbkrFlexParser.parseStatement(sample()).accounts().get("U1234521").snapshot();
         assertThat(s.positions()).extracting(BrokerDtos.Position::market, BrokerDtos.Position::ticker)
                 .containsExactly(
@@ -86,8 +86,66 @@ class IbkrFlexParserTest {
         // AAPL 只有 SUMMARY 那一行的 50 股,LOT 行的 20 股不能再加一遍
         assertThat(s.positions().get(0).shares()).isEqualByComparingTo("50");
         assertThat(s.positions().get(2).costPrice()).isEqualByComparingTo("1560.00");   // 千分位
-        assertThat(s.skippedNonEquity()).isEqualTo(1);                                  // 期权
+        // v1.29 · 期权不再跳过,单列进 derivatives(以前这里是 skippedNonEquity == 1)
+        assertThat(s.skippedNonEquity()).isZero();
+        assertThat(s.derivatives()).hasSize(1);
+        assertThat(s.derivatives().get(0).symbol()).isEqualTo("AAPL  261218C00250000");
     }
+
+    // ───────────── v1.29 · 期权 / 期货 / 债券(issue #26)─────────────
+
+    static String derivSample() throws IOException {
+        try (var in = IbkrFlexParserTest.class.getResourceAsStream("/ibkr/flex-sample-derivatives.xml")) {
+            return new String(Objects.requireNonNull(in).readAllBytes(), StandardCharsets.UTF_8);
+        }
+    }
+
+    private static BrokerDtos.Derivative deriv(BrokerDtos.Snapshot s, String symbol) {
+        return s.derivatives().stream().filter(d -> d.symbol().equals(symbol)).findFirst().orElseThrow();
+    }
+
+    @Test
+    void 期权_买入为正_卖出为负_市值用报表的持仓市值_已含乘数() throws IOException {
+        BrokerDtos.Snapshot s = IbkrFlexParser.parseStatement(derivSample()).accounts().get("U5550001").snapshot();
+        var longCall = deriv(s, "GOOGL 270416C00360000");
+        assertThat(longCall.kind()).isEqualTo(com.family.finance.domain.stock.InstrumentKind.OPTION);
+        assertThat(longCall.quantity()).isEqualByComparingTo("1");
+        assertThat(longCall.marketValue()).isEqualByComparingTo("2850");
+        assertThat(longCall.underlying()).isEqualTo("GOOGL");
+        assertThat(longCall.putCall()).isEqualTo("C");
+        assertThat(longCall.strike()).isEqualByComparingTo("360");
+        assertThat(longCall.expiry()).isEqualTo(java.time.LocalDate.of(2027, 4, 16));
+        assertThat(longCall.multiplier()).isEqualByComparingTo("100");
+        var shortCall = deriv(s, "GOOGL 270416C00400000");
+        assertThat(shortCall.quantity()).isEqualByComparingTo("-1");
+        assertThat(shortCall.marketValue()).isEqualByComparingTo("-1620");   // 卖出:负数,照实减
+        assertThat(deriv(s, "SPY   261009P00560000").marketValue()).isEqualByComparingTo("-340");
+    }
+
+    @Test
+    void 期货记0_只带名义价值_债券按持仓市值_不加应计利息() throws IOException {
+        BrokerDtos.Snapshot s = IbkrFlexParser.parseStatement(derivSample()).accounts().get("U5550001").snapshot();
+        var fut = deriv(s, "ESZ6");
+        assertThat(fut.kind()).isEqualTo(com.family.finance.domain.stock.InstrumentKind.FUTURE);
+        assertThat(fut.marketValue()).isEqualByComparingTo("0");          // 按名义价值记会多出 30 万
+        assertThat(fut.notional()).isEqualByComparingTo("300000");
+        var bond = deriv(s, "T 4 1/4 11/15/34");
+        assertThat(bond.kind()).isEqualTo(com.family.finance.domain.stock.InstrumentKind.BOND);
+        assertThat(bond.marketValue()).isEqualByComparingTo("9850");      // 不含 accruedInt 102.30
+    }
+
+    @Test
+    void 数据不全或对不上的行_不同步_照实点名_不拿猜的数顶上() throws IOException {
+        BrokerDtos.Snapshot s = IbkrFlexParser.parseStatement(derivSample()).accounts().get("U5550001").snapshot();
+        assertThat(s.derivatives()).extracting(BrokerDtos.Derivative::symbol)
+                .doesNotContain("TSLA  261120C00300000", "NVDA  261218C00150000");
+        assertThat(s.rejected()).hasSize(2);
+        assertThat(s.rejected().get(0)).contains("TSLA · 看涨 · 行权价 300 · 2026-11-20 到期").contains("缺持仓市值");
+        assertThat(s.rejected().get(1)).contains("NVDA").contains("对不上");
+        assertThat(s.skippedNonEquity()).isEqualTo(1);                    // 差价合约仍跳过
+        assertThat(s.positions()).extracting(BrokerDtos.Position::ticker).containsExactly("AAPL");
+    }
+
 
     @Test
     void 伦敦上市的美元ETF_不当美股_按报表收盘价估值() throws IOException {

@@ -109,11 +109,41 @@ public class StockHoldingController {
             }
         }
 
+        // v1.29 · 券商同步来的期权 / 期货 / 债券:一行写人话(张数、标记价 × 乘数、到期提示),
+        //   估值分解里单列一格 —— 它们在库里是手动估值行,不单列的话会被算进「手填市值」,读起来像是用户自己填的。
+        Map<Long, Map<String, Object>> derivInfo = new HashMap<>();
+        BigDecimal derivBase = BigDecimal.ZERO;
+        java.time.LocalDate today = java.time.LocalDate.now();
+        for (StockHolding h : active) {
+            if (!h.isDerivative()) continue;
+            var kind = com.family.finance.domain.stock.InstrumentKind.of(h.getInstrumentKind());
+            BigDecimal qty = h.getShares() == null ? BigDecimal.ZERO : h.getShares();
+            BigDecimal value = h.getManualValue() == null ? BigDecimal.ZERO : h.getManualValue().multiply(qty);
+            derivBase = derivBase.add(value);
+            Map<String, Object> di = new HashMap<>();
+            di.put("kindLabel", kind == null ? h.getInstrumentKind() : kind.getLabel());
+            di.put("counts", kind == null || kind.countsInBalance());
+            di.put("sideText", com.family.finance.domain.stock.InstrumentKind.sideText(kind, qty));
+            di.put("short", qty.signum() < 0);
+            di.put("value", value);
+            di.put("badge", com.family.finance.domain.stock.InstrumentKind.expiryBadge(h.getExpiry(), today));
+            String ccy = h.getCurrency() == null ? account.getCurrency() : h.getCurrency();
+            if (h.getQuotePrice() != null) {
+                di.put("markText", ccy + " " + h.getQuotePrice().stripTrailingZeros().toPlainString()
+                        + (h.getMultiplier() != null && kind != com.family.finance.domain.stock.InstrumentKind.BOND
+                            ? " × " + h.getMultiplier().stripTrailingZeros().toPlainString() : ""));
+            }
+            if (h.getNotional() != null) di.put("notionalText", ccy + " " + String.format("%,.0f", h.getNotional().abs()));
+            derivInfo.put(h.getId(), di);
+        }
+
         model.addAttribute("me", me);
         model.addAttribute("nav", navService.load(me));
         model.addAttribute("account", account);
         model.addAttribute("holdings", active);
         model.addAttribute("valuation", valuation);
+        model.addAttribute("derivInfo", derivInfo);
+        model.addAttribute("derivBase", derivBase);
         model.addAttribute("latestPrices", latestPrices);
         model.addAttribute("industryTags", com.family.finance.domain.lens.IndustryTag.values()); // v1.1 行业标下拉
         // v1.6.24 · 券商对接状态条:一个账房账户 ↔ 一个券商交易账户(broker_link 上有 UNIQUE(account_id))。

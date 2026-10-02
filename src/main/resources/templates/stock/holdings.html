@@ -120,18 +120,26 @@
          th:text="${priceSourceLabel}">数据源 · 新浪(主) + 腾讯(备)</div>
   </section>
 
-  <!-- 估值分解(有 CASH 才显示)-->
-  <section th:if="${valuation.cashBaseValue != null and valuation.cashBaseValue.signum() > 0}"
+  <!-- 估值分解(有 CASH 或有期权等才显示)· v1.29 期权 / 期货 / 债券单列一格:它们在库里是手动估值行,
+       不单列就会被算进「手填市值」,读起来像是用户自己填的 -->
+  <section th:if="${(valuation.cashBaseValue != null and valuation.cashBaseValue.signum() > 0) or !#maps.isEmpty(derivInfo)}"
+           id="valuation-breakdown"
            class="paper-card p-4 mb-6 bg-card-soft" style="border-left:4px solid var(--forest)">
     <div class="font-mono text-[10px] tracking-[0.18em] uppercase text-forest mb-2">估 · 值 · 分 · 解</div>
-    <div class="grid grid-cols-3 gap-4 text-sm tnum">
+    <div class="grid gap-4 text-sm tnum" th:classappend="${#maps.isEmpty(derivInfo)} ? 'grid-cols-3' : 'grid-cols-2 sm:grid-cols-4'">
       <div>
         <div class="font-mono text-[10px] text-ink-subtle mb-0.5">自动拉价</div>
         <div data-priv th:text="${account.currency} + ' ' + ${#numbers.formatInteger(valuation.autoBaseValue, 0, 'COMMA')}">HKD 0</div>
       </div>
       <div>
         <div class="font-mono text-[10px] text-ink-subtle mb-0.5">手填市值</div>
-        <div data-priv th:text="${account.currency} + ' ' + ${#numbers.formatInteger(valuation.manualBaseValue, 0, 'COMMA')}">HKD 0</div>
+        <div data-priv th:text="${account.currency} + ' ' + ${#numbers.formatInteger(valuation.manualBaseValue.subtract(derivBase), 0, 'COMMA')}">HKD 0</div>
+      </div>
+      <div th:unless="${#maps.isEmpty(derivInfo)}" data-deriv-total>
+        <div class="font-mono text-[10px] text-ink-subtle mb-0.5"
+             title="按券商给的持仓市值记(已含合约乘数);卖出的是负数,从账户余额里减去;期货不计入">期权等(券商报表)</div>
+        <div data-priv th:classappend="${derivBase.signum() < 0} ? 'text-rust' : ''"
+             th:text="${account.currency} + ' ' + ${#numbers.formatInteger(derivBase, 0, 'COMMA')}">USD 640</div>
       </div>
       <div>
         <div class="font-mono text-[10px] text-ink-subtle mb-0.5">现金(已折算)</div>
@@ -156,13 +164,21 @@
       <div>
         <div class="flex items-center gap-2 mb-2 flex-wrap">
           <svg th:if="${stale}" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-rust" aria-hidden="true"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-          <span class="font-display text-xl font-medium" th:text="${h.displayName}">持仓名</span>
-          <span class="pill text-[9px]" th:if="${h.ticker != null}" th:text="${h.ticker}">BABA</span>
+          <span class="font-display text-xl font-medium" th:text="${h.displayName}"
+                th:attr="title=${h.derivative} ? ${h.ticker} : null">持仓名</span>
+          <span class="pill text-[9px]" th:if="${h.ticker != null and !h.derivative}" th:text="${h.ticker}">BABA</span>
           <span class="pill text-[9px]" th:if="${h.market != null}" th:text="${h.market}">US</span>
           <span class="pill text-[9px]" th:if="${h.valuationMode.name() == 'AUTO'}"
                 style="background:rgba(47,93,80,.12);color:var(--forest);border-color:var(--forest)">自动估值</span>
-          <span class="pill text-[9px]" th:if="${h.valuationMode.name() == 'MANUAL'}"
+          <span class="pill text-[9px]" th:if="${h.valuationMode.name() == 'MANUAL' and !h.derivative}"
                 style="background:rgba(196,148,62,.15);color:var(--brass-deep);border-color:var(--brass-deep)">手填市值</span>
+          <!--/* v1.29 · 券商同步来的期权 / 期货 / 债券:标品种 + 到期提示(7 天内 / 今天 / 已到期) */-->
+          <span class="pill text-[9px]" th:if="${h.derivative}" data-deriv-kind
+                style="background:rgba(110,76,120,.10);color:#6e4c78;border-color:#6e4c78"
+                th:text="${derivInfo.get(h.id).kindLabel}">期权</span>
+          <span class="pill text-[9px]" th:if="${h.derivative and derivInfo.get(h.id).badge != null}" data-deriv-due
+                style="background:rgba(159,74,58,.10);color:var(--rust);border-color:var(--rust)"
+                th:text="${derivInfo.get(h.id).badge}">7 天内到期</span>
           <span class="pill text-[9px]" th:if="${h.valuationMode.name() == 'CASH'}"
                 style="background:rgba(47,93,80,.10);color:var(--forest);border-color:var(--forest)"><svg class="inline-block align-[-2px] mr-1" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/></svg>账户内现金</span>
           <span class="pill text-[9px]" th:if="${h.valuationMode.name() == 'CASH' and h.currency != null and h.currency != account.currency}"
@@ -232,7 +248,36 @@
             <div class="tnum text-rust" th:if="${price == null}">—</div>
           </div>
         </div>
-        <div th:if="${h.valuationMode.name() == 'MANUAL'}" class="grid grid-cols-4 gap-6 text-sm">
+        <!--/* v1.29 · 期权 / 期货 / 债券:张数(卖出赭色)· 标记价 × 乘数 · 市值(账户币种,卖出为负)· 上次同步 */-->
+        <div th:if="${h.derivative}" th:with="di=${derivInfo.get(h.id)}" data-deriv-row
+             class="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-3 text-sm"
+             th:attr="title=${di.counts} ? '按券商给的持仓市值记(已含合约乘数);卖出的是负数,从账户余额里减去' : '期货不计入余额:盈亏每天结算进现金,现金里已经有了;这里只展示名义价值'">
+          <div>
+            <div class="font-mono text-[10px] uppercase text-ink-subtle mb-0.5">张数</div>
+            <div class="tnum" th:classappend="${di.short} ? 'text-rust' : ''" th:text="${di.sideText}">买入 1 张</div>
+          </div>
+          <div>
+            <div class="font-mono text-[10px] uppercase text-ink-subtle mb-0.5">标记价(原币)</div>
+            <div class="tnum" data-priv th:text="${di.markText != null ? di.markText : '—'}">USD 9.80 × 100</div>
+          </div>
+          <div th:if="${di.counts}">
+            <div class="font-mono text-[10px] uppercase text-ink-subtle mb-0.5" th:text="'市值(' + ${account.currency} + ')'">市值(USD)</div>
+            <div class="tnum" data-priv th:classappend="${di.value.signum() < 0} ? 'text-rust' : 'text-brass-deep'"
+                 th:text="${account.currency} + ' ' + ${#numbers.formatInteger(di.value, 0, 'COMMA')}">USD 980</div>
+            <div class="font-mono text-[10px] text-ink-subtle mt-0.5" th:if="${di.short}">卖出的从余额里减去</div>
+          </div>
+          <div th:unless="${di.counts}">
+            <div class="font-mono text-[10px] uppercase text-ink-subtle mb-0.5">名义价值(不计入余额)</div>
+            <div class="tnum text-ink-soft" data-priv th:text="${di.notionalText != null ? di.notionalText : '—'}">USD 300,000</div>
+            <div class="font-mono text-[10px] text-ink-subtle mt-0.5">盈亏每天结算进现金</div>
+          </div>
+          <div>
+            <div class="font-mono text-[10px] uppercase text-ink-subtle mb-0.5">上次同步</div>
+            <div class="font-mono text-xs" th:if="${h.manualValueAt != null}"
+                 th:text="${#temporals.format(h.manualValueAt, 'yyyy-MM-dd')}">2026-10-02</div>
+          </div>
+        </div>
+        <div th:if="${h.valuationMode.name() == 'MANUAL' and !h.derivative}" class="grid grid-cols-4 gap-6 text-sm">
           <div>
             <div class="font-mono text-[10px] uppercase text-ink-subtle mb-0.5">持股</div>
             <div class="tnum" th:text="${(h.shares != null ? h.shares : 1)} + ' 股'">2,000 股</div>
@@ -272,7 +317,8 @@
         </div>
       </div>
       <div class="flex flex-col gap-1.5">
-        <form th:if="${h.valuationMode.name() == 'MANUAL'}"
+        <!--/* 期权等是券商同步行:手改会在下次同步被覆盖,而且卖出张数是负的,这个表单(张数 ≥ 0.0001)也装不下 */-->
+        <form th:if="${h.valuationMode.name() == 'MANUAL' and !h.derivative}"
               th:action="@{|/accounts/${account.id}/holdings/${h.id}/update|}" method="post" class="flex gap-1 items-center">
           <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
           <input type="number" name="shares" step="0.0001" min="0.0001" th:value="${h.shares != null ? h.shares : 1}"
@@ -313,7 +359,8 @@
       <li>· <strong class="text-ink">手填市值</strong>:手填账户币种市值 · 适合未上市 / 私募 / 拉不到价(默认账户币种 · 不做汇率换算)</li>
       <li>· <strong class="text-ink">账户内现金</strong>:券商账户里的闲置资金 · 多币种各一行 · 系统按汇率折算到账户币种</li>
       <li>· <strong class="text-ink">多币种混合</strong>:同一账户可放任意币种持仓 + 任意币种现金 · 系统按原币种算 · 再汇率折算汇总</li>
-      <li>· 账户余额 = 自动拉价市值汇总 + 手填市值汇总 + 现金折算汇总</li>
+      <li>· <strong class="text-ink">券商同步的期权 / 期货 / 债券</strong>:按券商给的持仓市值记(已含合约乘数),卖出的是负数、从余额里减去;期货只展示名义价值、不计入余额(盈亏每天结算进现金);到期或平仓后下次同步自动移除</li>
+      <li>· 账户余额 = 自动拉价市值汇总 + 手填市值汇总 + 期权等(券商报表)+ 现金折算汇总</li>
       <li>· 拉价失败时自动用最近已知价 + 界面标记"陈旧 N 天" · 超过 7 天提示改手填</li>
       <li>· 此账户未添加任何持仓时,余额仍可在填报页手填,系统不会自动覆盖。</li>
     </ul>

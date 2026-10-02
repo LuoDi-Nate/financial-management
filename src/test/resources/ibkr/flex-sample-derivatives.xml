@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  合成样例(v1.29 · issue #26):期权行的形状照 2026-10-02 @Jsonya 在 #26 贴的真实报表两行
+  (一买一卖的看涨价差:买入 position=1 / Side=Long、卖出 position=-1 / Side=Short;
+   positionValue = position × markPrice × multiplier,卖出为负;代码 21 个字符)。
+  账号、张数、价格全部编造,没有用他贴的数。
+
+  故意放进来的几种情况:
+    · 一买一卖的看涨价差(GOOGL)+ 一张卖出的看跌(SPY,到期日 e2e 会换成「三天后」)
+    · 期货一张(名义价值大,不许计入余额)
+    · 债券一笔(标记价按面值的百分比给,乘数 1;带应计利息,不计)
+    · 缺持仓市值的一行(不同步,点名)
+    · 持仓市值没乘乘数的一行(张数 × 标记价 × 乘数 对不上 → 不同步,点名)
+    · 差价合约一行(仍跳过计数)
+-->
+<FlexQueryResponse queryName="Holdings for FamilyFinance" type="AF">
+  <FlexStatements count="1">
+    <FlexStatement accountId="U5550001" fromDate="20261001" toDate="20261001" period="LastBusinessDay" whenGenerated="20261002;052011">
+      <CashReport>
+        <CashReportCurrency accountId="U5550001" currency="BASE_SUMMARY" levelOfDetail="BaseCurrency" endingCash="8,350.00" />
+        <CashReportCurrency accountId="U5550001" currency="USD" levelOfDetail="Currency" endingCash="8,350.00" />
+      </CashReport>
+      <OpenPositions>
+        <OpenPosition accountId="U5550001" currency="USD" assetCategory="STK" symbol="AAPL" description="APPLE INC" listingExchange="NASDAQ" position="20" markPrice="228.10" positionValue="4,562" costBasisPrice="172.40" side="Long" levelOfDetail="SUMMARY" />
+        <OpenPosition accountId="U5550001" currency="USD" assetCategory="OPT" subCategory="C" symbol="GOOGL 270416C00360000" description="GOOGL 16APR27 360 C" listingExchange="CBOE" underlyingSymbol="GOOGL" multiplier="100" strike="360" expiry="20270416" putCall="C" position="1" markPrice="28.5" positionValue="2,850" costBasisPrice="27.1" side="Long" levelOfDetail="SUMMARY" />
+        <OpenPosition accountId="U5550001" currency="USD" assetCategory="OPT" subCategory="C" symbol="GOOGL 270416C00400000" description="GOOGL 16APR27 400 C" listingExchange="CBOE" underlyingSymbol="GOOGL" multiplier="100" strike="400" expiry="20270416" putCall="C" position="-1" markPrice="16.2" positionValue="-1,620" costBasisPrice="15.4" side="Short" levelOfDetail="SUMMARY" />
+        <OpenPosition accountId="U5550001" currency="USD" assetCategory="OPT" subCategory="P" symbol="SPY   261009P00560000" description="SPY 09OCT26 560 P" listingExchange="CBOE" underlyingSymbol="SPY" multiplier="100" strike="560" expiry="20261009" putCall="P" position="-2" markPrice="1.70" positionValue="-340" costBasisPrice="2.05" side="Short" levelOfDetail="SUMMARY" />
+        <OpenPosition accountId="U5550001" currency="USD" assetCategory="FUT" symbol="ESZ6" description="ES 18DEC26" listingExchange="CME" underlyingSymbol="ES" multiplier="50" expiry="20261218" position="1" markPrice="6,000.00" positionValue="300,000" costBasisPrice="5,980.00" side="Long" levelOfDetail="SUMMARY" />
+        <OpenPosition accountId="U5550001" currency="USD" assetCategory="BOND" symbol="T 4 1/4 11/15/34" description="T 4 1/4 11/15/34" listingExchange="--" multiplier="1" position="10,000" markPrice="98.5" positionValue="9,850" accruedInt="102.30" side="Long" levelOfDetail="SUMMARY" />
+        <OpenPosition accountId="U5550001" currency="USD" assetCategory="OPT" subCategory="C" symbol="TSLA  261120C00300000" description="TSLA 20NOV26 300 C" listingExchange="CBOE" underlyingSymbol="TSLA" multiplier="100" strike="300" expiry="20261120" putCall="C" position="1" markPrice="12.40" positionValue="" side="Long" levelOfDetail="SUMMARY" />
+        <OpenPosition accountId="U5550001" currency="USD" assetCategory="OPT" subCategory="C" symbol="NVDA  261218C00150000" description="NVDA 18DEC26 150 C" listingExchange="CBOE" underlyingSymbol="NVDA" multiplier="100" strike="150" expiry="20261218" putCall="C" position="2" markPrice="5.00" positionValue="10.00" side="Long" levelOfDetail="SUMMARY" />
+        <OpenPosition accountId="U5550001" currency="USD" assetCategory="CFD" symbol="IBUS500" description="US 500 CFD" listingExchange="IBCFD" position="3" markPrice="5,800" positionValue="17,400" side="Long" levelOfDetail="SUMMARY" />
+      </OpenPositions>
+    </FlexStatement>
+  </FlexStatements>
+</FlexQueryResponse>

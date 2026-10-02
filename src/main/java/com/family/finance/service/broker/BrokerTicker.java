@@ -69,7 +69,7 @@ public final class BrokerTicker {
         return null;
     }
 
-    /** 是否股票(secType=STK / 空视为股票);OPT/FUT/WAR/BOND 等本版跳过。 */
+    /** 是否股票(secType=STK / 空视为股票);OPT/FUT/WAR 等 v1.29 起走期权那条路(TigerBrokerClient.map),不在这里。 */
     public static boolean isEquity(String secType) {
         if (secType == null || secType.isBlank()) return true;
         String s = secType.trim().toUpperCase(Locale.ROOT);

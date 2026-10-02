@@ -29,6 +29,18 @@
     </ul>
   </section>
 
+  <!-- v1.29 · 期权 / 期货 / 债券怎么记(issue #26) -->
+  <section id="derivatives" class="paper-card p-4 mb-6 bg-card-soft" style="border-left:4px solid var(--brass-deep)">
+    <div class="font-mono text-[10px] tracking-[0.18em] uppercase text-brass-deep mb-1">期 · 权 · 期 · 货 · 债 · 券 · 怎 · 么 · 记</div>
+    <ul class="text-sm text-ink-soft space-y-1">
+      <li>· <b class="text-ink">期权 / 权证 / 债券</b>:一张合约一行,市值用券商给的持仓市值(已含合约乘数,美股期权通常是 100)。<b class="text-ink">卖出的是负数</b>,从账户余额里减去 —— 这样账户余额和券商那边的净值对得上。</li>
+      <li>· <b class="text-ink">期货</b>:只展示名义价值,<b class="text-ink">不计入余额</b>。期货盈亏每天结算进现金,现金里已经有了;按名义价值记会把几千块保证金的合约算成几十万。</li>
+      <li>· 到期或平仓之后,下次同步自动从持仓里拿掉;行权、被指派变成的股票,下次同步自然出现在股票那一行。</li>
+      <li>· 某一行数据不全或自相矛盾(张数 × 标记价 × 乘数 和市值对不上),<b class="text-ink">这一行不同步</b>,同步结果里会点名 —— 不拿猜的数顶上。</li>
+      <li>· <b class="text-ink">升级后第一次同步</b>:新关联的账户,这些都算开账时就有的;已经在记的账户,余额会因为期权等「第一次被算进来」跳一下,这一跳<b class="text-ink">计入当月收益</b>,当月收益率会因此偏高一次。以前为了凑数手填过一条期权市值的,记得把那条归档,免得算两遍。</li>
+    </ul>
+  </section>
+
   <!-- 选券商 -->
   <div class="flex flex-wrap gap-3 mb-8">
     <a href="#futu" class="btn-ink no-underline">富途 Futu 怎么配 ↓</a>

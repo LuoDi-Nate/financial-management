@@ -72,11 +72,17 @@ public class IbkrFlexClient implements BrokerClient {
         for (var a : report.accounts().values()) {
             var s = a.snapshot();
             int n = s.positions().size() + s.manualPositions().size();
-            positions += n;
+            positions += n + s.derivatives().size();
             List<String> ccys = s.cash().stream().map(BrokerDtos.Cash::currency).toList();
-            parts.add(mask(a.accountId()) + "(" + n + " 笔持仓"
+            // v1.29 · 期权 / 期货 / 债券也会同步了:分开数,让人一眼看到「期权进来了几笔」(FR-949)
+            java.util.Map<String, Integer> kinds = new java.util.LinkedHashMap<>();
+            for (var d : s.derivatives()) kinds.merge(d.kind().getLabel(), 1, Integer::sum);
+            StringBuilder deriv = new StringBuilder();
+            kinds.forEach((k, c) -> deriv.append(" · ").append(k).append(" ").append(c).append(" 笔"));
+            parts.add(mask(a.accountId()) + "(" + n + " 笔股票" + deriv
                     + (ccys.isEmpty() ? "" : " · " + String.join(" / ", ccys) + " 现金")
-                    + (s.skippedNonEquity() > 0 ? " · 另有 " + s.skippedNonEquity() + " 笔期权 / 期货 / 债券不同步" : "")
+                    + (s.skippedNonEquity() > 0 ? " · 另有 " + s.skippedNonEquity() + " 笔其他品种不同步" : "")
+                    + (s.rejected().isEmpty() ? "" : " · " + s.rejected().size() + " 行数据对不上、不会同步")
                     + ")");
             s.cash().forEach(c -> cashAll.merge(c.currency(), c.amount(), BigDecimal::add));
         }

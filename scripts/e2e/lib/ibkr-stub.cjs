@@ -18,10 +18,12 @@ function envelope(code, msg) {
 /**
  * @param {string} reportXml     GetStatement 要回放的报表
  * @param {string} expiredToken  用这个口令发 SendRequest 时回 1012(口令过期)
- * @returns {Promise<{server, port, hits: Array<{path, ua}>}>}
+ * @returns {Promise<{server, port, hits: Array<{path, ua}>, setReport: (xml: string) => void}>}
+ *          setReport:换一份报表(v1.29 flow 41 用:模拟「过了几天,有一张期权到期了」)
  */
 function start(reportXml, expiredToken) {
   const hits = [];
+  const cur = { xml: reportXml };
   return new Promise((resolve) => {
     const server = http.createServer((req, res) => {
       const u = new URL(req.url, 'http://x');
@@ -33,9 +35,10 @@ function start(reportXml, expiredToken) {
         res.end("<FlexStatementResponse timestamp='x'><Status>Success</Status><ReferenceCode>555001</ReferenceCode></FlexStatementResponse>");
         return;
       }
-      res.end(reportXml);
+      res.end(cur.xml);
     });
-    server.listen(0, '127.0.0.1', () => resolve({ server, port: server.address().port, hits }));
+    server.listen(0, '127.0.0.1', () => resolve({ server, port: server.address().port, hits,
+                                                   setReport: (xml) => { cur.xml = xml; } }));
   });
 }
 

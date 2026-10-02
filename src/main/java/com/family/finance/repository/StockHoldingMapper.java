@@ -27,7 +27,10 @@ public interface StockHoldingMapper {
             + " h.cost_basis, h.currency, h.unit, h.sync_source AS syncSource, h.industry_tag AS industryTag,"
             + " h.asset_class_tag AS assetClassTag, h.risk_tag AS riskTag, h.liquidity_tag AS liquidityTag,"
             + " h.manual_value, h.manual_value_at, h.cash_linked AS cashLinked, h.fund_code AS fundCode,"
-            + " h.penetrate_state AS penetrateState, h.archived_at, h.created_at, h.updated_at ";
+            + " h.penetrate_state AS penetrateState, h.archived_at, h.created_at, h.updated_at,"
+            // v1.29 · 券商同步来的期权 / 期货 / 债券的说明列(估值不读)
+            + " h.instrument_kind AS instrumentKind, h.underlying, h.put_call AS putCall, h.strike, h.expiry,"
+            + " h.multiplier, h.quote_price AS quotePrice, h.notional ";
 
     @Select("SELECT" + COLS + "FROM stock_holding h"
           + " JOIN account a ON a.id = h.account_id"
@@ -71,10 +74,13 @@ public interface StockHoldingMapper {
     @Insert("""
             INSERT INTO stock_holding (account_id, display_name, valuation_mode, ticker, market, shares,
                                        cost_basis, currency, unit, sync_source, industry_tag,
-                                       asset_class_tag, risk_tag, liquidity_tag, manual_value, manual_value_at, cash_linked)
+                                       asset_class_tag, risk_tag, liquidity_tag, manual_value, manual_value_at, cash_linked,
+                                       instrument_kind, underlying, put_call, strike, expiry, multiplier, quote_price, notional)
             SELECT #{h.accountId}, #{h.displayName}, #{h.valuationMode}, #{h.ticker}, #{h.market}, #{h.shares},
                    #{h.costBasis}, #{h.currency}, #{h.unit}, #{h.syncSource}, #{h.industryTag},
-                   #{h.assetClassTag}, #{h.riskTag}, #{h.liquidityTag}, #{h.manualValue}, #{h.manualValueAt}, #{h.cashLinked}
+                   #{h.assetClassTag}, #{h.riskTag}, #{h.liquidityTag}, #{h.manualValue}, #{h.manualValueAt}, #{h.cashLinked},
+                   #{h.instrumentKind}, #{h.underlying}, #{h.putCall}, #{h.strike}, #{h.expiry}, #{h.multiplier},
+                   #{h.quotePrice}, #{h.notional}
               FROM account a
              WHERE a.id = #{h.accountId} AND a.family_id = #{familyId}
             """)
@@ -107,7 +113,15 @@ public interface StockHoldingMapper {
                    h.liquidity_tag = #{h.liquidityTag},
                    h.manual_value = #{h.manualValue},
                    h.manual_value_at = #{h.manualValueAt},
-                   h.cash_linked = #{h.cashLinked}
+                   h.cash_linked = #{h.cashLinked},
+                   h.instrument_kind = #{h.instrumentKind},
+                   h.underlying = #{h.underlying},
+                   h.put_call = #{h.putCall},
+                   h.strike = #{h.strike},
+                   h.expiry = #{h.expiry},
+                   h.multiplier = #{h.multiplier},
+                   h.quote_price = #{h.quotePrice},
+                   h.notional = #{h.notional}
              WHERE a.family_id = #{familyId}
                AND h.id = #{h.id}
                AND h.archived_at IS NULL
@@ -152,11 +166,16 @@ public interface StockHoldingMapper {
             """)
     List<Long> findActiveHoldingIdsByFamily(@Param("familyId") long familyId);
 
-    /** v1.5 · 家庭活的「基金」持仓(MANUAL 估值 = 截图导入的基金/理财,穿透候选;个股/现金不进)· 流式穿透用 */
+    /**
+     * v1.5 · 家庭活的「基金」持仓(MANUAL 估值 = 截图导入的基金/理财,穿透候选;个股/现金不进)· 流式穿透用。
+     * v1.29 · 券商同步来的期权 / 期货 / 债券也是 MANUAL 行,但不是基金 —— 不进候选(否则拿
+     * 「AAPL · 看涨 · …」去天天基金搜名字,白发请求还把它标成「穿透不了」)。
+     */
     @Select("""
             SELECT h.id FROM stock_holding h JOIN account a ON a.id = h.account_id
             WHERE a.family_id = #{familyId} AND h.archived_at IS NULL
               AND h.valuation_mode = 'MANUAL'
+              AND h.instrument_kind IS NULL
             ORDER BY h.account_id, h.id
             """)
     List<Long> findActiveFundHoldingIdsByFamily(@Param("familyId") long familyId);

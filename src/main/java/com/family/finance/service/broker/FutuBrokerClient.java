@@ -107,12 +107,15 @@ public class FutuBrokerClient implements BrokerClient {
     @Override
     public BrokerDtos.TestReport testConnection(long familyId, BrokerLink link) {
         Collected c = collect(familyId, link);
-        String summary = "OpenD 已连通 · 账户尾号 " + c.accountMasked + " · 持仓 " + c.snapshot.positions().size()
-                + " 笔 · 现金 " + c.snapshot.cash().size() + " 种币";
+        int deriv = c.snapshot.derivatives().size();
+        String summary = "OpenD 已连通 · 账户尾号 " + c.accountMasked + " · 持仓 " + (c.snapshot.positions().size() + deriv)
+                + " 笔" + (deriv > 0 ? "(含期权 " + deriv + " 笔)" : "")
+                + " · 现金 " + c.snapshot.cash().size() + " 种币"
+                + (c.snapshot.rejected().isEmpty() ? "" : " · " + c.snapshot.rejected().size() + " 笔数据对不上、不会同步");
         Map<String, BigDecimal> cashMap = new LinkedHashMap<>();
         c.snapshot.cash().forEach(x -> cashMap.put(x.currency(), x.amount()));
         return new BrokerDtos.TestReport(summary, c.accountMasked, c.accountType,
-                new ArrayList<>(c.markets), c.snapshot.positions().size(), cashMap);
+                new ArrayList<>(c.markets), c.snapshot.positions().size() + deriv, cashMap);
     }
 
     @Override
@@ -138,6 +141,8 @@ public class FutuBrokerClient implements BrokerClient {
             }
 
             Map<String, BrokerDtos.Position> posByKey = new LinkedHashMap<>();
+            Map<String, BrokerDtos.Derivative> derivByCode = new LinkedHashMap<>();
+            List<String> rejected = new ArrayList<>();
             Map<String, BigDecimal> cashByCcy = new LinkedHashMap<>();
             Set<String> marketBadges = new LinkedHashSet<>();
             int skipped = 0;
@@ -174,26 +179,23 @@ public class FutuBrokerClient implements BrokerClient {
                     List<TrdCommon.Position> plist = s.positions(acc.getAccID(), m).getS2C().getPositionListList();
                     log.info("futu positions · accID={} trdMarket={} count={}", acc.getAccID(), m, plist.size());
                     for (TrdCommon.Position p : plist) {
-                        if (p.getQty() == 0) continue;
-                        String mk = marketOf(p.getSecMarket());
-                        if (mk == null || p.getPositionSide() != TrdCommon.PositionSide.PositionSide_Long_VALUE) {
-                            skipped++;   // 未支持市场 / 空头(期权期货等衍生形态)本版跳过
-                            continue;
-                        }
-                        String ticker = p.getCode().trim().toUpperCase(Locale.ROOT);
-                        posByKey.putIfAbsent(mk + "|" + ticker, new BrokerDtos.Position(
-                                mk, ticker, p.getName(),
-                                BigDecimal.valueOf(p.getQty()),
-                                p.getCostPrice() > 0 ? BigDecimal.valueOf(p.getCostPrice()) : null,
-                                currencyOfMarket(mk), true));
+                        Mapped mp = map(p.getCode(), p.getName(), p.getQty(), p.getPrice(), p.getVal(),
+                                p.getCostPrice(), p.getSecMarket(), p.getPositionSide());
+                        if (mp == null) continue;
+                        if (mp.skipped()) { skipped++; continue; }
+                        if (mp.rejected() != null) { rejected.add(mp.rejected()); continue; }
+                        if (mp.derivative() != null) { derivByCode.putIfAbsent(mp.derivative().symbol(), mp.derivative()); continue; }
+                        posByKey.putIfAbsent(mp.stock().market() + "|" + mp.stock().ticker(), mp.stock());
                     }
                 }
             }
 
             List<BrokerDtos.Cash> cash = new ArrayList<>();
             cashByCcy.forEach((ccy, amt) -> cash.add(new BrokerDtos.Cash(ccy, amt)));
-            log.info("futu fetch · positions={} cashCcy={} skipped={}", posByKey.size(), cash.size(), skipped);
-            return new Collected(new BrokerDtos.Snapshot(new ArrayList<>(posByKey.values()), cash, skipped),
+            log.info("futu fetch · positions={} derivatives={} cashCcy={} skipped={} rejected={}",
+                    posByKey.size(), derivByCode.size(), cash.size(), skipped, rejected);
+            return new Collected(new BrokerDtos.Snapshot(new ArrayList<>(posByKey.values()), cash, skipped,
+                    List.of(), new ArrayList<>(derivByCode.values()), rejected),
                     accountMasked, accountType, marketBadges);
         } finally { s.close(); }
     }
@@ -204,6 +206,71 @@ public class FutuBrokerClient implements BrokerClient {
     }
 
     // ---------- 归一 ----------
+
+    /** 一笔富途持仓归到哪儿:股票 / 期权 / 没同步(带原因)/ 跳过计数。四个里只有一个非空。 */
+    record Mapped(BrokerDtos.Position stock, BrokerDtos.Derivative derivative, String rejected, boolean skipped) {}
+
+    /**
+     * 富途期权代码:标的 + 到期日(yyMMdd)+ C/P + 行权价 × 1000,例如美股 {@code AAPL260116C250000}、
+     * 港股 {@code TCH250328C400000}。股票代码(美股字母、港股 / A 股数字)不会长成这样。
+     */
+    static final java.util.regex.Pattern OPTION_CODE =
+            java.util.regex.Pattern.compile("^([A-Z][A-Z0-9.]{0,11}?)(\\d{6})([CP])(\\d{3,})$");
+
+    /** 美股期权的标准乘数;富途不给乘数,用「市值 ÷(张数 × 价格)」反推出来核对 */
+    static final BigDecimal US_OPTION_MULTIPLIER = BigDecimal.valueOf(100);
+
+    /**
+     * 一笔富途持仓 → 归类 · v1.29(issue #26 · 包可见供单测)。
+     *
+     * <p><b>v1.28 以前的两个洞</b>:</p>
+     * <ul>
+     *   <li>没判断品种:买入的期权被当成股票、拿期权代码去拉股价(拉不到 → 按 0 计);美股期权代码 17 个字符,
+     *       比当时 16 字符的列长 → 严格模式下插入失败,<b>整次同步失败</b>。</li>
+     *   <li>空头一律跳过:卖出的期权 / 融券卖出的股票都没减掉,账户余额偏高。</li>
+     * </ul>
+     *
+     * <p>现在:期权按富途给的<b>持仓市值</b>记(卖出为负);美股期权用「市值 ÷(张数 × 价格)≈ 100」核对一遍,
+     * 对不上就这一行不同步、照实说(富途文档没写清市值含不含乘数,不赌)。空头股票记负股数,估值照常拉价。</p>
+     */
+    static Mapped map(String code, String name, double qty, double price, double val, double costPrice,
+                      int secMarket, int positionSide) {
+        if (qty == 0 || code == null || code.isBlank()) return null;
+        String mk = marketOf(secMarket);
+        if (mk == null) return new Mapped(null, null, null, true);   // 未支持的市场:跳过计数
+        int sign = positionSide == TrdCommon.PositionSide.PositionSide_Short_VALUE ? -1 : 1;
+        BigDecimal q = BigDecimal.valueOf(Math.abs(qty)).multiply(BigDecimal.valueOf(sign));
+        String c = code.trim().toUpperCase(Locale.ROOT);
+        String ccy = currencyOfMarket(mk);
+        java.util.regex.Matcher m = OPTION_CODE.matcher(c);
+        if (m.matches()) {
+            String und = m.group(1);
+            java.time.LocalDate exp;
+            try {
+                exp = java.time.LocalDate.parse("20" + m.group(2), java.time.format.DateTimeFormatter.BASIC_ISO_DATE);
+            } catch (java.time.format.DateTimeParseException e) { exp = null; }
+            String pc = m.group(3);
+            BigDecimal strike = new BigDecimal(m.group(4)).movePointLeft(3).stripTrailingZeros();
+            BigDecimal value = BigDecimal.valueOf(Math.abs(val)).multiply(BigDecimal.valueOf(sign));
+            BigDecimal mark = price > 0 ? BigDecimal.valueOf(price) : null;
+            BigDecimal implied = mark == null || val == 0 ? null
+                    : value.abs().divide(q.abs().multiply(mark), 4, java.math.RoundingMode.HALF_EVEN);
+            if ("US".equals(mk) && implied != null
+                    && implied.subtract(US_OPTION_MULTIPLIER).abs().compareTo(BigDecimal.valueOf(2)) > 0) {
+                return new Mapped(null, null, DerivativeRows.rejectLine(
+                        com.family.finance.domain.stock.InstrumentKind.OPTION, und, c, pc, strike, exp, name,
+                        "富途给的市值 ÷(张数 × 价格)= " + implied.stripTrailingZeros().toPlainString()
+                                + ",不是美股期权的 100 倍乘数,核对不了"), false);
+            }
+            BigDecimal mult = implied == null ? ("US".equals(mk) ? US_OPTION_MULTIPLIER : null)
+                    : implied.setScale(0, java.math.RoundingMode.HALF_EVEN);
+            return new Mapped(null, new BrokerDtos.Derivative(
+                    com.family.finance.domain.stock.InstrumentKind.OPTION, c, und, pc, strike, exp, mult,
+                    q, mark, value, null, ccy, name), null, false);
+        }
+        return new Mapped(new BrokerDtos.Position(mk, c, name, q,
+                costPrice > 0 ? BigDecimal.valueOf(costPrice) : null, ccy, true), null, null, false);
+    }
 
     /** TrdSecMarket → 我们的 Market 名;未支持返回 null(跳过计数)。 */
     static String marketOf(int secMarket) {
