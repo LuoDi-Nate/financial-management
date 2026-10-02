@@ -37,9 +37,11 @@
 <header th:unless="${nav != null}" class="sticky top-1 backdrop-blur border-b border-rule z-30"
         style="background:rgba(246,241,234,.95);">
   <div class="max-w-[1400px] mx-auto px-6 lg:px-10 flex items-center justify-between h-16">
-    <a href="/login" class="flex items-baseline gap-2 no-underline">
+    <a href="/login" class="flex items-center gap-2 no-underline">
       <span class="font-display text-xl font-medium">账房</span>
-      <span class="font-mono text-[10px] tracking-[0.2em] text-ink-subtle">№ 张</span>
+      <!--/* v1.28.5 · issue #31 · 与顶栏一致:古钱小图标替代「№ 首字」 */-->
+      <svg class="shrink-0" style="color:var(--brass-deep)" width="15" height="15" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><rect x="9" y="9" width="6" height="6" rx=".5"/></svg>
     </a>
     <a href="/login" class="font-mono text-[10px] tracking-[0.18em] uppercase text-ink-soft hover:text-ink no-underline">↩ 去登录</a>
   </div>
