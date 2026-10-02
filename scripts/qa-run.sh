@@ -4174,7 +4174,7 @@ BRO_HITS="$(grep -rnE 'unlockTrade\(|\.placeOrder|\.modifyOrder|\.cancelOrder|\.
 
 # v15-MAP-1 · reconcile 只动 sync_source=本 vendor 行(不碰手填持仓)
 { grep -q 'src.equals(h.getSyncSource())' "$BSVC" && grep -q 'skippedNonEquity' "$BSVC"; } \
-  && log_ok "v15-MAP-1 对账只动 sync_source 行 · 期权/期货跳过计数" \
+  && log_ok "v15-MAP-1 对账只动 sync_source 行 · 不同步的品种计数(v1.29 起期权 / 期货 / 债券同步,见 v129-*)" \
   || log_bad "v15-MAP-1 对账未按 sync_source 隔离手填持仓" "see BrokerSyncService.reconcile"
 
 # v15-LINK-1 · 关联前留审计快照 + 软归档 + 两步确认硬门
