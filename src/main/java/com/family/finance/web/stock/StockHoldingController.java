@@ -124,6 +124,7 @@ public class StockHoldingController {
             di.put("kindLabel", kind == null ? h.getInstrumentKind() : kind.getLabel());
             di.put("counts", kind == null || kind.countsInBalance());
             di.put("sideText", com.family.finance.domain.stock.InstrumentKind.sideText(kind, qty));
+            di.put("qtyLabel", kind == null || kind.countsContracts() ? "张数" : "面值");
             di.put("short", qty.signum() < 0);
             di.put("value", value);
             di.put("badge", com.family.finance.domain.stock.InstrumentKind.expiryBadge(h.getExpiry(), today));

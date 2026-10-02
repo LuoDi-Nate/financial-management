@@ -37,7 +37,8 @@ class InstrumentKindTest {
     void 张数_买入卖出() {
         assertThat(InstrumentKind.sideText(InstrumentKind.OPTION, new BigDecimal("1.00000000"))).isEqualTo("买入 1 张");
         assertThat(InstrumentKind.sideText(InstrumentKind.OPTION, new BigDecimal("-2"))).isEqualTo("卖出 2 张");
-        assertThat(InstrumentKind.sideText(InstrumentKind.BOND, new BigDecimal("10000"))).isEqualTo("持有面值 10000");
+        assertThat(InstrumentKind.sideText(InstrumentKind.BOND, new BigDecimal("10000"))).isEqualTo("持有面值 10,000");
+        assertThat(InstrumentKind.sideText(InstrumentKind.BOND, new BigDecimal("10000.50000000"))).isEqualTo("持有面值 10,000.5");
     }
 
     @Test

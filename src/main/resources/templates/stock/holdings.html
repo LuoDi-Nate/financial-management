@@ -164,8 +164,9 @@
       <div>
         <div class="flex items-center gap-2 mb-2 flex-wrap">
           <svg th:if="${stale}" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-rust" aria-hidden="true"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-          <span class="font-display text-xl font-medium" th:text="${h.displayName}"
-                th:attr="title=${h.derivative} ? ${h.ticker} : null">持仓名</span>
+          <span class="font-display text-xl font-medium" th:unless="${h.derivative}" th:text="${h.displayName}">持仓名</span>
+          <!--/* v1.29 · 期权标题按「 · 」分段,每段不折行:手机上不会把「2027-04-16」从中间断开(实测截图发现) */-->
+          <span class="font-display text-xl font-medium" th:if="${h.derivative}" th:attr="title=${h.ticker}"><th:block th:each="seg, st : ${#strings.arraySplit(h.displayName, '·')}"><span class="whitespace-nowrap" th:text="${#strings.trim(seg)}">AAPL</span><th:block th:unless="${st.last}"> · </th:block></th:block></span>
           <span class="pill text-[9px]" th:if="${h.ticker != null and !h.derivative}" th:text="${h.ticker}">BABA</span>
           <span class="pill text-[9px]" th:if="${h.market != null}" th:text="${h.market}">US</span>
           <span class="pill text-[9px]" th:if="${h.valuationMode.name() == 'AUTO'}"
@@ -253,7 +254,7 @@
              class="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-3 text-sm"
              th:attr="title=${di.counts} ? '按券商给的持仓市值记(已含合约乘数);卖出的是负数,从账户余额里减去' : '期货不计入余额:盈亏每天结算进现金,现金里已经有了;这里只展示名义价值'">
           <div>
-            <div class="font-mono text-[10px] uppercase text-ink-subtle mb-0.5">张数</div>
+            <div class="font-mono text-[10px] uppercase text-ink-subtle mb-0.5" th:text="${di.qtyLabel}">张数</div>
             <div class="tnum" th:classappend="${di.short} ? 'text-rust' : ''" th:text="${di.sideText}">买入 1 张</div>
           </div>
           <div>

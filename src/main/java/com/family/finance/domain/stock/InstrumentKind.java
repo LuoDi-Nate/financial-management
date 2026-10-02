@@ -91,7 +91,10 @@ public enum InstrumentKind {
         if (qty == null) return "";
         boolean shortSide = qty.signum() < 0;
         String n = plain(qty.abs());
-        if (kind == BOND) return (shortSide ? "卖出面值 " : "持有面值 ") + n;
+        if (kind == BOND) {
+            String grouped = String.format("%,f", qty.abs()).replaceAll("\\.?0+$", "");   // 面值动辄上万,加千分位
+            return (shortSide ? "卖出面值 " : "持有面值 ") + grouped;
+        }
         return (shortSide ? "卖出 " : "买入 ") + n + " 张";
     }
 

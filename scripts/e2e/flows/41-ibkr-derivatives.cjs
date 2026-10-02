@@ -191,10 +191,10 @@ module.exports = {
       titles: [...document.querySelectorAll('article .font-display')].filter(e => e.getBoundingClientRect().right > window.innerWidth + 1).length,
     }));
     await ui.assert(mob.over <= 1 && mob.titles === 0, '手机 390px:期权标题换行,不撑出横向滚动', JSON.stringify(mob));
-    await ui.page.screenshot({ path: '/tmp/e2e-41-holdings-mobile.png', fullPage: false }).catch(() => {});
+    await ui.page.screenshot({ path: '/tmp/e2e-41-holdings-mobile.png', fullPage: true }).catch(() => {});   // 双端截图给人看排版(UED 自查)
     await ui.page.setViewportSize(vp);
     await ui.page.reload({ waitUntil: 'networkidle' });
-    await ui.page.screenshot({ path: '/tmp/e2e-41-holdings-pc.png', fullPage: false }).catch(() => {});
+    await ui.page.screenshot({ path: '/tmp/e2e-41-holdings-pc.png', fullPage: true }).catch(() => {});
 
     // ── 4 · 新账户第一次同步 = 开账 ──────────────────────────────────
     report.section('4 · 首页账户表:新账户第一次同步算开账,这个月「本期损益」为 0');
