@@ -1,7 +1,9 @@
 package com.family.finance.service.broker.ibkr;
 
+import com.family.finance.domain.stock.InstrumentKind;
 import com.family.finance.service.broker.BrokerDtos;
 import com.family.finance.service.broker.BrokerTicker;
+import com.family.finance.service.broker.DerivativeRows;
 
 import javax.xml.stream.XMLInputFactory;
 import javax.xml.stream.XMLStreamConstants;
@@ -32,6 +34,12 @@ import java.util.Map;
  *   <li>{@code OpenPosition levelOfDetail="LOT"} 是按批次拆开的明细,与 SUMMARY 行同时出现时不跳过持仓就算两遍。</li>
  *   <li>报表里<b>没有</b> Open Positions / Cash Report 栏目(用户建报表时漏勾)≠「全卖光了」—— 拒绝,不许进对账。</li>
  * </ul>
+ *
+ * <h3>v1.29 · 期权 / 期货 / 债券(issue #26)</h3>
+ * <p>{@code assetCategory} 为 OPT / FOP / WAR / FUT / BOND 的行进 {@link BrokerDtos.Derivative}:
+ * 市值用报表的 {@code positionValue}(已含乘数,卖出为负 —— 2026-10-02 @Jsonya 贴的真实报表核对过),
+ * 但仍用「张数 × 标记价 × 乘数」交叉核对一遍,对不上的行不同步、照实列出({@link DerivativeRows#check})。
+ * 其余品种(差价合约、外汇头寸 …)仍跳过计数。</p>
  *
  * <p><b>XXE</b>:报表来自外部网络,解析器关闭 DTD 与外部实体。</p>
  */
@@ -89,6 +97,8 @@ public final class IbkrFlexParser {
             String account = null;
             List<BrokerDtos.Position> positions = null;
             List<BrokerDtos.ManualPosition> manual = null;
+            List<BrokerDtos.Derivative> derivs = null;
+            List<String> rejected = null;
             Map<String, BigDecimal> cash = null;
             int skipped = 0, lotSkipped = 0;
             boolean sawPositions = false, sawCash = false;
@@ -102,6 +112,8 @@ public final class IbkrFlexParser {
                             account = attr(r, "accountId");
                             positions = new ArrayList<>();
                             manual = new ArrayList<>();
+                            derivs = new ArrayList<>();
+                            rejected = new ArrayList<>();
                             cash = new LinkedHashMap<>();
                             skipped = 0; lotSkipped = 0;
                             sawPositions = false; sawCash = false;
@@ -112,8 +124,10 @@ public final class IbkrFlexParser {
                             if (positions == null) break;
                             String lvl = attr(r, "levelOfDetail");
                             if (lvl != null && !lvl.isBlank() && !"SUMMARY".equalsIgnoreCase(lvl)) { lotSkipped++; break; }
-                            String cat = attr(r, "assetCategory");
-                            if (cat != null && !"STK".equalsIgnoreCase(cat.trim())) { skipped++; break; }
+                            String cat = upper(attr(r, "assetCategory"));
+                            InstrumentKind kind = kindOf(cat);
+                            if (kind != null) { readDerivative(r, kind, derivs, rejected); break; }
+                            if (cat != null && !cat.isEmpty() && !"STK".equals(cat)) { skipped++; break; }
                             BigDecimal shares = num(attr(r, "position"));
                             if (shares == null) { skipped++; break; }
                             String symbol = attr(r, "symbol");
@@ -156,9 +170,10 @@ public final class IbkrFlexParser {
                     List<BrokerDtos.Cash> cashList = new ArrayList<>();
                     cash.forEach((k, v) -> cashList.add(new BrokerDtos.Cash(k, v)));
                     out.put(account.trim(), new AccountReport(account.trim(),
-                            new BrokerDtos.Snapshot(List.copyOf(positions), List.copyOf(cashList), skipped, List.copyOf(manual)),
+                            new BrokerDtos.Snapshot(List.copyOf(positions), List.copyOf(cashList), skipped,
+                                    List.copyOf(manual), List.copyOf(derivs), List.copyOf(rejected)),
                             lotSkipped));
-                    account = null; positions = null; manual = null; cash = null;
+                    account = null; positions = null; manual = null; derivs = null; rejected = null; cash = null;
                 }
             }
             r.close();
@@ -205,6 +220,45 @@ public final class IbkrFlexParser {
         } catch (XMLStreamException e) {
             return null;
         }
+    }
+
+    /** IBKR 的 assetCategory → 我们的品种;股票 / 不同步的品种返回 null */
+    static InstrumentKind kindOf(String cat) {
+        if (cat == null) return null;
+        return switch (cat) {
+            case "OPT", "FOP" -> InstrumentKind.OPTION;   // 期货期权也是期权:一样按持仓市值记
+            case "WAR" -> InstrumentKind.WARRANT;
+            case "FUT" -> InstrumentKind.FUTURE;
+            case "BOND" -> InstrumentKind.BOND;
+            default -> null;
+        };
+    }
+
+    /** 一行期权 / 期货 / 债券:读字段 → 交叉核对 → 进 derivs 或 rejected */
+    private static void readDerivative(XMLStreamReader r, InstrumentKind kind,
+                                       List<BrokerDtos.Derivative> derivs, List<String> rejected) {
+        String symbol = blankToNull(attr(r, "symbol"));
+        String desc = blankToNull(attr(r, "description"));
+        String underlying = blankToNull(attr(r, "underlyingSymbol"));
+        String putCall = blankToNull(attr(r, "putCall"));
+        BigDecimal strike = num(attr(r, "strike"));
+        java.time.LocalDate expiry = DerivativeRows.parseDate(attr(r, "expiry"));
+        BigDecimal qty = num(attr(r, "position"));
+        BigDecimal mark = num(attr(r, "markPrice"));
+        BigDecimal mult = num(attr(r, "multiplier"));
+        BigDecimal value = num(attr(r, "positionValue"));
+        String ccy = upper(attr(r, "currency"));
+        if (symbol == null) symbol = desc;
+        String why = symbol == null ? "报表里缺代码" : DerivativeRows.check(kind, qty, mark, mult, value);
+        if (why != null) {
+            rejected.add(DerivativeRows.rejectLine(kind, underlying, symbol, putCall, strike, expiry, desc, why));
+            return;
+        }
+        BigDecimal counted = kind.countsInBalance() ? value : BigDecimal.ZERO;
+        BigDecimal notional = kind == InstrumentKind.FUTURE && mark != null && mult != null
+                ? qty.multiply(mark).multiply(mult) : null;
+        derivs.add(new BrokerDtos.Derivative(kind, symbol, underlying, putCall, strike, expiry, mult,
+                qty, mark, counted, notional, ccy, desc));
     }
 
     // ---- 小工具 ----

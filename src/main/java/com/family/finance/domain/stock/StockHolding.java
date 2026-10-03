@@ -65,4 +65,24 @@ public class StockHolding {
     private String fundCode;
     /** v1.5 · PENDING/RESOLVED/MANUAL/UNPENETRATED */
     private String penetrateState;
+
+    // v1.29 · 券商同步来的期权 / 期货 / 债券(都是 MANUAL 行:单价 × 张数,卖出张数为负)。
+    // 估值不读下面这些列 —— 它们只用来把这一行写成人话、标到期;NULL = 股票 / 基金 / 现金。
+    /** {@link InstrumentKind} 的 name();NULL = 普通持仓 */
+    private String instrumentKind;
+    private String underlying;
+    /** C 看涨 / P 看跌 */
+    private String putCall;
+    private BigDecimal strike;
+    private java.time.LocalDate expiry;
+    private BigDecimal multiplier;
+    /** 券商给的标记价(原币 · 每股 / 每单位);原币记在 {@link #currency} */
+    private BigDecimal quotePrice;
+    /** 期货名义价值(原币)· 只展示,不计入余额 */
+    private BigDecimal notional;
+
+    /** 是不是券商同步来的期权 / 期货 / 债券这一类 */
+    public boolean isDerivative() {
+        return instrumentKind != null && !instrumentKind.isBlank();
+    }
 }

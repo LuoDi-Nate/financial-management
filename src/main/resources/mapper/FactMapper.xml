@@ -102,10 +102,15 @@
       ON ps.account_id = a.id
      AND ps.period_id = p.id
     <!-- v1.12 FR-350 · 分类属性定格行。主键 (period_id, account_id) 直接命中,与上面
-         period_snapshot 的 join 同形,不引入新的扫描量级。 -->
+         period_snapshot 的 join 同形,不引入新的扫描量级。
+         v1.29 · issue #34 · 只认【已关账】那一期的定格行。定格只在关账时写、重开时删,
+         所以正常数据里未关账的期本来就没有定格行;一旦有,一定是残留(全新 Docker 装好后清演示数据
+         只清了 period / account、没清本表 → 演示账户的类型按编号挂到了用户自己的账户上,
+         当期的「总负债」把现金账户当成贷款)。读的这一侧把它挡在外面,残留就伤不到当期。 -->
     LEFT JOIN period_account_attr paa
       ON paa.period_id = p.id
      AND paa.account_id = a.id
+     AND p.status = 'CLOSED'
     LEFT JOIN (
         SELECT period_id,
                account_id,

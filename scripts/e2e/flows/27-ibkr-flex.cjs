@@ -150,7 +150,9 @@ module.exports = {
     await ui.assert(has(/^CASH\|\|\|\|USD\|3200/) && has(/^CASH\|\|\|\|HKD\|12000/), '真值层:美元 / 港币现金各一行');
     await ui.assert(!rows.some(r => r.includes('BASE_SUMMARY')) && rows.filter(r => r.startsWith('CASH')).length === 2,
                     '真值层:BASE_SUMMARY 合计行没有被当成一个币种');
-    await ui.assert(rows.length === 6, '真值层:期权那一行没有同步进来', `共 ${rows.length} 行`);
+    // v1.29 · 期权不再跳过:一张合约一条手动估值行,单价 = 持仓市值 ÷ 张数(美元账户不折算)
+    await ui.assert(has(/^MANUAL\|\|AAPL\s+261218C00250000\|1(\.0+)?\|USD\|980/), '真值层:期权一张合约一条,市值用报表的持仓市值(v1.29)');
+    await ui.assert(rows.length === 7, '真值层:股票 4 + 现金 2 + 期权 1,一共 7 行', `共 ${rows.length} 行`);
 
     await ui.goto(`/accounts/${state.acc}/holdings`);
     await ui.rendered('持仓页');
@@ -185,7 +187,7 @@ module.exports = {
     const last = db.one(`SELECT last_status FROM broker_link WHERE account_id=${state.acc}`);
     await ui.assert(/^同步失败 · 报表口令已过期/.test(last || ''), '真值层:失败落库(卡片与账户列表读的就是它)', last);
     const kept = db.num(`SELECT COUNT(*) FROM stock_holding WHERE account_id=${state.acc} AND archived_at IS NULL AND sync_source='IBKR'`);
-    await ui.assert(kept === 6, '真值层:失败时一行持仓都没被归档(失败信封没被当成空报表)', `还剩 ${kept} 行`);
+    await ui.assert(kept === 7, '真值层:失败时一行持仓都没被归档(失败信封没被当成空报表)', `还剩 ${kept} 行`);
     await ui.goto('/accounts');
     const r2 = await rowText(ui);
     await ui.assert(r2.includes('同步失败') && !r2.includes('天后到期'),

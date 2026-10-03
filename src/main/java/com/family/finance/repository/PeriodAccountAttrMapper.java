@@ -74,6 +74,8 @@ public interface PeriodAccountAttrMapper {
      * {@code LEFT JOIN period_account_attr} + {@code COALESCE} —— 那样所有吃 {@code FactBaseRow}
      * 的消费者(SealedPeriodService / AllocationService / 各 lens)自动受益,不用逐个改调用点。</p>
      *
+     * <p>v1.29 · 只认已关账的期(issue #34 · 理由见 {@code FactMapper.queryBase} 那条 join 的注释)。</p>
+     *
      * <p>列顺序与 {@link PeriodAccountAttr} 的记录组件<b>逐一对齐</b>:这是 record 唯一规范构造器的
      * 位置映射,{@code benchmark_pct} 与 {@code expected_return_pct} 都是 {@code DECIMAL} ——
      * 两列相邻且同型,顺序错了不会报错,只会静默错位。改这里必须同步改 record。</p>
@@ -86,6 +88,7 @@ public interface PeriodAccountAttrMapper {
               JOIN period p ON p.id = pa.period_id
              WHERE p.family_id = #{familyId}
                AND pa.period_id = #{periodId}
+               AND p.status = 'CLOSED'
             """)
     List<PeriodAccountAttr> findByPeriod(@Param("familyId") long familyId, @Param("periodId") long periodId);
 

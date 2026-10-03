@@ -508,6 +508,11 @@ public class AccountValuationService {
         return resolveFxRate(familyId, fromCurrency, acc.getCurrency());
     }
 
+    /** v1.29 · 账户币种(同步结果里写「市值 USD 640」用);账户不存在返回 null */
+    public String accountCurrency(long familyId, long accountId) {
+        return accountMapper.findById(familyId, accountId).map(Account::getCurrency).orElse(null);
+    }
+
     private BigDecimal resolveFxRate(long familyId, String fromCurrency, String toCurrency) {
         if (fromCurrency == null || toCurrency == null || fromCurrency.equalsIgnoreCase(toCurrency)) {
             return BigDecimal.ONE;
