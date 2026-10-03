@@ -131,7 +131,7 @@
 | 前端 | Thymeleaf + HTMX 1.9 + Chart.js 4 + ECharts(无 SPA、无构建管线) |
 | 认证 | Spring Security + bcrypt + Session Cookie |
 | 部署 | **Docker compose 一键(v0.7,推荐)** · 或 Linux systemd + nginx 反代 :80 → :20000 · macOS launchd(可选)直连 :20000 |
-| 测试 | JUnit 5 · **1074 单元** / 603 e2e 断言(21 条浏览器主线,真浏览器 + 真 DB)/ **940 黑盒回归**护栏 —— 每条护栏守的是哪个坑,见 [QA case 库](docs/qa-cases.md) |
+| 测试 | JUnit 5 · **1104 单元** / 664 e2e 断言(22 条浏览器主线,真浏览器 + 真 DB)/ **944 黑盒回归**护栏 —— 每条护栏守的是哪个坑,见 [QA case 库](docs/qa-cases.md) |
 
 ## 快速开始(自托管部署)
 
@@ -339,7 +339,7 @@ mvn spring-boot:run
 测试:
 
 ```bash
-mvn test                       # JUnit 单元测试(1074)
+mvn test                       # JUnit 单元测试(1104)
 bash scripts/qa-run.sh         # 黑盒 endpoint + 模板渲染(见 README 上方测试行的黑盒回归数)
 node scripts/e2e/run.cjs       # 真 e2e:Playwright 开浏览器按用户路径点(失败自动截图)
 bash scripts/regression-data.sh # 数据层/口径回归(原 e2e.sh · curl 端点 + DB 真值 · 快照还原不清库)
@@ -377,12 +377,12 @@ bash scripts/regression-data.sh # 数据层/口径回归(原 e2e.sh · curl 端�
 每版做了什么、为什么那么做,都写在各自的文档里;这里只放入口,不复述。
 
 <details>
-<summary><b>展开全部 45 个版本</b>(v0.1 → v1.28)</summary>
+<summary><b>展开全部 46 个版本</b>(v0.1 → v1.29)</summary>
 
 | 版本 | 文档 |
 |---|---|
+| `v1.29` | [PRD](prd/v1.29.md) · [技术设计](tech-design/v1.29.md) · [预览](preview/v1.29/) |
 | `v1.28` | [PRD](prd/v1.28.md) · [技术设计](tech-design/v1.28.md) · [预览](preview/v1.28/) |
-| `v1.29` | [PRD](prd/v1.29.md)(待评审)· [预览](preview/v1.29/) |
 | `v1.27` | [PRD](prd/v1.27.md) · [技术设计](tech-design/v1.27.md) · [预览](preview/v1.27/) |
 | `v1.26` | [PRD](prd/v1.26.md) · [技术设计](tech-design/v1.26.md) · [预览](preview/v1.26/) |
 | `v1.24` | [PRD](prd/v1.24.md) · [技术设计](tech-design/v1.24.md) · [预览](preview/v1.24/) |
@@ -468,7 +468,7 @@ financial-management/
 ├── docs/qa-cases.md                      # QA case 库
 ├── icons/                                # 用户可替换的图标源 PNG
 └── scripts/
-    ├── qa-run.sh                         # 黑盒回归护栏(940 条)
+    ├── qa-run.sh                         # 黑盒回归护栏(944 条)
     ├── e2e/run.cjs                       # 端到端(真浏览器点 + 回库查真值)
     └── release-shots.cjs                 # 发版截图(隐私模式默认开)
 ```

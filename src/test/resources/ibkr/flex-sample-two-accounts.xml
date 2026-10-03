@@ -6,7 +6,7 @@
   故意放进来的几种情况:
     · 两个账户
     · 美股 / 港股(IBKR 给 700,我们存 00700)/ 沪股通 / 伦敦上市的美元 ETF(按报表收盘价估值)
-    · 一行期权(不同步,计数)
+    · 一行期权(v1.26 时不同步只计数;v1.29 起同步,字段照 #26 真实报表的形状补齐了乘数 / 行权价 / 到期日)
     · 同一持仓的 LOT 明细行(不跳过就算两遍)
     · 现金里的 BASE_SUMMARY 合计行(不跳过就算两遍)
     · 带千分位的数字
@@ -25,7 +25,7 @@
         <OpenPosition accountId="U1234521" currency="HKD" assetCategory="STK" symbol="700" description="TENCENT HOLDINGS LTD" listingExchange="SEHK" position="200" markPrice="512.00" positionValue="102,400" costBasisPrice="318.00" levelOfDetail="SUMMARY" />
         <OpenPosition accountId="U1234521" currency="CNH" assetCategory="STK" symbol="600519" description="KWEICHOW MOUTAI CO LTD-A" listingExchange="SEHKNTL" position="10" markPrice="1,480.00" positionValue="14,800" costBasisPrice="1,560.00" levelOfDetail="SUMMARY" />
         <OpenPosition accountId="U1234521" currency="USD" assetCategory="STK" symbol="VWRA" description="VANGUARD FTSE ALL-WORLD" listingExchange="LSEETF" position="30" markPrice="131.52" positionValue="3,945.60" costBasisPrice="118.20" levelOfDetail="SUMMARY" />
-        <OpenPosition accountId="U1234521" currency="USD" assetCategory="OPT" symbol="AAPL  261218C00250000" description="AAPL 18DEC26 250 C" listingExchange="CBOE" position="1" markPrice="9.80" positionValue="980" costBasisPrice="7.10" levelOfDetail="SUMMARY" />
+        <OpenPosition accountId="U1234521" currency="USD" assetCategory="OPT" symbol="AAPL  261218C00250000" description="AAPL 18DEC26 250 C" listingExchange="CBOE" underlyingSymbol="AAPL" multiplier="100" strike="250" expiry="20261218" putCall="C" side="Long" position="1" markPrice="9.80" positionValue="980" costBasisPrice="7.10" levelOfDetail="SUMMARY" />
       </OpenPositions>
     </FlexStatement>
     <FlexStatement accountId="U7658830" fromDate="20260923" toDate="20260923" period="LastBusinessDay" whenGenerated="20260924;052011">

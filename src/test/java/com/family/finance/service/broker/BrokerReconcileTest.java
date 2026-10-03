@@ -74,7 +74,7 @@ class BrokerReconcileTest {
         verify(hm).archive(FAM, 2L);
         // 关键护栏:用户手填持仓(id=3)绝不被归档/更新
         verify(hm, never()).archive(FAM, 3L);
-        assertThat(summary).contains("新增 2").contains("更新 2").contains("归档 1").contains("跳过期权/期货 2");
+        assertThat(summary).contains("新增 2").contains("更新 2").contains("归档 1").contains("跳过其他品种 2");
         // AAPL 更新为券商新股数/成本
         assertThat(synced_aapl.getShares()).isEqualByComparingTo("20");
         assertThat(synced_aapl.getCostBasis()).isEqualByComparingTo("95");
@@ -130,5 +130,107 @@ class BrokerReconcileTest {
         assertThat(cap.getValue().getSyncSource()).isEqualTo("IBKR");
         assertThat(cap.getValue().getDisplayName()).isEqualTo("TOYOTA · TSEJ");
         assertThat(summary).contains("按券商收盘价估值 2");
+    }
+
+    // ───────────── v1.29 · 期权 / 期货 / 债券(issue #26)─────────────
+
+    private static BrokerDtos.Derivative opt(String symbol, String und, String pc, String strike, String qty,
+                                             String mark, String value) {
+        return new BrokerDtos.Derivative(com.family.finance.domain.stock.InstrumentKind.OPTION, symbol, und, pc,
+                new BigDecimal(strike), java.time.LocalDate.of(2027, 4, 16), BigDecimal.valueOf(100),
+                new BigDecimal(qty), new BigDecimal(mark), new BigDecimal(value), null, "USD", null);
+    }
+
+    /**
+     * 期权落成手动估值行:单价 = 持仓市值 ÷ 张数(折成账户币种),张数带符号 ——
+     * 单价 × 张数 必须正好还原成券商给的市值(卖出为负),估值路径不用改一行。
+     */
+    @Test
+    void 期权落成手动估值行_单价乘张数还原券商市值_卖出为负_期货记0() {
+        StockHoldingMapper hm = mock(StockHoldingMapper.class);
+        AccountValuationService vs = mock(AccountValuationService.class);
+        when(vs.fxToAccountCurrency(FAM, ACC, "USD")).thenReturn(BigDecimal.ONE);
+        when(vs.accountCurrency(FAM, ACC)).thenReturn("USD");
+        when(hm.findActiveByAccount(FAM, ACC)).thenReturn(List.of());
+
+        BrokerDtos.Snapshot snap = new BrokerDtos.Snapshot(List.of(), List.of(), 0, List.of(), List.of(
+                opt("GOOGL 270416C00360000", "GOOGL", "C", "360", "1", "28.5", "2850"),
+                opt("GOOGL 270416C00400000", "GOOGL", "C", "400", "-1", "16.2", "-1620"),
+                new BrokerDtos.Derivative(com.family.finance.domain.stock.InstrumentKind.FUTURE, "ESZ6", "ES", null,
+                        null, java.time.LocalDate.of(2026, 12, 18), BigDecimal.valueOf(50), BigDecimal.ONE,
+                        new BigDecimal("6000"), BigDecimal.ZERO, new BigDecimal("300000"), "USD", "ES 18DEC26")),
+                List.of("TSLA · 看涨 · 行权价 300 · 2026-11-20 到期:报表里缺持仓市值,这一行没有同步"));
+        String summary = new BrokerSyncService(mock(BrokerLinkMapper.class), hm, List.of(), vs)
+                .reconcile(FAM, ACC, BrokerVendor.IBKR, snap);
+
+        org.mockito.ArgumentCaptor<StockHolding> cap = org.mockito.ArgumentCaptor.forClass(StockHolding.class);
+        verify(hm, times(3)).insertOwned(org.mockito.ArgumentMatchers.eq(FAM), cap.capture());
+        var rows = cap.getAllValues();
+        StockHolding longCall = rows.get(0), shortCall = rows.get(1), fut = rows.get(2);
+        assertThat(longCall.getValuationMode()).isEqualTo(ValuationMode.MANUAL);
+        assertThat(longCall.getInstrumentKind()).isEqualTo("OPTION");
+        assertThat(longCall.getSyncSource()).isEqualTo("IBKR");
+        assertThat(longCall.getDisplayName()).isEqualTo("GOOGL · 看涨 · 行权价 360 · 2027-04-16 到期");
+        assertThat(longCall.getManualValue().multiply(longCall.getShares())).isEqualByComparingTo("2850");
+        assertThat(shortCall.getShares()).isEqualByComparingTo("-1");
+        assertThat(shortCall.getManualValue().multiply(shortCall.getShares())).isEqualByComparingTo("-1620");
+        assertThat(shortCall.getCostBasis()).isNull();                 // 不给半对的盈亏
+        assertThat(fut.getManualValue()).isEqualByComparingTo("0");    // 期货不计入余额
+        assertThat(fut.getNotional()).isEqualByComparingTo("300000");
+        assertThat(summary).contains("期权 2 笔 · 市值 USD 1,230").contains("期货 1 笔(不计入余额)")
+                .contains("1 行数据对不上没同步(TSLA · 看涨 · 行权价 300 · 2026-11-20 到期:报表里缺持仓市值)");
+    }
+
+    @Test
+    void 期权折算到账户币种_港币账户里的美股期权() {
+        StockHoldingMapper hm = mock(StockHoldingMapper.class);
+        AccountValuationService vs = mock(AccountValuationService.class);
+        when(vs.fxToAccountCurrency(FAM, ACC, "USD")).thenReturn(new BigDecimal("7.8"));
+        when(hm.findActiveByAccount(FAM, ACC)).thenReturn(List.of());
+        BrokerDtos.Snapshot snap = new BrokerDtos.Snapshot(List.of(), List.of(), 0, List.of(), List.of(
+                opt("SPY   261009P00560000", "SPY", "P", "560", "-2", "1.70", "-340")), List.of());
+        new BrokerSyncService(mock(BrokerLinkMapper.class), hm, List.of(), vs).reconcile(FAM, ACC, BrokerVendor.IBKR, snap);
+        org.mockito.ArgumentCaptor<StockHolding> cap = org.mockito.ArgumentCaptor.forClass(StockHolding.class);
+        verify(hm).insertOwned(org.mockito.ArgumentMatchers.eq(FAM), cap.capture());
+        // −340 美元 × 7.8 = −2652 港币
+        assertThat(cap.getValue().getManualValue().multiply(cap.getValue().getShares())).isEqualByComparingTo("-2652");
+    }
+
+    /** 同一张合约下次同步:更新,不新建;到期 / 平仓的(报表里没了):归档;用户手填的:不碰,但提醒可能算两遍 */
+    @Test
+    void 期权更新_到期归档_手填行不碰但提醒可能算两遍() {
+        StockHoldingMapper hm = mock(StockHoldingMapper.class);
+        AccountValuationService vs = mock(AccountValuationService.class);
+        when(vs.fxToAccountCurrency(FAM, ACC, "USD")).thenReturn(BigDecimal.ONE);
+        StockHolding held = StockHolding.builder().id(31L).accountId(ACC).valuationMode(ValuationMode.MANUAL)
+                .instrumentKind("OPTION").ticker("GOOGL 270416C00360000").displayName("我改过的名字")
+                .shares(BigDecimal.ONE).manualValue(new BigDecimal("2000")).syncSource("IBKR").build();
+        StockHolding expired = StockHolding.builder().id(32L).accountId(ACC).valuationMode(ValuationMode.MANUAL)
+                .instrumentKind("OPTION").ticker("SPY   260918P00550000")
+                .shares(BigDecimal.ONE).manualValue(BigDecimal.TEN).syncSource("IBKR").build();
+        StockHolding userManual = StockHolding.builder().id(33L).accountId(ACC).valuationMode(ValuationMode.MANUAL)
+                .displayName("期权(手填)").shares(BigDecimal.ONE).manualValue(new BigDecimal("900")).build();
+        when(hm.findActiveByAccount(FAM, ACC)).thenReturn(List.of(held, expired, userManual));
+
+        BrokerDtos.Snapshot snap = new BrokerDtos.Snapshot(List.of(), List.of(), 0, List.of(), List.of(
+                opt("GOOGL 270416C00360000", "GOOGL", "C", "360", "1", "28.5", "2850"),
+                opt("GOOGL 270416C00400000", "GOOGL", "C", "400", "-1", "16.2", "-1620")), List.of());
+        String summary = new BrokerSyncService(mock(BrokerLinkMapper.class), hm, List.of(), vs)
+                .reconcile(FAM, ACC, BrokerVendor.IBKR, snap);
+
+        verify(hm).update(FAM, held);
+        assertThat(held.getManualValue()).isEqualByComparingTo("2850");
+        assertThat(held.getDisplayName()).isEqualTo("我改过的名字");   // 用户改过的名不覆盖
+        verify(hm).archive(FAM, 32L);                                // 报表里没了 = 到期 / 平仓
+        verify(hm, never()).archive(FAM, 33L);                       // 手填的绝不碰
+        verify(hm, never()).update(FAM, userManual);
+        assertThat(summary).contains("账户里另有 1 条手填持仓");
+    }
+
+    @Test
+    void 同步结果落库前截到255字以内() {
+        String longText = "同步 · " + "x".repeat(400);
+        assertThat(BrokerSyncService.clip(longText)).hasSizeLessThanOrEqualTo(250);
+        assertThat(BrokerSyncService.clip("短的")).isEqualTo("短的");
     }
 }

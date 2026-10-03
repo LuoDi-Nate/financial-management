@@ -4174,7 +4174,7 @@ BRO_HITS="$(grep -rnE 'unlockTrade\(|\.placeOrder|\.modifyOrder|\.cancelOrder|\.
 
 # v15-MAP-1 · reconcile 只动 sync_source=本 vendor 行(不碰手填持仓)
 { grep -q 'src.equals(h.getSyncSource())' "$BSVC" && grep -q 'skippedNonEquity' "$BSVC"; } \
-  && log_ok "v15-MAP-1 对账只动 sync_source 行 · 期权/期货跳过计数" \
+  && log_ok "v15-MAP-1 对账只动 sync_source 行 · 不同步的品种计数(v1.29 起期权 / 期货 / 债券同步,见 v129-*)" \
   || log_bad "v15-MAP-1 对账未按 sync_source 隔离手填持仓" "see BrokerSyncService.reconcile"
 
 # v15-LINK-1 · 关联前留审计快照 + 软归档 + 两步确认硬门
@@ -11088,6 +11088,61 @@ QA1285_NAV="$RD/src/main/resources/templates/fragments/nav.html"
   && [ -f "$RD/scripts/e2e/flows/40-nav-coin.cjs" ]; } \
   && log_ok "v1285-NAV-COIN(顶栏古钱图标 · 家庭名在 title / aria-label · 错误页同步 · flow 40 在)" \
   || log_bad "v1285-NAV-COIN 顶栏又出现「№ + 首字」或图标丢了家庭名" "see fragments/nav.html · error.html"
+
+section "v1.29 · issue #26:券商同步带上期权 / 期货 / 债券"
+QA129_SYNC="$RD/src/main/java/com/family/finance/service/broker/BrokerSyncService.java"
+QA129_VAL="$RD/src/main/java/com/family/finance/service/stock/AccountValuationService.java"
+QA129_IBKR="$RD/src/main/java/com/family/finance/service/broker/ibkr/IbkrFlexParser.java"
+QA129_FUTU="$RD/src/main/java/com/family/finance/service/broker/FutuBrokerClient.java"
+QA129_TIGER="$RD/src/main/java/com/family/finance/service/broker/TigerBrokerClient.java"
+QA129_ROWS="$RD/src/main/java/com/family/finance/service/broker/DerivativeRows.java"
+QA129_KIND="$RD/src/main/java/com/family/finance/domain/stock/InstrumentKind.java"
+QA129_MAP="$RD/src/main/java/com/family/finance/repository/StockHoldingMapper.java"
+QA129_HOLD="$RD/src/main/resources/templates/stock/holdings.html"
+
+# v129-DERIV-ONE-PATH · 期权等是 MANUAL 行:单价 = 券商市值 ÷ 张数,张数带符号(卖出为负)—— 估值不许为它另开分支
+#   (另开一条求和路径 = 本项目 pivot / kpi 差 0.01 那类病的温床;卖出靠负张数,不靠 if)
+{ grep -qF 'd.marketValue().divide(d.quantity(), 12, RoundingMode.HALF_EVEN)' "$QA129_SYNC" \
+  && grep -qF 'h.setShares(d.quantity());' "$QA129_SYNC" \
+  && grep -qF '.accountId(accountId).valuationMode(ValuationMode.MANUAL)' "$QA129_SYNC" \
+  && ! java_code_only "$QA129_VAL" | grep -qE 'instrumentKind|isDerivative|InstrumentKind'; } \
+  && log_ok "v129-DERIV-ONE-PATH(期权等落 MANUAL 行 · 单价 = 市值 ÷ 张数 · 卖出张数为负 · 估值没有另开分支)" \
+  || log_bad "v129-DERIV-ONE-PATH 期权等的估值另起了一条路 / 卖出不再靠负张数" "see BrokerSyncService.reconcile 期权段 · AccountValuationService.valuateInternal"
+
+# v129-DERIV-CROSSCHECK · 「张数 × 标记价 × 乘数」与市值交叉核对,对不上不同步(三家都走同一个判据);期货记 0
+{ grep -qF 'BigDecimal expected = qty.multiply(mark).multiply(multiplier);' "$QA129_ROWS" \
+  && grep -qF 'DerivativeRows.check(kind, qty, mark, mult, value)' "$QA129_IBKR" \
+  && grep -qF 'DerivativeRows.check(kind, qty, mark, mult, value)' "$QA129_TIGER" \
+  && grep -qF 'US_OPTION_MULTIPLIER' "$QA129_FUTU" \
+  && grep -qF 'public boolean countsInBalance() { return this != FUTURE; }' "$QA129_KIND" \
+  && grep -qF 'kind.countsInBalance() ? value : BigDecimal.ZERO' "$QA129_IBKR" \
+  && grep -qF 'DerivativeRows.rejectSummary(snap.rejected())' "$QA129_SYNC"; } \
+  && log_ok "v129-DERIV-CROSSCHECK(三家都交叉核对 · 对不上的行不同步并点名 · 期货不计入余额)" \
+  || log_bad "v129-DERIV-CROSSCHECK 期权市值不再核对 / 对不上的行被静默吞掉 / 期货按名义价值计入" "see DerivativeRows.check · IbkrFlexParser.readDerivative · TigerBrokerClient.map · FutuBrokerClient.map"
+
+# v129-NO-OPTION-SKIP · 期权不再跳过:IBKR 先认品种再判 STK;富途不再把空头一律跳过;老虎持仓接上(v0.15 起一直返回 null)
+{ ! grep -rqF '跳过期权/期货' "$RD/src/main" \
+  && ! grep -rqF '期权 / 期货本版' "$RD/src/main/resources/templates" \
+  && grep -qF 'if (kind != null) { readDerivative(r, kind, derivs, rejected); break; }' "$QA129_IBKR" \
+  && ! grep -qF 'p.getPositionSide() != TrdCommon.PositionSide.PositionSide_Long_VALUE' "$QA129_FUTU" \
+  && grep -qF 'OPTION_CODE' "$QA129_FUTU" \
+  && grep -qF 'new TigerHttpRequest(MethodName.POSITIONS)' "$QA129_TIGER" \
+  && ! java_code_only "$QA129_TIGER" | grep -qF 'buildPositionsRequest' \
+  && grep -qF '老虎资产查询失败' "$QA129_TIGER" \
+  && grep -qE 'MODIFY COLUMN ticker VARCHAR\(48\)' "$RD/db/migration/V66__holding_derivatives.sql"; } \
+  && log_ok "v129-NO-OPTION-SKIP(IBKR 期权进来 · 富途期权 / 空头不再跳过 · 老虎持仓接上且资产查询失败不清空现金 · 代码列加宽到 48)" \
+  || log_bad "v129-NO-OPTION-SKIP 又有券商把期权跳过 / 老虎持仓回到 null / 代码列装不下期权代码" "see IbkrFlexParser · FutuBrokerClient.map · TigerBrokerClient.positions · V66"
+
+# v129-DERIV-NOT-FUND · 期权等不是基金:不进穿透候选;券商同步行不给手改表单(卖出张数是负的,表单也装不下)
+{ grep -B8 'List<Long> findActiveFundHoldingIdsByFamily' "$QA129_MAP" | grep -qF 'h.instrument_kind IS NULL' \
+  && grep -qF "h.valuationMode.name() == 'MANUAL' and !h.derivative}\"" "$QA129_HOLD" \
+  && grep -qF 'data-deriv-row' "$QA129_HOLD" && grep -qF 'data-deriv-due' "$QA129_HOLD" \
+  && grep -qF '期权等(券商报表)' "$QA129_HOLD" \
+  && grep -qF 'linkMapper.markSynced(familyId, accountId, clip(s));' "$QA129_SYNC" \
+  && [ -f "$RD/scripts/e2e/flows/41-ibkr-derivatives.cjs" ] \
+  && grep -qF 'rows.length === 7' "$RD/scripts/e2e/flows/27-ibkr-flex.cjs"; } \
+  && log_ok "v129-DERIV-NOT-FUND(不进穿透 · 不给手改 · 持仓页人话行 + 到期提示 + 估值分解单列 · 同步结果截到 255 · flow 41 在)" \
+  || log_bad "v129-DERIV-NOT-FUND 期权行进了基金穿透 / 能手改 / 持仓页不再单列" "see StockHoldingMapper.findActiveFundHoldingIdsByFamily · stock/holdings.html"
 
 echo
 echo "═══════════════════════════════════════"

@@ -2,6 +2,7 @@ package com.family.finance.service.broker;
 
 import com.family.finance.domain.broker.BrokerLink;
 import com.family.finance.domain.broker.BrokerVendor;
+import com.family.finance.domain.stock.InstrumentKind;
 import com.family.finance.domain.stock.Market;
 import com.family.finance.domain.stock.StockHolding;
 import com.family.finance.domain.stock.ValuationMode;
@@ -12,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -22,6 +24,8 @@ import java.util.Set;
  * <p><b>只动带 sync_source=本 vendor 的持仓行,绝不碰用户手填持仓</b>:
  * 券商有我方无→建 AUTO;都有→更 shares/cost;我方有券商无→软归档;现金按币种 upsert CASH。
  * 持仓 currency 落 native,估值层按账户币种 FX 折算(不在此强转)。</p>
+ *
+ * <p>v1.29 · 期权 / 权证 / 期货 / 债券也同步进来(issue #26),落成手动估值行 —— 见 {@link #reconcile}。</p>
  */
 @Service
 @Slf4j
@@ -75,7 +79,7 @@ public class BrokerSyncService {
             BrokerDtos.Snapshot snap = clientFor(link.getVendor()).fetch(familyId, link);
             java.util.function.Supplier<String> apply = () -> {
                 String s = reconcile(familyId, accountId, link.getVendor(), snap);
-                linkMapper.markSynced(familyId, accountId, s);
+                linkMapper.markSynced(familyId, accountId, clip(s));
                 return s;
             };
             summary = tx == null ? apply.get() : tx.execute(st -> apply.get());
@@ -142,12 +146,18 @@ public class BrokerSyncService {
                 + java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("MM-dd HH:mm")) + ")";
     }
 
+    /** last_status 是 VARCHAR(255);同步结果写全给页面看,落库时截一下 */
+    static String clip(String s) {
+        return s == null || s.length() <= 250 ? s : s.substring(0, 249) + "…";
+    }
+
     /**
      * 对账:只动 sync_source=vendor 的行。返回摘要。包可见供单测。
      */
     String reconcile(long familyId, long accountId, BrokerVendor vendor, BrokerDtos.Snapshot snap) {
         String src = vendor.name();
-        List<StockHolding> existing = holdingMapper.findActiveByAccount(familyId, accountId).stream()
+        List<StockHolding> all = holdingMapper.findActiveByAccount(familyId, accountId);
+        List<StockHolding> existing = all.stream()
                 .filter(h -> src.equals(h.getSyncSource())).toList();
 
         Set<Long> keepIds = new HashSet<>();
@@ -219,7 +229,7 @@ public class BrokerSyncService {
             BigDecimal unit = mp.unitPrice() == null ? null : mp.unitPrice().multiply(fx).setScale(6, java.math.RoundingMode.HALF_EVEN);
             BigDecimal cost = mp.costPrice() == null ? null : mp.costPrice().multiply(fx).setScale(6, java.math.RoundingMode.HALF_EVEN);
             StockHolding match = existing.stream()
-                    .filter(h -> h.getValuationMode() == ValuationMode.MANUAL
+                    .filter(h -> h.getValuationMode() == ValuationMode.MANUAL && !h.isDerivative()
                             && h.getTicker() != null && mp.symbol().equalsIgnoreCase(h.getTicker()))
                     .findFirst().orElse(null);
             if (match != null) {
@@ -245,15 +255,87 @@ public class BrokerSyncService {
             }
             priced++;
         }
+        // v1.29 · 期权 / 权证 / 期货 / 债券(issue #26)→ 手动估值行:单价 = 持仓市值 ÷ 张数(折成账户币种),
+        //   张数带符号 —— 卖出的期权张数为负、单价为正,相乘就是负的市值,从余额里减去;期货单价 0(不计入余额)。
+        //   估值仍是「单价 × 张数」那一条路,没有另起一条求和路径。
+        //   已到期 / 平仓的:报表里没有了 → 走下面的「券商已无 → 软归档」,不留残行(FR-947)。
+        int optRows = 0, futRows = 0, bondRows = 0, derivCreated = 0;
+        BigDecimal optValue = BigDecimal.ZERO, bondValue = BigDecimal.ZERO;
+        for (BrokerDtos.Derivative d : snap.derivatives()) {
+            BigDecimal fx = d.currency() == null ? BigDecimal.ONE
+                    : valuationService.fxToAccountCurrency(familyId, accountId, d.currency());
+            if (fx == null) {
+                throw new IllegalStateException("缺 " + d.currency() + " → 账户币种的汇率,无法给 " + d.symbol() + " 估值");
+            }
+            BigDecimal unit = d.marketValue().signum() == 0 ? BigDecimal.ZERO
+                    : d.marketValue().divide(d.quantity(), 12, RoundingMode.HALF_EVEN)
+                            .multiply(fx).setScale(6, RoundingMode.HALF_EVEN);
+            StockHolding match = existing.stream()
+                    .filter(h -> h.isDerivative() && d.symbol().equalsIgnoreCase(h.getTicker()))
+                    .findFirst().orElse(null);
+            StockHolding h = match != null ? match : StockHolding.builder()
+                    .accountId(accountId).valuationMode(ValuationMode.MANUAL)
+                    .ticker(d.symbol()).syncSource(src).cashLinked(false).build();
+            String title = InstrumentKind.title(d.kind(), d.underlying(), d.symbol(), d.putCall(),
+                    d.strike(), d.expiry(), d.description());
+            if (h.getDisplayName() == null || h.getDisplayName().isBlank()
+                    || h.getDisplayName().equalsIgnoreCase(d.symbol())) {
+                h.setDisplayName(title);
+            }
+            h.setInstrumentKind(d.kind().name());
+            h.setUnderlying(d.underlying());
+            h.setPutCall(d.putCall() == null ? null : d.putCall().trim().substring(0, 1).toUpperCase(java.util.Locale.ROOT));
+            h.setStrike(d.strike());
+            h.setExpiry(d.expiry());
+            h.setMultiplier(d.multiplier());
+            h.setQuotePrice(d.markPrice());
+            h.setNotional(d.notional());
+            h.setCurrency(d.currency());
+            h.setShares(d.quantity());
+            h.setManualValue(unit);
+            h.setManualValueAt(java.time.LocalDateTime.now());
+            h.setCostBasis(null);   // 期权的成本口径各家不一(每股 / 每张),不显示盈亏,别给半对的数
+            if (match != null) {
+                holdingMapper.update(familyId, h);
+                updated++;
+            } else {
+                holdingMapper.insertOwned(familyId, h);
+                created++;
+                derivCreated++;
+            }
+            keepIds.add(h.getId());
+            BigDecimal valueAcct = unit.multiply(d.quantity());
+            switch (d.kind()) {
+                case OPTION, WARRANT -> { optRows++; optValue = optValue.add(valueAcct); }
+                case FUTURE -> futRows++;
+                case BOND -> { bondRows++; bondValue = bondValue.add(valueAcct); }
+            }
+        }
         // 券商已无 → 软归档
         int archived = 0;
         for (StockHolding h : existing) {
             if (!keepIds.contains(h.getId())) { holdingMapper.archive(familyId, h.getId()); archived++; }
         }
+        String ccy = valuationService.accountCurrency(familyId, accountId);
+        // 第一次带进期权这类时,账户里若还有手填持仓,多半是以前为了凑数手动补的那一条 —— 提醒一句,免得算两遍
+        long manualRows = derivCreated == 0 ? 0 : all.stream()
+                .filter(h -> h.getSyncSource() == null && h.getValuationMode() == ValuationMode.MANUAL).count();
         String summary = "同步 · 新增 " + created + " · 更新 " + updated + " · 归档 " + archived
                 + (priced > 0 ? " · 按券商收盘价估值 " + priced : "")
-                + (snap.skippedNonEquity() > 0 ? " · 跳过期权/期货 " + snap.skippedNonEquity() : "");
+                + (optRows > 0 ? " · 期权 " + optRows + " 笔 · 市值 " + money(ccy, optValue) : "")
+                + (futRows > 0 ? " · 期货 " + futRows + " 笔(不计入余额)" : "")
+                + (bondRows > 0 ? " · 债券 " + bondRows + " 笔 · 市值 " + money(ccy, bondValue) : "")
+                + (snap.skippedNonEquity() > 0 ? " · 跳过其他品种 " + snap.skippedNonEquity() : "")
+                + DerivativeRows.rejectSummary(snap.rejected())
+                + (manualRows > 0 ? " · 账户里另有 " + manualRows + " 条手填持仓:若是以前为期权补录的,请归档,免得算两遍" : "");
         log.info("broker reconcile · account={} vendor={} {}", accountId, vendor, summary);
+        if (!snap.rejected().isEmpty()) {
+            log.warn("broker reconcile · account={} vendor={} 没同步的行:{}", accountId, vendor, snap.rejected());
+        }
         return summary;
+    }
+
+    private static String money(String ccy, BigDecimal v) {
+        return (ccy == null ? "" : ccy + " ") + String.format("%,.0f", v.setScale(0, RoundingMode.HALF_EVEN));
     }
 }
