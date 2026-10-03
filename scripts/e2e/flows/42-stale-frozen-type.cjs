@@ -1,5 +1,5 @@
 /**
- * flow · v1.29.1 · issue #34(续)· 定格表里的残留行不许影响还没关账的那一期
+ * flow · v1.29 · issue #34(续)· 定格表里的残留行不许影响还没关账的那一期
  *
  * 提交者 2026-10-02 贴的查询把根因照了出来:10 月(还没关账)这一期在 period_account_attr 里有定格行,
  * 「中国银行(现金)」定格成了 LOAN、一张信用卡定格成了 PROPERTY —— 正是演示数据里 5 号、10 号账户的类型。
@@ -30,7 +30,7 @@ async function readLiab(ui) {
 
 module.exports = {
   name: '42-stale-frozen-type',
-  title: 'v1.29.1 · issue #34 · 定格表的残留行不影响没关账的那一期(现金账户不会被当成贷款)',
+  title: 'v1.29 · issue #34 · 定格表的残留行不影响没关账的那一期(现金账户不会被当成贷款)',
 
   async run(ui, report) {
     ui.flow = this.name;

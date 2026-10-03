@@ -11144,34 +11144,34 @@ QA129_HOLD="$RD/src/main/resources/templates/stock/holdings.html"
   && log_ok "v129-DERIV-NOT-FUND(不进穿透 · 不给手改 · 持仓页人话行 + 到期提示 + 估值分解单列 · 同步结果截到 255 · flow 41 在)" \
   || log_bad "v129-DERIV-NOT-FUND 期权行进了基金穿透 / 能手改 / 持仓页不再单列" "see StockHoldingMapper.findActiveFundHoldingIdsByFamily · stock/holdings.html"
 
-section "v1.29.1 · issue #34(续):定格残留行不许影响没关账的期"
-# v1291-FROZEN-ONLY-CLOSED · 定格行只在关账时写、重开时删 → 读的一侧只认已关账的期(残留伤不到当期);V67 清掉不可能是真定格的行
-QA1291_FM="$RD/src/main/resources/mapper/FactMapper.xml"
-QA1291_AM="$RD/src/main/java/com/family/finance/repository/PeriodAccountAttrMapper.java"
-QA1291_GM="$RD/src/main/java/com/family/finance/repository/PeriodAccountGroupMapper.java"
-QA1291_V="$RD/db/migration/V67__purge_stale_frozen_attrs.sql"
-{ grep -A4 'LEFT JOIN period_account_attr paa' "$QA1291_FM" | grep -qF "AND p.status = 'CLOSED'" \
-  && grep -B6 'List<PeriodAccountAttr> findByPeriod' "$QA1291_AM" | grep -qF "AND p.status = 'CLOSED'" \
-  && grep -B6 'List<Row> findByPeriod' "$QA1291_GM" | grep -qF "AND p.status = 'CLOSED'" \
-  && grep -qF "WHERE p.status <> 'CLOSED';" "$QA1291_V" \
-  && grep -qF 'WHERE pa.sealed_at < a.created_at;' "$QA1291_V" \
+section "v1.29 · issue #34(续):定格残留行不许影响没关账的期"
+# v129-FROZEN-ONLY-CLOSED · 定格行只在关账时写、重开时删 → 读的一侧只认已关账的期(残留伤不到当期);V67 清掉不可能是真定格的行
+QA129B_FM="$RD/src/main/resources/mapper/FactMapper.xml"
+QA129B_AM="$RD/src/main/java/com/family/finance/repository/PeriodAccountAttrMapper.java"
+QA129B_GM="$RD/src/main/java/com/family/finance/repository/PeriodAccountGroupMapper.java"
+QA129B_V="$RD/db/migration/V67__purge_stale_frozen_attrs.sql"
+{ grep -A4 'LEFT JOIN period_account_attr paa' "$QA129B_FM" | grep -qF "AND p.status = 'CLOSED'" \
+  && grep -B6 'List<PeriodAccountAttr> findByPeriod' "$QA129B_AM" | grep -qF "AND p.status = 'CLOSED'" \
+  && grep -B6 'List<Row> findByPeriod' "$QA129B_GM" | grep -qF "AND p.status = 'CLOSED'" \
+  && grep -qF "WHERE p.status <> 'CLOSED';" "$QA129B_V" \
+  && grep -qF 'WHERE pa.sealed_at < a.created_at;' "$QA129B_V" \
   && [ -f "$RD/scripts/e2e/flows/42-stale-frozen-type.cjs" ]; } \
-  && log_ok "v1291-FROZEN-ONLY-CLOSED(定格行只在已关账的期生效 · V67 清残留 · flow 42 在)" \
-  || log_bad "v1291-FROZEN-ONLY-CLOSED 没关账的期又会读到定格行(残留会把现金账户当成贷款)" "see FactMapper.queryBase paa join · PeriodAccountAttrMapper/PeriodAccountGroupMapper.findByPeriod · V67"
+  && log_ok "v129-FROZEN-ONLY-CLOSED(定格行只在已关账的期生效 · V67 清残留 · flow 42 在)" \
+  || log_bad "v129-FROZEN-ONLY-CLOSED 没关账的期又会读到定格行(残留会把现金账户当成贷款)" "see FactMapper.queryBase paa join · PeriodAccountAttrMapper/PeriodAccountGroupMapper.findByPeriod · V67"
 
-# v1291-DEMO-CLEAN-COMPLETE · 清演示数据的三个脚本:迁移写过数据的表,要么清、要么在「保留」名单里
+# v129-DEMO-CLEAN-COMPLETE · 清演示数据的三个脚本:迁移写过数据的表,要么清、要么在「保留」名单里
 #   (V54 回填了 period_account_attr,三个脚本却只清了 period / account → 编号重用,演示账户的类型挂到用户账户上)
-QA1291_KEEP=" family member account_template product_category cash_flow_category macro_benchmark allocation_anchor step3_period_seed "
-QA1291_BAD=""
+QA129B_KEEP=" family member account_template product_category cash_flow_category macro_benchmark allocation_anchor step3_period_seed "
+QA129B_BAD=""
 for t in $(grep -ohiE 'INSERT (IGNORE )?INTO +`?[a-z_0-9]+' "$RD"/db/migration/*.sql | sed -E 's/.*INTO +`?//I' | sort -u); do
-  case "$QA1291_KEEP" in *" $t "*) continue ;; esac
+  case "$QA129B_KEEP" in *" $t "*) continue ;; esac
   for f in docker/clean-dev-data.sh deploy/deploy.sh deploy/_deploy-macos.sh; do
-    grep -qE "TRUNCATE TABLE $t;" "$RD/$f" || QA1291_BAD="$QA1291_BAD $f:$t"
+    grep -qE "TRUNCATE TABLE $t;" "$RD/$f" || QA129B_BAD="$QA129B_BAD $f:$t"
   done
 done
-[ -z "$QA1291_BAD" ] \
-  && log_ok "v1291-DEMO-CLEAN-COMPLETE(迁移写过数据的表,三个清演示脚本都清了 · 含定格表)" \
-  || log_bad "v1291-DEMO-CLEAN-COMPLETE 清演示数据漏了表(编号重用会把演示数据挂到用户账户上)" "$QA1291_BAD"
+[ -z "$QA129B_BAD" ] \
+  && log_ok "v129-DEMO-CLEAN-COMPLETE(迁移写过数据的表,三个清演示脚本都清了 · 含定格表)" \
+  || log_bad "v129-DEMO-CLEAN-COMPLETE 清演示数据漏了表(编号重用会把演示数据挂到用户账户上)" "$QA129B_BAD"
 
 echo
 echo "═══════════════════════════════════════"

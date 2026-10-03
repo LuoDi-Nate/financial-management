@@ -91,7 +91,7 @@ TRUNCATE TABLE snapshot_todo; TRUNCATE TABLE period_member_completion;
 TRUNCATE TABLE fx_rate; TRUNCATE TABLE audit_log; TRUNCATE TABLE backup_log;
 TRUNCATE TABLE metrics_recompute_log; TRUNCATE TABLE period_reopen_log;
 TRUNCATE TABLE period; TRUNCATE TABLE account;
--- v1.29.1 · issue #34 · 关账定格表也要清:迁移 V54 会给演示数据里已关账的期回填定格行,
+-- v1.29 · issue #34 · 关账定格表也要清:迁移 V54 会给演示数据里已关账的期回填定格行,
 --   只清 period / account 的话编号会被重用 → 演示账户的类型按编号挂到用户自己的账户上
 --   (用户的「中国银行(现金)」在当期被当成了贷款)。新加任何按期 / 按账户定格的表,这里都要加一行。
 TRUNCATE TABLE period_account_attr; TRUNCATE TABLE period_account_group;
