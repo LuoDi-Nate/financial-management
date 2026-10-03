@@ -67,6 +67,7 @@ public interface PeriodAccountGroupMapper {
               FROM period_account_group pg
               JOIN period p ON p.id = pg.period_id
              WHERE p.family_id = #{familyId} AND pg.period_id = #{periodId}
+               AND p.status = 'CLOSED'
             """)
     List<Row> findByPeriod(@Param("familyId") long familyId, @Param("periodId") long periodId);
 
