@@ -377,10 +377,11 @@ bash scripts/regression-data.sh # 数据层/口径回归(原 e2e.sh · curl 端�
 每版做了什么、为什么那么做,都写在各自的文档里;这里只放入口,不复述。
 
 <details>
-<summary><b>展开全部 46 个版本</b>(v0.1 → v1.29)</summary>
+<summary><b>展开全部 47 个版本</b>(v0.1 → v1.30)</summary>
 
 | 版本 | 文档 |
 |---|---|
+| `v1.30` | [PRD](prd/v1.30.md)(待评审)· [预览](preview/v1.30/) · [竞品报告 · Capivot](docs/research/capivot/README.md) |
 | `v1.29` | [PRD](prd/v1.29.md) · [技术设计](tech-design/v1.29.md) · [预览](preview/v1.29/) |
 | `v1.28` | [PRD](prd/v1.28.md) · [技术设计](tech-design/v1.28.md) · [预览](preview/v1.28/) |
 | `v1.27` | [PRD](prd/v1.27.md) · [技术设计](tech-design/v1.27.md) · [预览](preview/v1.27/) |

@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>v1.30 Preview · 场外基金按代码自动估值</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..700&family=JetBrains+Mono:wght@300;400;500&family=Noto+Serif+SC:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/style.css">
+<style>
+  body{background:var(--paper-deep,#e9e2d4);margin:0}
+  .wrap{max-width:1180px;margin:0 auto;padding:28px 20px 60px}
+  .eyebrow{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-subtle)}
+  h1,h2,h3{font-family:'Fraunces','Noto Serif SC',serif;font-weight:500}
+  .note{font-size:12px;color:var(--ink-subtle);line-height:1.75}
+  .zone{margin-top:40px}
+  .zone-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+  .zone-no{font-family:'JetBrains Mono',monospace;font-size:20px;color:var(--paper);background:var(--brass-deep);line-height:1;padding:5px 10px}
+  .zone-t{font-family:'Fraunces','Noto Serif SC',serif;font-size:20px}
+  .zone-line{height:2px;background:var(--brass-deep);opacity:.35;margin:10px 0 18px}
+  .card{border:1px solid var(--rule);background:var(--card);padding:18px 20px}
+  .mono{font-family:'JetBrains Mono',monospace;font-feature-settings:"tnum" 1}
+  .pill{font-family:'JetBrains Mono',monospace;font-size:9.5px;padding:2px 7px;border:1px solid var(--rule);color:var(--ink-soft);white-space:nowrap;letter-spacing:.06em}
+  .p-auto{background:rgba(47,93,80,.12);color:var(--forest);border-color:var(--forest)}
+  .p-fund{background:rgba(52,88,122,.10);color:#34587a;border-color:#34587a}
+  .p-mm{background:rgba(180,138,58,.12);color:var(--brass-deep);border-color:var(--brass-deep)}
+  .p-manual{background:rgba(196,148,62,.15);color:var(--brass-deep);border-color:var(--brass-deep)}
+  .p-stale{background:rgba(159,74,58,.10);color:var(--rust);border-color:var(--rust)}
+  .lbl{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ink-subtle);letter-spacing:.06em;margin-bottom:6px}
+  .input{font-family:'JetBrains Mono',monospace;font-size:16px;background:var(--paper-soft,#efe8da);border:1px solid var(--rule);padding:12px 14px;width:100%;box-sizing:border-box}
+  .input.focus{border-color:var(--brass-deep);background:#fffdf7}
+  .dd{border:1px solid var(--brass-deep);border-top:none;background:#fffdf7}
+  .dd-row{display:grid;grid-template-columns:1fr auto;gap:10px;padding:10px 14px;border-top:1px solid var(--rule);font-size:13px}
+  .dd-row.on{background:rgba(180,138,58,.10)}
+  .dd-row .meta{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink-subtle)}
+  .picked{border:1px solid var(--forest);background:rgba(47,93,80,.06);padding:14px 16px;display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center}
+  .seg{display:inline-flex;border:1px solid var(--rule)}
+  .seg span{padding:7px 12px;font-size:12px;cursor:default}
+  .seg .on{background:var(--ink);color:var(--paper)}
+  .calc{font-family:'Fraunces',serif;font-size:22px}
+  .row{border:1px solid var(--rule);background:var(--card);padding:16px 20px;margin-bottom:10px;display:grid;grid-template-columns:1fr auto;gap:16px;align-items:start}
+  .row .t{font-family:'Fraunces','Noto Serif SC',serif;font-size:19px}
+  .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:10px}
+  .grid4 .v{font-family:'JetBrains Mono',monospace;font-size:13px;margin-top:2px}
+  .neg{color:var(--rust)}
+  .btn-ink{background:var(--ink);color:var(--paper);border:1px solid var(--ink);padding:9px 16px;font-size:12px;letter-spacing:.06em;white-space:nowrap}
+  .btn-paper{background:transparent;color:var(--ink);border:1px solid var(--ink);padding:8px 14px;font-size:12px;letter-spacing:.06em;white-space:nowrap}
+  .modal{border:1px solid var(--ink);background:var(--card);padding:22px 24px;max-width:520px;box-shadow:0 10px 30px rgba(26,23,20,.18)}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+  .two > *{min-width:0}
+  .phone{width:390px;max-width:100%;border:10px solid #1c1a17;border-radius:40px;padding:20px 12px;background:var(--paper);box-sizing:border-box}
+  .phone .row{grid-template-columns:1fr;gap:8px;padding:14px}
+  .phone .grid4{grid-template-columns:1fr 1fr}
+  .phone .t{font-size:16px}
+  @media (max-width:900px){.two{grid-template-columns:1fr}.grid4{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">v1.30 · preview · 待评审 · issue #25</div>
+  <h1 style="font-size:28px;margin:6px 0 4px">场外基金按代码自动估值</h1>
+  <p class="note" style="max-width:920px">搜代码或名称 → 先看到基金名称与最新净值 → 只填份额(不知道份额就填市值,系统反推)→ 以后净值自动更新,页面总是写「净值日期」。
+    两只基金的名称、代码、类型、净值与日期取自 2026-10-05 对天天基金的实测(002943 / 270042);其余金额都是编的。</p>
+
+  <!-- ① 添加 -->
+  <section class="zone">
+    <div class="zone-head"><span class="zone-no">1</span><span class="zone-t">添加基金 · 按净值自动估值</span>
+      <span class="note">持仓页单独一个入口(§13 ③);股票那页是「先选市场再填代码」,基金是「搜名字」</span></div>
+    <div class="zone-line"></div>
+    <div class="two">
+      <div class="card">
+        <div class="lbl">第 1 步 · 找到这只基金</div>
+        <div class="input focus">广发多因子<span style="opacity:.4">|</span></div>
+        <div class="dd">
+          <div class="dd-row on"><div>广发多因子混合</div><div class="meta">002943 · 混合型-灵活</div></div>
+          <div class="dd-row"><div>广发纳斯达克100ETF联接人民币(QDII)A</div><div class="meta">270042 · 指数型-海外股票</div></div>
+        </div>
+        <p class="note" style="margin-top:8px">输 6 位代码或名称都行;列表里写着类型,货币基金、QDII 一眼能分出来。</p>
+      </div>
+      <div class="card">
+        <div class="lbl">第 2 步 · 确认是这只,再填份额</div>
+        <div class="picked">
+          <div><div style="font-family:'Fraunces','Noto Serif SC',serif;font-size:18px">广发多因子混合</div>
+            <div class="mono" style="font-size:11px;color:var(--ink-soft);margin-top:4px">002943 · 混合型-灵活</div></div>
+          <div style="text-align:right"><div class="lbl" style="margin:0">最新单位净值</div>
+            <div class="mono" style="font-size:18px">4.7800</div><div class="mono" style="font-size:11px;color:var(--ink-subtle)">9 月 30 日</div></div>
+        </div>
+        <div style="margin:14px 0 8px"><span class="seg"><span class="on">填份额</span><span>不知道份额?按市值填</span></span></div>
+        <div class="lbl">持有份额</div>
+        <div class="input">1,000.00</div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:12px">
+          <span class="note">1,000.00 份 × 4.7800</span><span class="calc mono">¥4,780.00</span></div>
+        <div style="display:flex;justify-content:flex-end;margin-top:14px"><span class="btn-ink">添加 · 以后按净值自动更新</span></div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:16px;max-width:560px">
+      <div class="lbl">「按市值填」时</div>
+      <div class="input">5,000.00</div>
+      <p class="note" style="margin:8px 0 0">按 9 月 30 日净值 4.7800 估算:<b class="mono" style="color:var(--ink)">约 1,046.03 份</b> —— 之后按份额 × 净值更新。份额日后可在持仓行直接改。</p>
+    </div>
+  </section>
+
+  <!-- ② 持仓行 -->
+  <section class="zone">
+    <div class="zone-head"><span class="zone-no">2</span><span class="zone-t">持仓页 · 四种状态</span>
+      <span class="note">每行都写净值日期;拉不到新净值就照实说,不静默用旧值</span></div>
+    <div class="zone-line"></div>
+
+    <div class="row">
+      <div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="t">广发多因子混合</span><span class="pill">002943</span><span class="pill p-fund">场外基金</span><span class="pill p-auto">自动估值</span></div>
+        <div class="grid4">
+          <div><div class="lbl">份额</div><div class="v">1,046.03</div></div>
+          <div><div class="lbl">单位净值</div><div class="v">4.7800 <span style="color:var(--ink-subtle)">· 9 月 30 日</span></div></div>
+          <div><div class="lbl">市值</div><div class="v" style="color:var(--brass-deep)">¥5,000.02</div></div>
+          <div><div class="lbl">上次刷新</div><div class="v">10-05 09:31</div></div>
+        </div></div>
+      <div style="display:flex;flex-direction:column;gap:6px"><span class="btn-paper">改份额</span><span class="btn-paper">归档</span></div>
+    </div>
+
+    <div class="row">
+      <div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="t">广发纳斯达克100ETF联接人民币(QDII)A</span><span class="pill">270042</span><span class="pill p-fund">场外基金</span><span class="pill p-auto">自动估值</span></div>
+        <div class="grid4">
+          <div><div class="lbl">份额</div><div class="v">300.00</div></div>
+          <div><div class="lbl">单位净值</div><div class="v">8.3418 <span style="color:var(--ink-subtle)">· 9 月 29 日</span></div></div>
+          <div><div class="lbl">市值</div><div class="v" style="color:var(--brass-deep)">¥2,502.54</div></div>
+          <div><div class="lbl">上次刷新</div><div class="v">10-05 09:31</div></div>
+        </div>
+        <p class="note" style="margin:8px 0 0">QDII 基金的净值比国内基金晚一天</p></div>
+      <div style="display:flex;flex-direction:column;gap:6px"><span class="btn-paper">改份额</span><span class="btn-paper">归档</span></div>
+    </div>
+
+    <div class="row">
+      <div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="t">某只已终止的基金</span><span class="pill">0XXXXX</span><span class="pill p-fund">场外基金</span><span class="pill p-stale">净值停在 9 月 25 日</span></div>
+        <div class="grid4">
+          <div><div class="lbl">份额</div><div class="v">500.00</div></div>
+          <div><div class="lbl">单位净值</div><div class="v neg">1.2030 · 9 月 25 日</div></div>
+          <div><div class="lbl">市值</div><div class="v">¥601.50</div></div>
+          <div><div class="lbl">上次刷新</div><div class="v neg">最近三次都没拿到</div></div>
+        </div>
+        <p class="note" style="margin:8px 0 0">基金可能已终止或代码有变。确认后可以「转为手填市值」。</p></div>
+      <div style="display:flex;flex-direction:column;gap:6px"><span class="btn-paper">转为手填</span><span class="btn-paper">归档</span></div>
+    </div>
+
+    <div class="row">
+      <div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="t">天弘余额宝货币</span><span class="pill">000198</span><span class="pill p-mm">货币基金 · 按金额记</span></div>
+        <div class="grid4">
+          <div><div class="lbl">金额</div><div class="v" style="color:var(--brass-deep)">¥12,000.00</div></div>
+          <div><div class="lbl">净值</div><div class="v">固定 1.0000</div></div>
+          <div><div class="lbl">七日年化(参考)</div><div class="v">0.83% · 10 月 1 日</div></div>
+          <div><div class="lbl">上次核对</div><div class="v">09-30</div></div>
+        </div>
+        <p class="note" style="margin:8px 0 0">货币基金按金额记 —— 收益每天变成份额,月底核对一次金额即可</p></div>
+      <div style="display:flex;flex-direction:column;gap:6px"><span class="btn-paper">改金额</span><span class="btn-paper">归档</span></div>
+    </div>
+  </section>
+
+  <!-- ③ 手填转自动 -->
+  <section class="zone">
+    <div class="zone-head"><span class="zone-no">3</span><span class="zone-t">已有手填基金 → 一键改为按净值自动估值</span>
+      <span class="note">截图导入 / 穿透已经识别出代码的才出现这个按钮</span></div>
+    <div class="zone-line"></div>
+    <div class="two">
+      <div class="row" style="margin:0">
+        <div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="t">广发多因子混合</span><span class="pill p-manual">手填市值</span><span class="pill">已识别 002943</span></div>
+          <div class="grid4" style="grid-template-columns:1fr 1fr">
+            <div><div class="lbl">市值(手填)</div><div class="v">¥5,000.00</div></div>
+            <div><div class="lbl">上次更新</div><div class="v">2026-09-30</div></div>
+          </div></div>
+        <div style="display:flex;flex-direction:column;gap:6px"><span class="btn-ink">改为按净值自动估值</span><span class="btn-paper">归档</span></div>
+      </div>
+      <div class="modal">
+        <div style="font-family:'Fraunces','Noto Serif SC',serif;font-size:18px;margin-bottom:8px">改为按净值自动估值?</div>
+        <p style="font-size:14px;line-height:1.8;margin:0">按 <b>9 月 30 日</b>净值 <b class="mono">4.7800</b>,把当前市值 <b class="mono">¥5,000.00</b> 折成 <b class="mono">1,046.03 份</b>。<br>之后每天按净值更新;想改回手填随时可以。</p>
+        <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px"><span class="btn-paper">取消</span><span class="btn-ink">确认改为自动</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ④ 手机 -->
+  <section class="zone">
+    <div class="zone-head"><span class="zone-no">4</span><span class="zone-t">手机(390px)</span><span class="note">四格变两格;净值日期始终在净值旁边</span></div>
+    <div class="zone-line"></div>
+    <div class="phone">
+      <div class="row" style="margin:0 0 10px">
+        <div><span class="t">广发纳斯达克100ETF联接人民币(QDII)A</span>
+          <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap"><span class="pill">270042</span><span class="pill p-fund">场外基金</span><span class="pill p-auto">自动估值</span></div>
+          <div class="grid4">
+            <div><div class="lbl">份额</div><div class="v">300.00</div></div>
+            <div><div class="lbl">市值</div><div class="v" style="color:var(--brass-deep)">¥2,502.54</div></div>
+            <div style="grid-column:span 2"><div class="lbl">单位净值</div><div class="v">8.3418 · 9 月 29 日(QDII 晚一天)</div></div>
+          </div></div>
+        <div style="display:flex;gap:6px"><span class="btn-paper">改份额</span><span class="btn-paper">归档</span></div>
+      </div>
+      <div class="card" style="padding:14px">
+        <div class="lbl">添加基金</div>
+        <div class="input focus" style="font-size:14px">002943</div>
+        <div class="dd"><div class="dd-row on"><div>广发多因子混合</div><div class="meta">混合型-灵活</div></div></div>
+        <div class="picked" style="margin-top:10px;grid-template-columns:1fr"><div class="mono" style="font-size:12px">最新净值 4.7800 · 9 月 30 日</div></div>
+      </div>
+    </div>
+  </section>
+</div>
+</body>
+</html>
