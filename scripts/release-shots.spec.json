@@ -1,57 +1,54 @@
 {
-  "_comment": "v1.28.0 · 看 AI 收到了什么。核心叙事:①每张 AI 结果卡片头一个 >_,点开是终端,逐字显示那一次发给 AI 的内容 ②你的范围 / 模板 / 偏好带进去的段落标色写来源(mine)③账户名换成「账户A」代号发出去,回答里换回真名 ④管理 → AI 接入一个开关。PC 用 selector 裁掉导航与留白;手机整屏不裁,用 eval 点开并滚到位。拍之前在 beta 上先加一条演示偏好、生成一份调仓建议(拍完删掉偏好)。",
-  "_mobile_scroll_note": "手机版 scrollIntoView 之后必须再 scrollBy 一个负偏移 —— 顶栏是吸顶的,block:'start' 会把标题正好塞到顶栏底下,拍出来只有条没有题。",
-  "_peek_note": ">_ 面板是点了才用 htmx 拉的:eval 先点图标,隔 2.5 秒再点「$ mine」并把标色段滚进面板可视区;wait 留足 4.5 秒。",
+  "_comment": "v1.29.0 · 券商同步带上期权 / 期货 / 债券。核心叙事:①持仓页上期权一行写人话(标的 · 看涨/看跌 · 行权价 · 到期日 · 买入/卖出几张),卖出的是负数、7 天内到期标出来,期货只展示名义价值 ②同步结果按品种计数、对不上的行点名 ③估值分解单列「期权等(券商报表)」。拍之前在 beta 上用 e2e flow 41 的演示模式造一个账户(E2E_KEEP=1 E2E_41_DEMO=1,数是编的),拍完删掉。PC 持仓页用 eval 藏掉股票 / 现金那几行与操作栏,只留账户头、估值分解与期权行。",
+  "_account_note": "路径里的账户编号是拍摄当天演示账户的 id(beta 上造出来的),下次拍要换。",
   "pc": [
     {
-      "path": "/checkup",
-      "name": "checkup-peek",
-      "wait": 4500,
-      "waitFor": "#ai-diagnose-panel [data-peek-btn]",
-      "eval": "document.querySelector('#ai-diagnose-panel [data-peek-btn]').click(); setTimeout(function(){ var c=document.querySelector('#ai-diagnose-panel [data-peek-run=\"mine\"]'); if(c) c.click(); var m=document.querySelector('#ai-diagnose-panel [data-peek-mine]'); var b=document.querySelector('#ai-diagnose-panel .pk-body'); if(m&&b) b.scrollTop = m.offsetTop - 140; [].forEach.call(document.querySelectorAll('#ai-diagnose-panel .ln.cmt'), function(l){ if(/成员[A-Z] = /.test(l.textContent)) l.style.filter='blur(5px)'; }); }, 2500)",
-      "selector": "#ai-diagnose-panel [data-peek]"
+      "path": "/accounts/94/holdings",
+      "name": "holdings-options",
+      "wait": 1500,
+      "waitFor": "[data-deriv-row]",
+      "eval": "[].forEach.call(document.querySelectorAll('body > header, .fixed.top-0, [data-agent-fab], #agent-fab'), function(e){ e.style.display='none'; }); [].forEach.call(document.querySelectorAll('main article'), function(a){ if(!a.querySelector('[data-deriv-kind]')) a.style.display='none'; }); [].forEach.call(document.querySelectorAll('main > section'), function(s){ if(s.id!=='valuation-breakdown' && !s.querySelector('h1')) s.style.display='none'; }); var b=document.querySelector('main > div.font-mono'); if(b) b.style.display='none';",
+      "selector": "main"
     },
     {
-      "path": "/reports",
-      "name": "rebalance-peek",
-      "wait": 3500,
-      "waitFor": "#ai-rebalance [data-peek-btn]",
-      "eval": "document.querySelector('#ai-rebalance').scrollIntoView({block:'start'}); document.querySelector('#ai-rebalance [data-peek-btn]').click(); setTimeout(function(){ var b=document.querySelector('#ai-rebalance .pk-body'); var t=[].slice.call(document.querySelectorAll('#ai-rebalance .pk-body .ln')).find(function(l){return l.textContent.indexOf('各账户当前余额')===0;}); if(b&&t) b.scrollTop = t.offsetTop - 60; }, 2000)",
-      "selector": "#ai-rebalance"
-    },
-    {
-      "path": "/admin/ai-access",
-      "name": "admin-peek",
+      "path": "/accounts/94/broker",
+      "name": "sync-result",
       "wait": 1200,
-      "waitFor": "#peek",
-      "selector": "#peek"
+      "waitFor": "main section.paper-card.p-6",
+      "selector": "main section.paper-card.p-6"
+    },
+    {
+      "path": "/help/broker-sync",
+      "name": "help-derivatives",
+      "wait": 1000,
+      "waitFor": "#derivatives",
+      "selector": "#derivatives"
     }
   ],
   "mobile": [
     {
-      "path": "/checkup",
-      "name": "checkup-peek",
-      "wait": 4500,
-      "waitFor": "#ai-diagnose-panel [data-peek-btn]",
-      "eval": "document.querySelector('#ai-diagnose-panel').scrollIntoView({block:'start'}); window.scrollBy(0,-70); document.querySelector('#ai-diagnose-panel [data-peek-btn]').click(); setTimeout(function(){ var p=document.querySelector('#ai-diagnose-panel [data-peek]'); if(p){ p.scrollIntoView({block:'start'}); window.scrollBy(0,-70);} }, 2500)",
+      "path": "/accounts/94/holdings",
+      "name": "holdings-options",
+      "wait": 1500,
+      "waitFor": "[data-deriv-row]",
+      "eval": "var a=document.querySelector('main article [data-deriv-due]'); var art=a ? a.closest('article') : document.querySelector('[data-deriv-row]').closest('article'); art.previousElementSibling.scrollIntoView({block:'start'}); window.scrollBy(0,-70);",
       "full": false
     },
     {
-      "path": "/reports",
-      "name": "rebalance-peek",
-      "wait": 3500,
-      "waitFor": "#ai-rebalance [data-peek-btn]",
-      "eval": "document.querySelector('#ai-rebalance [data-peek-btn]').click(); setTimeout(function(){ var p=document.querySelector('#ai-rebalance [data-peek]'); if(p){ p.scrollIntoView({block:'start'}); window.scrollBy(0,-110);} }, 2000)",
+      "path": "/accounts/94/holdings",
+      "name": "holdings-breakdown",
+      "wait": 1500,
+      "waitFor": "#valuation-breakdown",
+      "eval": "document.querySelector('#valuation-breakdown').scrollIntoView({block:'start'}); window.scrollBy(0,-70);",
       "full": false
     },
     {
-      "path": "/admin/ai-access",
-      "name": "admin-peek",
+      "path": "/accounts/94/broker",
+      "name": "sync-result",
       "wait": 1200,
-      "waitFor": "#peek",
-      "eval": "(document.querySelector('#peek').scrollIntoView({block:'start'}), window.scrollBy(0,-90))",
+      "waitFor": "main section.paper-card.p-6",
+      "eval": "document.querySelector('main section.paper-card.p-6').scrollIntoView({block:'start'}); window.scrollBy(0,-70);",
       "full": false
     }
-  ],
-  "_privacy_note": "代号对照那一行里有 beta 演示成员的名字 —— 公开截图里糊掉(账户名是种子数据,不糊)。"
+  ]
 }
