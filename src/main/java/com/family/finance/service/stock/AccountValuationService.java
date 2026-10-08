@@ -223,8 +223,10 @@ public class AccountValuationService {
         }
         if (trigger == TriggerKind.MANUAL) return LedgerSource.MANUAL;
         if (holdings == null || holdings.isEmpty()) return LedgerSource.SYNC_STOCK_API;
-        int metal = 0, crypto = 0, stock = 0;
+        int metal = 0, crypto = 0, stock = 0, fund = 0;
         for (StockHolding h : holdings) {
+            // v1.30 · 净值行(场外基金 / 货币基金)算「基金」票 —— 它们是 MANUAL 行,market 为空,原来会被算成股价
+            if (h.isNavRow()) { fund++; continue; }
             if (h.getMarket() == null) { stock++; continue; }
             switch (h.getMarket()) {
                 case METAL -> metal++;
@@ -232,6 +234,7 @@ public class AccountValuationService {
                 default -> stock++;
             }
         }
+        if (fund > 0 && fund >= metal && fund >= crypto && fund >= stock) return LedgerSource.SYNC_FUND_NAV;
         if (metal >= crypto && metal >= stock) return LedgerSource.SYNC_METAL_API;
         if (crypto >= stock) return LedgerSource.SYNC_CRYPTO_API;
         return LedgerSource.SYNC_STOCK_API;

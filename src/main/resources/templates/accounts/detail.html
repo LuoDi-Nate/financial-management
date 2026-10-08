@@ -203,6 +203,8 @@
         <option value="EXPENSE"  th:selected="${filterType == 'EXPENSE'}">- 支出</option>
         <option value="TRANSFER" th:selected="${filterType == 'TRANSFER'}">↔ 划转(进/出)</option>
         <option value="SNAPSHOT" th:selected="${filterType == 'SNAPSHOT'}">= 月末校准</option>
+        <option value="SHARES"   th:selected="${filterType == 'SHARES'}"
+                th:if="${T(com.family.finance.service.stock.StockHoldingService).supportsHoldings(detail.account.type)}"># 持仓数量变动</option>
       </select>
       <select name="range" class="border border-rule bg-card px-2 py-1 text-xs">
         <option value="3"   th:selected="${rangeMonths == 3}">近 3 月</option>
@@ -257,8 +259,8 @@
       <ul class="px-5 pb-3 divide-y divide-rule-soft text-xs font-mono">
         <li th:each="e : ${g.entries}" class="py-2 flex items-baseline gap-3 flex-wrap">
           <span class="w-20 inline-flex items-center gap-1"
-                th:classappend="${e.kind.name() == 'INCOME' ? ' num-pos' : (e.kind.name() == 'EXPENSE' ? ' num-neg' : (e.kind.name() == 'TRANSFER_IN' ? ' text-forest' : (e.kind.name() == 'TRANSFER_OUT' ? ' text-rust' : (e.kind.name() == 'VALUATION' ? ' text-brass-deep' : ' text-ink-subtle'))))}"
-                th:text="${e.kind.name() == 'INCOME' ? '+ 收入' : (e.kind.name() == 'EXPENSE' ? '- 支出' : (e.kind.name() == 'TRANSFER_IN' ? '↳ 划入' : (e.kind.name() == 'TRANSFER_OUT' ? '↱ 划出' : (e.kind.name() == 'VALUATION' ? '△ 估值' : '= 校准'))))}">
+                th:classappend="${e.kind.name() == 'INCOME' ? ' num-pos' : (e.kind.name() == 'EXPENSE' ? ' num-neg' : (e.kind.name() == 'TRANSFER_IN' ? ' text-forest' : (e.kind.name() == 'TRANSFER_OUT' ? ' text-rust' : (e.kind.name() == 'VALUATION' ? ' text-brass-deep' : (e.kind.name() == 'SHARES' ? ' text-fund' : ' text-ink-subtle')))))}"
+                th:text="${e.kind.name() == 'INCOME' ? '+ 收入' : (e.kind.name() == 'EXPENSE' ? '- 支出' : (e.kind.name() == 'TRANSFER_IN' ? '↳ 划入' : (e.kind.name() == 'TRANSFER_OUT' ? '↱ 划出' : (e.kind.name() == 'VALUATION' ? '△ 估值' : (e.kind.name() == 'SHARES' ? '# 持仓数量' : '= 校准')))))}">
             类型</span>
           <span class="tnum w-28" data-priv th:text="${e.amountSignedLabel}">+¥0</span>
           <span class="text-ink-soft flex-1 min-w-[120px] sm:min-w-[140px]" th:text="${e.label}">类别 / 对手账户</span>

@@ -65,6 +65,8 @@ public class EntryController {
     private final StockPriceScheduler stockScheduler;
     private final AccountValuationService valuationService;
     private final EntryRefreshRateLimiter refreshRateLimiter;
+    /** v1.30 · 两个刷新按钮的唯一入口(股票各市场 + 基金净值 / 货基结转 + 估值写回) */
+    private final com.family.finance.service.stock.ValuationRefreshService valuationRefreshService;
     /** v0.12 · 股票收入:联动持仓 + 按股数入账 */
     private final com.family.finance.service.stock.StockHoldingService stockHoldingService;
     /** v0.12.2 · 收入列表本位币换算(账户币种 → 本位币,与 dashboard 人赚同源) */
@@ -337,43 +339,13 @@ public class EntryController {
             model.addAttribute("toastText", "操作太频繁 · 请 " + wait + " 秒后再试");
             return "entry/_refresh-toast :: toast";
         }
-        // v0.14 · 市场清单单一来源 · 分母用 markets.size(),不再写死(修 prod「4/3」:市场从 3→4→5 增,分母停在 3 → 全成功被误报成"仅 X/3 · 详情查 journal")
-        List<Market> markets = List.of(Market.US, Market.CN, Market.HK, Market.CRYPTO, Market.METAL);
-        int total = markets.size();
-        int marketsOk = 0;
-        for (Market mk : markets) {
-            try {
-                stockScheduler.fetchMarket(mk);
-                marketsOk++;
-            } catch (Exception e) {
-                log.warn("entry-refresh fetchMarket failed · market={}: {}", mk, e.toString());
-            }
-        }
-        int accountsRefreshed = 0;
-        try {
-            accountsRefreshed = valuationService.refreshAllForFamily(
-                me.getFamilyId(),
-                AccountValuationService.TriggerKind.MANUAL,
-                me.getMemberId());
-        } catch (Exception e) {
-            log.warn("entry-refresh valuation refresh failed: {}", e.toString());
-        }
-        if (marketsOk == total) {
-            model.addAttribute("toastKind", "forest");
-            model.addAttribute("toastIcon", "check");
-            model.addAttribute("toastText",
-                total + " 市场估值已刷新 · " + accountsRefreshed + " 账户");
-        } else if (marketsOk > 0) {
-            model.addAttribute("toastKind", "rust");
-            model.addAttribute("toastIcon", "warn");
-            model.addAttribute("toastText",
-                "仅 " + marketsOk + "/" + total + " 市场估值刷新成功 · " + accountsRefreshed + " 账户已更新 · 详情查 journal");
-        } else {
-            model.addAttribute("toastKind", "rust");
-            model.addAttribute("toastIcon", "fail");
-            model.addAttribute("toastText",
-                total + " 市场估值均刷新失败 · 上游限流/网络 · 详情查 journal");
-        }
+        // v1.30 · 市场 + 基金 + 估值写回收口到 ValuationRefreshService(两个刷新按钮只调它 · 护栏 v130-ONE-REFRESH-ENTRY)
+        //   (v0.14 修过的「分母写死」问题随之收口:市场清单单一来源是 ValuationRefreshService.MARKETS)
+        var r = valuationRefreshService.refreshFamily(me.getFamilyId(), me.getMemberId());
+        boolean clean = com.family.finance.service.stock.ValuationRefreshService.clean(r);
+        model.addAttribute("toastKind", clean ? "forest" : "rust");
+        model.addAttribute("toastIcon", clean ? "check" : (r.marketsOk() == 0 ? "fail" : "warn"));
+        model.addAttribute("toastText", com.family.finance.service.stock.ValuationRefreshService.summary(r));
         return "entry/_refresh-toast :: toast";
     }
 
@@ -500,7 +472,9 @@ public class EntryController {
                 .filter(a -> a.getFamilyId() == me.getFamilyId())
                 .filter(a -> a.getType() != null && "STOCK".equals(a.getType().name()))
                 .orElseThrow(() -> new IllegalArgumentException("非法股票账户"));
-        var holdings = stockHoldingService.findActiveByAccount(me.getFamilyId(), accountId);
+        // v1.30 · 基金行不列出:定投买的份额不是收入(服务端 EntryService 也拒绝 · 护栏 v130-STOCK-INCOME-NO-FUND)
+        var holdings = stockHoldingService.findActiveByAccount(me.getFamilyId(), accountId).stream()
+                .filter(h -> !h.isNavRow()).toList();
         java.util.Map<Long, BigDecimal> unitValues = new java.util.LinkedHashMap<>();
         for (var h : holdings) {
             if (h.getValuationMode() != null

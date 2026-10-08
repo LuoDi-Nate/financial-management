@@ -22,15 +22,60 @@ import java.util.regex.Pattern;
  * <p>四路数据:①名↔码表(fundcode_search)②资产配置 股/债/现金(pingzhongdata)
  * ③前十大重仓股(fundf10 FundArchivesDatas)④个股→东财细行业(push2 f127)。
  * 全 best-effort:失败返回空 / null,不抛给上层(承穿透是增强非核心)。</p>
+ *
+ * <p><b>v1.30 加两路</b>(场外基金按净值估值 · tech-design/v1.30.md §零 / 选型二):
+ * ⑤ 单位净值 {@link #latestNav}(lsjz 主、pingzhongdata 备)⑥ 货币基金逐日万份收益 {@link #mmfIncome}(lsjz 按日期区间翻页)。
+ * lsjz 有四个「HTTP 200 但没数据 / 数据换了含义」的坑,全在解析层判成失败并带原因,见 {@link #parseLsjzLatest}。
+ * 代码表(①)改成完整条目缓存 24 小时,穿透的名↔码索引从同一份数据派生(匹配行为不变)。</p>
  */
 @Slf4j
 @Component
 public class EastMoneyFundClient {
 
     private final RestTemplate rt;
+    /** v1.30 · 只用来读 e2e 测试基址(fund_data_base_url);单测里可为 null */
+    private final com.family.finance.service.config.FamilyConfigService config;
 
-    public EastMoneyFundClient(RestTemplateBuilder b) {
+    static final String CATALOG_URL = "https://fund.eastmoney.com/js/fundcode_search.js";
+    static final String LSJZ_URL = "https://api.fund.eastmoney.com/f10/lsjz";
+    static final String LSJZ_REFERER = "https://fundf10.eastmoney.com/";
+    static final String PZ_URL = "https://fund.eastmoney.com/pingzhongdata/";
+    static final java.time.ZoneId CN = java.time.ZoneId.of("Asia/Shanghai");
+    /** lsjz 不管要多少条,一页最多给 20(静默封顶,实测 2026-10-08) */
+    static final int LSJZ_PAGE = 20;
+    /** 货币基金一次最多补 120 天(6 页)—— 超过就不结,请用户先核对(选型六 约定 3) */
+    public static final int MMF_MAX_DAYS = 120;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public EastMoneyFundClient(RestTemplateBuilder b, com.family.finance.service.config.FamilyConfigService config) {
         this.rt = b.setConnectTimeout(Duration.ofSeconds(5)).setReadTimeout(Duration.ofSeconds(12)).build();
+        this.config = config;
+    }
+
+    /** 测试 / 旧调用用 */
+    public EastMoneyFundClient(RestTemplateBuilder b) { this(b, null); }
+
+    /**
+     * v1.30 · e2e 用的数据源基址(管理页不出现,只由 e2e 写进家庭配置)。
+     * 只认本机回环 —— 这一格能从家庭配置改,不能让它变成「让服务器替人去请求任意地址」的口子;别的值一律走东财。
+     */
+    String baseFor(long familyId) {
+        if (config == null) return "";
+        return normalizeBase(config.getString(familyId,
+                com.family.finance.service.config.FamilyConfigService.K_FUND_DATA_BASE_URL, ""));
+    }
+
+    static String normalizeBase(String raw) {
+        if (raw == null || raw.isBlank()) return "";
+        String b = raw.trim().replaceAll("/+$", "");
+        try {
+            URI u = URI.create(b);
+            String host = u.getHost() == null ? "" : u.getHost().toLowerCase(java.util.Locale.ROOT);
+            boolean loopback = "http".equalsIgnoreCase(u.getScheme()) && (host.equals("127.0.0.1") || host.equals("localhost"));
+            return loopback ? b : "";
+        } catch (IllegalArgumentException e) {
+            return "";
+        }
     }
 
     private HttpEntity<Void> headers(String referer) {
@@ -52,32 +97,76 @@ public class EastMoneyFundClient {
         }
     }
 
-    // ---------- ① 名 → 码(缓存全量名↔码表) ----------
+    // ---------- ① 代码表(v1.30 起缓存完整条目 · 名 → 码索引从它派生) ----------
 
-    private volatile Map<String, String> normNameToCode;   // 归一化名 → 代码
+    /** 代码表一条:[代码, 拼音缩写, 名称, 类型, 拼音全拼] */
+    public record FundInfo(String code, String abbr, String name, String type, String pinyin) {}
+
+    private record Catalog(List<FundInfo> list, Map<String, FundInfo> byCode, Map<String, String> normNameToCode,
+                           long loadedAt) {}
+
+    /** 按基址分开缓存(e2e 桩与真实东财互不污染);24 小时过期,取失败不缓存、下次重试 */
+    private final Map<String, Catalog> catalogs = new ConcurrentHashMap<>();
+    static final long CATALOG_TTL_MS = 24L * 3600 * 1000;
+
+    private Catalog catalogAt(String base) {
+        Catalog c = catalogs.get(base);
+        if (c != null && System.currentTimeMillis() - c.loadedAt() < CATALOG_TTL_MS) return c;
+        synchronized (catalogs) {
+            c = catalogs.get(base);
+            if (c != null && System.currentTimeMillis() - c.loadedAt() < CATALOG_TTL_MS) return c;
+            String js = get(base.isEmpty() ? CATALOG_URL : base + "/js/fundcode_search.js", null);
+            List<FundInfo> list = js == null ? List.of() : parseCatalog(js);
+            log.info("基金代码表载入 {} 条{}", list.size(), base.isEmpty() ? "" : " · 基址 " + base);
+            if (list.isEmpty()) return c;   // 取失败:有旧的用旧的,没有就空;不缓存空表
+            Map<String, FundInfo> byCode = new HashMap<>();
+            for (FundInfo f : list) byCode.putIfAbsent(f.code(), f);
+            Catalog fresh = new Catalog(list, byCode, buildNameIndex(list), System.currentTimeMillis());
+            catalogs.put(base, fresh);
+            return fresh;
+        }
+    }
+
+    /** v1.30 · 全量代码表(搜索 / 分类用);取不到返回空 */
+    public List<FundInfo> catalog(long familyId) {
+        Catalog c = catalogAt(baseFor(familyId));
+        return c == null ? List.of() : c.list();
+    }
+
+    /** v1.30 · 按代码查一条 */
+    public FundInfo find(long familyId, String code) {
+        if (code == null) return null;
+        Catalog c = catalogAt(baseFor(familyId));
+        return c == null ? null : c.byCode().get(code.trim());
+    }
+
+    /** 解析 fundcode_search.js:每项 ["000001","HXCZHH","华夏成长混合","混合型-灵活","HUAXIA…"] */
+    static List<FundInfo> parseCatalog(String js) {
+        List<FundInfo> out = new ArrayList<>();
+        int a = js.indexOf('['), z = js.lastIndexOf(']');
+        if (a < 0 || z <= a) return out;
+        Matcher em = Pattern.compile("\\[\"(\\d{6})\",\"([^\"]*)\",\"([^\"]*)\",\"([^\"]*)\",\"([^\"]*)\"\\]")
+                .matcher(js.substring(a, z + 1));
+        while (em.find()) out.add(new FundInfo(em.group(1), em.group(2), em.group(3), em.group(4), em.group(5)));
+        return out;
+    }
+
+    /**
+     * 名 → 码索引。<b>与 v1.5 的行为逐条一致</b>(护栏 v130-CATALOG-PARITY):名称非空才进、
+     * 按代码表顺序 putIfAbsent(同名取第一个)。
+     */
+    static Map<String, String> buildNameIndex(List<FundInfo> list) {
+        Map<String, String> m = new HashMap<>();
+        for (FundInfo f : list) {
+            if (f.name() == null || f.name().isEmpty()) continue;
+            m.putIfAbsent(normName(f.name()), f.code());
+        }
+        return m;
+    }
 
     private Map<String, String> nameIndex() {
-        Map<String, String> idx = normNameToCode;
-        if (idx != null) return idx;
-        synchronized (this) {
-            if (normNameToCode != null) return normNameToCode;
-            Map<String, String> m = new HashMap<>();
-            String js = get("https://fund.eastmoney.com/js/fundcode_search.js", null);
-            if (js != null) {
-                int a = js.indexOf('['), z = js.lastIndexOf(']');
-                if (a >= 0 && z > a) {
-                    // 每项 ["000001","HXCZHH","华夏成长混合","混合型-灵活","..."]
-                    Matcher em = Pattern.compile("\\[\"(\\d{6})\",\"[^\"]*\",\"([^\"]+)\",\"([^\"]*)\"").matcher(js.substring(a, z));
-                    while (em.find()) {
-                        String code = em.group(1), name = em.group(2);
-                        m.putIfAbsent(normName(name), code);
-                    }
-                }
-            }
-            log.info("穿透 · fundcode 名↔码表载入 {} 条", m.size());
-            normNameToCode = m.isEmpty() ? null : m;   // 空则不缓存,下次重试
-            return m;
-        }
+        Catalog c = catalogAt("");
+        return c == null ? Map.of() : c.normNameToCode();
     }
 
     /** 归一化:去空格 / 括号内容 / 份额后缀 / 公司别名 · 与 spike 一致 */
@@ -234,6 +323,145 @@ public class EastMoneyFundClient {
     private static boolean has(String s, String... kws) {
         for (String k : kws) if (s.contains(k)) return true;
         return false;
+    }
+
+    // ---------- ⑤ 单位净值(v1.30 · lsjz 主 / pingzhongdata 备) ----------
+
+    /** 一次取净值的结果:拿到了就带日期与单位净值;没拿到就带「人话原因」(页面与刷新结果直接用) */
+    public record NavFetch(boolean ok, java.time.LocalDate navDate, BigDecimal unitNav, String source, String error) {
+        static NavFetch fail(String why) { return new NavFetch(false, null, null, null, why); }
+    }
+
+    private static final com.fasterxml.jackson.databind.ObjectMapper JSON = new com.fasterxml.jackson.databind.ObjectMapper();
+
+    /**
+     * 最新单位净值。主源 lsjz 失败(超时 / 拒绝 / 查不到 / 字段换义)才走备源 pingzhongdata;
+     * 两个都失败,返回<b>主源</b>的原因(那是更具体的那一个)。<b>货币基金不该走到这里</b>(见 FundNavService)。
+     */
+    public NavFetch latestNav(long familyId, String code) {
+        String base = baseFor(familyId);
+        String lsjzUrl = (base.isEmpty() ? LSJZ_URL : base + "/f10/lsjz") + "?fundCode=" + code + "&pageIndex=1&pageSize=1";
+        NavFetch primary = parseLsjzLatest(get(lsjzUrl, LSJZ_REFERER));
+        if (primary.ok()) return primary;
+        String pzUrl = (base.isEmpty() ? PZ_URL : base + "/pingzhongdata/") + code + ".js";
+        NavFetch backup = parsePzLatest(get(pzUrl, "https://fund.eastmoney.com/"));
+        if (backup.ok()) return backup;
+        log.warn("基金净值没拿到 · {} · lsjz:{} · pingzhongdata:{}", code, primary.error(), backup.error());
+        return primary;
+    }
+
+    /**
+     * 解析 lsjz 的「最新一条」。四种 HTTP 200 都要判成失败(tech-design/v1.30.md §零 实测):
+     * 不带 Referer → {@code ErrCode:-999};查无此码 → {@code ErrCode:0} + 空列表;
+     * 货币基金 → {@code DWJZ} 其实是每万份收益({@code SYType} 非空);单位净值 ≤ 0 / 解析不了。
+     */
+    static NavFetch parseLsjzLatest(String body) {
+        if (body == null) return NavFetch.fail("连不上数据源");
+        try {
+            var root = JSON.readTree(body);
+            int err = root.path("ErrCode").asInt(0);
+            if (err != 0) return NavFetch.fail("数据源拒绝了请求(ErrCode " + err + ")");
+            var data = root.path("Data");
+            if (!data.isObject()) return NavFetch.fail("数据源返回了空数据");
+            var list = data.path("LSJZList");
+            if (!list.isArray() || list.isEmpty()) return NavFetch.fail("数据源查不到这只基金");
+            String syType = data.path("SYType").isNull() ? null : data.path("SYType").asText(null);
+            if (syType != null && !syType.isBlank()) {
+                return NavFetch.fail("这只基金公布的是「" + syType + "」,不是单位净值(货币基金按金额记)");
+            }
+            var row = list.get(0);
+            java.time.LocalDate d = java.time.LocalDate.parse(row.path("FSRQ").asText());
+            BigDecimal nav = new BigDecimal(row.path("DWJZ").asText());
+            if (nav.signum() <= 0) return NavFetch.fail("数据源给的单位净值不是正数");
+            return new NavFetch(true, d, nav, "eastmoney-lsjz", null);
+        } catch (Exception e) {
+            return NavFetch.fail("数据源的格式看不懂(" + e.getClass().getSimpleName() + ")");
+        }
+    }
+
+    /** 解析 pingzhongdata 的最新净值:{@code ishb=true}(货币基金)不认;{@code x} = 净值日期东八区 0 点的毫秒数 */
+    static NavFetch parsePzLatest(String js) {
+        if (js == null || js.isBlank()) return NavFetch.fail("连不上数据源");
+        if (js.contains("var ishb=true")) return NavFetch.fail("这是货币基金,没有单位净值序列");
+        String seg = between(js, "Data_netWorthTrend", ";");
+        if (seg == null) return NavFetch.fail("数据源里没有净值序列");
+        Matcher m = Pattern.compile("\\{\"x\":(\\d+),\"y\":([\\d.]+)").matcher(seg);
+        String x = null, y = null;
+        while (m.find()) { x = m.group(1); y = m.group(2); }
+        if (x == null) return NavFetch.fail("数据源里没有净值序列");
+        try {
+            java.time.LocalDate d = java.time.Instant.ofEpochMilli(Long.parseLong(x)).atZone(CN).toLocalDate();
+            BigDecimal nav = new BigDecimal(y);
+            if (nav.signum() <= 0) return NavFetch.fail("数据源给的单位净值不是正数");
+            return new NavFetch(true, d, nav, "eastmoney-pz", null);
+        } catch (Exception e) {
+            return NavFetch.fail("数据源的格式看不懂(" + e.getClass().getSimpleName() + ")");
+        }
+    }
+
+    // ---------- ⑥ 货币基金逐日万份收益(v1.30 · lsjz 按日期区间翻页) ----------
+
+    public record IncomeDay(java.time.LocalDate date, BigDecimal per10k, BigDecimal yield7d) {}
+
+    /** ok = 区间内的数全拿到了(按 TotalCount 核过);days 按日期升序 */
+    public record IncomeFetch(boolean ok, List<IncomeDay> days, String error) {
+        static IncomeFetch fail(String why) { return new IncomeFetch(false, List.of(), why); }
+    }
+
+    /** 一页的解析结果(单测用) */
+    record IncomePage(List<IncomeDay> days, int total, String error) {}
+
+    /**
+     * (fromExclusive, toInclusive] 的逐日万份收益。lsjz 的 {@code pageSize} 静默封顶 20 条 →
+     * 按日期区间翻页,直到拿到的条数 == {@code TotalCount};拿不全就判失败,<b>不拿半截去结转</b>。
+     */
+    public IncomeFetch mmfIncome(long familyId, String code, java.time.LocalDate fromExclusive, java.time.LocalDate toInclusive) {
+        if (!toInclusive.isAfter(fromExclusive)) return new IncomeFetch(true, List.of(), null);
+        String base = baseFor(familyId);
+        String url0 = (base.isEmpty() ? LSJZ_URL : base + "/f10/lsjz") + "?fundCode=" + code + "&pageSize=" + LSJZ_PAGE
+                + "&startDate=" + fromExclusive.plusDays(1) + "&endDate=" + toInclusive + "&pageIndex=";
+        List<IncomeDay> all = new ArrayList<>();
+        int total = -1;
+        int maxPages = (MMF_MAX_DAYS + LSJZ_PAGE - 1) / LSJZ_PAGE + 1;
+        for (int page = 1; page <= maxPages; page++) {
+            IncomePage p = parseLsjzIncomePage(get(url0 + page, LSJZ_REFERER));
+            if (p.error() != null) return IncomeFetch.fail(p.error());
+            if (total < 0) total = p.total();
+            all.addAll(p.days());
+            if (p.days().isEmpty() || all.size() >= total) break;
+        }
+        if (all.size() < total) return IncomeFetch.fail("数据源只给了 " + all.size() + " / " + total + " 天,没拿全");
+        all.sort(java.util.Comparator.comparing(IncomeDay::date));
+        return new IncomeFetch(true, all, null);
+    }
+
+    static IncomePage parseLsjzIncomePage(String body) {
+        if (body == null) return new IncomePage(List.of(), 0, "连不上数据源");
+        try {
+            var root = JSON.readTree(body);
+            int err = root.path("ErrCode").asInt(0);
+            if (err != 0) return new IncomePage(List.of(), 0, "数据源拒绝了请求(ErrCode " + err + ")");
+            var data = root.path("Data");
+            if (!data.isObject()) return new IncomePage(List.of(), 0, "数据源返回了空数据");
+            String syType = data.path("SYType").isNull() ? null : data.path("SYType").asText(null);
+            var list = data.path("LSJZList");
+            int total = root.path("TotalCount").asInt(0);
+            if (list.isArray() && !list.isEmpty() && !"每万份收益".equals(syType)) {
+                return new IncomePage(List.of(), 0, "这只基金公布的不是每万份收益,不能按货币基金结转");
+            }
+            List<IncomeDay> days = new ArrayList<>();
+            if (list.isArray()) {
+                for (var row : list) {
+                    java.time.LocalDate d = java.time.LocalDate.parse(row.path("FSRQ").asText());
+                    BigDecimal per10k = new BigDecimal(row.path("DWJZ").asText());
+                    String y7 = row.path("LJJZ").asText("");
+                    days.add(new IncomeDay(d, per10k, y7.isBlank() ? null : new BigDecimal(y7)));
+                }
+            }
+            return new IncomePage(days, total, null);
+        } catch (Exception e) {
+            return new IncomePage(List.of(), 0, "数据源的格式看不懂(" + e.getClass().getSimpleName() + ")");
+        }
     }
 
     // ---------- 小工具 ----------

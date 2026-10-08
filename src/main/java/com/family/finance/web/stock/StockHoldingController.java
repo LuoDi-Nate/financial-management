@@ -58,6 +58,7 @@ public class StockHoldingController {
     private final StockHoldingService holdingService;
     private final AccountValuationService valuationService;
     private final StockPriceScheduler scheduler;
+    private final com.family.finance.service.stock.ValuationRefreshService valuationRefreshService;   // v1.30
     private final StockPriceSnapshotMapper priceMapper;
     private final BrokerLinkMapper brokerLinkMapper;   // v1.6.24 · 持仓页展示本账户的券商对接状态(1:1)
     private final AccountMapper accountMapper;
@@ -346,17 +347,13 @@ public class StockHoldingController {
 
     @PostMapping("/accounts/{accountId}/holdings/refresh")
     public String refresh(@AuthenticationPrincipal MemberPrincipal me,
-                          @PathVariable long accountId) {
+                          @PathVariable long accountId,
+                          org.springframework.web.servlet.mvc.support.RedirectAttributes ra) {
+        // v1.30 · 收口到 ValuationRefreshService:股票各市场 + 基金净值 / 货币基金结转 + 估值写回(trigger=MANUAL)
         try {
-            // 全市场都拉一次 · 简单粗暴
-            scheduler.fetchMarket(Market.US);
-            scheduler.fetchMarket(Market.CN);
-            scheduler.fetchMarket(Market.HK);
-            scheduler.fetchMarket(Market.CRYPTO);
-            scheduler.fetchMarket(Market.METAL);
-            // v0.4.1 · 用户主动 click → trigger=MANUAL · 写 valuation event 含用户 ID
-            valuationService.refreshAllForFamily(me.getFamilyId(),
-                AccountValuationService.TriggerKind.MANUAL, me.getMemberId());
+            var r = valuationRefreshService.refreshFamily(me.getFamilyId(), me.getMemberId());
+            ra.addFlashAttribute(com.family.finance.service.stock.ValuationRefreshService.clean(r) ? "flashOk" : "flashWarn",
+                    com.family.finance.service.stock.ValuationRefreshService.summary(r));
         } catch (Exception e) {
             log.warn("refresh failed: {}", e.toString());
         }

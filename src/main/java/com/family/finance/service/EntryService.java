@@ -510,6 +510,10 @@ public class EntryService {
         if (h.getValuationMode() != ValuationMode.AUTO && h.getValuationMode() != ValuationMode.MANUAL) {
             throw new IllegalArgumentException("仅上市/未上市持仓可按股数录收入(券商现金请用现金入账)");
         }
+        // v1.30 · 基金份额变化(定投、赎回)不是收入 —— 记成收入会让「人赚」虚高(护栏 v130-STOCK-INCOME-NO-FUND)
+        if (h.isNavRow()) {
+            throw new IllegalArgumentException("基金的份额变化不是收入,请在持仓页「改份额」里改");
+        }
         BigDecimal shares = positiveShares(addShares);
         BigDecimal unit = stockHoldingService.currentUnitValueInAccountCcy(familyId, h);
         if (unit == null) {

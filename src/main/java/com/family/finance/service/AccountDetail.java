@@ -74,6 +74,8 @@ public record AccountDetail(
     public enum Kind {
         SNAPSHOT, INCOME, EXPENSE, TRANSFER_IN, TRANSFER_OUT,
         /** v0.4.1 FR-52f · 股票账户估值变动事件 */
-        VALUATION
+        VALUATION,
+        /** v1.30 FR-968 · 持仓数量变动(只说「份额怎么变的」,不带钱:amount 恒为 null,不进月净额) */
+        SHARES
     }
 }

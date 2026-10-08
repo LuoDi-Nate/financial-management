@@ -24,6 +24,9 @@ public enum LedgerSource {
     /** 定时拉加密货币价格后自动估值 */
     SYNC_CRYPTO_API("自动 · 币价", "auto"),
 
+    /** v1.30 · 场外基金净值更新 / 货币基金收益结转后自动估值 */
+    SYNC_FUND_NAV("自动 · 基金净值", "auto"),
+
     /** 富途 OpenD 同步持仓后引起的变动 */
     SYNC_BROKER_FUTU("自动 · 富途", "broker"),
 
@@ -60,7 +63,7 @@ public enum LedgerSource {
     /** 是不是"自动来的"(页面上可能只想区分手动 vs 自动)。 */
     public boolean isAutomatic() {
         return this == SYNC_STOCK_API || this == SYNC_METAL_API || this == SYNC_CRYPTO_API
-                || "broker".equals(group);
+                || this == SYNC_FUND_NAV || "broker".equals(group);
     }
 
     /**

@@ -46,15 +46,22 @@ public class StockPriceScheduler {
      * 这个 wire 从 v0.3 上线就遗漏 · 是 latent bug,不是新功能。
      */
     private final AccountValuationService valuationService;
+    /**
+     * v1.30 · 基金净值 / 货币基金结转<b>跟着每一次定时拉价跑</b>(§13 ④「跟随原有同步」,不另设 cron)。
+     * 节流 30 分钟:早上 06:05 / 06:15、下午 16:10 / 16:20 / 16:30 各只真拉一次。
+     */
+    private final com.family.finance.service.fund.FundNavService fundNavService;
 
     public StockPriceScheduler(StockHoldingMapper holdingMapper,
                                StockPriceFetcher fetcher,
                                FamilyConfigService configService,
-                               AccountValuationService valuationService) {
+                               AccountValuationService valuationService,
+                               com.family.finance.service.fund.FundNavService fundNavService) {
         this.holdingMapper = holdingMapper;
         this.fetcher = fetcher;
         this.configService = configService;
         this.valuationService = valuationService;
+        this.fundNavService = fundNavService;
         log.info("StockPriceScheduler initialized · enabled-source=DB(family_runtime_config.stock_fetch_enabled)");
     }
 
@@ -107,6 +114,12 @@ public class StockPriceScheduler {
      * 自己显式调 {@code refreshAllForFamily(MANUAL/HOLDING_CHANGE)} · 避免双跑。
      */
     private void refreshValuationsAfterCron(Market market, int persisted) {
+        // v1.30 · 先同步基金(只改持仓行;有变化的家庭在里面顺手写回估值),再走原来的估值写回
+        try {
+            fundNavService.refreshAllFamilies();
+        } catch (Exception e) {
+            log.warn("post-cron 基金净值同步失败 · market={}: {}", market, e.toString());
+        }
         try {
             int refreshed = valuationService.refreshAllForFamily(
                 FAMILY_ID,

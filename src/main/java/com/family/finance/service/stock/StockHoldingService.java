@@ -199,6 +199,10 @@ public class StockHoldingService {
         if (h.getValuationMode() != ValuationMode.MANUAL) {
             throw new IllegalArgumentException("仅未上市(手填)持仓可用此接口更新");
         }
+        // v1.30 · 净值行的单价由系统按净值写:这里改了,下一次刷新就被盖掉,用户还以为改成功了(护栏 v130-NAV-NOT-HAND-EDITED)
+        if (h.isNavRow()) {
+            throw new IllegalArgumentException("基金的净值由系统更新,只能改份额");
+        }
         if (shares != null) {
             if (shares.signum() <= 0) throw new IllegalArgumentException("股数必须 > 0");
             h.setShares(shares);
@@ -221,6 +225,10 @@ public class StockHoldingService {
         StockHolding h = require(familyId, holdingId);
         if (h.getValuationMode() != ValuationMode.AUTO && h.getValuationMode() != ValuationMode.MANUAL) {
             throw new IllegalArgumentException("仅上市/未上市持仓可增减股数");
+        }
+        // v1.30 · 基金份额只走 FundHoldingService(要记持仓数量变动、可选现金联动);这里加份额会被记成股票收入
+        if (h.isNavRow()) {
+            throw new IllegalArgumentException("基金的份额请在持仓页「改份额」里改");
         }
         if (deltaShares == null || deltaShares.signum() == 0) return h;
         BigDecimal cur = h.getShares() == null ? BigDecimal.ZERO : h.getShares();

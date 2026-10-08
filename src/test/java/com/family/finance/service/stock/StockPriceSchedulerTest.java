@@ -47,7 +47,8 @@ class StockPriceSchedulerTest {
         fetcher = mock(StockPriceFetcher.class);
         configService = mock(FamilyConfigService.class);
         valuationService = mock(AccountValuationService.class);
-        scheduler = new StockPriceScheduler(holdingMapper, fetcher, configService, valuationService);
+        scheduler = new StockPriceScheduler(holdingMapper, fetcher, configService, valuationService,
+                org.mockito.Mockito.mock(com.family.finance.service.fund.FundNavService.class));
 
         // 默认开启,有持仓
         when(configService.getBoolean(eq(1L), eq(FamilyConfigService.K_STOCK_ENABLED), any(Boolean.class)))

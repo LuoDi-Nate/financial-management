@@ -50,6 +50,8 @@ public class AccountDetailService {
     private final TransferMapper transferMapper;
     /** v0.4.1 FR-52f · 股票估值事件 */
     private final com.family.finance.repository.StockValuationEventMapper stockValuationEventMapper;
+    /** v1.30 FR-968 · 持仓数量变动(只给人看) */
+    private final com.family.finance.repository.HoldingShareEventMapper holdingShareEventMapper;
     private final ProductCategoryService productCategoryService;
 
     /**
@@ -218,6 +220,36 @@ public class AccountDetailService {
                 // ledger 渲染失败不阻塞整体页面
             }
         }
+        // v1.30 FR-968 · 持仓数量变动 entries —— 只说份额怎么变的;钱的变化在上面的估值事件里,这里 amount 为 null、不进月净额
+        if (com.family.finance.service.stock.StockHoldingService.supportsHoldings(account.getType())) {
+            try {
+                for (com.family.finance.domain.stock.HoldingShareEvent ev :
+                        holdingShareEventMapper.findRecentByAccount(familyId, accountId, 500)) {
+                    Period p = ev.getPeriodId() == null ? null : periodById.get(ev.getPeriodId());
+                    if (p == null && ev.getCreatedAt() != null) {
+                        LocalDate d = ev.getCreatedAt().toLocalDate();
+                        p = periodById.values().stream()
+                                .filter(x -> !d.isBefore(x.getPeriodStart()) && !d.isAfter(x.getPeriodEnd()))
+                                .findFirst().orElse(null);
+                    }
+                    if (p == null) continue;
+                    byMonth.computeIfAbsent(p.getPeriodStart(), k -> new ArrayList<>()).add(new AccountDetail.Entry(
+                        AccountDetail.Kind.SHARES,
+                        ev.getCreatedAt(),
+                        null,
+                        shareDeltaLabel(ev),
+                        (ev.getHoldingName() == null ? "持仓" : ev.getHoldingName()) + " · " + ev.reasonEnum().getLabel(),
+                        shareEventNote(ev, account.getCurrency()),
+                        ev.getId(),
+                        false,
+                        ev.getMemberId() == null ? com.family.finance.domain.ledger.LedgerSource.SYNC_FUND_NAV
+                                                 : com.family.finance.domain.ledger.LedgerSource.MANUAL
+                    ));
+                }
+            } catch (Exception ignored) {
+                // 时间线渲染失败不阻塞整体页面
+            }
+        }
         // TRANSFER entries(本账户视角:in / out 二选一)
         for (Transfer t : allTransfers) {
             Period p = periodById.get(t.getPeriodId());
@@ -262,7 +294,7 @@ public class AccountDetailService {
             if (filtered.isEmpty()) continue;
 
             BigDecimal net = filtered.stream()
-                    .filter(e -> e.kind() != AccountDetail.Kind.SNAPSHOT)
+                    .filter(e -> e.kind() != AccountDetail.Kind.SNAPSHOT && e.kind() != AccountDetail.Kind.SHARES)
                     .map(e -> {
                         boolean positive = e.kind() == AccountDetail.Kind.INCOME
                                 || e.kind() == AccountDetail.Kind.TRANSFER_IN;
@@ -307,8 +339,40 @@ public class AccountDetailService {
             case "EXPENSE" -> AccountDetail.Kind.EXPENSE;
             case "TRANSFER" -> AccountDetail.Kind.TRANSFER_IN; // 用 IN 当哨兵,matchesKind 内部展开 IN/OUT
             case "SNAPSHOT" -> AccountDetail.Kind.SNAPSHOT;
+            case "SHARES" -> AccountDetail.Kind.SHARES;   // v1.30
             default -> null;
         };
+    }
+
+    /** v1.30 · 「+1.89 份」/「1,046.03 → 1,250.00 份」 */
+    static String shareDeltaLabel(com.family.finance.domain.stock.HoldingShareEvent ev) {
+        BigDecimal d = ev.getSharesDelta() == null ? BigDecimal.ZERO : ev.getSharesDelta();
+        String sign = d.signum() > 0 ? "+" : (d.signum() < 0 ? "−" : "");
+        return sign + String.format("%,.2f", d.abs()) + " 份";
+    }
+
+    /** v1.30 · 「1,046.03 → 1,250.00 份 · 约 +¥974.98 · 10 月 1 日 – 10 月 7 日(7 天)」 */
+    static String shareEventNote(com.family.finance.domain.stock.HoldingShareEvent ev, String currency) {
+        List<String> parts = new ArrayList<>();
+        if (ev.getSharesBefore() != null && ev.getSharesAfter() != null) {
+            parts.add(String.format("%,.2f → %,.2f 份", ev.getSharesBefore(), ev.getSharesAfter()));
+        }
+        var r = ev.reasonEnum();
+        if (ev.getValueDelta() != null && ev.getValueDelta().signum() != 0) {
+            String money = (ev.getValueDelta().signum() > 0 ? "+" : "−") + MoneyFormat.format(currency, ev.getValueDelta().abs());
+            parts.add(r.movesBalance() ? "约 " + money : "约 " + money + "(余额不变)");
+        }
+        if (ev.getUnitValue() != null && ev.getUnitValue().compareTo(BigDecimal.ONE) != 0) {
+            parts.add("单位净值 " + ev.getUnitValue().stripTrailingZeros().toPlainString());
+        }
+        if (ev.getDateFrom() != null && ev.getDateTo() != null) {
+            long n = java.time.temporal.ChronoUnit.DAYS.between(ev.getDateFrom(), ev.getDateTo()) + 1;
+            parts.add(ev.getDateFrom().getMonthValue() + " 月 " + ev.getDateFrom().getDayOfMonth() + " 日 – "
+                    + ev.getDateTo().getMonthValue() + " 月 " + ev.getDateTo().getDayOfMonth() + " 日(" + n + " 天)");
+        }
+        if (r == com.family.finance.domain.stock.ShareEventReason.CASH_BUY) parts.add("钱来自账户现金行");
+        if (r == com.family.finance.domain.stock.ShareEventReason.CASH_REDEEM) parts.add("钱回到账户现金行");
+        return String.join(" · ", parts);
     }
 
     private static boolean matchesKind(AccountDetail.Kind actual, AccountDetail.Kind filter) {
