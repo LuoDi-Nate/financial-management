@@ -96,8 +96,8 @@
 
 > 完整发布记录与截图见 [Releases](https://github.com/LuoDi-Nate/financial-management/releases)(本段每版只留 2–4 行,细节不搬过来)。
 
-**[v1.29.0](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.29.0) · 券商同步带上期权、期货、债券**
-盈透 / 富途 / 老虎同步时,期权一张合约一行,市值用券商给的持仓市值,卖出为负 —— 账户余额和券商对得上;期货只展示名义价值、不计入余额,债券按市值记;对不上的行不同步并点名([#26](https://github.com/LuoDi-Nate/financial-management/issues/26))。顺带修了富途期权按 0 计 / 整次同步失败、老虎股票一直没同步进来;以及全新安装后当期把现金账户算成贷款([#34](https://github.com/LuoDi-Nate/financial-management/issues/34))。
+**[v1.29.0](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.29.0) – [v1.29.1](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.29.1) · 券商同步带上期权、期货、债券**
+盈透 / 富途 / 老虎同步时,期权一张合约一行,市值用券商给的持仓市值,卖出为负 —— 账户余额和券商对得上;期货只展示名义价值、不计入余额,债券按市值记;对不上的行不同步并点名([#26](https://github.com/LuoDi-Nate/financial-management/issues/26))。顺带修了富途期权按 0 计 / 整次同步失败、老虎股票一直没同步进来;以及全新安装后当期把现金账户算成贷款([#34](https://github.com/LuoDi-Nate/financial-management/issues/34))。v1.29.1 同步完先给同步进来的股票拉价,余额当场就对,不用再手动刷一次。
 
 **[v1.28.0](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.28.0) – [v1.28.5](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.28.5) · 看 AI 收到了什么**
 每个 AI 结果旁一个「>_ 查看 prompt」,点开是终端,逐字显示那一次发给大模型的内容,你的范围 / 模板 / 偏好带进去的段落标色写来源。账户名也换成代号再发出去;服务器日志不再写提示词正文;隐私模式也糊 AI 正文里的金额。v1.28.1 修了「新开账户从老账户转钱进去被算成亏损」,以及账户页、首页的三处问题([#25](https://github.com/LuoDi-Nate/financial-management/issues/25));v1.28.2 首页「超额闲置」提示的链接改成人话;v1.28.3 修了 Safari / iPhone 上传 logo、关账节奏选中态、Docker 备份容器假 unhealthy([#27](https://github.com/LuoDi-Nate/financial-management/issues/27) [#28](https://github.com/LuoDi-Nate/financial-management/issues/28) [#29](https://github.com/LuoDi-Nate/financial-management/issues/29))。v1.28.4 修了仪表盘「总负债」明细加起来对不上合计([#34](https://github.com/LuoDi-Nate/financial-management/issues/34));v1.28.5 左上角换成古钱小图标([#31](https://github.com/LuoDi-Nate/financial-management/issues/31))。
