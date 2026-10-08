@@ -95,6 +95,11 @@ worktree 的工作目录里没有 `.githooks/`(那是 master 上的文件),hook 
 - **双轨收入**:`period_member_cashflow`(PMC「2框」· 家庭成员月度总收入/总支出 · 无账户关联)vs 账户级 `cash_flow`(每账户逐笔 · 驱动余额/XIRR/PnL)。**FR-142 起收入侧以 `cash_flow` 汇总为准**(历史 PMC 收入 >0 时兜底优先,防双计);支出侧仍 PMC 优先。
 - **券商只读同步**(v0.15 · v1.26 加盈透):`BrokerClient` 只有读方法;同步只动 `sync_source=本券商` 的持仓行,绝不碰手填。券商拉不到价的市场(IBKR 的伦敦 / 东京 …)按券商报表收盘价落 **MANUAL** 行(单价折成账户币种)。**IBKR 的「报表口令」**一年一到期,到期后同步会停 —— 账户列表 / 券商页提前 14 天提醒,过期后卡片标红(`IbkrErrors` 把错误码翻成人话并带 IBKR 原话)。IBKR 的失败是 **HTTP 200 + Fail 信封**,不带 User-Agent 是 403。**期权 / 权证 / 期货 / 债券**(v1.29 · issue #26 · 三家都同步):落 **MANUAL** 行 + `stock_holding.instrument_kind`(单价 = 券商持仓市值 ÷ 张数,**卖出张数为负** → 负市值从余额里减;**期货单价 0**,名义价值只展示);用「张数 × 标记价 × 乘数」交叉核对,对不上的行**不同步、点名**(`DerivativeRows`);报表里没了 = 到期 / 平仓 → 归档。不单列资产类别,跟账户类型走;不是穿透候选。升级后第一次带进来那一跳:新账户 = 开账,已在记的账户 = 当月收益(维护者 2026-10-03 定)。
 - **股票账户估值**:账户余额 = Σ 持仓估值。持仓 `ValuationMode`:**AUTO**(上市 · ticker+shares · 自动拉价)/ **MANUAL**(未上市如字节 · **v0.12.1 起 = 股数 × 单股手填估值**)/ **CASH**(券商现金 · 按币种)。估值刷新(`AccountValuationService.refreshAllForFamily`)会**重算并覆盖 `period_snapshot`** → 股票收入必须落 **CASH 行**(现金)或 **+持仓股数**(RSU),再 `applyDeltaToBalance` 立即入账,别直接改余额(会被刷新覆盖)。
+- **净值行 / 持仓数量变动 / 基金账户**(v1.30 · issue #25 · 见 L6、L21):
+  - **净值行** = `valuation_mode='MANUAL'` 且 `nav_mode` 非空的持仓行。估值上**就是普通 MANUAL 行**(份额 × 单价),区别只在单价由系统写:`FUND` 场外基金单价 = 单位净值(`nav_date` = 净值日期);`MMF` 货币基金单价恒 1、份额 = 金额,按逐日万份收益结转(`nav_date` = 已结转到哪天,录入 / 校正日 = 前一天)。数据源天天基金(lsjz 主 / pingzhongdata 备),公共缓存 `fund_nav_snapshot`。**跟随原有同步**:两个刷新按钮经 `ValuationRefreshService`、定时拉价后 `StockPriceScheduler` 调 `FundNavService.refreshAllFamilies`,不另设 cron。lsjz 有四个「HTTP 200 但不对」的坑(不带 Referer -999 / 查无此码空列表 / 货基 DWJZ 是万份收益 / pageSize 静默封顶 20),全在 `EastMoneyFundClient` 解析层判失败。只做**人民币账户 + 人民币份额**;浮动净值货基不支持。
+  - **持仓数量变动**(`holding_share_event`)= 份额怎么变的(货基收益结转 / 手动改份额 / 手动校正 / 申购·赎回(现金联动)/ 截图导入 / 改为自动 / 添加)。**只给人看,不进任何金额汇总**;钱的变化只在估值事件里。账户时间线 Kind `SHARES`(「# 持仓数量」)。
+  - **基金账户**(`AccountType.FUND`)= 投资类、半流动、默认类目 `MIXED_FUND`、资产类别按类目(有持仓时按穿透);能挂持仓。**老 jar 不认识 FUND → 回滚到 v1.30 之前先跑 `db/rollback/v1.30.sql`**(`deploy/rollback.sh` 按版本自动执行)。「添加持仓 · 场外基金」出现在人民币的 基金 / 证券 / 理财 / 现金 账户(PRD v1.30 §3.1)。
+  - **现金联动**:有持仓的账户,转进来的钱落在现金行(v1.18.1);改份额 / 添加基金时勾「用账户里的现金」→ 走 `StockHoldingService.adjustAccountCash`,余额不变、不写估值事件,否则同一笔钱算两遍。
 - **`is_adjustment`(V33)**:手动改股票现金行的本金进出 → `cash_adjust`/`is_adjustment=1`,**剔出 PnL、不计家庭收入**;真实外部收入 `is_adjustment=0`。
 - **币种三层**(极易错,见 L2/L3):
   - **账户币种** — `cash_flow.amount`、`period_snapshot.end_balance`、持仓 `manual_value` 都存这个。
@@ -131,7 +136,7 @@ worktree 的工作目录里没有 `.githooks/`(那是 master 上的文件),hook 
 |---|---|---|---|
 | 仪表盘 | `/dashboard` | 净资产/趋势(CPI+M2 线)/配置环/KPI 横条/**人赚vs钱赚拆解**/AI 洞察 | `dashboard/index.html` + `_region.html` · `DashboardController` · `CashflowSplitView` |
 | 填报 | `/entry` | 每月录入:账户余额快照 + 收支 + 划转;**收入侧结构化**(现金/股票·联动持仓);退休目标折叠于此 | `entry/index.html` + `_row.html` + `_income-stock.html` · `EntryController`/`EntryService` |
-| 账户 | `/accounts` | **9 类**账户簿(现金/股票/理财/加密/贵金属/房产/负债/保险/其他) · 按成员归集 · 划转/体检/账本/导出;股票账户 → 持仓管理 | `accounts/*` · `stock/holdings.html` · `StockHoldingController` |
+| 账户 | `/accounts` | **10 类**账户簿(现金/股票/理财/基金/加密/贵金属/房产/负债/保险/其他) · 按成员归集 · 划转/体检/账本/导出(时间线含「# 持仓数量」)· 能挂持仓的账户 → 持仓管理(v1.30「添加持仓 · 场外基金」→ `/accounts/{id}/holdings/new-fund`;手填基金「改为按净值自动估值」→ `/to-nav`) | `accounts/*` · `stock/holdings.html` · `stock/fund-new.html` + `_fund-parts.html` · `StockHoldingController` · `FundHoldingController` |
 | 报表 | `/reports` | **月度封板快照**(v1.10 三区):一区 本期封板(资产负债表/资金流瀑布/环比同比/归因)· 二区 结构与风险(集中度/流动性分层)· 三区 趋势(**range 只作用于此**)· 账期筛选 + 长文目录 TOC | `reports/*` · `_toc` |
 | 目标 | `/goals` | FIRE 退休 / 教育 / 应急金 · 三情景预测 | `goals/*` |
 | 资产体检 | `/checkup` | 4 维诊断(配置/风险/流动性/收益)+ AI 调仓 · **长文目录 TOC** · v1.27 分析范围切换(`?scope=`)+ AI 模板选择行(`?tpl=`)+ AI 页脚「换模板 / 定制这个模板」 | `checkup/*` · `_toc` · `_analysis-footer` |
@@ -187,7 +192,8 @@ worktree 的工作目录里没有 `.githooks/`(那是 master 上的文件),hook 
 | `src/main/resources/templates/landing.html` | 落地页**工程数字带** | `data-stat` version/tests/migrations/blackbox 必须与现状一致(release preflight 硬门) |
 | `.claude/skills/release-prod/` | 发布 prod skill | 见第 10 节 |
 | `.claude/skills/auto-issue-killer/` | GitHub issue 预处理 skill | `bash .claude/skills/auto-issue-killer/issue.sh scan`;先 👀 → 打 label → 以「作者的 agent 助手」双语回复;bug 开 `issue/<n>-<slug>` 分支修到 beta 为止,需求先写 PRD+preview,**发布/合并/关 issue 一律等作者批准** |
-| `deploy/deploy.sh` `rollback.sh` | prod 部署/回滚 | 幂等 + 失败自动回滚 |
+| `deploy/deploy.sh` `rollback.sh` | prod 部署/回滚 | 幂等 + 失败自动回滚;`rollback.sh` 读 `app.jar.prev` 的版本,回到 vX.Y 之前先执行 `db/rollback/vX.Y.sql`(v1.30 起:基金账户改回理财) |
+| `src/main/java/.../service/fund/` | v1.30 场外基金 / 货币基金 | `FundCatalog`(搜索 / 分类)· `FundNavService`(同步 + 货基结转,行锁)· `MmfAccrual`(逐日结转纯函数)· `FundHoldingService`(用户动作 + 现金联动)· 数据在 `penetration/EastMoneyFundClient` |
 | `AGENTS.md`(本文) | 项目操作手册 | 每次迭代必过 |
 | memory `~/.claude/projects/-home-finance-financial-management/memory/` | Claude 跨会话记忆 | 一事一文件 + `MEMORY.md` 索引;详细规则见各 `feedback_*` |
 
@@ -204,7 +210,7 @@ worktree 的工作目录里没有 `.githooks/`(那是 master 上的文件),hook 
 | L3 · 比值类 KPI 币种不变性 | 新增/改**比例类**指标 | 三视图币种下**比值完全相等**、金额按 fx 缩放;两比值相比用**相减(pp)**非相除 | `v05-CCY-INV-1` · `v08-CCY-INV-3` · `CurrencyInvarianceTest` |
 | L4 · 长文目录 TOC | `reports`/`dashboard`/`checkup` 加/改/删/调序 section | 同步该页 `fragments/_toc` + `static/js/toc.js` + section `id` 锚点 | `v05-TOC-1/2/3` |
 | L5 · 主页数字带 + 文档 | 出新版本 / 加迁移 / 改单测数或黑盒数 | `landing.html` `data-stat`(version=prd 个数 · migrations=`V*.sql` 个数 · tests/blackbox=README)+ README「N 单元 / N 黑盒」+ `prd`+`tech-design`+`CHANGELOG`+`docs/qa-cases` | release preflight(硬门)· `v09-LAND-6` · `v07-CLEAN-2` |
-| L6 · 股票估值/持仓模型 | 改 `stock_holding` 字段 / `ValuationMode` / 计值 | `AccountValuationService.valuateInternal`(AUTO/MANUAL/CASH 三分支)· 迁移 backward-compat(prod 老数据折算总值不变)· 持仓管理 UI + 收入侧联动。**v1.29 期权等**是 MANUAL 行 + `instrument_kind`:估值**不许**为它另开分支(单价 × 张数一条路,卖出靠负张数);新加读 `stock_holding` 的地方要想清楚期权行该不该进(穿透候选不进、手改表单不给) | `v12-MANUAL-SHARES` · `v03-STOCK-*` · `v129-DERIV-ONE-PATH` · `v129-DERIV-NOT-FUND` |
+| L6 · 股票估值/持仓模型 | 改 `stock_holding` 字段 / `ValuationMode` / 计值 | `AccountValuationService.valuateInternal`(AUTO/MANUAL/CASH 三分支)· 迁移 backward-compat(prod 老数据折算总值不变)· 持仓管理 UI + 收入侧联动。**v1.29 期权等**是 MANUAL 行 + `instrument_kind`:估值**不许**为它另开分支(单价 × 张数一条路,卖出靠负张数);新加读 `stock_holding` 的地方要想清楚期权行该不该进(穿透候选不进、手改表单不给)。**v1.30 净值行**同理是 MANUAL 行 + `nav_mode`:单价只许经 `FundNavService` / `FundHoldingService` 写(`writeNav` 把 `manual_value_at` 与 `nav_checked_at` 写成同一时刻,别处改过就暂停自动更新);手改单价表单、股票收入「增加股数」、截图导入的「份额 = 1、单价 = 市值」都要先判 `isNavRow()` | `v12-MANUAL-SHARES` · `v03-STOCK-*` · `v129-DERIV-ONE-PATH` · `v129-DERIV-NOT-FUND` · `v130-FUND-ONE-PATH` · `v130-IMPORT-NAV-SAFE` · `v130-NAV-NOT-HAND-EDITED` · `v130-STOCK-INCOME-NO-FUND` |
 | L7 · prod backward-compat | 任何 schema/代码/部署改动 | 先想对线上现有数据影响:迁移只 `ADD COLUMN NULL`/数据折算不破坏;**回滚只回 jar 不回 DB → 迁移须向前兼容老 jar** | release preflight 迁移提示 |
 | L8 · UI 规范 | 新增 UI 文案/图标 | **禁 emoji**,用 inline SVG(Feather 24×24 `stroke=currentColor`);入口/按钮命名**避免技术词**(集成/API/接口)让非技术家庭成员看得懂 | `TODO: no-emoji grep 守护` |
 | L9 · 运营参数 | 新增阈值/aksk/节奏/手机号等运营配置(任何新的 `FamilyConfigService.K_*`) | 走**管理页**配(DB > env > 代码默认 三层 fallback)· 不写服务器配置文件;涉及外部平台接入配一键测试入口。**放哪**(2026-09-27 维护者定):按「用户要完成的事」归,不按技术分类 —— 同一件事(又一家券商 / 又一个行情源)并进已有那一节;不同的事(个人凭据 vs 公共数据、AI vs 行情)新开入口,判据三问:① 用户会带着什么词来找?那个词必须出现在**管理首页卡片**上(IBKR 这次就漏在这:卡上只写「券商同步」没写哪几家)② 填的是用户自己的账户凭据,还是系统用的公共数据?③ 配完在哪用、出了问题要和谁一起排查?**找得到**:页面上任何「去管理页配」的指路都必须是能点的链接,直达那一节的锚点,从某个账户过来的带 `?account=` 回跳 | `v126-CONFIG-KEY-HAS-HOME`(新 K_ 键要么 web 层有读写、要么登记不用配的理由)· `v126-BROKER-OWN-PAGE` · `v1197-ADMIN-LANDING-COMPLETE` |
@@ -222,6 +228,8 @@ worktree 的工作目录里没有 `.githooks/`(那是 master 上的文件),hook 
 
 | L19 · 分析范围(v1.27) | 新增 / 改任何**占比类**组件(分母是资产合计的:配置、风险分布、集中度、配置锚、AI 的配置结论) | 要么吃分析范围(从 `FamilyDiagnose` / `AllocationService.compute(…, scope, …)` / `AssetInsightService.compute(…, scope, …)` 取,范围只经 `AnalysisScope.apply` → `FactSlice.excludingAccounts`),要么在 `prd/v1.27.md` §6 矩阵里写明为什么不跟;**绝对数一格都不许跟**。改任何分析类 AI 的提示词:偏好 / 补充要求经 `AnalysisPromptBlocks` 拼、在材料之后;基线组合须与 `golden/v1261` 逐字相同;缓存键带 `AnalysisContext.fingerprint()` | `v127-RATIO-FOLLOWS-SCOPE` · `v127-SCOPE-SLICE-ONLY` · `v127-PROMPT-BASELINE` · `v127-BLOCK-ORDER` · `v127-CACHE-KEYS` · e2e flow 30–33 |
 | L20 · 看 AI 收到了什么(v1.28) | 新增 / 改任何**调用大模型并展示回答**的地方 | 走 `llmRouter.invoke(familyId, PromptTrace, …)`(不走不记录的老重载);结果带 `promptRecordId` 一路传到页面;卡片头挂 `_prompt-peek :: btn`(JSON 渲染的用 `btnJs` + `peekSet`);AI 正文用 `@aiText.priv` / `privText`;提示词里账户名只在系统写入的位置用 `AccountCodenames` 换代号、回答反映射;**不许在面板侧重拼提示词**;日志只记元数据 | `v128-ROUTER-TRACE` · `v128-PEEK-EVERYWHERE` · `v128-PEEK-STORED-NOT-REBUILT` · `v128-ACCOUNT-CODENAMES` · `v128-LOG-NO-PROMPT` · `v128-AI-TEXT-PRIV` · e2e flow 34 |
+
+| L21 · 加账户类型(v1.30 是第三次:METAL v0.14 / INSURANCE v0.17 / FUND v1.30) | 给 `AccountType` 加取值 | ① 枚举谓词(`isInvestment` / `isLiability` / `expectsFlowsToExplainBalance`)显式归类 + `AccountTypeSemanticsTest`;② 编译器抓得到的穷尽 switch(流动性 / 资产类别 / 托管形态 / 默认类目 / 风险档 / 排序);③ **编译器抓不到的**:模板里的类型字面量链(账户页 / 详情 / 填报行的标签色)、`BenchmarkAggregator` 兜底表、`AllocationDiff` 桶、金融盘清单、`supportsHoldings`、产品类目 `applicable_types`;④ 迁移放宽 `ck_account_type` / `ck_account_template_type`;⑤ **老 jar 不认识新取值** → 写 `db/rollback/vX.Y.sql` 把它改回旧类型 | `v130-FUND-TYPE-SWEPT` · `v130-FUND-ROLLBACK-SQL` · `AccountTypeSemanticsTest` |
 
 **新链怎么加**:出现"改 A 漏了 B"事故 → 加一行(触发/必须同步/守护)+ `qa-run.sh` 加静态 grep 把它网住,下次它自己 fail。
 

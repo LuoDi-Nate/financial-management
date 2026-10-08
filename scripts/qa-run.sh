@@ -4111,14 +4111,18 @@ grep -q 'intl ? "XPD" : null' "$MU" \
 # v14-METAL-ENTRY · 填报页持仓入口覆盖 METAL(修:此前硬编码 STOCK/CRYPTO 漏金属 → 填报录不了重量)
 ROWF="$RD/src/main/resources/templates/entry/_row.html"
 ECF="$RD/src/main/java/com/family/finance/web/entry/EntryController.java"
+# v1.30 · 市场列表从 EntryController 收口到 ValuationRefreshService.MARKETS(两个刷新入口共用一份,护栏跟过去)
+QA14_VRS="$RD/src/main/java/com/family/finance/service/stock/ValuationRefreshService.java"
 { grep -q 'supportsHoldings(row.account.type)' "$ROWF" \
   && ! grep -q "row.account.type.name() == 'STOCK' or row.account.type.name() == 'CRYPTO'" "$ROWF" \
-  && grep -q 'Market.METAL' "$ECF"; } \
+  && grep -q 'MARKETS = List.of(.*Market.METAL' "$QA14_VRS" \
+  && grep -q 'valuationRefreshService.refreshFamily(' "$ECF"; } \
   && log_ok "v14-METAL-ENTRY 填报页持仓入口走 supportsHoldings(含 METAL)+ 一键刷新含 METAL 市场" \
   || log_bad "v14-METAL-ENTRY 填报页仍漏 METAL 入口" "see entry/_row.html supportsHoldings / EntryController.refresh-stocks"
 
 # v14-REFRESH-COUNT · 刷新估值 toast 分母动态(修 prod「4/3」:市场数增而分母写死 3 → 全成功误报成 warning)
-{ grep -q 'marketsOk == total' "$ECF" && ! grep -qE 'marketsOk == 3|/3 市场|"3 市场' "$ECF"; } \
+{ grep -q 'marketsOk == marketsTotal' "$QA14_VRS" && grep -q 'MARKETS.size()' "$QA14_VRS" \
+  && ! grep -qE 'marketsOk == 3|/3 市场|"3 市场' "$ECF" "$QA14_VRS"; } \
   && log_ok "v14-REFRESH-COUNT 刷新估值 toast 分母 = markets.size() 动态(不再写死 3)" \
   || log_bad "v14-REFRESH-COUNT 刷新估值 toast 仍写死市场数(会误报 X/3)" "see EntryController.refreshStocks"
 
@@ -7017,8 +7021,9 @@ MINOR=$(printf '%s' "$APPV" | cut -d. -f1,2)
 #   是单测造的家庭,「净资产 100 万远大于阈值 5」是讲判据,而「同一时刻 checkup ¥5399878」
 #   是 prod 实测。机器分不出来,硬扫会得到一条天天红的护栏,然后被人关掉(这一版刚为
 #   「误报会让告警被关掉」付过代价)。要收得先由维护者逐条裁定哪些是真的。
-QA111_SYNTH='53,210|48,765|61,234|40,000|35,000|1,234,567\.89|123,456\.78|1,234,567|1,234,568|1,000,000|2,000,000|1,140,000|1,520,000|99,999,999|10,950,000|1,200,000|1,500,000|1,140,580|4,917,500|7,745,000|1,552,823|1,628,895|3,181,718|3,762,836|17,901,892|0,891,892,893,890|7,747,000|111,221.91|111,222.95|1,280\.00|12,845\.30|3,182\.50|1,046\.03|5,000\.00|1,250\.00'
-#   v1.30 登记的最后三项:prd/v1.30.md「关键文案」表里编的示例(按市值反推份额、手动改份额那两行)。
+QA111_SYNTH='53,210|48,765|61,234|40,000|35,000|1,234,567\.89|123,456\.78|1,234,567|1,234,568|1,000,000|2,000,000|1,140,000|1,520,000|99,999,999|10,950,000|1,200,000|1,500,000|1,140,580|4,917,500|7,745,000|1,552,823|1,628,895|3,181,718|3,762,836|17,901,892|0,891,892,893,890|7,747,000|111,221.91|111,222.95|1,280\.00|12,845\.30|3,182\.50|1,046\.03|5,000\.00|1,250\.00|1,000,022\.53|12,001\.89|5,000\.02|12,000\.00'
+#   v1.30 登记的最后七项:前三项是 prd/v1.30.md「关键文案」表里编的示例(按市值反推份额、手动改份额那两行);
+#   后四项是货基逐日结转单测的复利结果,以及持仓页 / 确认框模板里的占位示例。
 # 【基线 · 待裁定】把扫描面扩到源码/模板时一次性捞出来的存量(v1.19)。
 #   里面**真假混杂**:有的是单测造的家庭、股价报文片段、模板占位;但也确实有真的 ——
 #   `451,497.63` 就是本条护栏自己的注释里点名过的真实余额。机器分不出来,
@@ -7662,17 +7667,21 @@ QA118_MIG="$RD/db/migration/V56__ledger_source_tag.sql"
 QA118_ADS="$RD/src/main/java/com/family/finance/service/AccountDetailService.java"
 QA118_ENTRIES="$(grep -c 'new AccountDetail.Entry(' "$QA118_ADS" 2>/dev/null || echo 0)"
 QA118_SRCS="$(grep -c 'LedgerSource.parse(' "$QA118_ADS" 2>/dev/null || echo 0)"
+# v1.30 · 第 5 个构造点:持仓数量变动(holding_share_event)。这张表不存来源 —— 来源由「原因」唯一决定
+#   (货基结转=自动、截图导入=截图、其余=手动),由 ShareEventReason.source() 给出,不是写死一个值。
+QA118_DERIVED="$(grep -c 'reasonEnum().source()' "$QA118_ADS" 2>/dev/null || echo 0)"
 { [ -f "$QA118_MIG" ] \
   && [ "$(grep -c 'ADD COLUMN source_tag' "$QA118_MIG")" -eq 4 ] \
   && grep -q 'ALTER TABLE stock_valuation_event' "$QA118_MIG" \
   && grep -q 'ALTER TABLE cash_flow' "$QA118_MIG" \
   && grep -q 'ALTER TABLE transfer' "$QA118_MIG" \
   && grep -q 'ALTER TABLE period_snapshot' "$QA118_MIG" \
-  && [ "$QA118_ENTRIES" -eq 4 ] && [ "$QA118_SRCS" -eq 4 ] \
+  && [ "$QA118_SRCS" -eq 4 ] && [ "$QA118_DERIVED" -eq 1 ] \
+  && [ "$QA118_ENTRIES" -eq $((QA118_SRCS + QA118_DERIVED)) ] \
   && grep -q 'src-tag' "$RD/src/main/resources/templates/accounts/detail.html" \
   && grep -q 'e.source.group' "$RD/src/main/resources/templates/accounts/detail.html"; } \
   && log_ok "v118-SOURCE-TAG-ALL-TABLES(4 张流水表都有 source_tag · 时间线 $QA118_ENTRIES 个构造点都带来源 · 模板按分组上色)" \
-  || log_bad "v118-SOURCE-TAG-ALL-TABLES 有流水表或时间线构造点漏了来源" "V56 要 4 条 ADD COLUMN;AccountDetailService 的 Entry 构造点数($QA118_ENTRIES)必须等于 LedgerSource.parse 数($QA118_SRCS)"
+  || log_bad "v118-SOURCE-TAG-ALL-TABLES 有流水表或时间线构造点漏了来源" "V56 要 4 条 ADD COLUMN;AccountDetailService 的 Entry 构造点数($QA118_ENTRIES)必须等于 LedgerSource.parse 数($QA118_SRCS)+ 由原因推出来源的数($QA118_DERIVED)"
 
 # v118-UNKNOWN-NOT-MANUAL · 历史数据一律 UNKNOWN,不许回填成 MANUAL(v1.18 FR-413 · 维护者定)
 # 回填 MANUAL 等于【假装我们知道】:历史行里确实有一部分是自动同步来的,
@@ -10714,7 +10723,7 @@ QA127_BL="$QA127_SVC/AnalysisPromptBlocks.java"
 
 # v127-D-FIXES · 纠正默认值:其他类不进投资桶、金融盘含贵金属不含其他、调仓真的带余额、自定义锚能填
 { codeonly "$RD/src/main/java/com/family/finance/calc/AllocationDiff.java" | grep -q 'if ("OTHER".equals(type)) return null;' \
-  && codeonly "$RD/src/main/java/com/family/finance/service/insight/AssetInsightService.java" | tr -d '\n' | grep -qE 'AccountType\.WEALTH, AccountType\.CRYPTO, AccountType\.METAL, AccountType\.INSURANCE\)' \
+  && codeonly "$RD/src/main/java/com/family/finance/service/insight/AssetInsightService.java" | tr -d '\n' | grep -qE 'AccountType\.WEALTH, AccountType\.CRYPTO, AccountType\.METAL, AccountType\.INSURANCE, *AccountType\.FUND\)' \
   && codeonly "$RD/src/main/java/com/family/finance/service/allocation/RebalanceAdvisorService.java" | grep -q '当前余额=¥' \
   && codeonly "$RD/src/main/java/com/family/finance/service/allocation/AllocationService.java" | grep -q 'familyMapper.updateAllocationAnchorCustom(familyId, json)' \
   && grep -q 'effectiveTargetDropsAbsentBucketsAndRescales' "$RD/src/test/java/com/family/finance/calc/AllocationDiffTest.java"; } \
@@ -11137,7 +11146,7 @@ QA129_HOLD="$RD/src/main/resources/templates/stock/holdings.html"
 
 # v129-DERIV-NOT-FUND · 期权等不是基金:不进穿透候选;券商同步行不给手改表单(卖出张数是负的,表单也装不下)
 { grep -B8 'List<Long> findActiveFundHoldingIdsByFamily' "$QA129_MAP" | grep -qF 'h.instrument_kind IS NULL' \
-  && grep -qF "h.valuationMode.name() == 'MANUAL' and !h.derivative}\"" "$QA129_HOLD" \
+  && grep -qE "h.valuationMode.name\(\) == 'MANUAL' and !h.derivative( and !h.navRow)?}\"" "$QA129_HOLD" \
   && grep -qF 'data-deriv-row' "$QA129_HOLD" && grep -qF 'data-deriv-due' "$QA129_HOLD" \
   && grep -qF '期权等(券商报表)' "$QA129_HOLD" \
   && grep -qF 'linkMapper.markSynced(familyId, accountId, clip(s));' "$QA129_SYNC" \
@@ -11297,8 +11306,12 @@ QA130_W=$(grep -n 'valuationService.refreshAllForFamily' <<<"$QA130_SCH" | head 
   && grep -q '美元' "$QA130_J/service/fund/FundCatalog.java" && grep -q '货币型-浮动净值' "$QA130_J/service/fund/FundCatalog.java"; } \
   && log_ok "v130-NO-FOREIGN-SHARECLASS(外币份额 / 浮动净值货基不被当人民币算)" \
   || log_bad "v130-NO-FOREIGN-SHARECLASS 外币份额可能按人民币估值" "see FundCatalog.classify"
-grep -q '哪些账户的添加持仓里有场外基金' "$QA130_T/service/fund/FundCatalogTest.java" \
-  && log_ok "v130-ENTRY-BY-TYPE(PRD §3.1 的表逐类型 × 币种有单测)" \
+# 判据落在 AccountType.holdsOtcFunds(穷尽 switch,再加类型编译器逼着表态),不许在服务里写裸的类型清单
+{ grep -q '哪些账户的添加持仓里有场外基金' "$QA130_T/service/fund/FundCatalogTest.java" \
+  && grep -q 'public boolean holdsOtcFunds()' "$QA130_J/domain/account/AccountType.java" \
+  && grep -q 'type.holdsOtcFunds()' "$QA130_J/service/fund/FundHoldingService.java" \
+  && grep -q '能放场外基金的只有基金证券理财现金' "$QA130_T/domain/account/AccountTypeSemanticsTest.java"; } \
+  && log_ok "v130-ENTRY-BY-TYPE(PRD §3.1 的表逐类型 × 币种有单测 · 判据是 AccountType 上的具名谓词)" \
   || log_bad "v130-ENTRY-BY-TYPE §3.1 的表没被单测钉住" "see FundCatalogTest"
 grep -q '代码表收口后_名到码索引与v15逐条相同' "$QA130_PT" \
   && log_ok "v130-CATALOG-PARITY(代码表收口后 v1.5 名↔码匹配逐条一致)" \

@@ -41,7 +41,22 @@ public enum ShareEventReason {
         }
     }
 
-    /** 这一类变动有没有同时改余额(联动现金的两类不改;改为自动估值、添加基金只是开始记份额) */
+    /**
+     * 时间线上显示的来源(v1.18 「每条流水都带来源」)。holding_share_event 不单存来源列 ——
+     * 来源由原因唯一决定:货基结转是系统按万份收益算的,截图导入来自截图,其余都是人在页面上点的。
+     * 认不出的原因({@link #OTHER})老实写「来源未记录」,不猜成手动。
+     */
+    public com.family.finance.domain.ledger.LedgerSource source() {
+        return switch (this) {
+            case MMF_ACCRUAL -> com.family.finance.domain.ledger.LedgerSource.SYNC_FUND_NAV;
+            case IMPORT -> com.family.finance.domain.ledger.LedgerSource.IMPORT_SCREENSHOT;
+            case MANUAL_EDIT, MANUAL_CORRECTION, CASH_BUY, CASH_REDEEM, CONVERT, CREATE ->
+                    com.family.finance.domain.ledger.LedgerSource.MANUAL;
+            case OTHER -> com.family.finance.domain.ledger.LedgerSource.UNKNOWN;
+        };
+    }
+
+    /** 这一类变动有没有同时改余额(联动现金的两类不改;改为自动估值只是换记法 —— 市值不变,开始按份额记) */
     public boolean movesBalance() {
         return switch (this) {
             case CASH_BUY, CASH_REDEEM, CONVERT -> false;

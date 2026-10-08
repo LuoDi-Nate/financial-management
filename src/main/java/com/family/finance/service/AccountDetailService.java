@@ -242,8 +242,7 @@ public class AccountDetailService {
                         shareEventNote(ev, account.getCurrency()),
                         ev.getId(),
                         false,
-                        ev.getMemberId() == null ? com.family.finance.domain.ledger.LedgerSource.SYNC_FUND_NAV
-                                                 : com.family.finance.domain.ledger.LedgerSource.MANUAL
+                        ev.reasonEnum().source()
                     ));
                 }
             } catch (Exception ignored) {

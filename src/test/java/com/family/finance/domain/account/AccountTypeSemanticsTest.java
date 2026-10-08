@@ -91,6 +91,16 @@ class AccountTypeSemanticsTest {
                 .isEqualTo(com.family.finance.domain.lens.AssetClass.FIXED_INCOME);
         assertThat(com.family.finance.calc.BenchmarkAggregator.benchmarkForAccount(null, null, "FUND"))
                 .as("没设类目时的兜底基准不能是 0").isEqualByComparingTo("6.00");
+        assertThat(f.holdsOtcFunds()).isTrue();
+    }
+
+    /** v1.30 PRD §3.1:能放场外基金的只有这四类(币种另判);逐个类型表过态 */
+    @Test
+    void 能放场外基金的只有基金证券理财现金() {
+        var yes = java.util.EnumSet.of(AccountType.FUND, AccountType.STOCK, AccountType.WEALTH, AccountType.CASH);
+        for (AccountType t : AccountType.values()) {
+            assertThat(t.holdsOtcFunds()).as(t + " 能不能放场外基金").isEqualTo(yes.contains(t));
+        }
     }
 
     @Test

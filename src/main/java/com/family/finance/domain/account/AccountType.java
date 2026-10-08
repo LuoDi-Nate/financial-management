@@ -80,4 +80,16 @@ public enum AccountType {
     public boolean expectsFlowsToExplainBalance() {
         return this == CASH || this == LOAN;
     }
+
+    /**
+     * v1.30 · 这类账户里能不能放场外基金 / 货币基金(PRD v1.30 §3.1;币种另判,只认人民币)。
+     *
+     * <p>写成穷尽 switch:再加类型时编译器会逼着表态,而不是悄悄落进「不能」。</p>
+     */
+    public boolean holdsOtcFunds() {
+        return switch (this) {
+            case FUND, STOCK, WEALTH, CASH -> true;   // 基金平台 / 券商场外 / 银行理财 / 余额宝那类现金
+            case CRYPTO, METAL, PROPERTY, LOAN, INSURANCE, OTHER -> false;
+        };
+    }
 }

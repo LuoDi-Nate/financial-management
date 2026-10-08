@@ -81,10 +81,8 @@ public class FundHoldingService {
 
     /** 「添加持仓」里有没有「场外基金」:基金 / 证券 / 理财 / 现金账户,且账户币种是人民币(选型七) */
     public static boolean accountAllowsFunds(AccountType type, String currency) {
-        if (type == null) return false;
-        boolean typeOk = type == AccountType.FUND || type == AccountType.STOCK
-                || type == AccountType.WEALTH || type == AccountType.CASH;
-        return typeOk && "CNY".equalsIgnoreCase(currency == null ? "" : currency.trim());
+        return type != null && type.holdsOtcFunds()
+                && "CNY".equalsIgnoreCase(currency == null ? "" : currency.trim());
     }
 
     public static boolean accountAllowsFunds(Account a) {
