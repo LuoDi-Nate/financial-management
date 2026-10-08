@@ -381,7 +381,7 @@ bash scripts/regression-data.sh # 数据层/口径回归(原 e2e.sh · curl 端�
 
 | 版本 | 文档 |
 |---|---|
-| `v1.30` | [PRD](prd/v1.30.md)(待评审)· [预览](preview/v1.30/) · [竞品报告 · Capivot](docs/research/capivot/README.md) |
+| `v1.30` | [PRD](prd/v1.30.md)(待评审)· [技术设计](tech-design/v1.30.md)(待评审)· [预览](preview/v1.30/) · [竞品报告 · Capivot](docs/research/capivot/README.md) |
 | `v1.29` | [PRD](prd/v1.29.md) · [技术设计](tech-design/v1.29.md) · [预览](preview/v1.29/) |
 | `v1.28` | [PRD](prd/v1.28.md) · [技术设计](tech-design/v1.28.md) · [预览](preview/v1.28/) |
 | `v1.27` | [PRD](prd/v1.27.md) · [技术设计](tech-design/v1.27.md) · [预览](preview/v1.27/) |
