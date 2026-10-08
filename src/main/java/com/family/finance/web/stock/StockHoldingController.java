@@ -149,10 +149,17 @@ public class StockHoldingController {
         Map<Long, Map<String, Object>> navInfo = new HashMap<>();
         BigDecimal navBase = BigDecimal.ZERO;
         java.util.Set<Long> convertible = new java.util.HashSet<>();
+        // 每行市值取估值服务的 perHoldingLines(与账户余额同一个算式,护栏 v130-FUND-ONE-PATH)—— 页面不另乘一遍
+        Map<Long, BigDecimal> lineValue = new HashMap<>();
+        if (active.stream().anyMatch(StockHolding::isNavRow)) {
+            for (var line : valuationService.perHoldingLines(account)) lineValue.put(line.holding().getId(), line.valueAcctCcy());
+        }
         for (StockHolding h : active) {
             if (h.isNavRow()) {
                 Map<String, Object> ni = navView(me.getFamilyId(), h, today);
-                navBase = navBase.add((BigDecimal) ni.get("value"));
+                BigDecimal v = lineValue.getOrDefault(h.getId(), BigDecimal.ZERO);
+                ni.put("value", v);
+                navBase = navBase.add(v);
                 navInfo.put(h.getId(), ni);
             } else if (fundAllowed && h.getValuationMode() == ValuationMode.MANUAL && !h.isDerivative()
                     && h.getFundCode() != null && h.getFundCode().matches("\\d{6}")) {
@@ -394,16 +401,13 @@ public class StockHoldingController {
     // ---------- helpers ----------
 
     /**
-     * v1.30 · 一条净值行写成人话:份额 / 单价 / 市值 / 净值日期 / 晚到说明 / 估算提示 / 出了什么问题。
-     * 市值 = 份额 × 单价,与估值服务 MANUAL 支同一个算式(只是展示;余额从估值服务来)。
+     * v1.30 · 一条净值行写成人话:净值日期 / 晚到说明 / 估算提示 / 出了什么问题。
+     * 市值不在这里算 —— 调用方从估值服务的 perHoldingLines 取(与账户余额同一个算式)。
      */
     private Map<String, Object> navView(long familyId, StockHolding h, java.time.LocalDate today) {
         Map<String, Object> ni = new HashMap<>();
         var kind = h.nav();
-        BigDecimal sh = h.getShares() == null ? BigDecimal.ZERO : h.getShares();
-        BigDecimal unit = h.getManualValue() == null ? BigDecimal.ZERO : h.getManualValue();
         ni.put("mmf", kind == com.family.finance.domain.stock.NavMode.MMF);
-        ni.put("value", sh.multiply(unit).setScale(2, java.math.RoundingMode.HALF_UP));
         ni.put("dateText", cnDate(h.getNavDate()));
         ni.put("checkedText", h.getNavCheckedAt() == null ? null
                 : h.getNavCheckedAt().format(java.time.format.DateTimeFormatter.ofPattern("MM-dd HH:mm")));

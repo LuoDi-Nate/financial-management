@@ -94,7 +94,7 @@ TRUNCATE TABLE period; TRUNCATE TABLE account;
 -- v1.29 · issue #34 · 关账定格表也要清:迁移 V54 会给演示数据里已关账的期回填定格行,
 --   只清 period / account 的话编号会被重用 → 演示账户的类型按编号挂到用户自己的账户上
 --   (用户的「中国银行(现金)」在当期被当成了贷款)。新加任何按期 / 按账户定格的表,这里都要加一行。
-TRUNCATE TABLE period_account_attr; TRUNCATE TABLE period_account_group;
+TRUNCATE TABLE period_account_attr; TRUNCATE TABLE period_account_group; TRUNCATE TABLE holding_share_event; TRUNCATE TABLE fund_nav_snapshot;
 SET FOREIGN_KEY_CHECKS=1;
 SQL
 echo "[clean] 完成 · 全家空态,登录后走 onboarding 引导从零开始"
