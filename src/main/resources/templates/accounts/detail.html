@@ -23,7 +23,7 @@
           th:text="${detail.account.displayName}">账户名</h1>
       <div class="flex items-center gap-2 flex-wrap">
         <span class="pill"
-              th:classappend="${detail.account.type.name() == 'LOAN' ? ' pill-rust' : (detail.account.type.name() == 'WEALTH' ? ' pill-forest' : (detail.account.type.name() == 'STOCK' ? ' pill-brass' : (detail.account.type.name() == 'INSURANCE' ? ' pill-slate' : '')))}"
+              th:classappend="${detail.account.type.name() == 'LOAN' ? ' pill-rust' : (detail.account.type.name() == 'WEALTH' ? ' pill-forest' : (detail.account.type.name() == 'STOCK' ? ' pill-brass' : (detail.account.type.name() == 'INSURANCE' ? ' pill-slate' : (detail.account.type.name() == 'FUND' ? ' pill-fund' : ''))))}"
               th:text="${detail.account.type.label} + ' (' + ${detail.account.type.name()} + ')'">现金 (CASH)</span>
         <!--/* v1.20 · 所属分组 + 去管理的入口。和类目 pill 同级 ——
                「这个账户属于哪个分组」和「它是什么类目」是同一类信息。 */-->

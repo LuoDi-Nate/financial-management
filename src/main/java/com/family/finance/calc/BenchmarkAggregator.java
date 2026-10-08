@@ -15,7 +15,7 @@ import java.util.Map;
  * </ul>
  *
  * <p>fallback:account 没 product_category_code 的,按 AccountType 兜底
- * (STOCK→6% / WEALTH→3% / CASH→0.5% / PROPERTY→3% / LOAN→0% / OTHER→0%)</p>
+ * (STOCK→6% / WEALTH→3% / FUND→6% / CASH→0.5% / PROPERTY→3% / LOAN→0% / OTHER→0%)</p>
  */
 public final class BenchmarkAggregator {
     private BenchmarkAggregator() {}
@@ -25,6 +25,7 @@ public final class BenchmarkAggregator {
         "CASH",     new BigDecimal("0.50"),
         "STOCK",    new BigDecimal("6.00"),
         "WEALTH",   new BigDecimal("3.00"),
+        "FUND",     new BigDecimal("6.00"),   // v1.30 · 同默认类目 MIXED_FUND 的基准
         "PROPERTY", new BigDecimal("3.00"),
         "LOAN",     BigDecimal.ZERO,
         "OTHER",    BigDecimal.ZERO

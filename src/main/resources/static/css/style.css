@@ -39,6 +39,8 @@
   --plum:         #5C3A4B;
   --slate:        #3C4A5A;
   --slate-soft:   #C5CDD8;  /* v0.17 · 保险 pill 底色 */
+  --fund:         #34587A;  /* v1.30 · 基金账户 / 场外基金 */
+  --fund-soft:    #D5DDE6;
 
   /* — Sizing — */
   --rule-thin:    0.5px;
@@ -298,6 +300,8 @@ h1, h2, h3, h4 {
 .pill-forest { background: var(--forest-soft); border-color: var(--forest); color: var(--forest); }
 .pill-rust { background: var(--rust-soft); border-color: var(--rust); color: var(--rust); }
 .pill-slate { background: var(--slate-soft); border-color: var(--slate); color: var(--slate); } /* v0.17 保险 */
+.pill-fund { background: var(--fund-soft); border-color: var(--fund); color: var(--fund); } /* v1.30 基金账户 */
+.text-fund { color: var(--fund); }
 .pill-ink { background: var(--ink); border-color: var(--ink); color: var(--paper); }
 
 /* Number coloring */

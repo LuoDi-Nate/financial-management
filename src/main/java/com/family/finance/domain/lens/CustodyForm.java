@@ -46,7 +46,7 @@ public enum CustodyForm {
         return switch (type) {
             case CASH -> LIQUID;
             case STOCK, CRYPTO, METAL -> SELF;
-            case WEALTH -> liquidTag ? LIQUID : DELEGATED;   // 货基算随时可取,其余算交给产品
+            case WEALTH, FUND -> liquidTag ? LIQUID : DELEGATED;   // 货基算随时可取,其余算交给产品(v1.30 基金账户同理财)
             case PROPERTY, INSURANCE -> PARKED;
             case OTHER -> PARKED;                            // 兜底类型:语义上什么都不承诺
             case LOAN -> PARKED;                             // 负债本就不进资产透视,这里只为穷尽

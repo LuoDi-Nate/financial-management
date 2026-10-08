@@ -48,6 +48,7 @@ public class ProductCategoryService {
             case CASH     -> "CASH_DEPOSIT";
             case STOCK    -> "A_STOCK";
             case WEALTH   -> "BANK_WEALTH";
+            case FUND     -> "MIXED_FUND";   // v1.30 · 基金账户里最常见的是偏股 / 混合;用户可改
             case CRYPTO   -> "CRYPTO";
             case METAL    -> "PRECIOUS_METAL";
             case LOAN     -> "LIABILITY";

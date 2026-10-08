@@ -142,7 +142,7 @@
           </div>
         </td>
         <td>
-          <span class="pill" th:classappend="${row.account.type.name() == 'LOAN' ? ' pill-rust' : (row.account.type.name() == 'WEALTH' ? ' pill-forest' : (row.account.type.name() == 'STOCK' ? ' pill-brass' : (row.account.type.name() == 'INSURANCE' ? ' pill-slate' : '')))}"
+          <span class="pill" th:classappend="${row.account.type.name() == 'LOAN' ? ' pill-rust' : (row.account.type.name() == 'WEALTH' ? ' pill-forest' : (row.account.type.name() == 'STOCK' ? ' pill-brass' : (row.account.type.name() == 'INSURANCE' ? ' pill-slate' : (row.account.type.name() == 'FUND' ? ' pill-fund' : ''))))}"
                 th:text="${row.account.type.label} + ' (' + ${row.account.type.name()} + ')'">现金 (CASH)</span>
           <span class="pill text-[9px]" th:if="${brokerLinks != null and brokerLinks.containsKey(row.account.id)}"
                 style="background:rgba(180,138,58,.12);color:var(--brass-deep);border-color:var(--brass-deep)"
@@ -296,7 +296,7 @@
           </div>
         </div>
         <div class="flex flex-col items-end gap-1 flex-shrink-0">
-          <span class="pill text-[9px]" th:classappend="${row.account.type.name() == 'LOAN' ? ' pill-rust' : (row.account.type.name() == 'WEALTH' ? ' pill-forest' : (row.account.type.name() == 'STOCK' ? ' pill-brass' : (row.account.type.name() == 'INSURANCE' ? ' pill-slate' : '')))}"
+          <span class="pill text-[9px]" th:classappend="${row.account.type.name() == 'LOAN' ? ' pill-rust' : (row.account.type.name() == 'WEALTH' ? ' pill-forest' : (row.account.type.name() == 'STOCK' ? ' pill-brass' : (row.account.type.name() == 'INSURANCE' ? ' pill-slate' : (row.account.type.name() == 'FUND' ? ' pill-fund' : ''))))}"
                 th:text="${brokerLinks != null and brokerLinks.containsKey(row.account.id) ? row.account.type.label + ' · 券商托管' : row.account.type.label}">现金</span>
           <!-- v1.18 · 与 PC 表格同一枚标记。窄屏是另一套卡片视图,只改表格那侧会让手机用户
                完全看不到同步失败(第一版就漏了,截图复看时它的盒子是 0×0)。 -->

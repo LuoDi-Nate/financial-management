@@ -173,7 +173,7 @@ public final class AllocationDiff {
     private static Bucket typeFallback(String type) {
         return switch (type) {
             case "CASH" -> Bucket.CASH;
-            case "STOCK", "WEALTH" -> Bucket.INVEST;
+            case "STOCK", "WEALTH", "FUND" -> Bucket.INVEST;   // v1.30 FUND = 投资桶
             case "PROPERTY" -> Bucket.PROPERTY;
             case "INSURANCE" -> Bucket.INSURANCE; // v0.17 · 保险独立桶(pickBucket 已短路,此为兜底)
             default -> Bucket.INVEST; // CRYPTO / METAL 等投资类(OTHER 已在 pickBucket 短路)

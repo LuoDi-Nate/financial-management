@@ -32,6 +32,33 @@ fi
 
 SERVER_PORT=$(grep '^SERVER_PORT=' /etc/finance.env 2>/dev/null | cut -d= -f2- | tr -d '"' || echo 20000)
 
+# ── v1.30 起 · 跨版本回滚的前置 SQL(db/rollback/vX.Y.sql)─────────────────────────
+# 多数迁移老 jar 兼容,但「加账户类型」这种不兼容:v1.30 加了 FUND,老 jar 读到就炸。
+# 规则:要换上的 jar 版本 < X.Y,就先执行 db/rollback/vX.Y.sql(幂等)。版本从 jar 里的 application.yml 读。
+REPO_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+jar_yml() {   # 机器上不一定装了 unzip,装不了就退而用 python3 读 jar(jar 就是 zip)
+  unzip -p "$1" BOOT-INF/classes/application.yml 2>/dev/null \
+    || python3 -c 'import sys,zipfile;sys.stdout.write(zipfile.ZipFile(sys.argv[1]).read("BOOT-INF/classes/application.yml").decode())' "$1" 2>/dev/null
+}
+PREV_VER=$(jar_yml /opt/finance/app.jar.prev | grep -oE 'APP_VERSION:[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1 | cut -d: -f2 || true)
+ver_lt() { [[ "$1" != "$2" && "$(printf '%s\n%s\n' "$1" "$2" | sort -V | head -1)" == "$1" ]]; }
+if [[ -n "$PREV_VER" ]]; then
+  echo "═══ 回滚前置 SQL(上一版 jar = v$PREV_VER)═══"
+  DB_NAME="${DB_NAME:-finance}"; DB_USER="${DB_USER:-finance}"
+  DB_PASS=$(grep '^DB_PASS=' /etc/finance.env 2>/dev/null | cut -d= -f2- || true)
+  for f in "$REPO_DIR"/db/rollback/v*.sql; do
+    [[ -f "$f" ]] || continue
+    v=$(basename "$f" .sql); v=${v#v}
+    if ver_lt "$PREV_VER" "$v"; then
+      MYSQL_PWD="$DB_PASS" mysql -h127.0.0.1 -u"$DB_USER" "$DB_NAME" < "$f" \
+        || die "执行 $(basename "$f") 失败 —— 没换 jar,服务还是当前版本"
+      ok "已执行 $(basename "$f")(回到 v$v 之前的版本前必须先跑)"
+    fi
+  done
+else
+  echo "${Y}⚠${X} 读不出 app.jar.prev 的版本号 —— 若它早于 v1.30 且库里有基金账户,先手动执行 db/rollback/v1.30.sql"
+fi
+
 echo "═══ 回滚 jar ═══"
 # 当前 jar 暂存到 .reverted,以便万一回滚也挂了能再切回
 cp /opt/finance/app.jar /opt/finance/app.jar.reverted-$(date +%s)

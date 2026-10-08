@@ -24,6 +24,15 @@ public enum AccountType {
     STOCK("股票"),
     CASH("现金"),
     WEALTH("理财"),
+    /**
+     * v1.30 · 基金账户(issue #25 · 维护者 2026-10-08 裁定)。支付宝 / 天天基金 / 银行 App 里那一揽子场外基金。
+     * 以前只能放进「理财」,而理财的默认分类按银行理财算(资产类别 = 债券理财、类目 R2、基准 3%)——
+     * 偏股基金账户整个被当成固收。默认分类见 tech-design/v1.30.md 选型十。
+     *
+     * <p><b>回滚注意</b>:老 jar 的这个枚举里没有 FUND,读到就抛异常。回滚到 v1.30 之前先跑
+     * {@code db/rollback/v1.30.sql}(deploy/rollback.sh 会按版本自动执行)。</p>
+     */
+    FUND("基金"),
     CRYPTO("加密"),
     METAL("贵金属"),
     PROPERTY("房产"),
@@ -58,7 +67,7 @@ public enum AccountType {
      * 用户手填,谈年化没有意义)。INSURANCE 同理(现金价值按合同走)。</p>
      */
     public boolean isInvestment() {
-        return this == STOCK || this == WEALTH || this == CRYPTO || this == METAL;
+        return this == STOCK || this == WEALTH || this == CRYPTO || this == METAL || this == FUND;
     }
 
     /**

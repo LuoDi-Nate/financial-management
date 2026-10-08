@@ -458,7 +458,7 @@ public class StockHoldingService {
             throw new IllegalArgumentException("无权访问账户");
         }
         if (!supportsHoldings(acc.getType())) {
-            throw new IllegalArgumentException("仅 STOCK / CRYPTO / METAL 类型账户可加持仓 · 当前类型 " + acc.getType());
+            throw new IllegalArgumentException("该账户类型不能挂持仓(支持:股票 / 现金 / 理财 / 基金 / 加密 / 贵金属)· 当前类型 " + acc.getType());
         }
         return acc;
     }
@@ -490,8 +490,9 @@ public class StockHoldingService {
     public static boolean supportsHoldings(AccountType type) {
         // v1.4 · 放开 WEALTH/CASH(基金/理财/支付宝)· 支持截图导入多真实持仓。
         // 红线不变:没有持仓的账户,AccountValuationService.holdings.isEmpty()→skip,系统绝不碰其手填余额。
+        // v1.30 · + FUND(基金账户就是为挂基金持仓加的)
         return type == AccountType.STOCK || type == AccountType.CRYPTO || type == AccountType.METAL
-                || type == AccountType.WEALTH || type == AccountType.CASH;
+                || type == AccountType.WEALTH || type == AccountType.CASH || type == AccountType.FUND;
     }
 
     private void validateMarketForAccount(AccountType accountType, Market market) {
