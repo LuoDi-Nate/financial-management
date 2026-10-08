@@ -59,6 +59,11 @@ public class StockHoldingController {
     private final AccountValuationService valuationService;
     private final StockPriceScheduler scheduler;
     private final com.family.finance.service.stock.ValuationRefreshService valuationRefreshService;   // v1.30
+    // v1.30 · 净值行展示 / 「改为按净值自动估值」按钮
+    private final com.family.finance.service.fund.FundHoldingService fundHoldingService;
+    private final com.family.finance.service.fund.FundCatalog fundCatalog;
+    private final com.family.finance.repository.FundNavSnapshotMapper fundNavSnapshotMapper;
+    private final com.family.finance.repository.HoldingShareEventMapper holdingShareEventMapper;
     private final StockPriceSnapshotMapper priceMapper;
     private final BrokerLinkMapper brokerLinkMapper;   // v1.6.24 · 持仓页展示本账户的券商对接状态(1:1)
     private final AccountMapper accountMapper;
@@ -139,12 +144,38 @@ public class StockHoldingController {
             derivInfo.put(h.getId(), di);
         }
 
+        // v1.30 · 净值行(场外基金 / 货币基金):估值仍是 MANUAL 支,这里只为「写成人话」+ 估值分解单列一格
+        boolean fundAllowed = com.family.finance.service.fund.FundHoldingService.accountAllowsFunds(account);
+        Map<Long, Map<String, Object>> navInfo = new HashMap<>();
+        BigDecimal navBase = BigDecimal.ZERO;
+        java.util.Set<Long> convertible = new java.util.HashSet<>();
+        for (StockHolding h : active) {
+            if (h.isNavRow()) {
+                Map<String, Object> ni = navView(me.getFamilyId(), h, today);
+                navBase = navBase.add((BigDecimal) ni.get("value"));
+                navInfo.put(h.getId(), ni);
+            } else if (fundAllowed && h.getValuationMode() == ValuationMode.MANUAL && !h.isDerivative()
+                    && h.getFundCode() != null && h.getFundCode().matches("\\d{6}")) {
+                try {
+                    if (fundHoldingService.convertible(me.getFamilyId(), h, account)) convertible.add(h.getId());
+                } catch (Exception e) {
+                    log.debug("convertible check failed · holding={}: {}", h.getId(), e.toString());
+                }
+            }
+        }
+        boolean hasCashRow = active.stream().anyMatch(x -> x.getValuationMode() == ValuationMode.CASH);
+
         model.addAttribute("me", me);
         model.addAttribute("nav", navService.load(me));
         model.addAttribute("account", account);
         model.addAttribute("holdings", active);
         model.addAttribute("valuation", valuation);
         model.addAttribute("derivInfo", derivInfo);
+        model.addAttribute("fundAllowed", fundAllowed);
+        model.addAttribute("navInfo", navInfo);
+        model.addAttribute("navBase", navBase);
+        model.addAttribute("convertible", convertible);
+        model.addAttribute("hasCashRow", hasCashRow);
         model.addAttribute("derivBase", derivBase);
         model.addAttribute("latestPrices", latestPrices);
         model.addAttribute("industryTags", com.family.finance.domain.lens.IndustryTag.values()); // v1.1 行业标下拉
@@ -361,6 +392,67 @@ public class StockHoldingController {
     }
 
     // ---------- helpers ----------
+
+    /**
+     * v1.30 · 一条净值行写成人话:份额 / 单价 / 市值 / 净值日期 / 晚到说明 / 估算提示 / 出了什么问题。
+     * 市值 = 份额 × 单价,与估值服务 MANUAL 支同一个算式(只是展示;余额从估值服务来)。
+     */
+    private Map<String, Object> navView(long familyId, StockHolding h, java.time.LocalDate today) {
+        Map<String, Object> ni = new HashMap<>();
+        var kind = h.nav();
+        BigDecimal sh = h.getShares() == null ? BigDecimal.ZERO : h.getShares();
+        BigDecimal unit = h.getManualValue() == null ? BigDecimal.ZERO : h.getManualValue();
+        ni.put("mmf", kind == com.family.finance.domain.stock.NavMode.MMF);
+        ni.put("value", sh.multiply(unit).setScale(2, java.math.RoundingMode.HALF_UP));
+        ni.put("dateText", cnDate(h.getNavDate()));
+        ni.put("checkedText", h.getNavCheckedAt() == null ? null
+                : h.getNavCheckedAt().format(java.time.format.DateTimeFormatter.ofPattern("MM-dd HH:mm")));
+        if (h.getSharesEstimatedOn() != null) {
+            ni.put("estimated", "按 " + cnDate(h.getSharesEstimatedOn()) + "净值估算的份额 —— 在 App 里查到准确份额后改一下");
+        }
+        boolean edited = com.family.finance.service.fund.FundNavService.EDITED_ELSEWHERE.equals(h.getNavError());
+        ni.put("edited", edited);
+        String problem = edited ? "这只基金在别处被改过,已暂停自动更新 —— 核对份额后点「继续自动更新」" : h.getNavError();
+        String badge = null;
+        if (edited) badge = "已暂停自动更新";
+        else if (problem != null) {
+            badge = kind == com.family.finance.domain.stock.NavMode.MMF
+                    ? (h.getNavDate() == null ? "没结转" : "结转停在 " + cnDate(h.getNavDate()))
+                    : (h.getNavDate() == null ? "这次没拉到" : "净值停在 " + cnDate(h.getNavDate()));
+        } else if (kind == com.family.finance.domain.stock.NavMode.FUND && h.getNavDate() != null
+                && java.time.temporal.ChronoUnit.DAYS.between(h.getNavDate(), today)
+                   > com.family.finance.service.fund.FundNavService.STALE_DAYS) {
+            problem = "已经两周没有新净值 —— 基金可能已终止或代码有变";
+            badge = "净值停在 " + cnDate(h.getNavDate());
+        }
+        ni.put("problem", problem);
+        ni.put("badge", badge);
+        if (kind == com.family.finance.domain.stock.NavMode.FUND && h.getFundCode() != null) {
+            try {
+                var c = fundCatalog.find(familyId, h.getFundCode());
+                ni.put("late", c != null && c.lateNav());
+            } catch (Exception ignored) { ni.put("late", false); }
+        }
+        if (kind == com.family.finance.domain.stock.NavMode.MMF && h.getFundCode() != null) {
+            var inc = fundNavSnapshotMapper.findLatestIncome(h.getFundCode());
+            if (inc != null) {
+                ni.put("per10k", inc.incomePer10k());
+                ni.put("yield7d", inc.yield7d());
+            }
+            var ev = holdingShareEventMapper.findLatestByHolding(familyId, h.getId(),
+                    com.family.finance.domain.stock.ShareEventReason.MMF_ACCRUAL.name());
+            if (ev != null && ev.getDateFrom() != null && ev.getDateTo() != null) {
+                long n = java.time.temporal.ChronoUnit.DAYS.between(ev.getDateFrom(), ev.getDateTo()) + 1;
+                ni.put("lastAccrual", "+" + ev.getSharesDelta().setScale(2, java.math.RoundingMode.HALF_UP).toPlainString()
+                        + " · " + n + " 天");
+            }
+        }
+        return ni;
+    }
+
+    private static String cnDate(java.time.LocalDate d) {
+        return d == null ? null : d.getMonthValue() + " 月 " + d.getDayOfMonth() + " 日";
+    }
 
     private Account requireAccount(long familyId, long accountId) {
         Account acc = accountMapper.findById(familyId, accountId)

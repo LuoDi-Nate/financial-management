@@ -39,6 +39,14 @@
     </div>
   </section>
 
+  <!--/* v1.30 · 动作结果(添加基金 / 改份额 / 刷新时点名没拉到的基金 —— FR-963)*/-->
+  <div th:if="${flashOk != null}" class="paper-card p-3 mb-4 text-sm" data-flash-ok
+       style="border-left:4px solid var(--forest);color:var(--forest)" th:text="${flashOk}">已更新</div>
+  <div th:if="${flashWarn != null}" class="paper-card p-3 mb-4 text-sm" data-flash-warn
+       style="border-left:4px solid var(--rust);color:var(--rust)" th:text="${flashWarn}">部分没拉到</div>
+  <div th:if="${flashErr != null}" class="paper-card p-3 mb-4 text-sm" data-flash-err
+       style="border-left:4px solid var(--rust);color:var(--rust)" th:text="${flashErr}">出错了</div>
+
   <!-- 券商对接状态条(v1.6.24)· 反转 v0.15.x「入口迁到账户页」的决定:
        配置确实是账户颗粒度,但**持仓页本身就是账户颗粒度的页面**,而且是用户从填报页进来干活的地方;
        为看一眼对接状况绕回账户页,是把信息架构的整洁摆在手头的活前面。理由见 tech-design §34。
@@ -108,7 +116,12 @@
   <!-- 操作栏 -->
   <section class="flex flex-wrap gap-3 mb-6">
     <a th:if="${account.type.name() == 'METAL'}" th:href="@{|/accounts/${account.id}/holdings/new-metal|}" class="btn-ink no-underline">+ 添加贵金属</a>
-    <a th:if="${account.type.name() != 'METAL'}" th:href="@{|/accounts/${account.id}/holdings/new-auto|}" class="btn-ink no-underline">+ 添加持仓 · 自动估值</a>
+    <!--/* v1.30 · 「场外基金」按 PRD §3.1 出现(人民币的基金 / 证券 / 理财 / 现金账户);基金账户里它排第一,不出股票那个 */-->
+    <a th:if="${account.type.name() == 'FUND' and fundAllowed}" th:href="@{|/accounts/${account.id}/holdings/new-fund|}"
+       class="btn-ink no-underline" data-add-fund>+ 添加持仓 · 场外基金</a>
+    <a th:if="${account.type.name() != 'METAL' and account.type.name() != 'FUND'}" th:href="@{|/accounts/${account.id}/holdings/new-auto|}" class="btn-ink no-underline">+ 添加持仓 · 自动估值</a>
+    <a th:if="${account.type.name() != 'FUND' and fundAllowed}" th:href="@{|/accounts/${account.id}/holdings/new-fund|}"
+       class="btn-paper no-underline" data-add-fund>+ 添加持仓 · 场外基金</a>
     <a th:if="${account.type.name() != 'METAL'}" th:href="@{|/accounts/${account.id}/holdings/new-manual|}" class="btn-paper no-underline">+ 添加持仓 · 手填市值</a>
     <a th:href="@{|/accounts/${account.id}/holdings/new-cash|}" class="btn-paper no-underline">+ 账户内现金</a>
     <!-- 券商入口见上方「券商对接」状态条(v1.6.24 从账户页搬回来);持仓行上另有「券商同步」来源徽章 -->
@@ -122,18 +135,23 @@
 
   <!-- 估值分解(有 CASH 或有期权等才显示)· v1.29 期权 / 期货 / 债券单列一格:它们在库里是手动估值行,
        不单列就会被算进「手填市值」,读起来像是用户自己填的 -->
-  <section th:if="${(valuation.cashBaseValue != null and valuation.cashBaseValue.signum() > 0) or !#maps.isEmpty(derivInfo)}"
+  <section th:if="${(valuation.cashBaseValue != null and valuation.cashBaseValue.signum() > 0) or !#maps.isEmpty(derivInfo) or !#maps.isEmpty(navInfo)}"
            id="valuation-breakdown"
            class="paper-card p-4 mb-6 bg-card-soft" style="border-left:4px solid var(--forest)">
     <div class="font-mono text-[10px] tracking-[0.18em] uppercase text-forest mb-2">估 · 值 · 分 · 解</div>
-    <div class="grid gap-4 text-sm tnum" th:classappend="${#maps.isEmpty(derivInfo)} ? 'grid-cols-3' : 'grid-cols-2 sm:grid-cols-4'">
+    <div class="flex flex-wrap gap-x-10 gap-y-3 text-sm tnum">
       <div>
         <div class="font-mono text-[10px] text-ink-subtle mb-0.5">自动拉价</div>
         <div data-priv th:text="${account.currency} + ' ' + ${#numbers.formatInteger(valuation.autoBaseValue, 0, 'COMMA')}">HKD 0</div>
       </div>
       <div>
         <div class="font-mono text-[10px] text-ink-subtle mb-0.5">手填市值</div>
-        <div data-priv th:text="${account.currency} + ' ' + ${#numbers.formatInteger(valuation.manualBaseValue.subtract(derivBase), 0, 'COMMA')}">HKD 0</div>
+        <div data-priv th:text="${account.currency} + ' ' + ${#numbers.formatInteger(valuation.manualBaseValue.subtract(derivBase).subtract(navBase), 0, 'COMMA')}">HKD 0</div>
+      </div>
+      <!--/* v1.30 · 净值行在库里也是手动估值行(单价由系统写),不单列就会被算进「手填市值」 */-->
+      <div th:unless="${#maps.isEmpty(navInfo)}" data-fund-total>
+        <div class="font-mono text-[10px] text-ink-subtle mb-0.5" title="场外基金按单位净值、货币基金按金额,跟着刷新自动更新">基金(按净值)</div>
+        <div data-priv class="text-fund" th:text="${account.currency} + ' ' + ${#numbers.formatInteger(navBase, 0, 'COMMA')}">CNY 0</div>
       </div>
       <div th:unless="${#maps.isEmpty(derivInfo)}" data-deriv-total>
         <div class="font-mono text-[10px] text-ink-subtle mb-0.5"
@@ -171,8 +189,21 @@
           <span class="pill text-[9px]" th:if="${h.market != null}" th:text="${h.market}">US</span>
           <span class="pill text-[9px]" th:if="${h.valuationMode.name() == 'AUTO'}"
                 style="background:rgba(47,93,80,.12);color:var(--forest);border-color:var(--forest)">自动估值</span>
-          <span class="pill text-[9px]" th:if="${h.valuationMode.name() == 'MANUAL' and !h.derivative}"
+          <span class="pill text-[9px]" th:if="${h.valuationMode.name() == 'MANUAL' and !h.derivative and !h.navRow}"
                 style="background:rgba(196,148,62,.15);color:var(--brass-deep);border-color:var(--brass-deep)">手填市值</span>
+          <!--/* v1.30 · 净值行:代码 + 场外基金 / 货币基金 + 自动估值;出问题时标一个红的 */-->
+          <th:block th:if="${h.navRow}" th:with="ni=${navInfo.get(h.id)}">
+            <span class="pill text-[9px]" th:text="${h.fundCode}" data-fund-code-pill>002943</span>
+            <span class="pill pill-fund text-[9px]" th:unless="${ni.mmf}" data-nav-kind>场外基金</span>
+            <span class="pill text-[9px]" th:unless="${ni.mmf}"
+                  style="background:rgba(47,93,80,.12);color:var(--forest);border-color:var(--forest)">自动估值</span>
+            <span class="pill text-[9px]" th:if="${ni.mmf}" data-nav-kind
+                  style="background:rgba(180,138,58,.12);color:var(--brass-deep);border-color:var(--brass-deep)">货币基金 · 按金额记</span>
+            <span class="pill text-[9px]" th:if="${ni.badge != null}" data-nav-badge
+                  style="background:rgba(159,74,58,.10);color:var(--rust);border-color:var(--rust)" th:text="${ni.badge}">净值停在 9 月 25 日</span>
+          </th:block>
+          <span class="pill text-[9px]" th:if="${!h.navRow and h.fundCode != null and convertible.contains(h.id)}"
+                th:text="'已识别 ' + ${h.fundCode}">已识别 002943</span>
           <!--/* v1.29 · 券商同步来的期权 / 期货 / 债券:标品种 + 到期提示(7 天内 / 今天 / 已到期) */-->
           <span class="pill text-[9px]" th:if="${h.derivative}" data-deriv-kind
                 style="background:rgba(110,76,120,.10);color:#6e4c78;border-color:#6e4c78"
@@ -278,7 +309,58 @@
                  th:text="${#temporals.format(h.manualValueAt, 'yyyy-MM-dd')}">2026-10-02</div>
           </div>
         </div>
-        <div th:if="${h.valuationMode.name() == 'MANUAL' and !h.derivative}" class="grid grid-cols-4 gap-6 text-sm">
+        <!--/* v1.30 · 场外基金行:份额 · 单位净值(日期)· 市值 · 上次刷新 */-->
+        <div th:if="${h.navRow and !navInfo.get(h.id).mmf}" th:with="ni=${navInfo.get(h.id)}" data-nav-row="FUND">
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-3 text-sm">
+            <div>
+              <div class="font-mono text-[10px] uppercase text-ink-subtle mb-0.5">份额</div>
+              <div class="tnum" data-nav-shares th:text="${#numbers.formatDecimal(h.shares, 1, 'COMMA', 2, 'POINT')}">1,046.03</div>
+            </div>
+            <div>
+              <div class="font-mono text-[10px] uppercase text-ink-subtle mb-0.5">单位净值</div>
+              <div class="tnum" th:classappend="${ni.badge != null} ? 'text-rust' : ''">
+                <span data-nav-unit th:text="${#numbers.formatDecimal(h.manualValue, 1, 4)}">4.7800</span>
+                <span class="text-ink-subtle" data-nav-date th:text="'· ' + ${ni.dateText}">· 9 月 30 日</span></div>
+            </div>
+            <div>
+              <div class="font-mono text-[10px] uppercase text-ink-subtle mb-0.5" th:text="'市值(' + ${account.currency} + ')'">市值(CNY)</div>
+              <div class="tnum text-brass-deep" data-priv data-nav-value
+                   th:text="${account.currency} + ' ' + ${#numbers.formatDecimal(ni.value, 1, 'COMMA', 2, 'POINT')}">CNY 5,000.02</div>
+            </div>
+            <div>
+              <div class="font-mono text-[10px] uppercase text-ink-subtle mb-0.5">上次刷新</div>
+              <div class="font-mono text-xs" th:text="${ni.checkedText != null ? ni.checkedText : '—'}">10-08 06:05</div>
+            </div>
+          </div>
+          <p class="font-mono text-[11px] text-ink-subtle mt-2" th:if="${ni.late}" data-nav-late>QDII、FOF 这类基金的净值通常比国内基金晚一个交易日</p>
+          <p class="font-mono text-[11px] text-ink-subtle mt-1" th:if="${ni.estimated != null}" data-nav-estimated th:text="${ni.estimated}">按 9 月 30 日净值估算的份额</p>
+          <p class="font-mono text-[11px] mt-1" style="color:var(--rust)" th:if="${ni.problem != null}" data-nav-problem th:text="${ni.problem}">这次没拉到</p>
+        </div>
+        <!--/* v1.30 · 货币基金行:金额 · 已结转到 · 最近一次结转 · 万份收益 / 七日年化 */-->
+        <div th:if="${h.navRow and navInfo.get(h.id).mmf}" th:with="ni=${navInfo.get(h.id)}" data-nav-row="MMF">
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-3 text-sm">
+            <div>
+              <div class="font-mono text-[10px] uppercase text-ink-subtle mb-0.5">金额</div>
+              <div class="tnum text-brass-deep" data-priv data-nav-value
+                   th:text="${account.currency} + ' ' + ${#numbers.formatDecimal(ni.value, 1, 'COMMA', 2, 'POINT')}">CNY 12,001.89</div>
+            </div>
+            <div>
+              <div class="font-mono text-[10px] uppercase text-ink-subtle mb-0.5">已结转到</div>
+              <div class="tnum" data-nav-date th:text="${ni.dateText != null ? ni.dateText : '—'}">10 月 7 日</div>
+            </div>
+            <div>
+              <div class="font-mono text-[10px] uppercase text-ink-subtle mb-0.5">最近一次结转</div>
+              <div class="tnum text-forest" data-nav-accrual th:text="${ni.lastAccrual != null ? ni.lastAccrual : '—'}">+1.89 · 7 天</div>
+            </div>
+            <div>
+              <div class="font-mono text-[10px] uppercase text-ink-subtle mb-0.5">万份收益 · 七日年化</div>
+              <div class="tnum" th:text="${ni.per10k != null ? #numbers.formatDecimal(ni.per10k, 1, 4) + (ni.yield7d != null ? ' · ' + #numbers.formatDecimal(ni.yield7d, 1, 2) + '%' : '') : '—'}">0.2252 · 0.83%</div>
+            </div>
+          </div>
+          <p class="font-mono text-[11px] text-ink-subtle mt-2">每天按万份收益自动结转 —— 和 App 对不上时改一次金额(记成「手动校正」)</p>
+          <p class="font-mono text-[11px] mt-1" style="color:var(--rust)" th:if="${ni.problem != null}" data-nav-problem th:text="${ni.problem}">结转停了</p>
+        </div>
+        <div th:if="${h.valuationMode.name() == 'MANUAL' and !h.derivative and !h.navRow}" class="grid grid-cols-4 gap-6 text-sm">
           <div>
             <div class="font-mono text-[10px] uppercase text-ink-subtle mb-0.5">持股</div>
             <div class="tnum" th:text="${(h.shares != null ? h.shares : 1)} + ' 股'">2,000 股</div>
@@ -319,7 +401,36 @@
       </div>
       <div class="flex flex-col gap-1.5">
         <!--/* 期权等是券商同步行:手改会在下次同步被覆盖,而且卖出张数是负的,这个表单(张数 ≥ 0.0001)也装不下 */-->
-        <form th:if="${h.valuationMode.name() == 'MANUAL' and !h.derivative}"
+        <!--/* v1.30 · 净值行:改份额(货币基金是改金额)· 可勾现金联动(FR-970);单价不给改(系统按净值写)*/-->
+        <details th:if="${h.navRow}" class="nav-edit" data-nav-edit th:with="ni=${navInfo.get(h.id)}">
+          <summary class="btn-paper text-xs cursor-pointer list-none text-center" th:text="${ni.mmf} ? '改金额' : '改份额'">改份额</summary>
+          <form th:action="@{|/accounts/${account.id}/holdings/${h.id}/fund-shares|}" method="post"
+                class="mt-2 p-3 border border-rule bg-card-soft space-y-2 w-[260px] max-w-full">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+            <label class="font-mono text-[10px] uppercase text-ink-subtle block" th:text="${ni.mmf} ? '当前金额(和 App 一致)' : '持有份额'">持有份额</label>
+            <input type="number" name="shares" min="0" th:step="${ni.mmf} ? '0.01' : '0.0001'"
+                   th:value="${h.shares != null ? h.shares.stripTrailingZeros().toPlainString() : ''}"
+                   class="w-full font-mono text-sm bg-paper border border-rule px-2 py-1 tnum text-right">
+            <label th:if="${hasCashRow}" class="flex gap-2 items-start text-[12px] leading-snug">
+              <input type="checkbox" name="cashLinked" value="true" class="mt-0.5 w-4 h-4 accent-[var(--ink)]">
+              <span>多出来的是<b>用账户里的现金买的</b>(少了的是<b>赎回到账户现金</b>)<br><span class="text-ink-subtle">现金行跟着变,余额不变。不勾 = 份额变化算估值变动(分红再投、和 App 对账)</span></span>
+            </label>
+            <button type="submit" class="btn-ink text-xs w-full">保存</button>
+          </form>
+        </details>
+        <form th:if="${h.navRow and navInfo.get(h.id).edited}"
+              th:action="@{|/accounts/${account.id}/holdings/${h.id}/nav-resume|}" method="post">
+          <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+          <button type="submit" class="btn-ink text-xs w-full">继续自动更新</button>
+        </form>
+        <form th:if="${h.navRow}" th:action="@{|/accounts/${account.id}/holdings/${h.id}/nav-off|}" method="post">
+          <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+          <button type="submit" class="btn-paper text-xs w-full"
+                  onclick="return confirm('改回手填后不再自动更新:单价停在最后一次的净值,余额不变。继续?');">改回手填</button>
+        </form>
+        <a th:if="${!h.navRow and convertible.contains(h.id)}" th:href="@{|/accounts/${account.id}/holdings/${h.id}/to-nav|}"
+           class="btn-ink text-xs no-underline text-center" data-convert-btn>改为按净值自动估值</a>
+        <form th:if="${h.valuationMode.name() == 'MANUAL' and !h.derivative and !h.navRow}"
               th:action="@{|/accounts/${account.id}/holdings/${h.id}/update|}" method="post" class="flex gap-1 items-center">
           <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
           <input type="number" name="shares" step="0.0001" min="0.0001" th:value="${h.shares != null ? h.shares : 1}"
@@ -359,9 +470,11 @@
       <li>· <strong class="text-ink">自动拉价</strong>:录入代码 + 数量 · 系统每日 T+1 拉价 · 无维护成本</li>
       <li>· <strong class="text-ink">手填市值</strong>:手填账户币种市值 · 适合未上市 / 私募 / 拉不到价(默认账户币种 · 不做汇率换算)</li>
       <li>· <strong class="text-ink">账户内现金</strong>:券商账户里的闲置资金 · 多币种各一行 · 系统按汇率折算到账户币种</li>
+      <li>· <strong class="text-ink">场外基金</strong>:填代码 + 份额 · 市值 = 份额 × 单位净值 · 跟着刷新和定时拉价自动更新 · 总写净值日期(QDII、FOF 晚一个交易日)</li>
+      <li>· <strong class="text-ink">货币基金</strong>:按金额记 · 每天按万份收益自动结转,每次结转在账户时间线记一条「持仓数量变动」</li>
       <li>· <strong class="text-ink">多币种混合</strong>:同一账户可放任意币种持仓 + 任意币种现金 · 系统按原币种算 · 再汇率折算汇总</li>
       <li>· <strong class="text-ink">券商同步的期权 / 期货 / 债券</strong>:按券商给的持仓市值记(已含合约乘数),卖出的是负数、从余额里减去;期货只展示名义价值、不计入余额(盈亏每天结算进现金);到期或平仓后下次同步自动移除</li>
-      <li>· 账户余额 = 自动拉价市值汇总 + 手填市值汇总 + 期权等(券商报表)+ 现金折算汇总</li>
+      <li>· 账户余额 = 自动拉价市值汇总 + 手填市值汇总 + 基金(按净值)+ 期权等(券商报表)+ 现金折算汇总</li>
       <li>· 拉价失败时自动用最近已知价 + 界面标记"陈旧 N 天" · 超过 7 天提示改手填</li>
       <li>· 此账户未添加任何持仓时,余额仍可在填报页手填,系统不会自动覆盖。</li>
     </ul>

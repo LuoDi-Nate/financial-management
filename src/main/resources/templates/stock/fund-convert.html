@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('改为按净值自动估值')}"></head>
+<body class="min-h-screen relative">
+<div class="fixed top-0 left-0 right-0 h-1 bg-ink z-40"></div>
+<header th:replace="~{fragments/nav :: nav('accounts', ${me}, ${nav})}"></header>
+
+<!--/* v1.30 · FR-965 · 手填市值的基金 → 按净值自动估值的确认框(preview/v1.30 ⑤)
+       确认框里写出代码表里的基金全名:穿透的代码是按名字猜的,要给用户核对的机会 */-->
+<main class="max-w-[640px] mx-auto px-4 sm:px-6 py-6 sm:py-10 relative z-10">
+  <div class="font-mono text-[10px] tracking-[0.18em] uppercase text-ink-subtle mb-4">
+    <a th:href="@{|/accounts/${account.id}/holdings|}" class="hover:text-ink no-underline" th:text="${account.displayName}">账户</a>
+    <span class="mx-2 text-rule">/</span><span class="text-ink">改为按净值自动估值</span>
+  </div>
+
+  <section class="paper-card p-6" style="border:1px solid var(--ink)" data-convert-card>
+    <h1 class="font-display text-2xl mb-3">改为按净值自动估值?</h1>
+    <p class="text-sm text-ink-soft mb-1">持仓:<b class="text-ink" th:text="${h.displayName}">广发多因子</b></p>
+
+    <th:block th:if="${plan.error() == null}" th:with="mmf=${plan.fund().kind().name() == 'MMF'}">
+      <p class="text-sm leading-relaxed" data-convert-fund>认出的基金:<b th:text="${plan.fund().info().name()} + ' · ' + ${plan.fund().info().code()}">广发多因子混合 · 002943</b>
+        <span class="text-ink-subtle">(不对就取消,先在资产透视里改代码)</span></p>
+      <p th:unless="${mmf}" class="text-sm leading-relaxed mt-2" data-convert-plan>
+        按 <b th:text="${#temporals.month(plan.navDate())} + ' 月 ' + ${#temporals.day(plan.navDate())} + ' 日'">9 月 30 日</b>净值
+        <b class="font-mono" th:text="${#numbers.formatDecimal(plan.unit(), 1, 4)}">4.7800</b>,把当前市值
+        <b class="font-mono" data-priv th:text="'¥' + ${#numbers.formatDecimal(plan.currentValue(), 1, 'COMMA', 2, 'POINT')}">¥5,000.00</b> 折成
+        <b class="font-mono" th:text="${#numbers.formatDecimal(plan.newShares(), 1, 'COMMA', 2, 'POINT')} + ' 份'">1,046.03 份</b>。
+      </p>
+      <p th:if="${mmf}" class="text-sm leading-relaxed mt-2" data-convert-plan>
+        这是货币基金:按金额记,当前金额 <b class="font-mono" data-priv th:text="'¥' + ${#numbers.formatDecimal(plan.currentValue(), 1, 'COMMA', 2, 'POINT')}">¥12,000.00</b>,
+        之后每天按万份收益自动结转。
+      </p>
+      <p class="text-sm text-ink-soft mt-2">之后跟着刷新自动更新;想改回手填随时可以。余额现在不会变。</p>
+      <div class="flex gap-3 justify-end mt-5">
+        <a th:href="@{|/accounts/${account.id}/holdings|}" class="btn-paper no-underline">取消</a>
+        <form th:action="@{|/accounts/${account.id}/holdings/${h.id}/to-nav|}" method="post">
+          <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+          <button type="submit" class="btn-ink">确认改为自动</button>
+        </form>
+      </div>
+    </th:block>
+
+    <th:block th:if="${plan.error() != null}">
+      <p class="text-sm mt-2" style="color:var(--rust)" data-convert-error th:text="${plan.error()}">拿不到净值</p>
+      <div class="flex justify-end mt-5">
+        <a th:href="@{|/accounts/${account.id}/holdings|}" class="btn-paper no-underline">返回</a>
+      </div>
+    </th:block>
+  </section>
+</main>
+
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>
