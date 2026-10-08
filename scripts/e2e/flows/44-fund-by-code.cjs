@@ -313,7 +313,8 @@ module.exports = {
     await ui.assert(cv.nav === 'FUND' && Math.abs(cv.shares - 1041.6667) < 0.00005 && cv.unit === 4.8, '真值层:改成 FUND · 份额 1041.6667 · 单价 4.80', JSON.stringify(cv));
     await ui.assert(Math.abs(balance() - bal3) < 0.01, '真值层:余额不跳(差 < 0.01)', `${bal3} → ${balance()}`);
     await ui.assert(events('CONVERT').length === 1, '真值层:记一条「改为按净值自动估值」', events('CONVERT').join(' ; '));
-    await ui.page.once('dialog', d => d.accept());
+    // 全量跑时前面的 flow(20 / 21)已在同一个页面上挂了自动确认 —— 重复确认会抛错,吞掉即可(同 flow 31)
+    ui.page.once('dialog', d => d.accept().catch(() => {}));
     await ui.submit(`article:has(.font-display:text-is("广发多因子")) form[action$="/nav-off"] button`, '点「改回手填」并确认');
     const off = db.one(`SELECT CONCAT_WS('|', IFNULL(nav_mode,'-'), manual_value) FROM stock_holding WHERE id=${manualId}`);
     await ui.assert(off.startsWith('-|4.8'), '真值层:nav_mode 清空,单价停在 4.80', off);
