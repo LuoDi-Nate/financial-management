@@ -11173,6 +11173,21 @@ done
   && log_ok "v129-DEMO-CLEAN-COMPLETE(迁移写过数据的表,三个清演示脚本都清了 · 含定格表)" \
   || log_bad "v129-DEMO-CLEAN-COMPLETE 清演示数据漏了表(编号重用会把演示数据挂到用户账户上)" "$QA129B_BAD"
 
+# v1291-SYNC-FETCHES-PRICES · 券商同步完【先拉价、再估值】(issue #26 续 · @Jsonya 2026-10-05)
+#   同步只写「代码 + 股数」;估值读库里已有的行情快照 —— 新代码没有快照按 0 计,老代码是上次拉价那天的价,
+#   要用户再手动刷一次余额才对。判据:sync() 里 refreshSyncedPrices 出现在估值写回之前,且它确实调拉价器;
+#   flow 43 在页面上复验(关联并同步 / 立即同步之后,新代码当场有价、持仓页没有「无价」)。
+QA1291_S="$RD/src/main/java/com/family/finance/service/broker/BrokerSyncService.java"
+QA1291_SYNC=$(awk '/public String sync\(long familyId/{f=1} f{print} f&&/^    }$/{exit}' "$QA1291_S")
+QA1291_P=$(grep -n 'refreshSyncedPrices(familyId, accountId);' <<<"$QA1291_SYNC" | head -1 | cut -d: -f1)
+QA1291_V=$(grep -n 'valuationService.refreshAllForFamily' <<<"$QA1291_SYNC" | head -1 | cut -d: -f1)
+{ [ -n "$QA1291_P" ] && [ -n "$QA1291_V" ] && [ "$QA1291_P" -lt "$QA1291_V" ] \
+  && awk '/void refreshSyncedPrices\(/{f=1} f{print} f&&/^    }$/{exit}' "$QA1291_S" | grep -q 'priceFetcher.fetchAndPersist' \
+  && [ -f "$RD/src/test/java/com/family/finance/service/broker/BrokerSyncPriceRefreshTest.java" ] \
+  && [ -f "$RD/scripts/e2e/flows/43-broker-sync-prices.cjs" ]; } \
+  && log_ok "v1291-SYNC-FETCHES-PRICES(券商同步先给同步进来的股票拉价再估值 · 单测 + flow 43)" \
+  || log_bad "v1291-SYNC-FETCHES-PRICES 券商同步后没先拉价就估值(新代码按 0 计 / 老代码用旧价)" "see BrokerSyncService.sync / refreshSyncedPrices"
+
 echo
 echo "═══════════════════════════════════════"
 echo " 总结: PASS=$PASS  FAIL=$FAIL  SKIP=$SKIP"
