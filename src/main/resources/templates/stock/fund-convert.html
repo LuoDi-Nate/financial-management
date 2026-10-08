@@ -19,7 +19,7 @@
 
     <th:block th:if="${plan.error() == null}" th:with="mmf=${plan.fund().kind().name() == 'MMF'}">
       <p class="text-sm leading-relaxed" data-convert-fund>认出的基金:<b th:text="${plan.fund().info().name()} + ' · ' + ${plan.fund().info().code()}">广发多因子混合 · 002943</b>
-        <span class="text-ink-subtle">(不对就取消,先在资产透视里改代码)</span></p>
+        <span class="text-ink-subtle">(认错了就取消:这一条保持手填,用「添加持仓 · 场外基金」按正确的代码重新加一只,再把这条归档)</span></p>
       <p th:unless="${mmf}" class="text-sm leading-relaxed mt-2" data-convert-plan>
         按 <b th:text="${#temporals.month(plan.navDate())} + ' 月 ' + ${#temporals.day(plan.navDate())} + ' 日'">9 月 30 日</b>净值
         <b class="font-mono" th:text="${#numbers.formatDecimal(plan.unit(), 1, 4)}">4.7800</b>,把当前市值

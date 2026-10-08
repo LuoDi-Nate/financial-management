@@ -406,6 +406,11 @@ public class StockHoldingController {
      */
     private Map<String, Object> navView(long familyId, StockHolding h, java.time.LocalDate today) {
         Map<String, Object> ni = new HashMap<>();
+        // 每个键都先放好(SpEL 读 Map 里不存在的键会直接抛 EL1008E,而不是给 null —— e2e flow 44 实测抓到)
+        for (String k : List.of("value", "dateText", "checkedText", "estimated", "problem", "badge",
+                                "per10k", "yield7d", "lastAccrual")) ni.put(k, null);
+        ni.put("late", false);
+        ni.put("edited", false);
         var kind = h.nav();
         ni.put("mmf", kind == com.family.finance.domain.stock.NavMode.MMF);
         ni.put("dateText", cnDate(h.getNavDate()));
@@ -420,9 +425,12 @@ public class StockHoldingController {
         String badge = null;
         if (edited) badge = "已暂停自动更新";
         else if (problem != null) {
+            // 净值还很新(两天内)只是这一次没拉到 →「这次没拉到」;再早的才说「停在 X 日」,免得把今天的净值说成停了
+            boolean recent = h.getNavDate() != null
+                    && java.time.temporal.ChronoUnit.DAYS.between(h.getNavDate(), today) <= 2;
             badge = kind == com.family.finance.domain.stock.NavMode.MMF
-                    ? (h.getNavDate() == null ? "没结转" : "结转停在 " + cnDate(h.getNavDate()))
-                    : (h.getNavDate() == null ? "这次没拉到" : "净值停在 " + cnDate(h.getNavDate()));
+                    ? (recent || h.getNavDate() == null ? "这次没结转" : "结转停在 " + cnDate(h.getNavDate()))
+                    : (recent || h.getNavDate() == null ? "这次没拉到" : "净值停在 " + cnDate(h.getNavDate()));
         } else if (kind == com.family.finance.domain.stock.NavMode.FUND && h.getNavDate() != null
                 && java.time.temporal.ChronoUnit.DAYS.between(h.getNavDate(), today)
                    > com.family.finance.service.fund.FundNavService.STALE_DAYS) {

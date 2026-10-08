@@ -62,7 +62,7 @@ public class FundHoldingController {
         model.addAttribute("hits", hits);
         model.addAttribute("q", q == null ? "" : q.trim());
         model.addAttribute("accountId", accountId);
-        return "stock/fund-new :: results";
+        return "stock/_fund-parts :: results";
     }
 
     /** HTMX:选中一只后的报价卡 + 填份额 / 市值的表单 */
@@ -73,7 +73,7 @@ public class FundHoldingController {
         model.addAttribute("account", account);
         model.addAttribute("q", fundHoldingService.quote(me.getFamilyId(), code));
         model.addAttribute("hasCashRow", hasCashRow(me.getFamilyId(), accountId));
-        return "stock/fund-new :: quote";
+        return "stock/_fund-parts :: quote";
     }
 
     @PostMapping("/accounts/{accountId}/holdings/new-fund")

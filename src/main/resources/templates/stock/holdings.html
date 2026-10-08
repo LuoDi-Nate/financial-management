@@ -363,7 +363,7 @@
         <div th:if="${h.valuationMode.name() == 'MANUAL' and !h.derivative and !h.navRow}" class="grid grid-cols-4 gap-6 text-sm">
           <div>
             <div class="font-mono text-[10px] uppercase text-ink-subtle mb-0.5">持股</div>
-            <div class="tnum" th:text="${(h.shares != null ? h.shares : 1)} + ' 股'">2,000 股</div>
+            <div class="tnum" th:text="${(h.shares != null ? h.shares.stripTrailingZeros().toPlainString() : 1)} + ' 股'">2,000 股</div>
           </div>
           <div>
             <div class="font-mono text-[10px] uppercase text-ink-subtle mb-0.5"
@@ -402,8 +402,8 @@
       <div class="flex flex-col gap-1.5">
         <!--/* 期权等是券商同步行:手改会在下次同步被覆盖,而且卖出张数是负的,这个表单(张数 ≥ 0.0001)也装不下 */-->
         <!--/* v1.30 · 净值行:改份额(货币基金是改金额)· 可勾现金联动(FR-970);单价不给改(系统按净值写)*/-->
-        <details th:if="${h.navRow}" class="nav-edit" data-nav-edit th:with="ni=${navInfo.get(h.id)}">
-          <summary class="btn-paper text-xs cursor-pointer list-none text-center" th:text="${ni.mmf} ? '改金额' : '改份额'">改份额</summary>
+        <details th:if="${h.navRow}" class="nav-edit w-full" data-nav-edit th:with="ni=${navInfo.get(h.id)}">
+          <summary class="btn-paper text-xs cursor-pointer list-none text-center block w-full" th:text="${ni.mmf} ? '改金额' : '改份额'">改份额</summary>
           <form th:action="@{|/accounts/${account.id}/holdings/${h.id}/fund-shares|}" method="post"
                 class="mt-2 p-3 border border-rule bg-card-soft space-y-2 w-[260px] max-w-full">
             <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
@@ -456,7 +456,8 @@
         </form>
         <form th:action="@{|/accounts/${account.id}/holdings/${h.id}/archive|}" method="post">
           <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
-          <button type="submit" class="btn-paper text-xs"
+          <!--/* v1.30 · 基金行三个按钮(改份额 / 改回手填 / 归档)同宽 —— 并列同类控件同尺寸 */-->
+          <button type="submit" class="btn-paper text-xs" th:classappend="${h.navRow} ? 'w-full' : ''"
                   onclick="return confirm('归档此持仓(可恢复)?');"><svg class="inline-block align-[-2px] mr-1" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="5" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8M10 12h4"/></svg>归档</button>
         </form>
       </div>

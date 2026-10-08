@@ -359,11 +359,11 @@ public class AccountDetailService {
         }
         var r = ev.reasonEnum();
         if (ev.getValueDelta() != null && ev.getValueDelta().signum() != 0) {
-            String money = (ev.getValueDelta().signum() > 0 ? "+" : "−") + MoneyFormat.format(currency, ev.getValueDelta().abs());
+            String money = (ev.getValueDelta().signum() > 0 ? "+" : "−") + MoneyFormat.format2(currency, ev.getValueDelta().abs());
             parts.add(r.movesBalance() ? "约 " + money : "约 " + money + "(余额不变)");
         }
         if (ev.getUnitValue() != null && ev.getUnitValue().compareTo(BigDecimal.ONE) != 0) {
-            parts.add("单位净值 " + ev.getUnitValue().stripTrailingZeros().toPlainString());
+            parts.add("单位净值 " + ev.getUnitValue().setScale(4, RoundingMode.HALF_UP).toPlainString());
         }
         if (ev.getDateFrom() != null && ev.getDateTo() != null) {
             long n = java.time.temporal.ChronoUnit.DAYS.between(ev.getDateFrom(), ev.getDateTo()) + 1;

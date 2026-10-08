@@ -56,6 +56,31 @@ class StockPriceSchedulerTest {
         when(fetcher.fetchAndPersist(any(), any(), any(LocalDate.class))).thenReturn(2);
     }
 
+    /** v1.30 · §13 ④「跟随原有同步」:每次定时拉价后先同步基金净值 / 货基结转,再估值写回(顺序不能反) */
+    @Test
+    void cronRun_syncsFundsBeforeValuation() {
+        var funds = org.mockito.Mockito.mock(com.family.finance.service.fund.FundNavService.class);
+        var s = new StockPriceScheduler(holdingMapper, fetcher, configService, valuationService, funds);
+        when(holdingMapper.findDistinctAutoTickersByMarket("US")).thenReturn(List.of(new TickerMarket("BABA", "US")));
+
+        s.fetchUsStocks();
+
+        var order = org.mockito.Mockito.inOrder(funds, valuationService);
+        order.verify(funds).refreshAllFamilies();
+        order.verify(valuationService).refreshAllForFamily(eq(1L), eq(AccountValuationService.TriggerKind.CRON), eq(null));
+    }
+
+    @Test
+    void cronRun_fundSyncFailure_doesNotBlockValuation() {
+        var funds = org.mockito.Mockito.mock(com.family.finance.service.fund.FundNavService.class);
+        org.mockito.Mockito.doThrow(new RuntimeException("eastmoney down")).when(funds).refreshAllFamilies();
+        var s = new StockPriceScheduler(holdingMapper, fetcher, configService, valuationService, funds);
+
+        s.fetchCrypto();
+
+        verify(valuationService).refreshAllForFamily(eq(1L), eq(AccountValuationService.TriggerKind.CRON), eq(null));
+    }
+
     @Test
     void fetchUsStocks_triggersCronValuationRefresh() {
         when(holdingMapper.findDistinctAutoTickersByMarket("US"))
