@@ -57,6 +57,12 @@ public class BrokerSyncService {
         this.tx = new org.springframework.transaction.support.TransactionTemplate(tm);
     }
 
+    /** 同步完给同步进来的股票拉价(见 {@link #refreshSyncedPrices})。Spring 注入,单测里为 null → 跳过。 */
+    private com.family.finance.service.stock.StockPriceFetcher priceFetcher;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setPriceFetcher(com.family.finance.service.stock.StockPriceFetcher f) { this.priceFetcher = f; }
+
     /**
      * 同步单个已关联账户;返回状态摘要。
      *
@@ -90,6 +96,9 @@ public class BrokerSyncService {
             linkMapper.markFailed(familyId, accountId, failureNote(e));
             throw e;
         }
+        // issue #26(续)· 先拉价再估值 —— 否则估值读的是库里已有的快照:第一次出现的代码没有快照、按 0 计,
+        // 老代码是上一次有人拉价那天的价(「行情自动拉取」新装默认关),要用户再手动刷一次余额才对。
+        refreshSyncedPrices(familyId, accountId);
         try {
             // v1.18 · 明确告诉估值服务"这次是券商同步引起的",流水里才分得出富途/老虎
             valuationService.refreshAllForFamily(familyId,
@@ -99,6 +108,38 @@ public class BrokerSyncService {
             log.warn("post-broker-sync valuation refresh failed: {}", e.toString());
         }
         return summary;
+    }
+
+    /**
+     * issue #26(续)· 给这个账户的上市持仓(AUTO 行)按市场各拉一次价,写进行情快照。
+     *
+     * <p>只拉这个账户的代码,不拉整个市场 —— 同步是用户点了就等着看结果的动作。
+     * 用的是和「刷新持仓估值」同一个拉价器(新浪主、腾讯备;加密 / 贵金属各走各的源),不用券商报表里的标记价:
+     * 行情快照是全家共用的,别的账户也持有同一只股票,不该让某一家券商的报表时点决定所有人的价。</p>
+     *
+     * <p>拉价失败不让同步失败:同步本身已经成功落库,估值照旧回落到最近已知价,持仓页会标「陈旧 / 无价」。</p>
+     */
+    void refreshSyncedPrices(long familyId, long accountId) {
+        if (priceFetcher == null) return;
+        java.util.Map<Market, java.util.LinkedHashSet<String>> byMarket = new java.util.LinkedHashMap<>();
+        try {
+            for (StockHolding h : holdingMapper.findActiveByAccount(familyId, accountId)) {
+                if (h.getValuationMode() != ValuationMode.AUTO || h.getMarket() == null
+                        || h.getTicker() == null || h.getTicker().isBlank()) continue;
+                byMarket.computeIfAbsent(h.getMarket(), k -> new java.util.LinkedHashSet<>()).add(h.getTicker());
+            }
+        } catch (Exception e) {
+            log.warn("post-broker-sync price fetch skipped · account={} · {}", accountId, e.toString());
+            return;
+        }
+        java.time.LocalDate today = java.time.LocalDate.now();
+        byMarket.forEach((market, tickers) -> {
+            try {
+                priceFetcher.fetchAndPersist(market, List.copyOf(tickers), today);
+            } catch (Exception e) {
+                log.warn("post-broker-sync price fetch failed · account={} market={} · {}", accountId, market, e.toString());
+            }
+        });
     }
 
     /** cron 用:同步所有 enabled 的关联账户。 */
