@@ -295,7 +295,7 @@
       </div>
       <p th:if="${!at.opened().isEmpty()}" class="text-[11px] mt-3 px-2 py-1.5"
          style="border-left:3px solid var(--brass-deep);background:var(--card-soft)">
-        本期<b>新增</b>账户(资本纳入,不是赚来的,所以不进上面的排名):
+        本期<b>新纳入的本金</b>(新开账户带进来的存量 / 已有账户记的补录本金 —— 不是赚来的,不进上面的排名;从家里别的账户转进来的钱不算):
         <span th:each="c,i : ${at.opened()}" data-priv
               th:text="${(i.index > 0 ? ' · ' : '') + c.accountName() + ' ' + T(com.family.finance.service.MoneyFormat).intSigned(currencySymbol, c.amount())}"></span>
       </p>

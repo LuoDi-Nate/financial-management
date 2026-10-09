@@ -11384,6 +11384,34 @@ QA130_COST_LEAK="$(grep -rlE 'getCostBasis|costBasis|cost_basis' "$QA130_J/factv
   && log_ok "v130-PRINCIPAL-ENTRY(加基金时「钱从哪来」必选 · 账户详情能记 · 其它添加页指路 · 导出 / 清演示数据 / 家庭隔离审计都带上)" \
   || log_bad "v130-PRINCIPAL-ENTRY 补录本金的入口或配套缺一处" "see _fund-parts / accounts/detail / CsvExportService / clean-dev-data"
 
+# ── v1.30.1 · 账户间划转不许进「谁把净资产推上去 / 拉下来」(prod 2026-09 实报)──
+#   报表封板「本期归因」是 v1.10 另写的一套:按「期末 − 上期末」排名、新账户整笔算资本纳入 ——
+#   v1.28.1 修开账基线时只修了事实层,这里没跟上,于是余额宝转出去的钱成了「拉下来」的第一名。
+#   守:贡献必须扣净划转与补录本金;新账户的资本纳入必须走与家庭开账基线同一个函数(openingOf);封板口径版本 +1。
+QA1301_SPS="$RD/src/main/java/com/family/finance/service/report/SealedPeriodService.java"
+QA1301_ATTR="$(awk '/SealedSnapshot.Attribution buildAttribution\(/{f=1} f{print} f&&/^    }$/{exit}' "$QA1301_SPS")"
+{ grep -q 'transferInBase' <<<"$QA1301_ATTR" && grep -q 'transferOutBase' <<<"$QA1301_ATTR" \
+  && grep -q 'principalAdjBase' <<<"$QA1301_ATTR" && grep -q 'FactViewServiceImpl.openingOf' <<<"$QA1301_ATTR" \
+  && grep -q 'public static final int CURRENT = 2;' "$RD/src/main/java/com/family/finance/service/report/MetricFormulaVersion.java" \
+  && grep -q '账户间划转不进贡献_转进新账户的钱不算资本纳入' "$RD/src/test/java/com/family/finance/service/report/SealedPeriodServiceTest.java" \
+  && [ -f "$RD/scripts/e2e/flows/46-attribution-transfers.cjs" ]; } \
+  && log_ok "v1301-ATTR-NETS-TRANSFERS(本期归因扣净划转与补录本金 · 资本纳入走 openingOf · 封板口径 v2 · 单测 + flow 46)" \
+  || log_bad "v1301-ATTR-NETS-TRANSFERS 本期归因又会把账户间划转算成推上去 / 拉下来" "see SealedPeriodService.buildAttribution"
+# 账户体检:「本期变化」是余额差,含划转 —— 页面与 AI 提示词都要把划转单独说出来;补录本金在体检页也算外部投入
+QA1301_ADS="$RD/src/main/java/com/family/finance/service/checkup/AccountDiagnoseService.java"
+{ grep -q '其中账户间划转' "$RD/src/main/java/com/family/finance/service/checkup/llm/PromptBuilder.java" \
+  && grep -q 'periodNetTransfer' "$QA1301_ADS" && grep -q 'data-period-transfer' "$RD/src/main/resources/templates/checkup/account.html" \
+  && [ "$(grep -c 'principalAdjOrig' "$QA1301_ADS")" -ge 3 ] \
+  && grep -q 'nz(r.transferInOrig()).add(nz(r.principalAdjOrig()))' "$RD/src/main/java/com/family/finance/factview/FactViewServiceImpl.java"; } \
+  && log_ok "v1301-CHECKUP-TRANSFER-SAID(体检页与 AI 提示词把划转单独说出来 · 补录本金进体检的净投入 / XIRR / 回撤序列)" \
+  || log_bad "v1301-CHECKUP-TRANSFER-SAID 体检把一笔转出当成亏损,或补录本金在体检页被当成收益" "see AccountDiagnoseService · PromptBuilder"
+# 账户列表那一列:余额变化(含划转),不再叫「本期Δ」紧挨本期损益
+{ ! grep -q '本期Δ' "$RD/src/main/resources/templates/dashboard/_region.html" "$RD/src/main/resources/templates/reports/_region.html" \
+  && [ "$(grep -c 'title="余额较上期的变化 = 期末余额 − 上期末余额,含账户间划转与收支' "$RD/src/main/resources/templates/dashboard/_region.html")" -ge 2 ] \
+  && [ "$(grep -c 'title="余额较上期的变化 = 期末余额 − 上期末余额,含账户间划转与收支' "$RD/src/main/resources/templates/reports/_region.html")" -ge 2 ]; } \
+  && log_ok "v1301-BALANCE-DELTA-LABEL(「余额变化」改名 + 悬停写清含划转、看赚亏看本期损益 · 仪表盘与报表 PC / 手机)" \
+  || log_bad "v1301-BALANCE-DELTA-LABEL 余额变化又被叫成像赚亏的名字" "see dashboard/_region.html · reports/_region.html"
+
 echo
 echo "═══════════════════════════════════════"
 echo " 总结: PASS=$PASS  FAIL=$FAIL  SKIP=$SKIP"

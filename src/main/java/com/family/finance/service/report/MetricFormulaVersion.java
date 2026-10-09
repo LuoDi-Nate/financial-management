@@ -25,9 +25,13 @@ public final class MetricFormulaVersion {
      *   <tr><td>1</td><td>2026-08-11 · v1.10.0</td>
      *       <td>封板快照首版。含:归档账户过滤加时间语义(归档不再抹掉历史)、
      *           紧急储备的月均支出窗口固定为「asof 往前 N 期已关账」(不再随 range 变)</td></tr>
+     *   <tr><td>2</td><td>2026-10-09 · v1.30.1</td>
+     *       <td>「本期归因」扣掉账户间划转与补录本金(原来按余额变化排名,转出方成了「拉下来」的、
+     *           转入的新账户整笔算成「资本纳入」);新账户的资本纳入改用与家庭开账基线同一个函数。
+     *           <b>只有这一块的数字变</b>,其余封板指标逐字不变</td></tr>
      * </table>
      */
-    public static final int CURRENT = 1;
+    public static final int CURRENT = 2;
 
     /**
      * 月均支出窗口长度(期)· 紧急储备月数的分母。

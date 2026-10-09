@@ -813,7 +813,9 @@ public class FactViewServiceImpl implements FactViewService {
         if (origRows.size() >= 2) {
             List<NavSeriesBuilder.PeriodPoint> navInputs = origRows.stream()
                     .map(r -> new NavSeriesBuilder.PeriodPoint(r.periodStart(), r.endBalanceOrig(),
-                            r.incomeOrig(), r.expenseOrig(), r.transferInOrig(), r.transferOutOrig()))
+                            r.incomeOrig(), r.expenseOrig(),
+                            // v1.30.1 · 补录本金按外部投入进净值序列(v1.30 漏了:补录那一期会像涨了一大截)
+                            nz(r.transferInOrig()).add(nz(r.principalAdjOrig())), r.transferOutOrig()))
                     .toList();
             List<MaxDrawdownCalculator.NavPoint> nav = NavSeriesBuilder.build(navInputs);
             if (nav.size() >= 2) {
@@ -1134,7 +1136,8 @@ public class FactViewServiceImpl implements FactViewService {
      * 负债照常为负(新纳入一笔贷款、这一期还了一部分,带进来的是还款前的欠款)。
      * 首期没有转入的账户与原来逐字相同;收入 / 支出这一版不动(口径变更只做维护者点名的这一处)。</p>
      */
-    static BigDecimal openingOf(AccountPeriodFact row) {
+    /** v1.30.1 · 公开给报表封板「本期归因」的「资本纳入」用 —— 与家庭开账基线同一个函数,不许各算各的 */
+    public static BigDecimal openingOf(AccountPeriodFact row) {
         if (row == null || row.endBalanceBase() == null) return null;
         BigDecimal in = row.transferInBase() == null ? BigDecimal.ZERO : row.transferInBase();
         // 首期没有转入 → 与原来逐字相同(口径只动维护者点名的这一处;零差异基线守着)

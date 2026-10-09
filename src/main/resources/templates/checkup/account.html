@@ -47,9 +47,14 @@
       持有月数 <span class="font-mono text-ink" th:text="${diagnose.monthsHeld}">12</span>
       · 当前余额 <span class="font-mono text-ink tnum"
                        th:text="${account.currency + ' ' + (diagnose.currentBalance != null ? #numbers.formatDecimal(diagnose.currentBalance, 1, 'COMMA', 2, 'POINT') : '—')}">CNY 0.00</span>
-      · 较上期 <span class="font-mono tnum"
+      · 余额较上期 <span class="font-mono tnum"
                     th:classappend="${diagnose.monthDelta != null and diagnose.monthDelta.signum() > 0 ? ' num-pos' : (diagnose.monthDelta != null and diagnose.monthDelta.signum() < 0 ? ' num-neg' : '')}"
                     th:text="${diagnose.monthDeltaPctLabel()}">+0.0%</span>
+      <!--/* v1.30.1 · 余额变化里有划转时说出来:余额少了不等于亏了(prod 2026-09:一笔转出被当成亏损)*/-->
+      <span th:if="${diagnose.periodNetTransfer() != null and diagnose.periodNetTransfer().signum() != 0}" class="text-ink-subtle" data-period-transfer>
+        (其中账户间划转 <span class="font-mono tnum" data-priv
+              th:text="${(diagnose.periodNetTransfer().signum() > 0 ? '+' : '') + #numbers.formatDecimal(diagnose.periodNetTransfer(), 1, 'COMMA', 2, 'POINT')}">−1.00</span>,不是赚亏<span th:if="${diagnose.periodPnl() != null}">;本期投资损益 <span class="font-mono tnum" data-priv
+              th:text="${(diagnose.periodPnl().signum() > 0 ? '+' : '') + #numbers.formatDecimal(diagnose.periodPnl(), 1, 'COMMA', 2, 'POINT')}">−99.00</span></span>)</span>
     </p>
     <p class="text-sm text-ink-subtle mt-2" th:if="${diagnose.monthsHeld == null}">
       暂无该账户的历史数据 · 请先在「填报」录入至少一期月末余额

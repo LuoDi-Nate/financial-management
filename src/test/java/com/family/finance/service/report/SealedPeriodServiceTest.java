@@ -202,6 +202,75 @@ class SealedPeriodServiceTest {
         assertThat(a.negatives()).isEmpty();
     }
 
+    /** v1.30.1 · 带本期转入 / 转出 / 补录本金的一行(金额全是编的) */
+    private AccountPeriodFact rowT(long accId, String name, long periodId, int month, String endBase,
+                                   String in, String out, String principal) {
+        LocalDate ps = LocalDate.of(2026, month, 1);
+        BigDecimal e = new BigDecimal(endBase);
+        return new AccountPeriodFact(accId, name, AccountType.WEALTH, AccountClass.ASSET, AccountLiquidity.LIQUID,
+                "CNY", 1L, 1, periodId, ps, ps.plusMonths(1).minusDays(1), null, e, null, e,
+                Z, Z, Z, Z, new BigDecimal(in), new BigDecimal(in), new BigDecimal(out), new BigDecimal(out),
+                null, null, BigDecimal.ONE, new BigDecimal(principal), new BigDecimal(principal));
+    }
+
+    private Period prevPeriod() {
+        Period prev = new Period();
+        prev.setId(10L);
+        prev.setPeriodStart(LocalDate.of(2026, 1, 1));
+        return prev;
+    }
+
+    /**
+     * v1.30.1 · prod 2026-09 的形状(数是编的):余额宝 A 转出 30 到新开的账户 C,A 自己另外少了 10;
+     * 原来 A 排「拉下来」第一名 −40、C「资本纳入 +30」—— 那 30 只是家里挪了个地方。
+     */
+    @Test
+    void 账户间划转不进贡献_转进新账户的钱不算资本纳入() {
+        var rows = List.of(
+                rowT(1, "A", 10L, 1, "100", "0", "0", "0"),
+                rowT(1, "A", 20L, 2, "60", "0", "30", "0"),
+                rowT(3, "C", 20L, 2, "30", "30", "0", "0"));
+        var a = svc().buildAttribution(1L, slice(rows, List.of(10L, 20L)), 20L, prevPeriod(),
+                flow("100", "90", "0", "0"));
+        assertThat(a.negatives()).extracting(SealedSnapshot.Contribution::accountName).containsExactly("A");
+        assertThat(a.negatives().getFirst().amount()).as("贡献 = 余额变化 −40 − 净划转 −30 = −10")
+                .isEqualByComparingTo("-10");
+        assertThat(a.opened()).as("全是转进来的钱:开账基线 0,不列").isEmpty();
+        assertThat(a.positives()).isEmpty();
+    }
+
+    @Test
+    void 两个老账户之间划转_两边都不算贡献() {
+        var rows = List.of(
+                rowT(1, "A", 10L, 1, "100", "0", "0", "0"),
+                rowT(2, "B", 10L, 1, "50", "0", "0", "0"),
+                rowT(1, "A", 20L, 2, "75", "0", "25", "0"),
+                rowT(2, "B", 20L, 2, "80", "25", "0", "0"));
+        var a = svc().buildAttribution(1L, slice(rows, List.of(10L, 20L)), 20L, prevPeriod(),
+                flow("150", "155", "0", "0"));
+        assertThat(a.negatives()).isEmpty();
+        assertThat(a.positives()).extracting(SealedSnapshot.Contribution::accountName).containsExactly("B");
+        assertThat(a.positives().getFirst().amount()).as("B 余额 +30 里 25 是 A 转来的,自己只涨了 5")
+                .isEqualByComparingTo("5");
+    }
+
+    @Test
+    void 新账户自带的钱才是资本纳入_补录本金也列在那里() {
+        var rows = List.of(
+                rowT(1, "A", 10L, 1, "100", "0", "0", "0"),
+                rowT(1, "A", 20L, 2, "140", "0", "0", "40"),   // 已有账户补录本金 40
+                rowT(3, "C", 20L, 2, "70", "20", "0", "0"));   // 新账户:20 是转进来的,50 是自带的
+        var a = svc().buildAttribution(1L, slice(rows, List.of(10L, 20L)), 20L, prevPeriod(),
+                flow("100", "210", "0", "90"));
+        assertThat(a.positives()).as("A 的 +40 全是补录本金,不是贡献").isEmpty();
+        assertThat(a.opened()).extracting(SealedSnapshot.Contribution::accountName)
+                .containsExactlyInAnyOrder("A(补录本金)", "C");
+        assertThat(a.opened()).filteredOn(c -> c.accountName().equals("C")).first()
+                .extracting(SealedSnapshot.Contribution::amount).satisfies(v ->
+                        assertThat((BigDecimal) v).as("C 的资本纳入 = 期末 70 − 首期转入 20(与家庭开账基线同一个函数)")
+                                .isEqualByComparingTo("50"));
+    }
+
     @Test
     void 没有上期时归因返回null而不是把全部当成正贡献() {
         var rows = List.of(row(1, "A", 10L, 1, "100000", AccountClass.ASSET, AccountLiquidity.LIQUID, AccountType.CASH));
