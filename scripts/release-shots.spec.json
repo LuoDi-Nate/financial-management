@@ -1,53 +1,55 @@
 {
-  "_comment": "v1.29.0 · 券商同步带上期权 / 期货 / 债券。核心叙事:①持仓页上期权一行写人话(标的 · 看涨/看跌 · 行权价 · 到期日 · 买入/卖出几张),卖出的是负数、7 天内到期标出来,期货只展示名义价值 ②同步结果按品种计数、对不上的行点名 ③估值分解单列「期权等(券商报表)」。拍之前在 beta 上用 e2e flow 41 的演示模式造一个账户(E2E_KEEP=1 E2E_41_DEMO=1,数是编的),拍完删掉。PC 持仓页用 eval 藏掉股票 / 现金那几行与操作栏,只留账户头、估值分解与期权行。",
-  "_account_note": "路径里的账户编号是拍摄当天演示账户的 id(beta 上造出来的),下次拍要换。",
+  "_comment": "v1.30.0 · 场外基金按代码估值 + 货币基金每日结转 + 基金账户 + 持仓成本价 + 补录本金。核心叙事:①添加持仓里的「场外基金」—— 输代码 / 拼音选中,先看到名称与净值,填份额(可选成本价),「这笔钱从哪来」必选 ②持仓页的基金行 / QDII 行 / 货基行(按金额记、每日结转)③账户详情的「补录本金」与时间线。拍之前在 beta 上用 e2e flow 44 留现场(E2E_KEEP=1,数是编的,本机桩回放),另在「蚂蚁财富-基金」上手记一笔演示补录本金,拍完删掉。 账户 8 的余额与历史月份可能是维护者早期上传截图导入的真实数:拍它时只留补录本金卡片与本期那一条,头部卡片与其它月份全藏。",
+  "_account_note": "131 = flow 44 留下的「e2e · 基金账户」,8 = 演示数据「蚂蚁财富-基金」;下次拍要换编号。",
   "pc": [
     {
-      "path": "/accounts/94/holdings",
-      "name": "holdings-options",
-      "wait": 1500,
-      "waitFor": "[data-deriv-row]",
-      "eval": "[].forEach.call(document.querySelectorAll('body > header, .fixed.top-0, [data-agent-fab], #agent-fab'), function(e){ e.style.display='none'; }); [].forEach.call(document.querySelectorAll('main article'), function(a){ if(!a.querySelector('[data-deriv-kind]')) a.style.display='none'; }); [].forEach.call(document.querySelectorAll('main > section'), function(s){ if(s.id!=='valuation-breakdown' && !s.querySelector('h1')) s.style.display='none'; }); var b=document.querySelector('main > div.font-mono'); if(b) b.style.display='none';",
+      "path": "/accounts/131/holdings/new-fund",
+      "name": "new-fund",
+      "wait": 4500,
+      "waitFor": "#fund-q",
+      "eval": "[].forEach.call(document.querySelectorAll('body > header, .fixed.top-0'), function(e){ e.style.display='none'; }); var q=document.getElementById('fund-q'); q.value='gfdy'; htmx.trigger(q,'search'); setTimeout(function(){ htmx.ajax('GET','/funds/002943/quote?accountId=131',{target:'#fund-quote',swap:'innerHTML'}); },900); setTimeout(function(){ var f=document.querySelector('[data-fund-form]'); if(!f) return; f.amount.value='1000'; f.costBasis.value='4'; f.dispatchEvent(new Event('input',{bubbles:true})); var r=f.querySelector('input[name=moneyFrom][value=CASH]'); if(r) r.checked=true; },2600);",
       "selector": "main"
     },
     {
-      "path": "/accounts/94/broker",
-      "name": "sync-result",
-      "wait": 1200,
-      "waitFor": "main section.paper-card.p-6",
-      "selector": "main section.paper-card.p-6"
+      "path": "/accounts/131/holdings",
+      "name": "holdings-funds",
+      "wait": 1500,
+      "waitFor": "[data-nav-row]",
+      "eval": "[].forEach.call(document.querySelectorAll('body > header, .fixed.top-0, [data-agent-fab], #agent-fab'), function(e){ e.style.display='none'; }); [].forEach.call(document.querySelectorAll('main article'), function(a){ if(!a.querySelector('[data-nav-row]')) a.style.display='none'; }); [].forEach.call(document.querySelectorAll('main > section'), function(s){ if(s.id!=='valuation-breakdown' && !s.querySelector('h1')) s.style.display='none'; }); [].forEach.call(document.querySelectorAll('main > div.font-mono, main > p'), function(e){ e.style.display='none'; });",
+      "selector": "main"
     },
     {
-      "path": "/help/broker-sync",
-      "name": "help-derivatives",
-      "wait": 1000,
-      "waitFor": "#derivatives",
-      "selector": "#derivatives"
+      "path": "/accounts/8",
+      "name": "principal",
+      "wait": 1500,
+      "waitFor": "[data-principal-card]",
+      "eval": "[].forEach.call(document.querySelectorAll('body > header, .fixed.top-0, [data-agent-fab], #agent-fab'), function(e){ e.style.display='none'; }); document.querySelector('[data-principal-card]').open=true; [].forEach.call(document.querySelectorAll('main > section'), function(s){ if(!/流水时间线/.test(s.textContent)) s.style.display='none'; }); [].forEach.call(document.querySelectorAll('main details:not([data-principal-card])'), function(d){ d.open = /2026 · 10/.test(d.querySelector('summary').textContent); if(!d.open) d.style.display='none'; }); [].forEach.call(document.querySelectorAll('main details[open]:not([data-principal-card]) li'), function(li){ if(!/补录本金/.test(li.textContent)) li.style.display='none'; });",
+      "selector": "main"
     }
   ],
   "mobile": [
     {
-      "path": "/accounts/94/holdings",
-      "name": "holdings-options",
+      "path": "/accounts/131/holdings",
+      "name": "holdings-funds",
       "wait": 1500,
-      "waitFor": "[data-deriv-row]",
-      "eval": "var a=document.querySelector('main article [data-deriv-due]'); var art=a ? a.closest('article') : document.querySelector('[data-deriv-row]').closest('article'); art.previousElementSibling.scrollIntoView({block:'start'}); window.scrollBy(0,-70);",
+      "waitFor": "[data-nav-row]",
+      "eval": "document.querySelector('[data-nav-row]').closest('article').scrollIntoView({block:'start'}); window.scrollBy(0,-70); [].forEach.call(document.querySelectorAll('body *'), function(e){ var cs=getComputedStyle(e); if(cs.position==='fixed'){ var r=e.getBoundingClientRect(); if(r.top>window.innerHeight-260) e.style.display='none'; } });",
       "full": false
     },
     {
-      "path": "/accounts/94/holdings",
-      "name": "holdings-breakdown",
+      "path": "/accounts/131/holdings",
+      "name": "holdings-mmf",
       "wait": 1500,
-      "waitFor": "#valuation-breakdown",
-      "eval": "document.querySelector('#valuation-breakdown').scrollIntoView({block:'start'}); window.scrollBy(0,-70);",
+      "waitFor": "[data-nav-row=MMF]",
+      "eval": "document.querySelector('[data-nav-row=MMF]').closest('article').scrollIntoView({block:'start'}); window.scrollBy(0,-70); [].forEach.call(document.querySelectorAll('body *'), function(e){ var cs=getComputedStyle(e); if(cs.position==='fixed'){ var r=e.getBoundingClientRect(); if(r.top>window.innerHeight-260) e.style.display='none'; } });",
       "full": false
     },
     {
-      "path": "/accounts/94/broker",
-      "name": "sync-result",
-      "wait": 1200,
-      "waitFor": "main section.paper-card.p-6",
-      "eval": "document.querySelector('main section.paper-card.p-6').scrollIntoView({block:'start'}); window.scrollBy(0,-70);",
+      "path": "/accounts/8",
+      "name": "principal",
+      "wait": 1500,
+      "waitFor": "[data-principal-card]",
+      "eval": "document.querySelector('[data-principal-card]').open=true; [].forEach.call(document.querySelectorAll('main > section'), function(s){ if(!/流水时间线/.test(s.textContent)) s.style.display='none'; }); [].forEach.call(document.querySelectorAll('main details:not([data-principal-card])'), function(d){ d.open = /2026 · 10/.test(d.querySelector('summary').textContent); if(!d.open) d.style.display='none'; }); [].forEach.call(document.querySelectorAll('main details[open]:not([data-principal-card]) li'), function(li){ if(!/补录本金/.test(li.textContent)) li.style.display='none'; }); document.querySelector('[data-principal-card]').scrollIntoView({block:'start'}); window.scrollBy(0,-70); [].forEach.call(document.querySelectorAll('body *'), function(e){ var cs=getComputedStyle(e); if(cs.position==='fixed'){ var r=e.getBoundingClientRect(); if(r.top>window.innerHeight-260) e.style.display='none'; } });",
       "full": false
     }
   ]
