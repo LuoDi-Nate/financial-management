@@ -332,6 +332,14 @@
               <div class="font-mono text-xs" th:text="${ni.checkedText != null ? ni.checkedText : '—'}">10-08 06:05</div>
             </div>
           </div>
+          <!--/* FR-971 · 持有收益 = 市值 − 成本价 × 份额(买入以来,含记账之前那段)—— 只在这一行和资产透视持仓级维度用,不进收益率 */-->
+          <p class="font-mono text-[12px] mt-2" th:if="${ni.cost != null}" data-nav-pnl>
+            <span class="text-ink-subtle" th:text="'持仓成本价 ' + ${#numbers.formatDecimal(h.costBasis, 1, 4)} + ' · 持有收益 '">持仓成本价 4.0000 · 持有收益 </span>
+            <span data-priv th:classappend="${ni.pnl.signum() >= 0} ? 'text-forest' : 'text-rust'"
+                  th:text="(${ni.pnl.signum() >= 0} ? '+' : '−') + ${account.currency} + ' ' + ${#numbers.formatDecimal(ni.pnl.abs(), 1, 'COMMA', 2, 'POINT')} + (${ni.pnlPct != null} ? '(' + (${ni.pnlPct.signum() >= 0} ? '+' : '') + ${ni.pnlPct} + '%)' : '')">+CNY 20,000.00(+100.00%)</span>
+            <span class="text-ink-subtle text-[11px]">· 买入以来,含开始记账之前那段</span>
+          </p>
+          <p class="font-mono text-[11px] text-ink-subtle mt-2" th:if="${ni.cost == null}" data-nav-nocost>没填持仓成本价 —— 在「改份额」里补一个,就能看这只的持有收益</p>
           <p class="font-mono text-[11px] text-ink-subtle mt-2" th:if="${ni.late}" data-nav-late>QDII、FOF 这类基金的净值通常比国内基金晚一个交易日</p>
           <p class="font-mono text-[11px] text-ink-subtle mt-1" th:if="${ni.estimated != null}" data-nav-estimated th:text="${ni.estimated}">按 9 月 30 日净值估算的份额</p>
           <p class="font-mono text-[11px] mt-1" style="color:var(--rust)" th:if="${ni.problem != null}" data-nav-problem th:text="${ni.problem}">这次没拉到</p>
@@ -411,10 +419,30 @@
             <input type="number" name="shares" min="0" th:step="${ni.mmf} ? '0.01' : '0.0001'"
                    th:value="${h.shares != null ? h.shares.stripTrailingZeros().toPlainString() : ''}"
                    class="w-full font-mono text-sm bg-paper border border-rule px-2 py-1 tnum text-right">
-            <label th:if="${hasCashRow}" class="flex gap-2 items-start text-[12px] leading-snug">
-              <input type="checkbox" name="cashLinked" value="true" class="mt-0.5 w-4 h-4 accent-[var(--ink)]">
-              <span>多出来的是<b>用账户里的现金买的</b>(少了的是<b>赎回到账户现金</b>)<br><span class="text-ink-subtle">现金行跟着变,余额不变。不勾 = 份额变化算估值变动(分红再投、和 App 对账)</span></span>
-            </label>
+            <!--/* FR-971 · 普通基金可改持仓成本价(留空 = 清掉);用账户现金申购且没改它时,按这次净值加权平均 */-->
+            <th:block th:unless="${ni.mmf}">
+              <input type="hidden" name="costField" value="true">
+              <label class="font-mono text-[10px] uppercase text-ink-subtle block">持仓成本价(选填 · 每份)</label>
+              <input type="number" name="costBasis" min="0" step="0.0001"
+                     th:value="${h.costBasis != null ? h.costBasis.stripTrailingZeros().toPlainString() : ''}"
+                     class="w-full font-mono text-sm bg-paper border border-rule px-2 py-1 tnum text-right">
+            </th:block>
+            <!--/* FR-970 / 973 · 份额变化的钱从哪来;默认「照常计入」= 和 v1.30 之前一样 */-->
+            <fieldset class="space-y-1.5 text-[12px] leading-snug" data-money-from>
+              <legend class="font-mono text-[10px] uppercase text-ink-subtle mb-0.5">份额变化的钱从哪来</legend>
+              <label class="flex gap-2 items-start">
+                <input type="radio" name="moneyFrom" value="NEW" checked class="mt-0.5 w-4 h-4 accent-[var(--ink)]">
+                <span>照常计入<br><span class="text-ink-subtle">分红再投、和 App 对账 —— 算这期的估值变动</span></span>
+              </label>
+              <label th:if="${hasCashRow}" class="flex gap-2 items-start">
+                <input type="radio" name="moneyFrom" value="CASH" class="mt-0.5 w-4 h-4 accent-[var(--ink)]">
+                <span>用账户里的现金买的(或赎回到现金)<br><span class="text-ink-subtle">现金行跟着变,余额不变</span></span>
+              </label>
+              <label th:if="${priorAllowed}" class="flex gap-2 items-start">
+                <input type="radio" name="moneyFrom" value="PRIOR" class="mt-0.5 w-4 h-4 accent-[var(--ink)]">
+                <span>多出来的是以前就有、现在才补录<br><span class="text-ink-subtle">记为补录本金,不算这期的收益(只用于增加)</span></span>
+              </label>
+            </fieldset>
             <button type="submit" class="btn-ink text-xs w-full">保存</button>
           </form>
         </details>

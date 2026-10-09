@@ -13,6 +13,7 @@ class ShareEventReasonTest {
         assertThat(ShareEventReason.MMF_ACCRUAL.source()).isEqualTo(LedgerSource.SYNC_FUND_NAV);
         assertThat(ShareEventReason.IMPORT.source()).isEqualTo(LedgerSource.IMPORT_SCREENSHOT);
         assertThat(ShareEventReason.CASH_BUY.source()).isEqualTo(LedgerSource.MANUAL);
+        assertThat(ShareEventReason.PRIOR.source()).isEqualTo(LedgerSource.MANUAL);
         assertThat(ShareEventReason.of("SOMETHING_NEW").source()).isEqualTo(LedgerSource.UNKNOWN);
         for (ShareEventReason r : ShareEventReason.values()) {
             assertThat(r.source()).as(r + " 必须有来源").isNotNull();

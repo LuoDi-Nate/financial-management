@@ -16,6 +16,12 @@
     <span class="text-ink" th:text="${detail.account.displayName}">账户详情</span>
   </div>
 
+  <!--/* v1.30 · 动作结果(补录本金 记 / 删)*/-->
+  <div th:if="${flashOk != null}" class="paper-card p-3 mb-4 text-sm" data-flash-ok
+       style="border-left:4px solid var(--forest);color:var(--forest)" th:text="${flashOk}">已记一笔补录本金</div>
+  <div th:if="${flashErr != null}" class="paper-card p-3 mb-4 text-sm" data-flash-err
+       style="border-left:4px solid var(--rust);color:var(--rust)" th:text="${flashErr}">记不了</div>
+
   <!-- 顶部信息卡 -->
   <section class="paper-card p-6 mb-6">
     <div class="flex items-baseline justify-between gap-4 flex-wrap mb-3">
@@ -205,6 +211,7 @@
         <option value="SNAPSHOT" th:selected="${filterType == 'SNAPSHOT'}">= 月末校准</option>
         <option value="SHARES"   th:selected="${filterType == 'SHARES'}"
                 th:if="${T(com.family.finance.service.stock.StockHoldingService).supportsHoldings(detail.account.type)}"># 持仓数量变动</option>
+        <option value="PRINCIPAL" th:selected="${filterType == 'PRINCIPAL'}">+ 补录本金</option>
       </select>
       <select name="range" class="border border-rule bg-card px-2 py-1 text-xs">
         <option value="3"   th:selected="${rangeMonths == 3}">近 3 月</option>
@@ -226,6 +233,43 @@
       </a>
     </form>
   </section>
+
+  <!--/* v1.30 FR-973 · 补录本金:以前就有、这期才补录进来的钱(算本金,不算收入也不算收益)。
+         只在「还开着、且不是这个账户第一期」的期可记 —— 第一期的余额本来就整笔算本金;没有可记的期就整块不出现。 */-->
+  <details th:if="${!#lists.isEmpty(principalPeriods)}" id="principal" class="paper-card px-5 py-3 mb-6" data-principal-card>
+    <summary class="cursor-pointer select-none flex items-baseline gap-3 flex-wrap">
+      <span class="font-display text-lg">补录本金</span>
+      <span class="font-mono text-[11px] text-ink-subtle">以前就有、这期才补录进来的钱 —— 算本金,不算这期的收益</span>
+    </summary>
+    <p class="text-sm text-ink-soft leading-relaxed mt-3 max-w-[760px]">
+      比如在这个账户里补录了一只早就买了的股票 / 基金,或者发现一笔一直没登记的存款:余额这期会多出这么多,
+      但钱不是这期赚的。记在这里,仪表盘和报表就把它当<b>本金</b>(和新账户开户时填的余额一样,算进「开账基线」),
+      不算收入,也不算投资收益。<span class="text-ink-subtle">钱是从家里别的账户转来的,请记「划转」,不要记在这里。</span>
+    </p>
+    <form th:action="@{|/accounts/${detail.account.id}/principal|}" method="post"
+          class="mt-3 grid grid-cols-1 sm:grid-cols-[180px_200px_1fr_auto] gap-3 items-end" data-principal-form>
+      <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+      <label class="block">
+        <span class="font-mono text-[10px] uppercase text-ink-subtle block mb-1"
+              th:text="'金额(' + ${detail.account.currency} + ')'">金额(CNY)</span>
+        <input type="number" name="amount" step="0.01" min="0.01" required
+               class="w-full font-mono text-sm bg-paper border border-rule px-2 py-1.5 tnum text-right">
+      </label>
+      <label class="block">
+        <span class="font-mono text-[10px] uppercase text-ink-subtle block mb-1">记在哪一期(余额里含它的那期)</span>
+        <select name="periodId" class="w-full border border-rule bg-card px-2 py-1.5 text-sm">
+          <option th:each="p,pi : ${principalPeriods}" th:value="${p.id}" th:selected="${pi.last}"
+                  th:text="${#temporals.format(p.periodStart, 'yyyy · MM')}">2026 · 10</option>
+        </select>
+      </label>
+      <label class="block">
+        <span class="font-mono text-[10px] uppercase text-ink-subtle block mb-1">备注(选填)</span>
+        <input type="text" name="note" maxlength="255" placeholder="比如:补录早年买的招商银行"
+               class="w-full text-sm bg-paper border border-rule px-2 py-1.5">
+      </label>
+      <button type="submit" class="btn-ink text-xs">记一笔</button>
+    </form>
+  </details>
 
   <!-- 月分组流水时间线 -->
   <section class="mb-8">
@@ -259,8 +303,8 @@
       <ul class="px-5 pb-3 divide-y divide-rule-soft text-xs font-mono">
         <li th:each="e : ${g.entries}" class="py-2 flex items-baseline gap-3 flex-wrap">
           <span class="w-20 inline-flex items-center gap-1"
-                th:classappend="${e.kind.name() == 'INCOME' ? ' num-pos' : (e.kind.name() == 'EXPENSE' ? ' num-neg' : (e.kind.name() == 'TRANSFER_IN' ? ' text-forest' : (e.kind.name() == 'TRANSFER_OUT' ? ' text-rust' : (e.kind.name() == 'VALUATION' ? ' text-brass-deep' : (e.kind.name() == 'SHARES' ? ' text-fund' : ' text-ink-subtle')))))}"
-                th:text="${e.kind.name() == 'INCOME' ? '+ 收入' : (e.kind.name() == 'EXPENSE' ? '- 支出' : (e.kind.name() == 'TRANSFER_IN' ? '↳ 划入' : (e.kind.name() == 'TRANSFER_OUT' ? '↱ 划出' : (e.kind.name() == 'VALUATION' ? '△ 估值' : (e.kind.name() == 'SHARES' ? '# 持仓数量' : '= 校准')))))}">
+                th:classappend="${e.kind.name() == 'INCOME' ? ' num-pos' : (e.kind.name() == 'EXPENSE' ? ' num-neg' : (e.kind.name() == 'TRANSFER_IN' ? ' text-forest' : (e.kind.name() == 'TRANSFER_OUT' ? ' text-rust' : (e.kind.name() == 'VALUATION' ? ' text-brass-deep' : (e.kind.name() == 'SHARES' ? ' text-fund' : (e.kind.name() == 'PRINCIPAL' ? ' text-brass-deep' : ' text-ink-subtle'))))))}"
+                th:text="${e.kind.name() == 'INCOME' ? '+ 收入' : (e.kind.name() == 'EXPENSE' ? '- 支出' : (e.kind.name() == 'TRANSFER_IN' ? '↳ 划入' : (e.kind.name() == 'TRANSFER_OUT' ? '↱ 划出' : (e.kind.name() == 'VALUATION' ? '△ 估值' : (e.kind.name() == 'SHARES' ? '# 持仓数量' : (e.kind.name() == 'PRINCIPAL' ? '+ 补录本金' : '= 校准'))))))}">
             类型</span>
           <span class="tnum w-28" data-priv th:text="${e.amountSignedLabel}">+¥0</span>
           <span class="text-ink-soft flex-1 min-w-[120px] sm:min-w-[140px]" th:text="${e.label}">类别 / 对手账户</span>
@@ -274,12 +318,19 @@
                 th:if="${e.occurredAt != null}"
                 th:text="${#temporals.format(e.occurredAt, 'M月d日 HH:mm')}">5月15日 14:30</span>
           <!-- 删除按钮(仅 OPEN 期 + 非 SNAPSHOT,通过 entryService.softDelete 端点) -->
-          <form th:if="${e.deletable}" class="inline"
+          <form th:if="${e.deletable and e.kind.name() != 'PRINCIPAL'}" class="inline"
                 th:action="@{${e.kind.name() == 'TRANSFER_IN' or e.kind.name() == 'TRANSFER_OUT' ? '/entry/transfer/' + e.sourceId + '/delete' : '/entry/cash-flow/' + e.sourceId + '/delete'}}"
                 method="post"
                 onsubmit="return confirm('确定删除这条流水?余额会自动反向冲销。')">
             <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
             <button type="submit" class="text-ink-subtle hover:text-rust px-1" title="软删此条">✕</button>
+          </form>
+          <!--/* v1.30 · 补录本金删除:不动余额,只是这期余额里的这部分照常算回收益 */-->
+          <form th:if="${e.deletable and e.kind.name() == 'PRINCIPAL'}" class="inline" data-principal-delete
+                th:action="@{|/accounts/${detail.account.id}/principal/${e.sourceId}/delete|}" method="post"
+                onsubmit="return confirm('删除这笔补录本金?余额不变,这期余额里的这部分会照常算回收益。')">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+            <button type="submit" class="text-ink-subtle hover:text-rust px-1" title="删除这笔补录本金">✕</button>
           </form>
           <span th:if="${e.note != null and !e.note.isEmpty()}"
                 class="w-full text-ink-subtle italic pl-20"

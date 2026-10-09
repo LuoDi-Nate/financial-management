@@ -89,4 +89,29 @@ function start() {
   });
 }
 
-module.exports = { start, addDays, ymd };
+/**
+ * 家里已有的净值行(不在这条 flow 的账户里)先停用:刷新是全家一起刷的,桩不认识它们的代码 → 会被标成「没拉到」,
+ * flow 里「刷了几只基金 / 没有点名失败」的断言也会被它们带偏。停用 = 只清 nav_mode(估值照旧按手填单价 × 份额,余额不动);
+ * cleanup 把净值相关的几列逐字还回去。
+ */
+function parkOtherNavRows(db, fam, keepAccountIds) {
+  const keep = (keepAccountIds || []).filter(Boolean);
+  const rows = db.col(`SELECT CONCAT_WS('|', h.id, h.nav_mode, IFNULL(h.nav_date,''), IFNULL(h.nav_checked_at,''),
+                              IFNULL(h.nav_error,''), IFNULL(h.manual_value_at,''))
+                         FROM stock_holding h JOIN account a ON a.id = h.account_id
+                        WHERE a.family_id=${fam} AND h.nav_mode IS NOT NULL AND h.archived_at IS NULL
+                          ${keep.length ? `AND h.account_id NOT IN (${keep.join(',')})` : ''}`);
+  if (rows.length) db.raw(`UPDATE stock_holding SET nav_mode = NULL WHERE id IN (${rows.map(r => r.split('|')[0]).join(',')})`);
+  return rows;
+}
+
+function restoreParked(db, rows) {
+  const q = (v) => v === '' ? 'NULL' : `'${v}'`;
+  for (const r of rows || []) {
+    const [id, mode, navDate, checked, err, at] = r.split('|');
+    db.raw(`UPDATE stock_holding SET nav_mode=${q(mode)}, nav_date=${q(navDate)}, nav_checked_at=${q(checked)},
+            nav_error=${q(err)}, manual_value_at=${q(at)} WHERE id=${id}`);
+  }
+}
+
+module.exports = { start, addDays, ymd, parkOtherNavRows, restoreParked };

@@ -64,11 +64,36 @@
                class="w-full font-mono text-lg bg-paper-soft border border-rule px-4 py-2.5 tnum text-right"
                th:placeholder="${mmf} ? '12000.00' : '1000.00'">
       </div>
+      <!--/* FR-971 · 持仓成本价(选填,只普通基金):只用来算这一行的持有收益,不进任何收益率 */-->
+      <div th:unless="${mmf}">
+        <label class="font-mono text-[10px] uppercase text-ink-subtle mb-1 block">持仓成本价(选填 · 每份 · 人民币)</label>
+        <input type="number" name="costBasis" step="0.0001" min="0"
+               class="w-full font-mono text-sm bg-paper-soft border border-rule px-4 py-2 tnum text-right" placeholder="App 持仓详情里的「持仓成本」">
+        <p class="font-mono text-[11px] text-ink-subtle mt-1">填了就能在这一行看持有收益;不填不影响估值。仪表盘和报表的收益按记账以来的余额变化算,不用它</p>
+      </div>
       <p class="font-mono text-[12px] text-ink-soft min-h-[1.2em]" data-fund-calc></p>
-      <label th:if="${hasCashRow}" class="flex gap-2 items-start text-sm leading-relaxed">
-        <input type="checkbox" name="cashLinked" value="true" class="mt-1 w-4 h-4 accent-[var(--ink)]">
-        <span>钱是用这个账户里的现金买的<br><span class="font-mono text-[11px] text-ink-subtle">现金行扣掉同样的钱,账户余额不变(转进这个账户的钱先落在现金行,勾上才不会算两遍)。不勾 = 这只基金本来就有、钱没经过这个账户,余额会增加这么多</span></span>
-      </label>
+      <!--/* FR-970 / 973 · 这笔钱从哪来 —— 决定余额的这次增加算什么。账户第一期没有「补录」:第一期的余额本来就整笔算本金 */-->
+      <fieldset th:if="${hasCashRow or priorAllowed}" class="space-y-2" data-money-from>
+        <legend class="font-mono text-[10px] uppercase text-ink-subtle mb-1">这笔钱从哪来(必选)</legend>
+        <label th:if="${hasCashRow}" class="flex gap-2 items-start text-sm leading-relaxed">
+          <input type="radio" name="moneyFrom" value="CASH" required class="mt-1 w-4 h-4 accent-[var(--ink)]">
+          <span>用这个账户里的现金买的<br><span class="font-mono text-[11px] text-ink-subtle">现金行扣掉同样的钱,账户余额不变</span></span>
+        </label>
+        <label th:if="${priorAllowed}" class="flex gap-2 items-start text-sm leading-relaxed">
+          <input type="radio" name="moneyFrom" value="PRIOR" required class="mt-1 w-4 h-4 accent-[var(--ink)]">
+          <span>以前就有,现在才补录进来<br><span class="font-mono text-[11px] text-ink-subtle">余额会增加这么多,记为补录本金 —— 算本金,不算这期的收益</span></span>
+        </label>
+        <label class="flex gap-2 items-start text-sm leading-relaxed">
+          <input type="radio" name="moneyFrom" value="NEW" required class="mt-1 w-4 h-4 accent-[var(--ink)]">
+          <span><span th:text="${priorAllowed} ? '新买的,钱从家里别的账户转来' : '不是用这个账户的现金买的'">新买的,钱从家里别的账户转来</span><br><span
+                class="font-mono text-[11px] text-ink-subtle"
+                th:text="${priorAllowed} ? '余额会增加这么多;记得在填报页记一笔划转,不然这期会被算成收益' : '余额会增加这么多 —— 这是这个账户的第一期,余额整笔算本金(开账基线),不会被算成收益'">余额会增加这么多</span></span>
+        </label>
+      </fieldset>
+      <th:block th:unless="${hasCashRow or priorAllowed}">
+        <input type="hidden" name="moneyFrom" value="NEW">
+        <p class="font-mono text-[11px] text-ink-subtle" data-first-period>这是这个账户的第一期:余额整笔算本金(开账基线),不会被算成收益</p>
+      </th:block>
       <div class="flex justify-end">
         <button type="submit" class="btn-ink">添加 · 以后按净值自动更新</button>
       </div>
@@ -81,6 +106,7 @@
         var nav = parseFloat(card.getAttribute('data-nav'));
         var mmf = card.getAttribute('data-kind') === 'MMF';
         var out = form.querySelector('[data-fund-calc]');
+        var costIn = form.querySelector('input[name=costBasis]');
         var lbl = form.querySelector('[data-amount-label]');
         var date = (card.querySelector('[data-quote-date]') || {}).textContent || '';
         function fmt(n, d) { return n.toLocaleString('zh-CN', { minimumFractionDigits: d, maximumFractionDigits: d }); }
@@ -90,9 +116,16 @@
           if (!mmf && lbl) lbl.textContent = by === 'VALUE' ? '当前市值(人民币)' : '持有份额';
           if (!(a > 0)) { out.textContent = ''; return; }
           if (mmf) { out.textContent = '¥' + fmt(a, 2) + ' · 之后每天按万份收益自动结转'; return; }
-          out.textContent = by === 'VALUE'
-            ? '按 ' + date + '净值 ' + nav.toFixed(4) + ' 估算:约 ' + fmt(a / nav, 2) + ' 份'
+          var shares = by === 'VALUE' ? a / nav : a;
+          var text = by === 'VALUE'
+            ? '按 ' + date + '净值 ' + nav.toFixed(4) + ' 估算:约 ' + fmt(shares, 2) + ' 份'
             : fmt(a, 2) + ' 份 × ' + nav.toFixed(4) + ' = ¥' + fmt(a * nav, 2);
+          var cost = costIn ? parseFloat(costIn.value) : NaN;
+          if (cost >= 0 && costIn.value !== '') {
+            var pnl = shares * nav - shares * cost;
+            text += ' · 持有收益约 ' + (pnl >= 0 ? '+' : '−') + '¥' + fmt(Math.abs(pnl), 2);
+          }
+          out.textContent = text;
         }
         form.addEventListener('input', upd);
         form.addEventListener('change', upd);

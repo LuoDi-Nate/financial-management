@@ -24,6 +24,8 @@ public enum ShareEventReason {
     CONVERT("改为按净值自动估值"),
     /** 新加的基金(开始按份额记) */
     CREATE("添加基金"),
+    /** 份额增加、这部分是以前就有、现在才补录的(同时记一笔补录本金 · FR-973) */
+    PRIOR("补录(以前就有)"),
     OTHER("其他");
 
     private final String label;
@@ -50,7 +52,7 @@ public enum ShareEventReason {
         return switch (this) {
             case MMF_ACCRUAL -> com.family.finance.domain.ledger.LedgerSource.SYNC_FUND_NAV;
             case IMPORT -> com.family.finance.domain.ledger.LedgerSource.IMPORT_SCREENSHOT;
-            case MANUAL_EDIT, MANUAL_CORRECTION, CASH_BUY, CASH_REDEEM, CONVERT, CREATE ->
+            case MANUAL_EDIT, MANUAL_CORRECTION, CASH_BUY, CASH_REDEEM, CONVERT, CREATE, PRIOR ->
                     com.family.finance.domain.ledger.LedgerSource.MANUAL;
             case OTHER -> com.family.finance.domain.ledger.LedgerSource.UNKNOWN;
         };

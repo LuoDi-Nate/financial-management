@@ -57,7 +57,9 @@ class EntryStockIncomeTest {
                 // v1.18.5 · 手填余额落托管账户时要拿「持仓+现金」当前值算差额
                 mock(com.family.finance.service.stock.AccountValuationService.class),
                 // v1.21 · 支出录入要校验消费分类归属(isUsable)
-                mock(com.family.finance.service.expense.ExpenseCategoryService.class));
+                mock(com.family.finance.service.expense.ExpenseCategoryService.class),
+                // v1.30 · 补录本金算进未解释差额的已知流入
+                mock(com.family.finance.repository.PrincipalAdjustmentMapper.class));
 
         Period p = Period.builder().id(100L).familyId(1L).status(PeriodStatus.OPEN)
                 .periodStart(LocalDate.of(2026, 7, 1)).periodEnd(LocalDate.of(2026, 7, 31)).build();

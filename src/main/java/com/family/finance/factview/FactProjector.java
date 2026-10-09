@@ -20,8 +20,12 @@ public final class FactProjector {
         BigDecimal expenseOrig = money(nz(row.expenseOrig()));
         BigDecimal transferInOrig = money(nz(row.transferInOrig()));
         BigDecimal transferOutOrig = money(nz(row.transferOutOrig()));
+        // v1.30 · 补录本金:账户第一期(没有上期余额)不认 —— 第一期的余额已经整笔算开账基线,再认一次就重复了
+        BigDecimal principalAdjOrig = row.previousEndBalance() == null
+                ? BigDecimal.ZERO.setScale(2, RoundingMode.HALF_EVEN) : money(nz(row.principalAdjOrig()));
         BigDecimal periodPnlOrig = PnlCalculator.periodPnl(
-                row.endBalance(), row.previousEndBalance(), incomeOrig, expenseOrig, transferInOrig, transferOutOrig);
+                row.endBalance(), row.previousEndBalance(), incomeOrig, expenseOrig, transferInOrig, transferOutOrig,
+                principalAdjOrig);
         BigDecimal periodPnlBase = PnlCalculator.toBase(periodPnlOrig, fx);
 
         return new AccountPeriodFact(
@@ -50,7 +54,9 @@ public final class FactProjector {
                 PnlCalculator.toBase(transferOutOrig, fx),
                 periodPnlOrig,
                 periodPnlBase,
-                fx.setScale(6, RoundingMode.HALF_EVEN)
+                fx.setScale(6, RoundingMode.HALF_EVEN),
+                principalAdjOrig,
+                PnlCalculator.toBase(principalAdjOrig, fx)
         );
     }
 

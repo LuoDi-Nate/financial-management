@@ -57,6 +57,12 @@
       </ul>
     </div>
 
+    <!--/* v1.30 FR-973 · 已有账户补录以前就有的持仓:加完去账户详情记一笔补录本金,这期才不会把它算成收益 */-->
+    <p class="font-mono text-[11px] text-ink-subtle leading-relaxed" data-principal-hint>
+      以前就有、现在才补录进来的?加完后去 <a th:href="@{|/accounts/${account.id}#principal|}" class="text-brass-deep">账户详情 → 补录本金</a>
+      记一笔(账户第一期不用),这期就不会把它算成收益。
+    </p>
+
     <div class="flex items-center justify-between pt-6 border-t border-rule-soft">
       <a th:href="@{|/accounts/${account.id}/holdings|}" class="btn-paper no-underline">← 取消</a>
       <button type="submit" class="btn-ink">添加</button>

@@ -76,6 +76,8 @@ public record AccountDetail(
         /** v0.4.1 FR-52f · 股票账户估值变动事件 */
         VALUATION,
         /** v1.30 FR-968 · 持仓数量变动(只说「份额怎么变的」,不带钱:amount 恒为 null,不进月净额) */
-        SHARES
+        SHARES,
+        /** v1.30 FR-974 · 补录本金(以前就有、这期才补录的钱 · 算本金,不算收入也不算收益) */
+        PRINCIPAL
     }
 }

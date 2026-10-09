@@ -40,6 +40,7 @@ public class FundHoldingController {
     private final StockHoldingService stockHoldingService;
     private final AccountMapper accountMapper;
     private final NavService navService;
+    private final com.family.finance.service.ledger.PrincipalAdjustmentService principalService;   // v1.30 FR-973
 
     // ---------- 添加 ----------
 
@@ -73,6 +74,8 @@ public class FundHoldingController {
         model.addAttribute("account", account);
         model.addAttribute("q", fundHoldingService.quote(me.getFamilyId(), code));
         model.addAttribute("hasCashRow", hasCashRow(me.getFamilyId(), accountId));
+        // FR-973 · 账户第一期没有「以前就有、现在才补录」这一项:第一期的余额本来就整笔算本金
+        model.addAttribute("priorAllowed", principalService.checkBalancePeriod(me.getFamilyId(), accountId).ok());
         return "stock/_fund-parts :: quote";
     }
 
@@ -81,12 +84,18 @@ public class FundHoldingController {
                          @RequestParam String code, @RequestParam(defaultValue = "SHARES") String by,
                          @RequestParam BigDecimal amount,
                          @RequestParam(value = "cashLinked", defaultValue = "false") boolean cashLinked,
+                         @RequestParam(value = "moneyFrom", required = false) String moneyFrom,
+                         @RequestParam(value = "costBasis", required = false) BigDecimal costBasis,
                          RedirectAttributes ra) {
         requireFundAccount(me.getFamilyId(), accountId);
         try {
             FundHoldingService.By mode = "VALUE".equalsIgnoreCase(by) ? FundHoldingService.By.VALUE : FundHoldingService.By.SHARES;
-            var h = fundHoldingService.create(me.getFamilyId(), me.getMemberId(), accountId, code, mode, amount, cashLinked);
-            ra.addFlashAttribute("flashOk", "已添加「" + h.getDisplayName() + "」—— 以后跟着刷新自动更新");
+            var from = FundHoldingService.MoneyFrom.parse(moneyFrom, cashLinked);
+            var h = fundHoldingService.create(me.getFamilyId(), me.getMemberId(), accountId, code, mode, amount, from, costBasis);
+            ra.addFlashAttribute("flashOk", "已添加「" + h.getDisplayName() + "」—— 以后跟着刷新自动更新"
+                    + (from == FundHoldingService.MoneyFrom.PRIOR ? ";这笔记为补录本金,不算这期的收益" : "")
+                    + (from == FundHoldingService.MoneyFrom.NEW && principalService.checkBalancePeriod(me.getFamilyId(), accountId).ok()
+                        ? ";钱从别的账户来的话,记得在填报页记一笔划转" : ""));
         } catch (IllegalArgumentException e) {
             ra.addFlashAttribute("flashErr", e.getMessage());
             return "redirect:/accounts/" + accountId + "/holdings/new-fund";
@@ -146,11 +155,22 @@ public class FundHoldingController {
     public String editShares(@AuthenticationPrincipal MemberPrincipal me, @PathVariable long accountId,
                              @PathVariable long hid, @RequestParam BigDecimal shares,
                              @RequestParam(value = "cashLinked", defaultValue = "false") boolean cashLinked,
+                             @RequestParam(value = "moneyFrom", required = false) String moneyFrom,
+                             @RequestParam(value = "costBasis", required = false) BigDecimal costBasis,
+                             @RequestParam(value = "costField", defaultValue = "false") boolean costField,
                              RedirectAttributes ra) {
-        requireHoldingOf(me.getFamilyId(), accountId, hid);
+        var h = requireHoldingOf(me.getFamilyId(), accountId, hid);
         try {
-            fundHoldingService.editShares(me.getFamilyId(), me.getMemberId(), hid, shares, cashLinked);
-            ra.addFlashAttribute("flashOk", cashLinked ? "已更新 —— 钱从账户现金行里挪,余额不变" : "已更新");
+            var from = FundHoldingService.MoneyFrom.parse(moneyFrom, cashLinked);
+            // 表单里有成本价这一格(普通基金)才按它来;没有(货币基金 / 老页面)= 不动成本价。
+            // 有这一格而留空 = 用户把成本价清掉了,这和「没这一格」不是一回事,所以要单独的标记位。
+            BigDecimal cost = costField ? costBasis : h.getCostBasis();
+            fundHoldingService.editShares(me.getFamilyId(), me.getMemberId(), hid, shares, from, cost);
+            ra.addFlashAttribute("flashOk", switch (from) {
+                case CASH -> "已更新 —— 钱从账户现金行里挪,余额不变";
+                case PRIOR -> "已更新 —— 多出来的这部分记为补录本金,不算这期的收益";
+                case NEW -> "已更新";
+            });
         } catch (IllegalArgumentException e) {
             ra.addFlashAttribute("flashErr", e.getMessage());
         }

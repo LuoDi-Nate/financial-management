@@ -52,6 +52,8 @@ public class AccountDetailService {
     private final com.family.finance.repository.StockValuationEventMapper stockValuationEventMapper;
     /** v1.30 FR-968 · 持仓数量变动(只给人看) */
     private final com.family.finance.repository.HoldingShareEventMapper holdingShareEventMapper;
+    /** v1.30 FR-974 · 补录本金 */
+    private final com.family.finance.repository.PrincipalAdjustmentMapper principalAdjustmentMapper;
     private final ProductCategoryService productCategoryService;
 
     /**
@@ -131,8 +133,14 @@ public class AccountDetailService {
                 .filter(t -> Objects.equals(t.getFromAccountId(), accountId))
                 .map(Transfer::getAmount).filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+        // v1.30 · 补录本金也是投进来的本金(口径同开账基线)
+        List<com.family.finance.domain.ledger.PrincipalAdjustment> principals =
+                principalAdjustmentMapper.findByAccount(familyId, accountId);
+        BigDecimal cumPrincipal = principals.stream()
+                .map(com.family.finance.domain.ledger.PrincipalAdjustment::getAmount).filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal cumulativeNetInflow = cumIncome.subtract(cumExpense)
-                .add(cumTransferIn).subtract(cumTransferOut)
+                .add(cumTransferIn).subtract(cumTransferOut).add(cumPrincipal)
                 .setScale(2, RoundingMode.HALF_EVEN);
 
         int monthCount = Math.max(1, snapshots.size());
@@ -249,6 +257,22 @@ public class AccountDetailService {
                 // 时间线渲染失败不阻塞整体页面
             }
         }
+        // v1.30 FR-974 · 补录本金 entries —— 进行中的期可删(删了这期就照常算回收益)
+        for (com.family.finance.domain.ledger.PrincipalAdjustment pa : principals) {
+            Period p = periodById.get(pa.getPeriodId());
+            if (p == null) continue;
+            byMonth.computeIfAbsent(p.getPeriodStart(), k -> new ArrayList<>()).add(new AccountDetail.Entry(
+                    AccountDetail.Kind.PRINCIPAL,
+                    pa.getCreatedAt(),
+                    pa.getAmount(),
+                    "+" + MoneyFormat.format(account.getCurrency(), pa.getAmount()),
+                    "补录本金" + (pa.getHoldingName() == null ? "" : " · " + pa.getHoldingName()),
+                    pa.getNote(),
+                    pa.getId(),
+                    p.getStatus() == PeriodStatus.OPEN,
+                    com.family.finance.domain.ledger.LedgerSource.parse(pa.getSourceTag())
+            ));
+        }
         // TRANSFER entries(本账户视角:in / out 二选一)
         for (Transfer t : allTransfers) {
             Period p = periodById.get(t.getPeriodId());
@@ -296,7 +320,8 @@ public class AccountDetailService {
                     .filter(e -> e.kind() != AccountDetail.Kind.SNAPSHOT && e.kind() != AccountDetail.Kind.SHARES)
                     .map(e -> {
                         boolean positive = e.kind() == AccountDetail.Kind.INCOME
-                                || e.kind() == AccountDetail.Kind.TRANSFER_IN;
+                                || e.kind() == AccountDetail.Kind.TRANSFER_IN
+                                || e.kind() == AccountDetail.Kind.PRINCIPAL;
                         BigDecimal v = Optional.ofNullable(e.amount()).orElse(BigDecimal.ZERO);
                         return positive ? v : v.negate();
                     })
@@ -339,6 +364,7 @@ public class AccountDetailService {
             case "TRANSFER" -> AccountDetail.Kind.TRANSFER_IN; // 用 IN 当哨兵,matchesKind 内部展开 IN/OUT
             case "SNAPSHOT" -> AccountDetail.Kind.SNAPSHOT;
             case "SHARES" -> AccountDetail.Kind.SHARES;   // v1.30
+            case "PRINCIPAL" -> AccountDetail.Kind.PRINCIPAL;   // v1.30
             default -> null;
         };
     }

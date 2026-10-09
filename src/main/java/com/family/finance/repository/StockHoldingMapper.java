@@ -164,6 +164,20 @@ public interface StockHoldingMapper {
      * 比 {@code nav_checked_at} 晚,说明是别处(回滚期间的老代码 / 其它路径)改过这一行 —— 见 FundNavService。
      * 只动未归档的净值行或要变成净值行的 MANUAL 行。
      */
+    /**
+     * v1.30 FR-971 · 只改成本价。<b>不碰 manual_value_at</b> —— 那一列和 nav_checked_at 比较,判「在别处被改过」;
+     * 改成本价不是改估值,不能让净值行因此暂停自动更新。
+     */
+    @Update("""
+            UPDATE stock_holding h
+              JOIN account a ON a.id = h.account_id
+               SET h.cost_basis = #{cost}
+             WHERE a.family_id = #{familyId}
+               AND h.id = #{id}
+               AND h.archived_at IS NULL
+            """)
+    int updateCostBasis(@Param("familyId") long familyId, @Param("id") long id, @Param("cost") java.math.BigDecimal cost);
+
     @Update("""
             UPDATE stock_holding h
               JOIN account a ON a.id = h.account_id

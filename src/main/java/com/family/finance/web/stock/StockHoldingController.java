@@ -61,6 +61,7 @@ public class StockHoldingController {
     private final com.family.finance.service.stock.ValuationRefreshService valuationRefreshService;   // v1.30
     // v1.30 · 净值行展示 / 「改为按净值自动估值」按钮
     private final com.family.finance.service.fund.FundHoldingService fundHoldingService;
+    private final com.family.finance.service.ledger.PrincipalAdjustmentService principalService;   // v1.30 FR-973
     private final com.family.finance.service.fund.FundCatalog fundCatalog;
     private final com.family.finance.repository.FundNavSnapshotMapper fundNavSnapshotMapper;
     private final com.family.finance.repository.HoldingShareEventMapper holdingShareEventMapper;
@@ -151,14 +152,28 @@ public class StockHoldingController {
         java.util.Set<Long> convertible = new java.util.HashSet<>();
         // 每行市值取估值服务的 perHoldingLines(与账户余额同一个算式,护栏 v130-FUND-ONE-PATH)—— 页面不另乘一遍
         Map<Long, BigDecimal> lineValue = new HashMap<>();
+        Map<Long, BigDecimal> lineCost = new HashMap<>();   // v1.30 FR-971 · 成本也取同一行(成本价 × 份额)
         if (active.stream().anyMatch(StockHolding::isNavRow)) {
-            for (var line : valuationService.perHoldingLines(account)) lineValue.put(line.holding().getId(), line.valueAcctCcy());
+            for (var line : valuationService.perHoldingLines(account)) {
+                lineValue.put(line.holding().getId(), line.valueAcctCcy());
+                if (line.costAcctCcy() != null) lineCost.put(line.holding().getId(), line.costAcctCcy());
+            }
         }
         for (StockHolding h : active) {
             if (h.isNavRow()) {
                 Map<String, Object> ni = navView(me.getFamilyId(), h, today);
                 BigDecimal v = lineValue.getOrDefault(h.getId(), BigDecimal.ZERO);
                 ni.put("value", v);
+                // 持有收益 = 市值 − 成本(都来自 perHoldingLines,与资产透视持仓级「累计收益额」同一个数)
+                BigDecimal cost = lineCost.get(h.getId());
+                if (cost != null) {
+                    ni.put("cost", cost);
+                    ni.put("pnl", v.subtract(cost));
+                    if (cost.signum() > 0) {
+                        ni.put("pnlPct", v.subtract(cost).multiply(BigDecimal.valueOf(100))
+                                .divide(cost, 2, java.math.RoundingMode.HALF_UP));
+                    }
+                }
                 navBase = navBase.add(v);
                 navInfo.put(h.getId(), ni);
             } else if (fundAllowed && h.getValuationMode() == ValuationMode.MANUAL && !h.isDerivative()
@@ -171,6 +186,8 @@ public class StockHoldingController {
             }
         }
         boolean hasCashRow = active.stream().anyMatch(x -> x.getValuationMode() == ValuationMode.CASH);
+        // v1.30 FR-973 · 「以前就有、现在才补录」能不能选(账户第一期不行:第一期的余额本来就整笔算本金)
+        var prior = fundAllowed ? principalService.checkBalancePeriod(me.getFamilyId(), accountId) : null;
 
         model.addAttribute("me", me);
         model.addAttribute("nav", navService.load(me));
@@ -183,6 +200,7 @@ public class StockHoldingController {
         model.addAttribute("navBase", navBase);
         model.addAttribute("convertible", convertible);
         model.addAttribute("hasCashRow", hasCashRow);
+        model.addAttribute("priorAllowed", prior != null && prior.ok());
         model.addAttribute("derivBase", derivBase);
         model.addAttribute("latestPrices", latestPrices);
         model.addAttribute("industryTags", com.family.finance.domain.lens.IndustryTag.values()); // v1.1 行业标下拉
@@ -408,7 +426,7 @@ public class StockHoldingController {
         Map<String, Object> ni = new HashMap<>();
         // 每个键都先放好(SpEL 读 Map 里不存在的键会直接抛 EL1008E,而不是给 null —— e2e flow 44 实测抓到)
         for (String k : List.of("value", "dateText", "checkedText", "estimated", "problem", "badge",
-                                "per10k", "yield7d", "lastAccrual")) ni.put(k, null);
+                                "per10k", "yield7d", "lastAccrual", "cost", "pnl", "pnlPct")) ni.put(k, null);
         ni.put("late", false);
         ni.put("edited", false);
         var kind = h.nav();

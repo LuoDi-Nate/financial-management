@@ -152,4 +152,25 @@ class PivotEngineTest {
         // 本期收益率 = (0 + 5000) / (100000 + 95000) × 100 = 2.56%
         assertThat(r.rowTotals().get(diwa).get(1)).isEqualByComparingTo("2.56");
     }
+
+    /** v1.30 FR-972 · 持仓级维度下没有成本价的持仓数出来(同一只按穿透拆几份只算一次),账户级维度恒为 0 */
+    @Test
+    void holdingLevel_countsHoldingsWithoutCost_onceEach() {
+        List<Position> all = new java.util.ArrayList<>(fixture(BigDecimal.ONE));
+        // 一只没填成本价的基金,穿透拆成两个方向(同一个 holdingId 两份)
+        for (String ind : List.of("白酒消费", "新能源电力")) {
+            all.add(new Position(2L, 23L, "某混合基金", "富途证券账户", bd("10000"),
+                    "股票", "高风险", "半灵活", "CNY", "迪娃",
+                    "权益", "富途证券", ind, "A股", "长期增值", "交给产品",
+                    bd("5000"), bd("20000"), bd("80000"), null, bd("95000"),
+                    "富途证券账户"));
+        }
+        var holding = PivotEngine.pivot(all,
+                new LensQuery(List.of("industry"), List.of(), List.of("value", "cumPnl"), Map.of()));
+        assertThat(holding.holdingLevelSplit()).isTrue();
+        assertThat(holding.holdingsWithoutCost()).isEqualTo(1);
+        var acct = PivotEngine.pivot(all,
+                new LensQuery(List.of("risk"), List.of(), List.of("value", "cumPnl"), Map.of()));
+        assertThat(acct.holdingsWithoutCost()).isZero();
+    }
 }

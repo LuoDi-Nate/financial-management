@@ -314,7 +314,11 @@
         <a th:href="@{/entry}" class="btn-ink no-underline inline-flex items-center gap-1.5">去填报
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></a>
         <p class="font-mono text-[10px] text-ink-subtle mt-3">投资侧不受影响:钱赚(投资损益)
-          <b th:classappend="${cashflowSplit.qianPos()} ? ' num-pos' : ' num-neg'" data-priv th:text="${cfQianLabel}">+¥16,200</b></p>
+          <b th:classappend="${cashflowSplit.qianPos()} ? ' num-pos' : ' num-neg'" data-priv data-cf-qian th:text="${cfQianLabel}">+¥16,200</b></p>
+        <!--/* v1.30 · 收支没填时也要交代开账基线(新账户首期余额 / 已有账户的补录本金):
+               否则用户看到净资产涨了、钱赚却没涨,找不到差额去哪了 */-->
+        <p th:if="${cashflowSplit.hasOpening()}" class="font-mono text-[10px] text-ink-subtle mt-1">开账基线(本来就有、这期才开始记的本金 · 不算收益)
+          <b class="text-brass-deep" data-priv data-cf-opening th:text="${cfOpeningLabel}">+¥4,780</b></p>
       </div>
 
       <!-- 正常拆解(非空非首期):有符号双向条 + 两子卡 + 一句话 -->
@@ -336,7 +340,7 @@
               <div class="absolute left-1/2 top-[-3px] bottom-[-3px] w-px" style="background:var(--ink-subtle);opacity:.55"></div>
               <i class="absolute top-[3px] h-4 rounded-sm" th:style="${cashflowSplit.qianBarStyle()}"></i>
             </div>
-            <span class="font-mono text-xs w-20 sm:w-24 tnum" th:classappend="${cashflowSplit.qianPos()} ? ' num-pos' : ' num-neg'" data-priv th:text="${cfQianLabel}">+¥16,200</span>
+            <span class="font-mono text-xs w-20 sm:w-24 tnum" th:classappend="${cashflowSplit.qianPos()} ? ' num-pos' : ' num-neg'" data-priv data-cf-qian th:text="${cfQianLabel}">+¥16,200</span>
           </div>
           <!-- v0.13 · 开账基线(本期新纳入本金)· 仅当本期新增账户时显示 -->
           <div class="flex items-center gap-3" th:if="${cashflowSplit.hasOpening()}">
@@ -345,7 +349,7 @@
               <div class="absolute left-1/2 top-[-3px] bottom-[-3px] w-px" style="background:var(--ink-subtle);opacity:.55"></div>
               <i class="absolute top-[3px] h-4 rounded-sm" th:style="${cashflowSplit.openingBarStyle()}"></i>
             </div>
-            <span class="font-mono text-xs w-20 sm:w-24 tnum text-brass-deep" data-priv th:text="${cfOpeningLabel}">+¥426,372</span>
+            <span class="font-mono text-xs w-20 sm:w-24 tnum text-brass-deep" data-priv data-cf-opening th:text="${cfOpeningLabel}">+¥426,372</span>
           </div>
           <!-- ΔNW(=两/三条代数和)-->
           <div class="flex items-center gap-3">
@@ -361,7 +365,7 @@
 
         <p class="font-mono text-[11px] text-ink-subtle mb-4" th:text="${cashflowSplit.narrative()}">存下的 + 投资一起把净资产推高了。</p>
         <p class="font-mono text-[10px] text-brass-deep mb-4" th:if="${cashflowSplit.hasOpening()}">
-          开账基线 = 你本来就有、这月刚新纳入记录的存量本金(新账户开户时直接填的余额),不算这月赚/赔的(已从收益里剔除)。从家里别的账户转进新账户的钱不算在内。</p>
+          开账基线 = 你本来就有、这月刚新纳入记录的存量本金(新账户开户时直接填的余额,以及已有账户里记的「补录本金」),不算这月赚/赔的(已从收益里剔除)。从家里别的账户转进来的钱不算在内。</p>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div class="p-4" style="background:var(--card-soft);border-left:3px solid var(--forest)">

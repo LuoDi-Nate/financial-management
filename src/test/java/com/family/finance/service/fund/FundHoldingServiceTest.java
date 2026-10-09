@@ -42,6 +42,7 @@ class FundHoldingServiceTest {
     private HoldingShareEventMapper shares;
     private StockHoldingService stock;
     private AccountValuationService valuation;
+    private com.family.finance.service.ledger.PrincipalAdjustmentService principal;
     private FundHoldingService svc;
 
     @BeforeEach
@@ -56,9 +57,14 @@ class FundHoldingServiceTest {
         when(accounts.findById(FAM, ACC)).thenReturn(Optional.of(
                 Account.builder().id(ACC).familyId(FAM).type(AccountType.FUND).currency("CNY").build()));
         PeriodMapper periods = mock(PeriodMapper.class);
-        when(periods.findBalancePeriod(FAM)).thenReturn(Optional.empty());
+        when(periods.findBalancePeriod(FAM)).thenReturn(Optional.of(
+                com.family.finance.domain.period.Period.builder().id(99L).familyId(FAM).build()));
+        principal = mock(com.family.finance.service.ledger.PrincipalAdjustmentService.class);
+        when(principal.checkBalancePeriod(FAM, ACC)).thenReturn(
+                new com.family.finance.service.ledger.PrincipalAdjustmentService.Eligibility(null, true, null));
         svc = new FundHoldingService(catalog, mock(EastMoneyFundClient.class), snaps, holdings, shares, accounts, periods,
-                stock, valuation, mock(FundPenetrationService.class), null);
+                stock, valuation, mock(FundPenetrationService.class), principal,
+                mock(org.springframework.context.ApplicationEventPublisher.class), null);
         when(catalog.find(FAM, "002943")).thenReturn(FundCatalog.classify(
                 new FundInfo("002943", "GFDYZHH", "广发多因子混合", "混合型-灵活", "G")));
         when(snaps.lastFetchedAt("002943")).thenReturn(LocalDateTime.now());
@@ -180,9 +186,83 @@ class FundHoldingServiceTest {
         when(accounts.findById(FAM, ACC)).thenReturn(Optional.of(
                 Account.builder().id(ACC).familyId(FAM).type(AccountType.CRYPTO).currency("CNY").build()));
         FundHoldingService s = new FundHoldingService(catalog, mock(EastMoneyFundClient.class), snaps, holdings, shares,
-                accounts, mock(PeriodMapper.class), stock, valuation, mock(FundPenetrationService.class), null);
+                accounts, mock(PeriodMapper.class), stock, valuation, mock(FundPenetrationService.class),
+                mock(com.family.finance.service.ledger.PrincipalAdjustmentService.class),
+                mock(org.springframework.context.ApplicationEventPublisher.class), null);
         assertThatThrownBy(() -> s.create(FAM, 3L, ACC, "002943", FundHoldingService.By.SHARES, BigDecimal.TEN, false))
                 .hasMessageContaining("不能添加场外基金");
         verify(holdings, never()).insertOwned(anyLong(), any());
+    }
+
+    // ---------- v1.30 · 持仓成本价(FR-971)/ 补录本金(FR-973) ----------
+
+    @Test
+    void 添加时填成本价_存下来_货基不存() {
+        svc.create(FAM, 3L, ACC, "002943", FundHoldingService.By.SHARES, new BigDecimal("1000"),
+                FundHoldingService.MoneyFrom.NEW, new BigDecimal("4"));
+        ArgumentCaptor<StockHolding> h = ArgumentCaptor.forClass(StockHolding.class);
+        verify(holdings).insertOwned(eq(FAM), h.capture());
+        assertThat(h.getValue().getCostBasis()).isEqualByComparingTo("4");
+        verify(principal, never()).record(anyLong(), any(), anyLong(), any(), any(), any(), any());
+    }
+
+    @Test
+    void 添加时选以前就有_按市值记一笔补录本金_挂在这只持仓上() {
+        svc.create(FAM, 3L, ACC, "002943", FundHoldingService.By.SHARES, new BigDecimal("1000"),
+                FundHoldingService.MoneyFrom.PRIOR, null);
+        // 1000 份 × 4.78 = 4780.00 —— 与估值写回的余额同一个数
+        verify(principal).record(eq(FAM), eq(3L), eq(ACC), eq(99L), eq(new BigDecimal("4780.00")), any(), any());
+        verify(stock, never()).adjustAccountCash(anyLong(), anyLong(), any(), any());
+    }
+
+    @Test
+    void 账户第一期选以前就有_拒绝_什么都不写() {
+        when(principal.checkBalancePeriod(FAM, ACC)).thenReturn(
+                new com.family.finance.service.ledger.PrincipalAdjustmentService.Eligibility(null, false, "这是这个账户的第一期"));
+        assertThatThrownBy(() -> svc.create(FAM, 3L, ACC, "002943", FundHoldingService.By.SHARES, BigDecimal.TEN,
+                FundHoldingService.MoneyFrom.PRIOR, null)).hasMessageContaining("第一期");
+        verify(holdings, never()).insertOwned(anyLong(), any());
+    }
+
+    @Test
+    void 改份额选以前就有_只记增加的那部分_份额减少不允许() {
+        StockHolding h = navRow("1000");
+        when(stock.require(FAM, 7L)).thenReturn(h);
+        svc.editShares(FAM, 3L, 7L, new BigDecimal("1100"), FundHoldingService.MoneyFrom.PRIOR, null);
+        verify(principal).record(eq(FAM), eq(3L), eq(ACC), eq(99L), eq(new BigDecimal("478.00")), eq(7L), any());
+        ArgumentCaptor<HoldingShareEvent> ev = ArgumentCaptor.forClass(HoldingShareEvent.class);
+        verify(shares).insertOwned(eq(FAM), ev.capture());
+        assertThat(ev.getValue().getReason()).isEqualTo("PRIOR");
+        assertThatThrownBy(() -> svc.editShares(FAM, 3L, 7L, new BigDecimal("900"), FundHoldingService.MoneyFrom.PRIOR, null))
+                .hasMessageContaining("份额减少");
+    }
+
+    @Test
+    void 成本价_现金申购没改它时按本次净值加权平均_赎回不变_用户改了用用户的() {
+        BigDecimal cur = new BigDecimal("4.0000");
+        // 1000 份 @4 + 申购 500 份 @4.78 → (4000 + 2390) / 1500 = 4.26
+        assertThat(FundHoldingService.nextCost(cur, cur, new BigDecimal("1000"), new BigDecimal("500"),
+                new BigDecimal("4.78"), true)).isEqualByComparingTo("4.2600");
+        assertThat(FundHoldingService.nextCost(cur, cur, new BigDecimal("1000"), new BigDecimal("-500"),
+                new BigDecimal("4.78"), true)).as("赎回不改单位成本").isEqualByComparingTo("4");
+        assertThat(FundHoldingService.nextCost(cur, cur, new BigDecimal("1000"), new BigDecimal("500"),
+                new BigDecimal("4.78"), false)).as("不联动的改份额不动成本").isEqualByComparingTo("4");
+        assertThat(FundHoldingService.nextCost(cur, new BigDecimal("3.9"), new BigDecimal("1000"), new BigDecimal("500"),
+                new BigDecimal("4.78"), true)).as("用户改了就用用户的").isEqualByComparingTo("3.9");
+        assertThat(FundHoldingService.nextCost(null, null, new BigDecimal("1000"), new BigDecimal("500"),
+                new BigDecimal("4.78"), true)).as("原来没有成本价的,不凭空算一个").isNull();
+        assertThat(FundHoldingService.nextCost(cur, null, new BigDecimal("1000"), BigDecimal.ZERO,
+                new BigDecimal("4.78"), false)).as("清空 = 去掉成本价").isNull();
+    }
+
+    @Test
+    void 只改成本价_不动份额_不碰估值_不记事件() {
+        StockHolding h = navRow("1000");
+        h.setCostBasis(new BigDecimal("4"));
+        when(stock.require(FAM, 7L)).thenReturn(h);
+        svc.editShares(FAM, 3L, 7L, new BigDecimal("1000"), FundHoldingService.MoneyFrom.NEW, new BigDecimal("3.5"));
+        verify(holdings).updateCostBasis(FAM, 7L, new BigDecimal("3.5000"));
+        verify(holdings, never()).writeNav(anyLong(), anyLong(), any(), any(), any(), any(), any(), any(), any());
+        verify(shares, never()).insertOwned(anyLong(), any());
     }
 }

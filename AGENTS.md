@@ -36,6 +36,8 @@
 
 - **开账基线**(v0.13 起)= 本期**首次出现**账户的期末净值合计,是「本来就有、现在才开始记」的外部资本纳入,
   既不算人赚也不算钱赚 —— 早期版本的恒等式漏了这一项,**别再照抄两项版**。
+  **v1.30 起再加上本期的「补录本金」**(`principal_adjustment`:已有账户里「以前就有、这期才补录」的钱,同一个概念)——
+  账户级从本期收益里扣掉、当外部投入;家庭级并进 `openingBaseline`。**账户第一期不认**(第一期余额已整笔算开账基线)。见 L22。
 - 处理方式是**显式暴露差额,不抛异常**(v1.10 报表页资金流瀑布):容差 ¥1(四舍五入噪声),
   不闭合时页面写出差额与原因(开账基线可解释 / 来源不明),因为封板报表宁可让人看到"对不上多少"
   也不能假装闭合。历史文档里的 `DataInconsistencyException` **代码里从来不存在**,已删除该说法`。账户级 `PnL = ΔNW − 净流入 − 净划转`(外部流入被剔除 → 收入不该抬高收益率)。
@@ -100,6 +102,7 @@ worktree 的工作目录里没有 `.githooks/`(那是 master 上的文件),hook 
   - **持仓数量变动**(`holding_share_event`)= 份额怎么变的(货基收益结转 / 手动改份额 / 手动校正 / 申购·赎回(现金联动)/ 截图导入 / 改为自动 / 添加)。**只给人看,不进任何金额汇总**;钱的变化只在估值事件里。账户时间线 Kind `SHARES`(「# 持仓数量」)。
   - **基金账户**(`AccountType.FUND`)= 投资类、半流动、默认类目 `MIXED_FUND`、资产类别按类目(有持仓时按穿透);能挂持仓。**老 jar 不认识 FUND → 回滚到 v1.30 之前先跑 `db/rollback/v1.30.sql`**(`deploy/rollback.sh` 按版本自动执行)。「添加持仓 · 场外基金」出现在人民币的 基金 / 证券 / 理财 / 现金 账户(PRD v1.30 §3.1)。
   - **现金联动**:有持仓的账户,转进来的钱落在现金行(v1.18.1);改份额 / 添加基金时勾「用账户里的现金」→ 走 `StockHoldingService.adjustAccountCash`,余额不变、不写估值事件,否则同一笔钱算两遍。
+- **持仓成本价**(`stock_holding.cost_basis`,v1.30 起场外基金也能填)只回答「这一只买入以来赚了多少」:持仓行的盈亏 / 持有收益 + 资产透视持仓级维度的「累计收益额」。**不进任何账户级 / 家庭级指标**(那些是「记账以来」的口径)—— 新建账户录入一只成本 2 万、现值 4 万的基金,持仓行 +2 万、仪表盘收益 0,两个都对。护栏 `v130-COST-NOT-METRIC`。
 - **`is_adjustment`(V33)**:手动改股票现金行的本金进出 → `cash_adjust`/`is_adjustment=1`,**剔出 PnL、不计家庭收入**;真实外部收入 `is_adjustment=0`。
 - **币种三层**(极易错,见 L2/L3):
   - **账户币种** — `cash_flow.amount`、`period_snapshot.end_balance`、持仓 `manual_value` 都存这个。
@@ -230,6 +233,7 @@ worktree 的工作目录里没有 `.githooks/`(那是 master 上的文件),hook 
 | L20 · 看 AI 收到了什么(v1.28) | 新增 / 改任何**调用大模型并展示回答**的地方 | 走 `llmRouter.invoke(familyId, PromptTrace, …)`(不走不记录的老重载);结果带 `promptRecordId` 一路传到页面;卡片头挂 `_prompt-peek :: btn`(JSON 渲染的用 `btnJs` + `peekSet`);AI 正文用 `@aiText.priv` / `privText`;提示词里账户名只在系统写入的位置用 `AccountCodenames` 换代号、回答反映射;**不许在面板侧重拼提示词**;日志只记元数据 | `v128-ROUTER-TRACE` · `v128-PEEK-EVERYWHERE` · `v128-PEEK-STORED-NOT-REBUILT` · `v128-ACCOUNT-CODENAMES` · `v128-LOG-NO-PROMPT` · `v128-AI-TEXT-PRIV` · e2e flow 34 |
 
 | L21 · 加账户类型(v1.30 是第三次:METAL v0.14 / INSURANCE v0.17 / FUND v1.30) | 给 `AccountType` 加取值 | ① 枚举谓词(`isInvestment` / `isLiability` / `expectsFlowsToExplainBalance`)显式归类 + `AccountTypeSemanticsTest`;② 编译器抓得到的穷尽 switch(流动性 / 资产类别 / 托管形态 / 默认类目 / 风险档 / 排序);③ **编译器抓不到的**:模板里的类型字面量链(账户页 / 详情 / 填报行的标签色)、`BenchmarkAggregator` 兜底表、`AllocationDiff` 桶、金融盘清单、`supportsHoldings`、产品类目 `applicable_types`;④ 迁移放宽 `ck_account_type` / `ck_account_template_type`;⑤ **老 jar 不认识新取值** → 写 `db/rollback/vX.Y.sql` 把它改回旧类型 | `v130-FUND-TYPE-SWEPT` · `v130-FUND-ROLLBACK-SQL` · `AccountTypeSemanticsTest` |
+| L22 · 补录本金(v1.30) | 改「外部投入」的口径 / 加新的「本来就有」入口 / 动 `principal_adjustment` | ① **只从事实层进指标**:`FactMapper.queryBase` 的 `padj` 子查询 → `FactProjector`(本期收益扣掉;第一期归零)→ `FactViewServiceImpl`(账户累计净投入 / 账户 XIRR / `openingBaseline`)。别处不许读这张表算钱(填报页「未解释差额」当已知流入是本账户视角的解释,允许);② 新加一种「本来就有」的入口,金额要按 HALF_EVEN 到分(与估值写回的余额舍入同向)、只许记开着的期、第一期不许记;③ 导出 / 清演示数据 / 家庭隔离审计都要带上表;④ 回滚 jar 时表被忽略 = 那几期退回「算成收益」(与之前一致),不需要回滚 SQL | `v130-PRINCIPAL-ONE-PATH` · `v130-PRINCIPAL-FIRST-PERIOD` · `v130-PRINCIPAL-ENTRY` · `PrincipalAdjustmentMetricsTest` · e2e flow 45 |
 
 **新链怎么加**:出现"改 A 漏了 B"事故 → 加一行(触发/必须同步/守护)+ `qa-run.sh` 加静态 grep 把它网住,下次它自己 fail。
 

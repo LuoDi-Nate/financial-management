@@ -26,11 +26,12 @@ const state = {};
 const cfg = (k) => db.one(`SELECT value_text FROM family_runtime_config WHERE family_id=${fx.FAM} AND key_name='${k}'`);
 const num = (s) => Number(String(s || '').replace(/[^\d.\-]/g, '') || NaN);
 const row = (name) => db.one(`SELECT CONCAT_WS('|', id, valuation_mode, IFNULL(nav_mode,''), shares, manual_value, IFNULL(nav_date,''),
-                                                IFNULL(shares_estimated_on,''), IFNULL(nav_error,''), IFNULL(fund_code,''))
+                                                IFNULL(shares_estimated_on,''), IFNULL(nav_error,''), IFNULL(fund_code,''), IFNULL(cost_basis,''))
                                 FROM stock_holding WHERE account_id=${state.acc} AND archived_at IS NULL AND display_name='${name}'
                                ORDER BY id DESC LIMIT 1`);
-const cols = (r) => { const [id, mode, nav, shares, unit, navDate, est, err, code] = String(r || '').split('|');
-                      return { id: Number(id), mode, nav, shares: Number(shares), unit: Number(unit), navDate, est, err, code }; };
+const cols = (r) => { const [id, mode, nav, shares, unit, navDate, est, err, code, cost] = String(r || '').split('|');
+                      return { id: Number(id), mode, nav, shares: Number(shares), unit: Number(unit), navDate, est, err, code,
+                               cost: cost === '' || cost === undefined ? null : Number(cost) }; };
 const balance = () => Number(db.one(`SELECT end_balance FROM period_snapshot WHERE period_id=${state.cur} AND account_id=${state.acc}`));
 const cash = () => Number(db.one(`SELECT COALESCE(SUM(manual_value),0) FROM stock_holding WHERE account_id=${state.acc} AND archived_at IS NULL AND valuation_mode='CASH'`));
 const events = (reason) => db.col(`SELECT CONCAT_WS('|', reason, shares_delta, IFNULL(date_from,''), IFNULL(date_to,''))
@@ -57,7 +58,7 @@ async function rowView(ui, name) {
     const t = (s) => a.querySelector(s)?.textContent.replace(/\s+/g, ' ').trim() || null;
     return { shares: t('[data-nav-shares]'), unit: t('[data-nav-unit]'), date: t('[data-nav-date]'), value: t('[data-nav-value]'),
              kind: t('[data-nav-kind]'), badge: t('[data-nav-badge]'), late: t('[data-nav-late]'), est: t('[data-nav-estimated]'),
-             problem: t('[data-nav-problem]'), accrual: t('[data-nav-accrual]'),
+             problem: t('[data-nav-problem]'), accrual: t('[data-nav-accrual]'), pnl: t('[data-nav-pnl]'), nocost: t('[data-nav-nocost]'),
              manualForm: !!a.querySelector('form[action$="/update"]'), convert: !!a.querySelector('[data-convert-btn]'),
              text: a.innerText.replace(/\s+/g, ' ') };
   }, name);
@@ -84,6 +85,9 @@ module.exports = {
             ON DUPLICATE KEY UPDATE value_text = VALUES(value_text)`);
     db.raw(`DELETE FROM fund_nav_snapshot WHERE fund_code IN ('${CODES.join("','")}')`);
     state.cur = fx.currentPeriod();
+    // 家里别的账户若已有净值行(比如维护者 review 时自己加的),刷新会连它们一起拿桩去拉 → 被标成「没拉到」,
+    // 「刷了几只基金」的计数也不对。先停用、cleanup 原样还回去。
+    state.parked = fundStub.parkOtherNavRows(db, fx.FAM, []);
     report.info(`前置:天天基金桩 127.0.0.1:${state.stub.port} · 今天 ${state.stub.today}`);
     await ui.page.waitForTimeout(6000);   // 家庭配置有 5 秒缓存
 
@@ -120,7 +124,7 @@ module.exports = {
     await ui.assert(Math.abs(balance() - 10000) < 0.01, '真值层:账户余额 10,000', `余额 ${balance()}`);
 
     // ── 3 · 按份额添加 + 勾现金联动 ─────────────────────────────────
-    report.section('3 · 添加持仓 · 场外基金:拼音「gfdy」搜到 → 先看到名称与净值 → 填 1000 份 → 勾「用账户里的现金买的」');
+    report.section('3 · 添加持仓 · 场外基金:拼音「gfdy」搜到 → 先看到名称与净值 → 填 1000 份 + 成本价 4 → 选「用这个账户里的现金买的」');
     await ui.click('a[data-add-fund]', '点「+ 添加持仓 · 场外基金」');
     await ui.rendered('添加场外基金页');
     await pickFund(ui, 'gfdy', '002943');
@@ -133,7 +137,16 @@ module.exports = {
     await ui.page.waitForTimeout(300);
     const calc = await ui.page.textContent('[data-fund-calc]');
     await ui.assert(/1,000\.00 份 × 4\.7800 = ¥4,780\.00/.test(calc || ''), '实时显示「1,000.00 份 × 4.7800 = ¥4,780.00」', calc);
-    await ui.page.check('[data-fund-form] input[name="cashLinked"]');
+    // v1.30 FR-971 · 选填成本价 → 实时写出持有收益
+    await ui.fill('[data-fund-form] input[name="costBasis"]', '4', '持仓成本价填 4');
+    await ui.page.waitForTimeout(300);
+    const calcCost = await ui.page.textContent('[data-fund-calc]');
+    await ui.assert(/持有收益约 \+¥780\.00/.test(calcCost || ''), '填了成本价 → 实时写「持有收益约 +¥780.00」', calcCost);
+    // v1.30 FR-973 · 这是新账户的第一期:「这笔钱从哪来」里没有「以前就有、现在才补录」(第一期余额本来就整笔算本金)
+    const opts = await ui.page.evaluate(() => [...document.querySelectorAll('[data-fund-form] input[name="moneyFrom"]')].map(i => i.value));
+    await ui.assert(opts.join(',') === 'CASH,NEW', '第一期的账户:钱从哪来只有「账户现金」和「不是现金买的」,没有「补录」', opts.join(','));
+    await ui.seesText('这是这个账户的第一期,余额整笔算本金', '「不是现金买的」那一项写明第一期余额整笔算本金');
+    await ui.page.check('[data-fund-form] input[name="moneyFrom"][value="CASH"]');
     await ui.page.screenshot({ path: '/tmp/e2e-44-new-fund-pc.png', fullPage: true }).catch(() => {});   // 给人看排版(UED 自查)
     await ui.submit('[data-fund-form] button[type="submit"]', '点「添加 · 以后按净值自动更新」');
     await ui.seesText('已添加「广发多因子混合」', '回到持仓页,提示已添加');
@@ -147,6 +160,11 @@ module.exports = {
     await ui.assert(cash() === 5220, '真值层:现金行扣了 4,780(10,000 → 5,220)', `现金 ${cash()}`);
     await ui.assert(Math.abs(balance() - 10000) < 0.01, '真值层:余额不变(钱从现金行挪进基金)', `余额 ${balance()}`);
     await ui.assert(events('CASH_BUY').length === 1, '真值层:记了一条持仓数量变动「申购(用账户现金)」', events().join(' ; '));
+    await ui.assert(g.cost === 4, '真值层:成本价 4.0000 存下来了', JSON.stringify(g));
+    await ui.assert(r1 && /持仓成本价 4\.0000 · 持有收益 \+CNY 780\.00\(\+19\.50%\)/.test(r1.pnl || ''),
+      '持仓页这一行写「持仓成本价 4.0000 · 持有收益 +CNY 780.00(+19.50%)」', r1 && r1.pnl);
+    await ui.assert(Number(db.one(`SELECT COUNT(*) FROM principal_adjustment WHERE account_id=${state.acc}`)) === 0,
+      '真值层:第一期不记补录本金(余额本来就整笔算开账基线)');
 
     // ── 4 · 按市值添加(QDII)──────────────────────────────────────
     report.section('4 · 再加一只 QDII:不知道份额,按市值填 5,000 → 系统按净值反推份额并标明估算 · 写清「晚一个交易日」');
@@ -161,13 +179,15 @@ module.exports = {
     const calc2 = await ui.page.textContent('[data-fund-calc]');
     await ui.assert(/估算:约 599\.39 份/.test(calc2 || ''), '实时显示「按 … 净值 8.3418 估算:约 599.39 份」', calc2);
     const bal0 = balance();
-    await ui.submit('[data-fund-form] button[type="submit"]', '点「添加」');
+    await ui.page.check('[data-fund-form] input[name="moneyFrom"][value="NEW"]');
+    await ui.submit('[data-fund-form] button[type="submit"]', '选「不是用这个账户的现金买的」→ 点「添加」');
     const q = cols(row('广发纳斯达克100ETF联接人民币(QDII)A'));
     await ui.assert(Math.abs(q.shares - 599.3910) < 0.00005 && q.est === fundStub.addDays(state.stub.today, -2),
       '真值层:份额 = 5000 ÷ 8.3418(4 位)· 标了按哪天净值估算', JSON.stringify(q));
     await ui.assert(Math.abs(balance() - bal0 - 5000) < 0.01, '真值层:没勾现金联动 → 余额 +5,000', `${bal0} → ${balance()}`);
     const r2 = await rowView(ui, '广发纳斯达克100ETF联接人民币(QDII)A');
     await ui.assert(r2 && r2.late && r2.est && r2.est.includes('估算的份额'), '持仓页这一行写「晚一个交易日」和「按 … 净值估算的份额」', JSON.stringify(r2));
+    await ui.assert(r2 && /没填持仓成本价/.test(r2.nocost || '') && !r2.pnl, '没填成本价的基金行:写「没填持仓成本价」,不显示持有收益', JSON.stringify(r2));
 
     // ── 5 · 外币份额:搜得到但不让选 ─────────────────────────────────
     report.section('5 · 搜美元份额:搜得到,置灰写原因,没法选');
@@ -195,6 +215,8 @@ module.exports = {
     await ui.page.waitForSelector('[data-quote-card]', { timeout: 15000 }).catch(() => {});
     await ui.seesText('每万份收益', '货币基金的报价卡写「每万份收益」');
     await ui.fill('[data-fund-form] input[name="amount"]', '12000', '当前金额填 12000');
+    await ui.assert(await ui.page.locator('[data-fund-form] input[name="costBasis"]').count() === 0, '货币基金没有「持仓成本价」这一格');
+    await ui.page.check('[data-fund-form] input[name="moneyFrom"][value="NEW"]');
     await ui.submit('[data-fund-form] button[type="submit"]', '点「添加」');
     let m = cols(row('天弘余额宝货币'));
     await ui.assert(m.nav === 'MMF' && m.unit === 1 && m.shares === 12000 && m.navDate === yday(),
@@ -245,7 +267,7 @@ module.exports = {
       const art = 'article:has(.font-display:text-is("广发多因子混合"))';
       await ui.click(`${art} details[data-nav-edit] summary`, '点「改份额」');
       await ui.fill(`${art} details[data-nav-edit] input[name="shares"]`, String(to), `份额改成 ${to}`);
-      if (linked) await ui.page.check(`${art} details[data-nav-edit] input[name="cashLinked"]`);
+      if (linked) await ui.page.check(`${art} details[data-nav-edit] input[name="moneyFrom"][value="CASH"]`);
       await ui.submit(`${art} details[data-nav-edit] button[type="submit"]`, label);
     };
     const cash0 = cash(), bal2 = balance();
@@ -253,14 +275,20 @@ module.exports = {
     await ui.assert(cash() === cash0 - 480 && Math.abs(balance() - bal2) < 0.01, '真值层:现金行 −480,余额不变',
       `现金 ${cash0} → ${cash()} · 余额 ${bal2} → ${balance()}`);
     await ui.assert(events('CASH_BUY').length === 2, '真值层:又记一条「申购(用账户现金)」', events('CASH_BUY').join(' ; '));
+    // FR-971 · 用账户现金申购、没改成本价 → 按这次净值加权平均:(4 × 1000 + 4.8 × 100) ÷ 1100 = 4.0727
+    await ui.assert(cols(row('广发多因子混合')).cost === 4.0727, '真值层:成本价按申购净值加权平均成 4.0727',
+      JSON.stringify(cols(row('广发多因子混合'))));
     await editShares(1150, false, '保存(不勾)');
     await ui.assert(Math.abs(balance() - bal2 - 240) < 0.01, '真值层:不勾 → 余额 +240(算估值变动)', `${bal2} → ${balance()}`);
     await ui.assert(events('MANUAL_EDIT').length === 1, '真值层:记一条「手动改份额」', events().join(' ; '));
+    await ui.assert(cols(row('广发多因子混合')).cost === 4.0727, '真值层:不联动的改份额不动成本价', JSON.stringify(cols(row('广发多因子混合'))));
 
     // ── 9 · 时间线 ──────────────────────────────────────────────────
     report.section('9 · 账户详情时间线:「# 持仓数量」一类,筛选能单看它;不进月净额');
     await ui.goto(`/accounts/${state.acc}`);
     await ui.rendered('账户详情');
+    await ui.assert(await ui.page.locator('[data-principal-card]').count() === 0,
+      '新账户第一期:账户详情里没有「补录本金」这一块(第一期余额本来就整笔算本金)');
     await ui.seesText('# 持仓数量', '时间线有「# 持仓数量」类型的条目');
     await ui.seesText('天弘余额宝货币 · 货币基金收益结转', '写「天弘余额宝货币 · 货币基金收益结转」');
     await ui.seesText('+1.89 份', '写「+1.89 份」');
@@ -373,6 +401,7 @@ module.exports = {
       const a = state.acc;
       for (const sql of [
         `DELETE FROM holding_share_event WHERE account_id=${a}`,
+        `DELETE FROM principal_adjustment WHERE account_id=${a}`,
         `DELETE FROM holding_allocation WHERE holding_id IN (SELECT id FROM stock_holding WHERE account_id=${a})`,
         `DELETE FROM stock_valuation_event WHERE account_id=${a}`,
         `DELETE FROM stock_holding WHERE account_id=${a}`,
@@ -385,6 +414,7 @@ module.exports = {
       ]) { try { db.raw(sql); } catch (e) { report.info(`还原跳过:${sql.slice(0, 60)} · ${String(e.message).slice(0, 80)}`); } }
     }
     try { db.raw(`DELETE FROM fund_nav_snapshot WHERE fund_code IN ('${CODES.join("','")}')`); } catch (e) { /* 只是缓存 */ }
+    fundStub.restoreParked(db, state.parked);
     if (state.before === null || state.before === undefined) db.raw(`DELETE FROM family_runtime_config WHERE family_id=${fx.FAM} AND key_name='${KEY}'`);
     else db.raw(`UPDATE family_runtime_config SET value_text='${String(state.before).replace(/'/g, "''")}' WHERE family_id=${fx.FAM} AND key_name='${KEY}'`);
   },

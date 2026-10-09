@@ -217,7 +217,12 @@ public class PivotTool implements AskTool {
         }
         if (r.holdingLevelSplit()) {
             b.metaExtra("warning",
-                    "本次查询含持仓级维度:收益类度量按持有口径计,不可精确归因到账户。讲结论时要把这一点说出来。");
+                    "本次查询含持仓级维度:收益类度量按持有口径计,不可精确归因到账户。讲结论时要把这一点说出来。"
+                    // v1.30 FR-972 · 没有成本价的持仓不计入累计收益额 —— 不说的话,模型会把部分合计当全家的收益讲
+                    + (r.holdingsWithoutCost() > 0
+                        ? "另有 " + r.holdingsWithoutCost() + " 个持仓没有成本价,累计收益额里没算它们,这个合计不是全部持仓的收益。"
+                        : ""));
+            b.put("holdingsWithoutCost", r.holdingsWithoutCost());
         }
 
         // ── 可引用的数字 ──

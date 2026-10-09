@@ -11329,10 +11329,56 @@ done < <(grep -rn "type.name() == 'WEALTH'" "$RD/src/main/resources/templates" 2
   && log_ok "v130-FUND-TYPE-SWEPT(基金账户在谓词 / 持仓 / 模板类型链 / 产品类目都归过类)" \
   || log_bad "v130-FUND-TYPE-SWEPT 基金账户在某处没被归类(会被静默漏掉)" "模板行:$QA130_SW"
 
-# e2e flow 44 · 用户路径(浏览器真点 + 页面 + 库里的行)
-[ -f "$RD/scripts/e2e/flows/44-fund-by-code.cjs" ] && [ -f "$RD/scripts/e2e/lib/fund-stub.cjs" ] \
-  && log_ok "v130-E2E-FLOW(flow 44 + 天天基金本机桩在)" \
-  || log_bad "v130-E2E-FLOW 缺 e2e flow 44 / fund-stub" "scripts/e2e/flows/44-fund-by-code.cjs"
+# e2e flow 44 / 45 · 用户路径(浏览器真点 + 页面 + 库里的行)
+{ [ -f "$RD/scripts/e2e/flows/44-fund-by-code.cjs" ] && [ -f "$RD/scripts/e2e/lib/fund-stub.cjs" ] \
+  && [ -f "$RD/scripts/e2e/flows/45-principal-and-cost.cjs" ] \
+  && grep -q 'parkOtherNavRows' "$RD/scripts/e2e/flows/44-fund-by-code.cjs" \
+  && grep -q 'parkOtherNavRows' "$RD/scripts/e2e/flows/45-principal-and-cost.cjs"; } \
+  && log_ok "v130-E2E-FLOW(flow 44 + 45 + 天天基金本机桩在 · 别的账户的净值行先停用、跑完原样还回)" \
+  || log_bad "v130-E2E-FLOW 缺 e2e flow 44 / 45 / fund-stub,或没隔离家里已有的净值行" "scripts/e2e/flows/44-fund-by-code.cjs · 45-principal-and-cost.cjs"
+
+# ── v1.30 · 补录本金(FR-973 ~ 975)/ 持仓成本价(FR-971)/ 透视写明没成本的持仓(FR-972)──
+#   维护者 2026-10-09 问「2 万成本、现值 4 万的基金,仪表盘和报表的指标怎么算」→ 梳理出两条口径,这里守住:
+#   ① 补录本金和开账基线是同一件事:只从事实层进指标(FactMapper → FactProjector → openingBaseline),别处不许自己读表算钱;
+#   ② 账户第一期不认补录本金(第一期余额已整笔算开账基线 —— 认了就算两遍);
+#   ③ 持仓成本价不进任何账户级 / 家庭级指标(只给持仓行与透视持仓级「累计收益额」)。
+QA130_FVS="$QA130_J/factview/FactViewServiceImpl.java"
+QA130_PA_FILES="$(grep -rlw 'principal_adjustment' "$QA130_J" "$RD/src/main/resources/mapper" 2>/dev/null | sed "s|$RD/||" | sort | tr '\n' ' ')"
+{ [ "$QA130_PA_FILES" = "src/main/java/com/family/finance/repository/PrincipalAdjustmentMapper.java src/main/resources/mapper/FactMapper.xml " ] \
+  && grep -q 'principal_adj_orig' "$RD/src/main/resources/mapper/FactMapper.xml" \
+  && grep -q 'WHERE family_id = #{f.familyId}' <(grep -A6 'FROM principal_adjustment' "$RD/src/main/resources/mapper/FactMapper.xml") \
+  && body_of "$QA130_FVS" "private BigDecimal openingBaseline(" | grep -q 'principalAdjBase' \
+  && [ "$(grep -c 'principalAdj' "$QA130_FVS")" -ge 4 ] \
+  && grep -q 'PrincipalAdjustmentMetricsTest' <(ls "$QA130_T/factview/"); } \
+  && log_ok "v130-PRINCIPAL-ONE-PATH(补录本金只经事实层进指标:本期收益扣掉 · 累计净投入 / XIRR 算外部投入 · 家庭开账基线并入)" \
+  || log_bad "v130-PRINCIPAL-ONE-PATH 补录本金多了一条进指标的路,或某处没认它" "引用这张表的文件:$QA130_PA_FILES"
+{ grep -q 'row.previousEndBalance() == null' "$QA130_J/factview/FactProjector.java" \
+  && grep -q '账户第一期_补录本金归零_不和开账基线重复' "$QA130_T/factview/PrincipalAdjustmentMetricsTest.java" \
+  && grep -q 'findPreviousEndBalance' "$QA130_J/service/ledger/PrincipalAdjustmentService.java" \
+  && grep -q '账户第一期_不能记' "$QA130_T/service/ledger/PrincipalAdjustmentServiceTest.java"; } \
+  && log_ok "v130-PRINCIPAL-FIRST-PERIOD(账户第一期不认、也不让记补录本金 —— 第一期余额已整笔算开账基线)" \
+  || log_bad "v130-PRINCIPAL-FIRST-PERIOD 第一期的补录本金会和开账基线算两遍" "see FactProjector · PrincipalAdjustmentService.check"
+QA130_COST_LEAK="$(grep -rlE 'getCostBasis|costBasis|cost_basis' "$QA130_J/factview" "$QA130_J/calc" "$QA130_J/service/checkup" \
+  "$QA130_J/service/insight" "$QA130_J/service/goal" "$QA130_J/web/dashboard" "$QA130_J/web/report" 2>/dev/null | tr '\n' ' ')"
+{ [ -z "$QA130_COST_LEAK" ] \
+  && grep -q '账户级_累计净投入含补录本金_累计收益不含' "$QA130_T/factview/PrincipalAdjustmentMetricsTest.java" \
+  && grep -q 'line.costAcctCcy()' "$QA130_J/web/stock/StockHoldingController.java"; } \
+  && log_ok "v130-COST-NOT-METRIC(持仓成本价不进账户级 / 家庭级指标;持仓行的持有收益与透视同取 perHoldingLines)" \
+  || log_bad "v130-COST-NOT-METRIC 成本价漏进了家庭级 / 账户级指标" "$QA130_COST_LEAK"
+{ grep -q 'int holdingsWithoutCost' "$QA130_J/calc/lens/PivotEngine.java" \
+  && grep -q 'data-cumpnl-missing' "$RD/src/main/resources/static/js/lens.js" \
+  && grep -q 'holdingsWithoutCost' "$QA130_J/service/ask/tools/PivotTool.java" \
+  && grep -q 'holdingLevel_countsHoldingsWithoutCost_onceEach' "$QA130_T/calc/lens/PivotEngineTest.java"; } \
+  && log_ok "v130-LENS-NO-COST-SAID(透视持仓级「累计收益额」写明没算几只;AI 透视工具同样告知)" \
+  || log_bad "v130-LENS-NO-COST-SAID 没成本价的持仓被悄悄漏算" "see PivotEngine.Result.holdingsWithoutCost"
+{ grep -q 'name="moneyFrom" value="PRIOR" required' "$RD/src/main/resources/templates/stock/_fund-parts.html" \
+  && grep -q 'data-principal-card' "$RD/src/main/resources/templates/accounts/detail.html" \
+  && grep -q 'data-principal-hint' "$RD/src/main/resources/templates/stock/holding-new-auto.html" \
+  && grep -q 'principal_adjustments.csv' "$QA130_J/service/export/CsvExportService.java" \
+  && grep -q 'TRUNCATE TABLE principal_adjustment' "$RD/docker/clean-dev-data.sh" \
+  && grep -q 'principal_adjustment' "$RD/scripts/family-isolation-audit.py"; } \
+  && log_ok "v130-PRINCIPAL-ENTRY(加基金时「钱从哪来」必选 · 账户详情能记 · 其它添加页指路 · 导出 / 清演示数据 / 家庭隔离审计都带上)" \
+  || log_bad "v130-PRINCIPAL-ENTRY 补录本金的入口或配套缺一处" "see _fund-parts / accounts/detail / CsvExportService / clean-dev-data"
 
 echo
 echo "═══════════════════════════════════════"

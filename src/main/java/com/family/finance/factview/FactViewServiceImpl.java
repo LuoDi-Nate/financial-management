@@ -772,9 +772,11 @@ public class FactViewServiceImpl implements FactViewService {
                 .map(AccountPeriodFact::periodPnlBase).filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add).setScale(2, RoundingMode.HALF_EVEN);
         // 累计净投入 = Σ(income − expense + transferIn − transferOut)本位币
+        // v1.30 · + 补录本金(以前就有、这期才补录进来的钱,与开账基线同口径)
         BigDecimal netPrincipal = rows.stream()
                 .map(r -> nz(r.incomeBase()).subtract(nz(r.expenseBase()))
-                        .add(nz(r.transferInBase())).subtract(nz(r.transferOutBase())))
+                        .add(nz(r.transferInBase())).subtract(nz(r.transferOutBase()))
+                        .add(nz(r.principalAdjBase())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add).setScale(2, RoundingMode.HALF_EVEN);
         // v0.13 · 窗口内首次出现的账户:首期期末余额 = 带入本金,计入净投入(否则"净投入≈0 却有大额市值"不自洽)
         //   v1.28.1 · 带入本金 = 首期的开账基线(期末 − 首期转入 + 首期转出),与家庭级同一个函数。
@@ -856,7 +858,8 @@ public class FactViewServiceImpl implements FactViewService {
         for (int i = 1; i < rows.size(); i++) {
             AccountPeriodFact row = rows.get(i);
             BigDecimal netExternal = nz(row.incomeBase()).subtract(nz(row.expenseBase()))
-                    .add(nz(row.transferInBase())).subtract(nz(row.transferOutBase()));
+                    .add(nz(row.transferInBase())).subtract(nz(row.transferOutBase()))
+                    .add(nz(row.principalAdjBase()));   // v1.30 · 补录本金 = 外部投入
             if (netExternal.signum() != 0) {
                 flows.add(new XirrCalculator.CashFlowPoint(row.periodEnd(), netExternal.negate()));
             }
@@ -888,7 +891,8 @@ public class FactViewServiceImpl implements FactViewService {
             BigDecimal netExternal = row.incomeOrig()
                     .subtract(row.expenseOrig())
                     .add(row.transferInOrig())
-                    .subtract(row.transferOutOrig());
+                    .subtract(row.transferOutOrig())
+                    .add(nz(row.principalAdjOrig()));   // v1.30 · 补录本金 = 外部投入
             if (netExternal.signum() != 0) {
                 flows.add(new XirrCalculator.CashFlowPoint(row.periodEnd(), netExternal.negate()));
             }
@@ -1085,16 +1089,30 @@ public class FactViewServiceImpl implements FactViewService {
         return new ArrayList<>(want);
     }
 
+    /**
+     * 本期新纳入的存量本金 = 首次出现账户的开账基线 + v1.30 已有账户的补录本金。
+     *
+     * <p>两者是同一件事 —— 「本来就有、这期才开始记」—— 只是一个发生在新账户的第一期、
+     * 一个发生在已有账户的某一期。所以并在一个数里,家庭级所有剔除开账基线的地方
+     * (本月资产收益 / 钱赚 / TWR / XIRR / 财富水位 / 归因瀑布)一处改、处处生效。
+     * 补录本金在账户第一期恒为 0(FactProjector 归零),不会和开账基线重复。</p>
+     */
     private BigDecimal openingBaseline(FactSlice slice, Long periodId) {
         if (periodId == null) return BigDecimal.ZERO;
+        BigDecimal adj = slice.rows().stream()
+                .filter(row -> Objects.equals(row.periodId(), periodId))
+                .map(AccountPeriodFact::principalAdjBase)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
         java.util.Set<Long> ids = firstAppearingIn(slice.filter().familyId(), periodId);
-        if (ids.isEmpty()) return BigDecimal.ZERO;
+        if (ids.isEmpty()) return adj.signum() == 0 ? BigDecimal.ZERO : adj.setScale(2, RoundingMode.HALF_EVEN);
         return slice.rows().stream()
                 .filter(row -> Objects.equals(row.periodId(), periodId))
                 .filter(row -> ids.contains(row.accountId()))
                 .map(FactViewServiceImpl::openingOf)
                 .filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .add(adj)
                 .setScale(2, RoundingMode.HALF_EVEN);
     }
 
