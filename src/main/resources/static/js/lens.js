@@ -886,6 +886,11 @@
       if (r.holdingLevelSplit && (state.measures.indexOf('latestPnl') >= 0 || state.measures.indexOf('cumReturn') >= 0)) {
         html += '<p class="text-[11px] mt-2" style="color:var(--rust)">行业 / 地域维度会拆开持仓账户 —— 本期收益额 / 累计收益率无法精确归因,显示「—」;累计收益额按持有口径(市值−成本)。</p>';
       }
+      // v1.30 FR-972 · 持有口径下没有成本价的持仓求不出收益,只能不计入 —— 写明有几只,别让合计看起来像全算了
+      if (r.holdingLevelSplit && state.measures.indexOf('cumPnl') >= 0 && r.holdingsWithoutCost > 0) {
+        html += '<p class="text-[11px] mt-1 text-ink-subtle" data-cumpnl-missing>累计收益额里没算 ' + r.holdingsWithoutCost +
+          ' 个持仓 —— 它们没有成本价(手填市值、货币基金,或添加时没填)。基金可在持仓页「改份额」里补成本价。</p>';
+      }
       document.getElementById('pivot').innerHTML = html;
       document.querySelectorAll('.lens-cell').forEach(function (cell) { cell.onclick = function () { openDrawer(Number(cell.dataset.cell)); }; });
     });

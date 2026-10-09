@@ -58,7 +58,8 @@ public class LedgerExporter {
 
         Writer w = new OutputStreamWriter(out, StandardCharsets.UTF_8);
         w.write('﻿'); // BOM
-        w.write("月份,期初,入账,出账,转入,转出,期末,期间损益,累计损益\n");
+        // v1.30 · 「补录本金」加在最后一列:已有列的位置不动,按列号读这份文件的脚本不受影响
+        w.write("月份,期初,入账,出账,转入,转出,期末,期间损益,累计损益,补录本金\n");
 
         BigDecimal cumulative = BigDecimal.ZERO;
         for (AccountPeriodFact r : rows) {
@@ -81,6 +82,8 @@ public class LedgerExporter {
             w.write(d(pnl));
             w.write(',');
             w.write(d(cumulative));
+            w.write(',');
+            w.write(d(r.principalAdjOrig()));
             w.write('\n');
         }
         w.flush();

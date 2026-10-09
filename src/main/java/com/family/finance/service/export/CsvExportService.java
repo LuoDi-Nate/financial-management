@@ -49,6 +49,8 @@ public class CsvExportService {
     private final CashFlowMapper cashFlowMapper;
     private final TransferMapper transferMapper;
     private final FxMapper fxMapper;
+    /** v1.30 · 补录本金 —— 备份要完整:少了它,导出的数据重算出来的收益会对不上 */
+    private final com.family.finance.repository.PrincipalAdjustmentMapper principalAdjustmentMapper;
 
     public void writeZip(long familyId, OutputStream out) throws IOException {
         try (ZipOutputStream zip = new ZipOutputStream(out)) {
@@ -153,11 +155,24 @@ public class CsvExportService {
                 }
             });
 
+            // v1.30 · 补录本金(含已删除,带 deleted_at)—— 新文件放最后,已有文件一个字节不动
+            var principals = principalAdjustmentMapper.findAllByFamily(familyId);
+            writeEntry(zip, "principal_adjustments.csv", writer -> {
+                line(writer, "id", "period_id", "account_id", "amount", "holding_id", "note",
+                        "source_tag", "member_id", "created_at", "deleted_at");
+                for (var pa : principals) {
+                    line(writer,
+                            s(pa.getId()), s(pa.getPeriodId()), s(pa.getAccountId()), s(pa.getAmount()),
+                            s(pa.getHoldingId()), e(pa.getNote()), e(pa.getSourceTag()), s(pa.getMemberId()),
+                            ts(pa.getCreatedAt()), ts(pa.getDeletedAt()));
+                }
+            });
+
             writeEntry(zip, "README.txt", writer -> {
                 writer.write("家庭账房 v0.1 数据导出\n");
                 writer.write("导出时间: " + STAMP.format(LocalDateTime.now()) + "\n");
                 writer.write("家庭: " + family.getName() + " (id=" + family.getId() + ")\n\n");
-                writer.write("8 张 CSV 表格使用 UTF-8 编码,带 BOM,Excel 可直接打开。\n");
+                writer.write("9 张 CSV 表格使用 UTF-8 编码,带 BOM,Excel 可直接打开。\n");
                 writer.write("文件清单:\n");
                 writer.write("  families.csv     家庭基础信息\n");
                 writer.write("  members.csv      成员(不含密码哈希)\n");
@@ -167,6 +182,7 @@ public class CsvExportService {
                 writer.write("  cash_flows.csv   收入/支出流水\n");
                 writer.write("  transfers.csv    跨账户转账(含草稿)\n");
                 writer.write("  fx_rates.csv     汇率快照\n");
+                writer.write("  principal_adjustments.csv  补录本金(以前就有、某期才补录的钱 · 算本金不算收益)\n");
             });
         }
     }

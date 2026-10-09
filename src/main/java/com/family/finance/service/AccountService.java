@@ -128,6 +128,7 @@ public class AccountService {
             case CASH -> 1;
             case STOCK -> 2;
             case WEALTH -> 3;
+            case FUND -> 3;        // v1.30 · 紧跟理财(同一组「交给产品打理」的投资账户)
             case CRYPTO -> 4;
             case METAL -> 5;
             case PROPERTY -> 6;

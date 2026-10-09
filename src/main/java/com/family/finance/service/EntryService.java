@@ -100,6 +100,8 @@ public class EntryService {
     /** v1.18.5 · 手填余额落托管账户时要知道「持仓+现金」当前算出来是多少(只读估值) */
     private final com.family.finance.service.stock.AccountValuationService valuationService;
     private final com.family.finance.service.expense.ExpenseCategoryService expenseCategoryService;  // v1.21
+    /** v1.30 · 补录本金在本账户视角下是「已知流入」—— 不然补录完,现金账户这一期会冒出一条未解释差额 */
+    private final com.family.finance.repository.PrincipalAdjustmentMapper principalAdjustmentMapper;
 
     public Optional<Period> findSelectedPeriod(long familyId, String periodParam) {
         if (periodParam == null || periodParam.isBlank()) {
@@ -509,6 +511,10 @@ public class EntryService {
         }
         if (h.getValuationMode() != ValuationMode.AUTO && h.getValuationMode() != ValuationMode.MANUAL) {
             throw new IllegalArgumentException("仅上市/未上市持仓可按股数录收入(券商现金请用现金入账)");
+        }
+        // v1.30 · 基金份额变化(定投、赎回)不是收入 —— 记成收入会让「人赚」虚高(护栏 v130-STOCK-INCOME-NO-FUND)
+        if (h.isNavRow()) {
+            throw new IllegalArgumentException("基金的份额变化不是收入,请在持仓页「改份额」里改");
         }
         BigDecimal shares = positiveShares(addShares);
         BigDecimal unit = stockHoldingService.currentUnitValueInAccountCcy(familyId, h);
@@ -1217,6 +1223,9 @@ public class EntryService {
                 transferOut = transferOut.add(transfer.getAmount());
             }
         }
+        // v1.30 · 补录本金:这一期余额里本来就有、这期才补录的那部分 —— 和转入一样是能解释余额变化的已知流入
+        BigDecimal principalAdj = principalAdjustmentMapper.sumByPeriodAndAccount(familyId, periodId, accountId);
+        if (principalAdj != null) transferIn = transferIn.add(principalAdj);
         return new ReconciliationTotals(
                 income.setScale(2, RoundingMode.HALF_EVEN),
                 expense.setScale(2, RoundingMode.HALF_EVEN),

@@ -30,7 +30,10 @@ public interface StockHoldingMapper {
             + " h.penetrate_state AS penetrateState, h.archived_at, h.created_at, h.updated_at,"
             // v1.29 · 券商同步来的期权 / 期货 / 债券的说明列(估值不读)
             + " h.instrument_kind AS instrumentKind, h.underlying, h.put_call AS putCall, h.strike, h.expiry,"
-            + " h.multiplier, h.quote_price AS quotePrice, h.notional ";
+            + " h.multiplier, h.quote_price AS quotePrice, h.notional,"
+            // v1.30 · 净值行(场外基金 / 货币基金)· 见 NavMode
+            + " h.nav_mode AS navMode, h.nav_date AS navDate, h.nav_checked_at AS navCheckedAt,"
+            + " h.nav_error AS navError, h.shares_estimated_on AS sharesEstimatedOn ";
 
     @Select("SELECT" + COLS + "FROM stock_holding h"
           + " JOIN account a ON a.id = h.account_id"
@@ -75,12 +78,15 @@ public interface StockHoldingMapper {
             INSERT INTO stock_holding (account_id, display_name, valuation_mode, ticker, market, shares,
                                        cost_basis, currency, unit, sync_source, industry_tag,
                                        asset_class_tag, risk_tag, liquidity_tag, manual_value, manual_value_at, cash_linked,
-                                       instrument_kind, underlying, put_call, strike, expiry, multiplier, quote_price, notional)
+                                       instrument_kind, underlying, put_call, strike, expiry, multiplier, quote_price, notional,
+                                       fund_code, penetrate_state, nav_mode, nav_date, nav_checked_at, nav_error, shares_estimated_on)
             SELECT #{h.accountId}, #{h.displayName}, #{h.valuationMode}, #{h.ticker}, #{h.market}, #{h.shares},
                    #{h.costBasis}, #{h.currency}, #{h.unit}, #{h.syncSource}, #{h.industryTag},
                    #{h.assetClassTag}, #{h.riskTag}, #{h.liquidityTag}, #{h.manualValue}, #{h.manualValueAt}, #{h.cashLinked},
                    #{h.instrumentKind}, #{h.underlying}, #{h.putCall}, #{h.strike}, #{h.expiry}, #{h.multiplier},
-                   #{h.quotePrice}, #{h.notional}
+                   #{h.quotePrice}, #{h.notional},
+                   #{h.fundCode}, #{h.penetrateState}, #{h.navMode}, #{h.navDate}, #{h.navCheckedAt}, #{h.navError},
+                   #{h.sharesEstimatedOn}
               FROM account a
              WHERE a.id = #{h.accountId} AND a.family_id = #{familyId}
             """)
@@ -151,6 +157,74 @@ public interface StockHoldingMapper {
           + " WHERE a.family_id = #{familyId} AND h.id = #{id}")
     int updateIndustry(@Param("familyId") long familyId,
                        @Param("id") long id, @Param("industryTag") String industryTag);
+
+    /**
+     * v1.30 · 净值行的系统写入:份额 / 单价 / 净值日期 / 原因一次写完,并把 {@code manual_value_at} 与
+     * {@code nav_checked_at} 写成<b>同一时刻</b>(调用方传 {@code at},截到秒)。之后若 {@code manual_value_at}
+     * 比 {@code nav_checked_at} 晚,说明是别处(回滚期间的老代码 / 其它路径)改过这一行 —— 见 FundNavService。
+     * 只动未归档的净值行或要变成净值行的 MANUAL 行。
+     */
+    /**
+     * v1.30 FR-971 · 只改成本价。<b>不碰 manual_value_at</b> —— 那一列和 nav_checked_at 比较,判「在别处被改过」;
+     * 改成本价不是改估值,不能让净值行因此暂停自动更新。
+     */
+    @Update("""
+            UPDATE stock_holding h
+              JOIN account a ON a.id = h.account_id
+               SET h.cost_basis = #{cost}
+             WHERE a.family_id = #{familyId}
+               AND h.id = #{id}
+               AND h.archived_at IS NULL
+            """)
+    int updateCostBasis(@Param("familyId") long familyId, @Param("id") long id, @Param("cost") java.math.BigDecimal cost);
+
+    @Update("""
+            UPDATE stock_holding h
+              JOIN account a ON a.id = h.account_id
+               SET h.shares = #{shares},
+                   h.manual_value = #{unitValue},
+                   h.nav_mode = #{navMode},
+                   h.nav_date = #{navDate},
+                   h.nav_error = #{navError},
+                   h.shares_estimated_on = #{sharesEstimatedOn},
+                   h.manual_value_at = #{at},
+                   h.nav_checked_at = #{at}
+             WHERE a.family_id = #{familyId}
+               AND h.id = #{id}
+               AND h.archived_at IS NULL
+               AND h.valuation_mode = 'MANUAL'
+            """)
+    int writeNav(@Param("familyId") long familyId, @Param("id") long id,
+                 @Param("shares") java.math.BigDecimal shares, @Param("unitValue") java.math.BigDecimal unitValue,
+                 @Param("navMode") String navMode, @Param("navDate") java.time.LocalDate navDate,
+                 @Param("navError") String navError, @Param("sharesEstimatedOn") java.time.LocalDate sharesEstimatedOn,
+                 @Param("at") java.time.LocalDateTime at);
+
+    /** v1.30 · 只记「这次没拿到 / 没结转」的原因(单价、份额不动,余额不清零) */
+    @Update("UPDATE stock_holding h JOIN account a ON a.id = h.account_id"
+          + " SET h.nav_error = #{navError}, h.nav_checked_at = #{at}"
+          + " WHERE a.family_id = #{familyId} AND h.id = #{id} AND h.nav_mode IS NOT NULL")
+    int markNavError(@Param("familyId") long familyId, @Param("id") long id,
+                     @Param("navError") String navError, @Param("at") java.time.LocalDateTime at);
+
+    /** v1.30 · 改回手填:去掉净值标记,单价停在最后一次净值、份额不动 → 余额不变 */
+    @Update("UPDATE stock_holding h JOIN account a ON a.id = h.account_id"
+          + " SET h.nav_mode = NULL, h.nav_error = NULL, h.shares_estimated_on = NULL, h.manual_value_at = NOW()"
+          + " WHERE a.family_id = #{familyId} AND h.id = #{id} AND h.nav_mode IS NOT NULL")
+    int clearNavMode(@Param("familyId") long familyId, @Param("id") long id);
+
+    /** v1.30 · 某家庭全部活的净值行(同步 / 结转用) */
+    @Select("SELECT" + COLS + "FROM stock_holding h"
+          + " JOIN account a ON a.id = h.account_id"
+          + " WHERE a.family_id = #{familyId} AND h.archived_at IS NULL AND h.nav_mode IS NOT NULL"
+          + " ORDER BY h.account_id, h.id")
+    List<StockHolding> findActiveNavRowsByFamily(@Param("familyId") long familyId);
+
+    /** v1.30 · 行锁:货币基金结转在这把锁里做,定时 + 按钮同时到也只结一次 */
+    @Select("SELECT" + COLS + "FROM stock_holding h"
+          + " JOIN account a ON a.id = h.account_id"
+          + " WHERE a.family_id = #{familyId} AND h.id = #{id} FOR UPDATE")
+    Optional<StockHolding> lockById(@Param("familyId") long familyId, @Param("id") long id);
 
     /** v1.5 · 穿透后回写代码 + 状态 */
     @Update("UPDATE stock_holding h JOIN account a ON a.id = h.account_id"

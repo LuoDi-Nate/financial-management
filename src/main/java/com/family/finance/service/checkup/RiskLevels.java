@@ -45,6 +45,7 @@ public final class RiskLevels {
             case CASH -> "CASH_DEPOSIT";
             case STOCK -> "A_STOCK";
             case WEALTH -> "BANK_WEALTH";
+            case FUND -> "MIXED_FUND";             // v1.30 · 与 ProductCategoryService 的默认类目一致
             case LOAN -> "LIABILITY";
             case PROPERTY -> "PROPERTY_RES";
             case OTHER -> "OTHER";

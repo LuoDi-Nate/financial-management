@@ -22,6 +22,7 @@
       <arg column="transfer_out_orig" javaType="java.math.BigDecimal"/>
       <arg column="fx_to_base" javaType="java.math.BigDecimal"/>
       <arg column="product_liquidity_class" javaType="java.lang.String"/>
+      <arg column="principal_adj_orig" javaType="java.math.BigDecimal"/>
     </constructor>
   </resultMap>
 
@@ -91,7 +92,9 @@
           ELSE 1.000000
         END AS fx_to_base,
         <!-- v1.12 FR-350 · 同上,定格优先 · 回落当前 -->
-        COALESCE(paa.liquidity_class, pc.liquidity_class) AS product_liquidity_class
+        COALESCE(paa.liquidity_class, pc.liquidity_class) AS product_liquidity_class,
+        <!-- v1.30 · 补录本金(以前就有、这期才补录的钱)· 账户第一期由 FactProjector 归零(第一期整笔算开账基线) -->
+        COALESCE(padj.principal_adj_orig, 0) AS principal_adj_orig
     FROM account a
     LEFT JOIN product_category pc
       ON pc.code = a.product_category_code
@@ -148,6 +151,18 @@
     ) tout
       ON tout.period_id = p.id
      AND tout.account_id = a.id
+    <!-- v1.30 · 补录本金 · 进指标的唯一入口(护栏 v130-PRINCIPAL-ONE-PATH)-->
+    LEFT JOIN (
+        SELECT period_id,
+               account_id,
+               SUM(amount) AS principal_adj_orig
+          FROM principal_adjustment
+         WHERE family_id = #{f.familyId}
+           AND deleted_at IS NULL
+         GROUP BY period_id, account_id
+    ) padj
+      ON padj.period_id = p.id
+     AND padj.account_id = a.id
     <!-- 三角换算所需两行(均以家庭本位币为 base):base→view(分子)、base→acct(分母)。
          v0.10.1 单一镜头(v10-CCY-LENS):汇率取「锚点期(窗口内 period_start ≤ rangeEnd 的最新一期)」的行,
          而非每期各自的历史汇率。这样同一账户在所有账期用同一组汇率换算 → 金额/差额(ΔNW/净资产环比/本月收益/钱赚)

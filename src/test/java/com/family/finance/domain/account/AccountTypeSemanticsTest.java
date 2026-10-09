@@ -70,6 +70,39 @@ class AccountTypeSemanticsTest {
         assertThat(AccountType.CRYPTO.isInvestment()).isTrue();
     }
 
+    /**
+     * v1.30 · 基金账户(第三次加账户类型)。逐个判断点的取值见 tech-design/v1.30.md 选型十;
+     * 这里钉住「远处的判断都认它」—— 漏一处不报错,只是基金账户在那一块静默消失。
+     */
+    @Test
+    void 基金账户_每个判断点都显式归过类() {
+        AccountType f = AccountType.FUND;
+        assertThat(f.isInvestment()).as("基金会涨会跌,体检的投资类规则必须覆盖它").isTrue();
+        assertThat(f.isLiability()).isFalse();
+        assertThat(f.expectsFlowsToExplainBalance()).as("余额变动多是净值涨跌,提示未解释差额只会天天误报").isFalse();
+        assertThat(com.family.finance.service.stock.StockHoldingService.supportsHoldings(f))
+                .as("基金账户就是为挂基金持仓加的").isTrue();
+        assertThat(com.family.finance.domain.lens.AssetClass.defaultFor(f, null))
+                .as("默认类目混合型基金 → 股票股权(不能落成 null 被透视漏掉)")
+                .isEqualTo(com.family.finance.domain.lens.AssetClass.EQUITY);
+        assertThat(com.family.finance.domain.lens.AssetClass.defaultFor(f, "MONEY_FUND"))
+                .isEqualTo(com.family.finance.domain.lens.AssetClass.CASH_EQ);
+        assertThat(com.family.finance.domain.lens.AssetClass.defaultFor(f, "SHORT_BOND"))
+                .isEqualTo(com.family.finance.domain.lens.AssetClass.FIXED_INCOME);
+        assertThat(com.family.finance.calc.BenchmarkAggregator.benchmarkForAccount(null, null, "FUND"))
+                .as("没设类目时的兜底基准不能是 0").isEqualByComparingTo("6.00");
+        assertThat(f.holdsOtcFunds()).isTrue();
+    }
+
+    /** v1.30 PRD §3.1:能放场外基金的只有这四类(币种另判);逐个类型表过态 */
+    @Test
+    void 能放场外基金的只有基金证券理财现金() {
+        var yes = java.util.EnumSet.of(AccountType.FUND, AccountType.STOCK, AccountType.WEALTH, AccountType.CASH);
+        for (AccountType t : AccountType.values()) {
+            assertThat(t.holdsOtcFunds()).as(t + " 能不能放场外基金").isEqualTo(yes.contains(t));
+        }
+    }
+
     @Test
     void 只有贷款是负债() {
         assertThat(AccountType.LOAN.isLiability()).isTrue();

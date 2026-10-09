@@ -184,7 +184,8 @@ module.exports = {
 
     const prevSum = db.num(`SELECT COALESCE(SUM(end_balance),0) FROM period_snapshot WHERE period_id=${prev}`);
     await ui.goto('/entry');
-    const refresh = 'form[action="/entry/refresh-stocks"] button, [data-refresh-stocks]';
+    // 按钮从 v0.4.22 起是 hx-post 的 button,不在 form 里 —— 只认 form 的旧选择器一直落到 skip(v1.30 补上)
+    const refresh = 'button[hx-post="/entry/refresh-stocks"], form[action="/entry/refresh-stocks"] button, [data-refresh-stocks]';
     if (await ui.page.locator(refresh).count() > 0) {
       await ui.submit(refresh, '点「一键拉取股价」');
       await ui.page.waitForTimeout(2500);

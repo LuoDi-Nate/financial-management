@@ -97,7 +97,7 @@ public class AskCitationRenderer {
                 "本期净流入 —— 收入减支出。跟市场涨跌无关,是你自己攒下来的部分。",
                 "/dashboard#dash-cashflow", "→ 仪表盘 · 本期怎么变的"));
         METAS.put("kpi.openingBaseline", new Meta("开账基线",
-                "第一期开账时已有的存量,不算在任何一期的收益里 —— 否则第一期会凭空多出一大笔。",
+                "本来就有、这期才开始记的存量(新账户第一期的余额,以及已有账户记的「补录本金」),不算在任何一期的收益里 —— 否则会凭空多出一大笔。",
                 "/dashboard#dash-cashflow", "→ 仪表盘 · 本期怎么变的"));
         METAS.put("kpi.emergencyMonths", new Meta("紧急储备月数",
                 "随时能取用的钱,够覆盖几个月的平均支出。", "/checkup#liquidity", "→ 资产体检 · 流动性"));

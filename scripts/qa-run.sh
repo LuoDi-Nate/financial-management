@@ -495,7 +495,9 @@ $CURL -b $COOKIE "$BASE/export.zip" -o /tmp/finance-qa.zip -w ""
 file /tmp/finance-qa.zip 2>&1 | grep -q "Zip" && log_ok "FR16-1 /export.zip 是 ZIP" || log_bad "FR16-1 不是 ZIP" "$(file /tmp/qa.zip)"
 
 cnt=$(python3 -c "import zipfile; z=zipfile.ZipFile('/tmp/finance-qa.zip'); print(len(z.infolist()))" 2>/dev/null)
-[[ "$cnt" == "9" ]] && log_ok "FR16-2 ZIP 含 9 个文件" || log_bad "FR16-2 文件数 $cnt" "expected 9"
+# v1.30 · 多一张 principal_adjustments.csv(补录本金 —— 少了它,导出的数据重算出来的收益对不上)→ 9 张 CSV + README
+[[ "$cnt" == "10" ]] && unzip -l /tmp/finance-qa.zip 2>/dev/null | grep -q 'principal_adjustments.csv' \
+  && log_ok "FR16-2 ZIP 含 10 个文件(9 张 CSV + README · 含补录本金)" || log_bad "FR16-2 文件数 $cnt" "expected 10(含 principal_adjustments.csv)"
 
 bom=$(python3 -c "import zipfile; z=zipfile.ZipFile('/tmp/finance-qa.zip'); print(z.read('families.csv')[:3].hex())" 2>/dev/null)
 [[ "$bom" == "efbbbf" ]] && log_ok "FR16-3 UTF-8 BOM 头" || log_bad "FR16-3 BOM" "got $bom"
@@ -4111,14 +4113,18 @@ grep -q 'intl ? "XPD" : null' "$MU" \
 # v14-METAL-ENTRY · 填报页持仓入口覆盖 METAL(修:此前硬编码 STOCK/CRYPTO 漏金属 → 填报录不了重量)
 ROWF="$RD/src/main/resources/templates/entry/_row.html"
 ECF="$RD/src/main/java/com/family/finance/web/entry/EntryController.java"
+# v1.30 · 市场列表从 EntryController 收口到 ValuationRefreshService.MARKETS(两个刷新入口共用一份,护栏跟过去)
+QA14_VRS="$RD/src/main/java/com/family/finance/service/stock/ValuationRefreshService.java"
 { grep -q 'supportsHoldings(row.account.type)' "$ROWF" \
   && ! grep -q "row.account.type.name() == 'STOCK' or row.account.type.name() == 'CRYPTO'" "$ROWF" \
-  && grep -q 'Market.METAL' "$ECF"; } \
+  && grep -q 'MARKETS = List.of(.*Market.METAL' "$QA14_VRS" \
+  && grep -q 'valuationRefreshService.refreshFamily(' "$ECF"; } \
   && log_ok "v14-METAL-ENTRY 填报页持仓入口走 supportsHoldings(含 METAL)+ 一键刷新含 METAL 市场" \
   || log_bad "v14-METAL-ENTRY 填报页仍漏 METAL 入口" "see entry/_row.html supportsHoldings / EntryController.refresh-stocks"
 
 # v14-REFRESH-COUNT · 刷新估值 toast 分母动态(修 prod「4/3」:市场数增而分母写死 3 → 全成功误报成 warning)
-{ grep -q 'marketsOk == total' "$ECF" && ! grep -qE 'marketsOk == 3|/3 市场|"3 市场' "$ECF"; } \
+{ grep -q 'marketsOk == marketsTotal' "$QA14_VRS" && grep -q 'MARKETS.size()' "$QA14_VRS" \
+  && ! grep -qE 'marketsOk == 3|/3 市场|"3 市场' "$ECF" "$QA14_VRS"; } \
   && log_ok "v14-REFRESH-COUNT 刷新估值 toast 分母 = markets.size() 动态(不再写死 3)" \
   || log_bad "v14-REFRESH-COUNT 刷新估值 toast 仍写死市场数(会误报 X/3)" "see EntryController.refreshStocks"
 
@@ -6174,6 +6180,7 @@ QA_KEY_NOHOME=""
 QA_KEY_OK="
 K_BROKER_IBKR_ACCOUNTS:内部状态·最近一次报表里有哪些账户(关联页下拉用),不是用户配的
 K_BROKER_IBKR_BASE_URL:测试钩子·e2e 把取数地址指到本机桩;只认 IBKR 域名或本机回环,用户不需要改
+K_FUND_DATA_BASE_URL:测试钩子·e2e 把天天基金的取数地址指到本机桩;只认本机回环,用户不需要改(v1.30)
 K_ASK_MA_AGENT_VERSION:内部状态·托管 Agent 发布后回写的版本号
 K_CHECKUP_ADVICE_DISMISSED:用户操作的结果·体检卡片上点「不适用」写入,在体检页恢复
 K_LENS_PALETTE:经 LensMetaService 在「显示与外观」页配
@@ -7016,7 +7023,9 @@ MINOR=$(printf '%s' "$APPV" | cut -d. -f1,2)
 #   是单测造的家庭,「净资产 100 万远大于阈值 5」是讲判据,而「同一时刻 checkup ¥5399878」
 #   是 prod 实测。机器分不出来,硬扫会得到一条天天红的护栏,然后被人关掉(这一版刚为
 #   「误报会让告警被关掉」付过代价)。要收得先由维护者逐条裁定哪些是真的。
-QA111_SYNTH='53,210|48,765|61,234|40,000|35,000|1,234,567\.89|123,456\.78|1,234,567|1,234,568|1,000,000|2,000,000|1,140,000|1,520,000|99,999,999|10,950,000|1,200,000|1,500,000|1,140,580|4,917,500|7,745,000|1,552,823|1,628,895|3,181,718|3,762,836|17,901,892|0,891,892,893,890|7,747,000|111,221.91|111,222.95|1,280\.00|12,845\.30|3,182\.50'
+QA111_SYNTH='53,210|48,765|61,234|40,000|35,000|1,234,567\.89|123,456\.78|1,234,567|1,234,568|1,000,000|2,000,000|1,140,000|1,520,000|99,999,999|10,950,000|1,200,000|1,500,000|1,140,580|4,917,500|7,745,000|1,552,823|1,628,895|3,181,718|3,762,836|17,901,892|0,891,892,893,890|7,747,000|111,221.91|111,222.95|1,280\.00|12,845\.30|3,182\.50|1,046\.03|5,000\.00|1,250\.00|1,000,022\.53|12,001\.89|5,000\.02|12,000\.00'
+#   v1.30 登记的最后七项:前三项是 prd/v1.30.md「关键文案」表里编的示例(按市值反推份额、手动改份额那两行);
+#   后四项是货基逐日结转单测的复利结果,以及持仓页 / 确认框模板里的占位示例。
 # 【基线 · 待裁定】把扫描面扩到源码/模板时一次性捞出来的存量(v1.19)。
 #   里面**真假混杂**:有的是单测造的家庭、股价报文片段、模板占位;但也确实有真的 ——
 #   `451,497.63` 就是本条护栏自己的注释里点名过的真实余额。机器分不出来,
@@ -7660,17 +7669,23 @@ QA118_MIG="$RD/db/migration/V56__ledger_source_tag.sql"
 QA118_ADS="$RD/src/main/java/com/family/finance/service/AccountDetailService.java"
 QA118_ENTRIES="$(grep -c 'new AccountDetail.Entry(' "$QA118_ADS" 2>/dev/null || echo 0)"
 QA118_SRCS="$(grep -c 'LedgerSource.parse(' "$QA118_ADS" 2>/dev/null || echo 0)"
+# v1.30 · 第 5 个构造点:持仓数量变动(holding_share_event)。这张表不存来源 —— 来源由「原因」唯一决定
+#   (货基结转=自动、截图导入=截图、其余=手动),由 ShareEventReason.source() 给出,不是写死一个值。
+QA118_DERIVED="$(grep -c 'reasonEnum().source()' "$QA118_ADS" 2>/dev/null || echo 0)"
+# v1.30 · 第 6 个构造点:补录本金(principal_adjustment 自带 source_tag 列,走 parse —— parse 数因此是 5)
 { [ -f "$QA118_MIG" ] \
   && [ "$(grep -c 'ADD COLUMN source_tag' "$QA118_MIG")" -eq 4 ] \
   && grep -q 'ALTER TABLE stock_valuation_event' "$QA118_MIG" \
   && grep -q 'ALTER TABLE cash_flow' "$QA118_MIG" \
   && grep -q 'ALTER TABLE transfer' "$QA118_MIG" \
   && grep -q 'ALTER TABLE period_snapshot' "$QA118_MIG" \
-  && [ "$QA118_ENTRIES" -eq 4 ] && [ "$QA118_SRCS" -eq 4 ] \
+  && [ "$QA118_SRCS" -eq 5 ] && [ "$QA118_DERIVED" -eq 1 ] \
+  && grep -q 'source_tag' "$RD/db/migration/V69__principal_adjustment.sql" \
+  && [ "$QA118_ENTRIES" -eq $((QA118_SRCS + QA118_DERIVED)) ] \
   && grep -q 'src-tag' "$RD/src/main/resources/templates/accounts/detail.html" \
   && grep -q 'e.source.group' "$RD/src/main/resources/templates/accounts/detail.html"; } \
   && log_ok "v118-SOURCE-TAG-ALL-TABLES(4 张流水表都有 source_tag · 时间线 $QA118_ENTRIES 个构造点都带来源 · 模板按分组上色)" \
-  || log_bad "v118-SOURCE-TAG-ALL-TABLES 有流水表或时间线构造点漏了来源" "V56 要 4 条 ADD COLUMN;AccountDetailService 的 Entry 构造点数($QA118_ENTRIES)必须等于 LedgerSource.parse 数($QA118_SRCS)"
+  || log_bad "v118-SOURCE-TAG-ALL-TABLES 有流水表或时间线构造点漏了来源" "V56 要 4 条 ADD COLUMN;AccountDetailService 的 Entry 构造点数($QA118_ENTRIES)必须等于 LedgerSource.parse 数($QA118_SRCS)+ 由原因推出来源的数($QA118_DERIVED)"
 
 # v118-UNKNOWN-NOT-MANUAL · 历史数据一律 UNKNOWN,不许回填成 MANUAL(v1.18 FR-413 · 维护者定)
 # 回填 MANUAL 等于【假装我们知道】:历史行里确实有一部分是自动同步来的,
@@ -10712,7 +10727,7 @@ QA127_BL="$QA127_SVC/AnalysisPromptBlocks.java"
 
 # v127-D-FIXES · 纠正默认值:其他类不进投资桶、金融盘含贵金属不含其他、调仓真的带余额、自定义锚能填
 { codeonly "$RD/src/main/java/com/family/finance/calc/AllocationDiff.java" | grep -q 'if ("OTHER".equals(type)) return null;' \
-  && codeonly "$RD/src/main/java/com/family/finance/service/insight/AssetInsightService.java" | tr -d '\n' | grep -qE 'AccountType\.WEALTH, AccountType\.CRYPTO, AccountType\.METAL, AccountType\.INSURANCE\)' \
+  && codeonly "$RD/src/main/java/com/family/finance/service/insight/AssetInsightService.java" | tr -d '\n' | grep -qE 'AccountType\.WEALTH, AccountType\.CRYPTO, AccountType\.METAL, AccountType\.INSURANCE, *AccountType\.FUND\)' \
   && codeonly "$RD/src/main/java/com/family/finance/service/allocation/RebalanceAdvisorService.java" | grep -q '当前余额=¥' \
   && codeonly "$RD/src/main/java/com/family/finance/service/allocation/AllocationService.java" | grep -q 'familyMapper.updateAllocationAnchorCustom(familyId, json)' \
   && grep -q 'effectiveTargetDropsAbsentBucketsAndRescales' "$RD/src/test/java/com/family/finance/calc/AllocationDiffTest.java"; } \
@@ -11135,7 +11150,7 @@ QA129_HOLD="$RD/src/main/resources/templates/stock/holdings.html"
 
 # v129-DERIV-NOT-FUND · 期权等不是基金:不进穿透候选;券商同步行不给手改表单(卖出张数是负的,表单也装不下)
 { grep -B8 'List<Long> findActiveFundHoldingIdsByFamily' "$QA129_MAP" | grep -qF 'h.instrument_kind IS NULL' \
-  && grep -qF "h.valuationMode.name() == 'MANUAL' and !h.derivative}\"" "$QA129_HOLD" \
+  && grep -qE "h.valuationMode.name\(\) == 'MANUAL' and !h.derivative( and !h.navRow)?}\"" "$QA129_HOLD" \
   && grep -qF 'data-deriv-row' "$QA129_HOLD" && grep -qF 'data-deriv-due' "$QA129_HOLD" \
   && grep -qF '期权等(券商报表)' "$QA129_HOLD" \
   && grep -qF 'linkMapper.markSynced(familyId, accountId, clip(s));' "$QA129_SYNC" \
@@ -11187,6 +11202,187 @@ QA1291_V=$(grep -n 'valuationService.refreshAllForFamily' <<<"$QA1291_SYNC" | he
   && [ -f "$RD/scripts/e2e/flows/43-broker-sync-prices.cjs" ]; } \
   && log_ok "v1291-SYNC-FETCHES-PRICES(券商同步先给同步进来的股票拉价再估值 · 单测 + flow 43)" \
   || log_bad "v1291-SYNC-FETCHES-PRICES 券商同步后没先拉价就估值(新代码按 0 计 / 老代码用旧价)" "see BrokerSyncService.sync / refreshSyncedPrices"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# v1.30 · 场外基金按代码自动估值 · 货币基金每日结转 · 持仓数量变动 · 基金账户(issue #25)
+#   设计意图见 tech-design/v1.30.md §六;这里每条守的是「一类错」,不绑当下的写法与个数。
+# ─────────────────────────────────────────────────────────────────────────────
+echo -e "\n\033[1;36m─── v1.30 · 场外基金 / 货币基金 / 基金账户 ───\033[0m"
+QA130_J="$RD/src/main/java/com/family/finance"
+QA130_T="$RD/src/test/java/com/family/finance"
+QA130_AVS="$QA130_J/service/stock/AccountValuationService.java"
+body_of() { awk -v sig="$2" 'index($0, sig){f=1} f{print} f&&/^    }$/{exit}' "$1"; }
+
+# v130-FUND-ONE-PATH · 基金市值只走 MANUAL 支一条求和路径(估值不为净值行另开分支;持仓页每行市值从 perHoldingLines 取)
+{ ! body_of "$QA130_AVS" "private ValuationResult valuateInternal(" | grep -qE 'navMode|NavMode|isNavRow|nav\(\)' \
+  && ! body_of "$QA130_AVS" "public List<HoldingLine> perHoldingLines(" | grep -qE 'navMode|NavMode|isNavRow|nav\(\)' \
+  && grep -q 'valuationService.perHoldingLines(account)' "$QA130_J/web/stock/StockHoldingController.java" \
+  && ! body_of "$QA130_J/web/stock/StockHoldingController.java" "private Map<String, Object> navView(" | grep -q 'multiply'; } \
+  && log_ok "v130-FUND-ONE-PATH(净值行估值走 MANUAL 支;持仓页市值取 perHoldingLines,不另乘)" \
+  || log_bad "v130-FUND-ONE-PATH 基金市值多了一条求和路径" "valuateInternal / perHoldingLines 不许认 navMode;页面市值从 perHoldingLines 取"
+
+# v130-SHARE-EVENT-NO-MONEY · 持仓数量变动只给人看:这张表只许 HoldingShareEventMapper 碰,fact / 报表 SQL 里不许出现
+QA130_SE=$(grep -rl 'holding_share_event' "$QA130_J" "$RD/src/main/resources/mapper" 2>/dev/null | grep -v 'HoldingShareEventMapper.java' | tr '\n' ' ')
+[ -z "$QA130_SE" ] \
+  && log_ok "v130-SHARE-EVENT-NO-MONEY(holding_share_event 只被 HoldingShareEventMapper 读写,不进任何金额汇总)" \
+  || log_bad "v130-SHARE-EVENT-NO-MONEY 持仓数量变动被别处读了(钱的变化只在估值事件里)" "$QA130_SE"
+
+# v130-NAV-ROLLBACK-SAFE · 回滚 jar 不炸(持仓侧):V68 对 stock_holding 只加可空列;navMode 是 String 不是枚举
+QA130_V="$RD/db/migration/V68__fund_nav.sql"
+{ [ -f "$QA130_V" ] \
+  && ! grep -qiE 'ALTER TABLE stock_holding[^;]*MODIFY' "$QA130_V" \
+  && [ "$(awk '/ALTER TABLE stock_holding/,/;/' "$QA130_V" | grep -c 'ADD COLUMN')" = "$(awk '/ALTER TABLE stock_holding/,/;/' "$QA130_V" | grep 'ADD COLUMN' | grep -c ' NULL ')" ] \
+  && grep -q 'private String navMode;' "$QA130_J/domain/stock/StockHolding.java"; } \
+  && log_ok "v130-NAV-ROLLBACK-SAFE(stock_holding 只加可空列 · navMode 存字符串)" \
+  || log_bad "v130-NAV-ROLLBACK-SAFE 回滚 jar 会读不懂持仓行" "V68 只许 ADD COLUMN … NULL;StockHolding.navMode 必须是 String"
+
+# v130-FUND-ROLLBACK-SQL · 回滚 jar 不炸(账户类型侧):老 jar 不认识 FUND,回滚前要先改回 WEALTH,且 rollback.sh 会自动跑
+QA130_RB="$RD/db/rollback/v1.30.sql"
+{ [ -f "$QA130_RB" ] \
+  && grep -q "UPDATE account          SET type = 'WEALTH' WHERE type = 'FUND'" "$QA130_RB" \
+  && grep -q "UPDATE account_template SET type = 'WEALTH'" "$QA130_RB" \
+  && grep -q 'db/rollback/v\*.sql' "$RD/deploy/rollback.sh"; } \
+  && log_ok "v130-FUND-ROLLBACK-SQL(回滚到 v1.30 之前先把基金账户改回理财 · rollback.sh 按版本自动执行)" \
+  || log_bad "v130-FUND-ROLLBACK-SQL 回滚会让老 jar 读到 FUND 直接炸" "see db/rollback/v1.30.sql · deploy/rollback.sh"
+
+# v130-NAV-FETCH-LOUD / v130-MMF-PAGED · 「HTTP 200 但没数据 / 换了含义 / 静默封顶」都判成失败
+QA130_PT="$QA130_T/service/penetration/FundNavParseTest.java"
+QA130_C="$QA130_J/service/penetration/EastMoneyFundClient.java"
+{ grep -q '不带Referer_ErrCode负999_判失败' "$QA130_PT" && grep -q '查无此码_ErrCode0加空列表_判失败' "$QA130_PT" \
+  && grep -q '货币基金的DWJZ是万份收益_绝不当单位净值' "$QA130_PT" && grep -q 'LSJZ_REFERER' "$QA130_C"; } \
+  && log_ok "v130-NAV-FETCH-LOUD(-999 / 空列表 / 货基字段换义都判失败带原因)" \
+  || log_bad "v130-NAV-FETCH-LOUD 净值接口的静默失败没被钉住" "see FundNavParseTest"
+{ grep -q 'all.size() < total' "$QA130_C" && grep -q '万份收益一页_带TotalCount' "$QA130_PT"; } \
+  && log_ok "v130-MMF-PAGED(按 TotalCount 核全才结转,pageSize 静默封顶 20 不会少补)" \
+  || log_bad "v130-MMF-PAGED 货基补齐可能被 pageSize 截成半截" "see EastMoneyFundClient.mmfIncome"
+
+# v130-MMF-ACCRUE-ONCE · 一天只结一次、断了补齐、起点 = 录入日前一天、超 120 天不结;结转在行锁里
+{ grep -q '同一天跑三次只结一次' "$QA130_T/service/fund/MmfAccrualTest.java" \
+  && grep -q '中间缺一天_停在缺口前_不跳过去' "$QA130_T/service/fund/MmfAccrualTest.java" \
+  && grep -q 'holdingMapper.lockById' "$QA130_J/service/fund/FundNavService.java" \
+  && grep -q 'FOR UPDATE' "$QA130_J/repository/StockHoldingMapper.java"; } \
+  && log_ok "v130-MMF-ACCRUE-ONCE(逐日只结一次 · 行锁防并发重复 · 缺口不跳)" \
+  || log_bad "v130-MMF-ACCRUE-ONCE 货币基金可能重复结转 / 跳过缺口" "see MmfAccrual / FundNavService.accrueMmf"
+
+# v130-CASH-LINK · 现金联动复用股票的「买入扣现金」,勾了余额不变
+{ grep -q 'stockHoldingService.adjustAccountCash' "$QA130_J/service/fund/FundHoldingService.java" \
+  && grep -q '改份额勾现金联动_现金行减_余额不变_记申购' "$QA130_T/service/fund/FundHoldingServiceTest.java"; } \
+  && log_ok "v130-CASH-LINK(份额变动可联动现金行 · 复用 adjustAccountCash)" \
+  || log_bad "v130-CASH-LINK 现金联动缺失 / 另造了一套" "see FundHoldingService.editShares"
+
+# v130-IMPORT-NAV-SAFE · 截图导入命中净值行:先判 isNavRow,再走老的「份额 = 1、单价 = 市值」
+QA130_IMP=$(awk '/case HoldingImportItem.UPDATE ->/{f=1} f{print} f&&/case HoldingImportItem.SOLD/{exit}' "$QA130_J/service/holdingimport/HoldingImportService.java")
+QA130_A=$(grep -n 'isNavRow()' <<<"$QA130_IMP" | head -1 | cut -d: -f1)
+QA130_B=$(grep -n 'h.setManualValue(it.getMarketValue())' <<<"$QA130_IMP" | head -1 | cut -d: -f1)
+{ [ -n "$QA130_A" ] && [ -n "$QA130_B" ] && [ "$QA130_A" -lt "$QA130_B" ]; } \
+  && log_ok "v130-IMPORT-NAV-SAFE(截图导入对净值行只改份额,单价不动)" \
+  || log_bad "v130-IMPORT-NAV-SAFE 截图导入会把净值行的单价写成市值(下次刷新市值塌成一个净值数)" "see HoldingImportService.confirm"
+
+# v130-NAV-NOT-HAND-EDITED / v130-STOCK-INCOME-NO-FUND · 两条路都守(页面 + 服务端)
+{ body_of "$QA130_J/service/stock/StockHoldingService.java" "public StockHolding updateManual(" | grep -q 'isNavRow' \
+  && grep -q "h.valuationMode.name() == 'MANUAL' and !h.derivative and !h.navRow" "$RD/src/main/resources/templates/stock/holdings.html"; } \
+  && log_ok "v130-NAV-NOT-HAND-EDITED(净值行不给手改单价 · 页面与服务端都封)" \
+  || log_bad "v130-NAV-NOT-HAND-EDITED 净值行的单价能被手改(下次刷新又被盖掉)" "see StockHoldingService.updateManual · holdings.html"
+{ body_of "$QA130_J/service/EntryService.java" "public EntryRow recordStockIncomeExistingHolding(" | grep -q 'isNavRow' \
+  && grep -q 'filter(h -> !h.isNavRow())' "$QA130_J/web/entry/EntryController.java"; } \
+  && log_ok "v130-STOCK-INCOME-NO-FUND(股票收入「增加股数」不列、也不收基金行)" \
+  || log_bad "v130-STOCK-INCOME-NO-FUND 定投份额可能被记成收入(人赚虚高)" "see EntryService / EntryController.stockIncomeHoldings"
+
+# v130-ONE-REFRESH-ENTRY · 两个刷新按钮只调编排类;定时拉价后先同步基金再估值
+QA130_SCH=$(body_of "$QA130_J/service/stock/StockPriceScheduler.java" "private void refreshValuationsAfterCron(")
+QA130_F=$(grep -n 'fundNavService.refreshAllFamilies' <<<"$QA130_SCH" | head -1 | cut -d: -f1)
+QA130_W=$(grep -n 'valuationService.refreshAllForFamily' <<<"$QA130_SCH" | head -1 | cut -d: -f1)
+{ ! grep -rq 'fetchMarket(Market.CRYPTO)' "$QA130_J/web" \
+  && grep -q 'valuationRefreshService.refreshFamily' "$QA130_J/web/entry/EntryController.java" \
+  && grep -q 'valuationRefreshService.refreshFamily' "$QA130_J/web/stock/StockHoldingController.java" \
+  && [ -n "$QA130_F" ] && [ -n "$QA130_W" ] && [ "$QA130_F" -lt "$QA130_W" ]; } \
+  && log_ok "v130-ONE-REFRESH-ENTRY(刷新按钮收口到 ValuationRefreshService · 定时拉价后先同步基金)" \
+  || log_bad "v130-ONE-REFRESH-ENTRY 又出现了一份市场清单 / 定时任务没带上基金" "see ValuationRefreshService · StockPriceScheduler"
+
+# v130-NAV-EDITED-ELSEWHERE · 回滚再升级不抹掉别人的改动
+{ grep -q 'getManualValueAt().isAfter(h.getNavCheckedAt())' "$QA130_J/service/fund/FundNavService.java" \
+  && grep -q '别处改过的行_不覆盖_标出来' "$QA130_T/service/fund/FundNavServiceTest.java"; } \
+  && log_ok "v130-NAV-EDITED-ELSEWHERE(别处改过的净值行不覆盖、暂停自动更新)" \
+  || log_bad "v130-NAV-EDITED-ELSEWHERE 回滚期间别处写的值会被覆盖" "see FundNavService.editedElsewhere"
+
+# v130-NO-FOREIGN-SHARECLASS / v130-ENTRY-BY-TYPE / v130-CATALOG-PARITY
+{ grep -q '分类_货基走结转_浮动净值货基与外币份额不支持' "$QA130_T/service/fund/FundCatalogTest.java" \
+  && grep -q '美元' "$QA130_J/service/fund/FundCatalog.java" && grep -q '货币型-浮动净值' "$QA130_J/service/fund/FundCatalog.java"; } \
+  && log_ok "v130-NO-FOREIGN-SHARECLASS(外币份额 / 浮动净值货基不被当人民币算)" \
+  || log_bad "v130-NO-FOREIGN-SHARECLASS 外币份额可能按人民币估值" "see FundCatalog.classify"
+# 判据落在 AccountType.holdsOtcFunds(穷尽 switch,再加类型编译器逼着表态),不许在服务里写裸的类型清单
+{ grep -q '哪些账户的添加持仓里有场外基金' "$QA130_T/service/fund/FundCatalogTest.java" \
+  && grep -q 'public boolean holdsOtcFunds()' "$QA130_J/domain/account/AccountType.java" \
+  && grep -q 'type.holdsOtcFunds()' "$QA130_J/service/fund/FundHoldingService.java" \
+  && grep -q '能放场外基金的只有基金证券理财现金' "$QA130_T/domain/account/AccountTypeSemanticsTest.java"; } \
+  && log_ok "v130-ENTRY-BY-TYPE(PRD §3.1 的表逐类型 × 币种有单测 · 判据是 AccountType 上的具名谓词)" \
+  || log_bad "v130-ENTRY-BY-TYPE §3.1 的表没被单测钉住" "see FundCatalogTest"
+grep -q '代码表收口后_名到码索引与v15逐条相同' "$QA130_PT" \
+  && log_ok "v130-CATALOG-PARITY(代码表收口后 v1.5 名↔码匹配逐条一致)" \
+  || log_bad "v130-CATALOG-PARITY 穿透的名↔码匹配可能变了" "see FundNavParseTest"
+
+# v130-FUND-TYPE-SWEPT · 新账户类型在所有判断点被显式归类(不数个数:凡出现 'WEALTH' 类型链的模板行也要出现 'FUND')
+QA130_SW=""
+while IFS= read -r line; do
+  grep -q "'FUND'" <<<"$line" || QA130_SW="$QA130_SW ${line%%:*}"
+done < <(grep -rn "type.name() == 'WEALTH'" "$RD/src/main/resources/templates" 2>/dev/null)
+{ [ -z "$QA130_SW" ] \
+  && grep -q '基金账户_每个判断点都显式归过类' "$QA130_T/domain/account/AccountTypeSemanticsTest.java" \
+  && grep -q 'type == AccountType.FUND' "$QA130_J/service/stock/StockHoldingService.java" \
+  && grep -q "applicable_types = CONCAT(applicable_types, ',FUND')" "$QA130_V"; } \
+  && log_ok "v130-FUND-TYPE-SWEPT(基金账户在谓词 / 持仓 / 模板类型链 / 产品类目都归过类)" \
+  || log_bad "v130-FUND-TYPE-SWEPT 基金账户在某处没被归类(会被静默漏掉)" "模板行:$QA130_SW"
+
+# e2e flow 44 / 45 · 用户路径(浏览器真点 + 页面 + 库里的行)
+{ [ -f "$RD/scripts/e2e/flows/44-fund-by-code.cjs" ] && [ -f "$RD/scripts/e2e/lib/fund-stub.cjs" ] \
+  && [ -f "$RD/scripts/e2e/flows/45-principal-and-cost.cjs" ] \
+  && grep -q 'parkOtherNavRows' "$RD/scripts/e2e/flows/44-fund-by-code.cjs" \
+  && grep -q 'parkOtherNavRows' "$RD/scripts/e2e/flows/45-principal-and-cost.cjs"; } \
+  && log_ok "v130-E2E-FLOW(flow 44 + 45 + 天天基金本机桩在 · 别的账户的净值行先停用、跑完原样还回)" \
+  || log_bad "v130-E2E-FLOW 缺 e2e flow 44 / 45 / fund-stub,或没隔离家里已有的净值行" "scripts/e2e/flows/44-fund-by-code.cjs · 45-principal-and-cost.cjs"
+
+# ── v1.30 · 补录本金(FR-973 ~ 975)/ 持仓成本价(FR-971)/ 透视写明没成本的持仓(FR-972)──
+#   维护者 2026-10-09 问「2 万成本、现值 4 万的基金,仪表盘和报表的指标怎么算」→ 梳理出两条口径,这里守住:
+#   ① 补录本金和开账基线是同一件事:只从事实层进指标(FactMapper → FactProjector → openingBaseline),别处不许自己读表算钱;
+#   ② 账户第一期不认补录本金(第一期余额已整笔算开账基线 —— 认了就算两遍);
+#   ③ 持仓成本价不进任何账户级 / 家庭级指标(只给持仓行与透视持仓级「累计收益额」)。
+QA130_FVS="$QA130_J/factview/FactViewServiceImpl.java"
+QA130_PA_FILES="$(grep -rlw 'principal_adjustment' "$QA130_J" "$RD/src/main/resources/mapper" 2>/dev/null | sed "s|$RD/||" | sort | tr '\n' ' ')"
+{ [ "$QA130_PA_FILES" = "src/main/java/com/family/finance/repository/PrincipalAdjustmentMapper.java src/main/resources/mapper/FactMapper.xml " ] \
+  && grep -q 'principal_adj_orig' "$RD/src/main/resources/mapper/FactMapper.xml" \
+  && grep -q 'WHERE family_id = #{f.familyId}' <(grep -A6 'FROM principal_adjustment' "$RD/src/main/resources/mapper/FactMapper.xml") \
+  && body_of "$QA130_FVS" "private BigDecimal openingBaseline(" | grep -q 'principalAdjBase' \
+  && [ "$(grep -c 'principalAdj' "$QA130_FVS")" -ge 4 ] \
+  && grep -q 'PrincipalAdjustmentMetricsTest' <(ls "$QA130_T/factview/"); } \
+  && log_ok "v130-PRINCIPAL-ONE-PATH(补录本金只经事实层进指标:本期收益扣掉 · 累计净投入 / XIRR 算外部投入 · 家庭开账基线并入)" \
+  || log_bad "v130-PRINCIPAL-ONE-PATH 补录本金多了一条进指标的路,或某处没认它" "引用这张表的文件:$QA130_PA_FILES"
+{ grep -q 'row.previousEndBalance() == null' "$QA130_J/factview/FactProjector.java" \
+  && grep -q '账户第一期_补录本金归零_不和开账基线重复' "$QA130_T/factview/PrincipalAdjustmentMetricsTest.java" \
+  && grep -q 'findPreviousEndBalance' "$QA130_J/service/ledger/PrincipalAdjustmentService.java" \
+  && grep -q '账户第一期_不能记' "$QA130_T/service/ledger/PrincipalAdjustmentServiceTest.java"; } \
+  && log_ok "v130-PRINCIPAL-FIRST-PERIOD(账户第一期不认、也不让记补录本金 —— 第一期余额已整笔算开账基线)" \
+  || log_bad "v130-PRINCIPAL-FIRST-PERIOD 第一期的补录本金会和开账基线算两遍" "see FactProjector · PrincipalAdjustmentService.check"
+QA130_COST_LEAK="$(grep -rlE 'getCostBasis|costBasis|cost_basis' "$QA130_J/factview" "$QA130_J/calc" "$QA130_J/service/checkup" \
+  "$QA130_J/service/insight" "$QA130_J/service/goal" "$QA130_J/web/dashboard" "$QA130_J/web/report" 2>/dev/null | tr '\n' ' ')"
+{ [ -z "$QA130_COST_LEAK" ] \
+  && grep -q '账户级_累计净投入含补录本金_累计收益不含' "$QA130_T/factview/PrincipalAdjustmentMetricsTest.java" \
+  && grep -q 'line.costAcctCcy()' "$QA130_J/web/stock/StockHoldingController.java"; } \
+  && log_ok "v130-COST-NOT-METRIC(持仓成本价不进账户级 / 家庭级指标;持仓行的持有收益与透视同取 perHoldingLines)" \
+  || log_bad "v130-COST-NOT-METRIC 成本价漏进了家庭级 / 账户级指标" "$QA130_COST_LEAK"
+{ grep -q 'int holdingsWithoutCost' "$QA130_J/calc/lens/PivotEngine.java" \
+  && grep -q 'data-cumpnl-missing' "$RD/src/main/resources/static/js/lens.js" \
+  && grep -q 'holdingsWithoutCost' "$QA130_J/service/ask/tools/PivotTool.java" \
+  && grep -q 'holdingLevel_countsHoldingsWithoutCost_onceEach' "$QA130_T/calc/lens/PivotEngineTest.java"; } \
+  && log_ok "v130-LENS-NO-COST-SAID(透视持仓级「累计收益额」写明没算几只;AI 透视工具同样告知)" \
+  || log_bad "v130-LENS-NO-COST-SAID 没成本价的持仓被悄悄漏算" "see PivotEngine.Result.holdingsWithoutCost"
+{ grep -q 'name="moneyFrom" value="PRIOR" required' "$RD/src/main/resources/templates/stock/_fund-parts.html" \
+  && grep -q 'data-principal-card' "$RD/src/main/resources/templates/accounts/detail.html" \
+  && grep -q 'data-principal-hint' "$RD/src/main/resources/templates/stock/holding-new-auto.html" \
+  && grep -q 'principal_adjustments.csv' "$QA130_J/service/export/CsvExportService.java" \
+  && grep -q 'TRUNCATE TABLE principal_adjustment' "$RD/docker/clean-dev-data.sh" \
+  && grep -q 'principal_adjustment' "$RD/scripts/family-isolation-audit.py"; } \
+  && log_ok "v130-PRINCIPAL-ENTRY(加基金时「钱从哪来」必选 · 账户详情能记 · 其它添加页指路 · 导出 / 清演示数据 / 家庭隔离审计都带上)" \
+  || log_bad "v130-PRINCIPAL-ENTRY 补录本金的入口或配套缺一处" "see _fund-parts / accounts/detail / CsvExportService / clean-dev-data"
 
 echo
 echo "═══════════════════════════════════════"

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('添加场外基金')}"></head>
+<body class="min-h-screen relative">
+<div class="fixed top-0 left-0 right-0 h-1 bg-ink z-40"></div>
+<header th:replace="~{fragments/nav :: nav('accounts', ${me}, ${nav})}"></header>
+
+<!--/* v1.30 · 添加场外基金(PRD FR-959~961 / 964 / 970 · preview/v1.30 ②):先认出基金(名称 + 最新净值 + 日期),再填份额 */-->
+<main class="max-w-[960px] mx-auto px-4 sm:px-6 py-6 sm:py-10 relative z-10">
+  <div class="font-mono text-[10px] tracking-[0.18em] uppercase text-ink-subtle mb-4">
+    <a th:href="@{|/accounts/${account.id}/holdings|}" class="hover:text-ink no-underline" th:text="${account.displayName}">账户</a>
+    <span class="mx-2 text-rule">/</span><span class="text-ink">添加持仓 · 场外基金</span>
+  </div>
+
+  <div class="mb-6">
+    <div class="eyebrow mb-2 text-fund">+ 场 · 外 · 基 · 金 · 按 · 净 · 值 · 自 · 动 · 估 · 值</div>
+    <h1 class="font-display text-3xl md:text-4xl font-medium tracking-tight">输代码或名称,只填份额</h1>
+    <p class="font-serif text-sm text-ink-soft mt-2">支付宝、银行 App、券商代销的开放式基金 / 货币基金。以后跟着「刷新估值」和定时拉价自动更新,页面总写净值日期。</p>
+  </div>
+
+  <div th:if="${flashErr != null}" class="paper-card p-3 mb-4 text-sm" data-flash-err
+       style="border-left:4px solid var(--rust);color:var(--rust)" th:text="${flashErr}">出错了</div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+    <section class="paper-card p-5">
+      <div class="font-mono text-[10px] uppercase text-ink-subtle mb-2">第 1 步 · 找到这只基金</div>
+      <input type="search" name="q" id="fund-q" autocomplete="off" autofocus
+             class="w-full font-mono text-base bg-paper-soft border border-rule px-4 py-3"
+             placeholder="输入基金代码或名称,例如 002943 / 广发多因子"
+             th:attr="hx-get=@{/funds/search},hx-vals=|{&quot;accountId&quot;: ${account.id}}|"
+             hx-trigger="input changed delay:300ms, search" hx-target="#fund-results" hx-swap="innerHTML">
+      <div id="fund-results" class="mt-2" data-fund-results>
+        <p class="font-mono text-[11px] text-ink-subtle">输 6 位代码、名称或拼音缩写都行;列表里写着类型,货币基金、QDII 一眼能分出来。</p>
+      </div>
+    </section>
+
+    <section class="paper-card p-5" id="fund-quote" data-fund-quote>
+      <div class="font-mono text-[10px] uppercase text-ink-subtle mb-2">第 2 步 · 确认是这只,再填份额</div>
+      <p class="text-sm text-ink-subtle">先在第 1 步选中一只基金 —— 这里会先显示它的名称和最新净值,确认没选错再填。</p>
+    </section>
+  </div>
+
+  <div class="mt-6">
+    <a th:href="@{|/accounts/${account.id}/holdings|}" class="btn-paper no-underline">← 取消</a>
+  </div>
+</main>
+
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

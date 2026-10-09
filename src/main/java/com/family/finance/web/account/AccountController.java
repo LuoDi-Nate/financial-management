@@ -44,6 +44,7 @@ public class AccountController {
     private final ProductCategoryService productCategoryService;
     private final LedgerExporter ledgerExporter;
     private final AccountDetailService accountDetailService;
+    private final com.family.finance.service.ledger.PrincipalAdjustmentService principalService;   // v1.30 FR-973
     private final com.family.finance.repository.BrokerLinkMapper brokerLinkMapper; // v0.15.x 券商托管徽章
     private final com.family.finance.service.broker.ibkr.IbkrFlexClient ibkrClient;     // v1.26 · IBKR 口令到期标记
     private final InsurancePolicyMapper insurancePolicyMapper; // v0.17 保单登记旁表
@@ -177,6 +178,8 @@ public class AccountController {
         // v1.20 · 这个账户属于哪个分组(null = 未分组)· 顺带给出去管理的入口
         model.addAttribute("accountGroupName",
                 accountGroupService.occupiedBy(me.getFamilyId(), null).get(accountId));
+        // v1.30 FR-973 · 「补录本金」能记在哪几期(还开着、且不是这个账户的第一期);空 = 这一块不出现
+        model.addAttribute("principalPeriods", principalService.recordablePeriods(me.getFamilyId(), accountId));
         return "accounts/detail";
     }
 

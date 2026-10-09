@@ -61,7 +61,7 @@
               data-not-calibrated
               class="font-mono text-[9px] px-1.5 py-0.5 border border-rule text-ink-subtle whitespace-nowrap">本月还没校准</span>
         <span class="flex-shrink-0 font-mono text-[10px] sm:text-[11px] tracking-wide"
-              th:classappend="${row.account.type.name() == 'LOAN' ? 'text-rust' : (row.account.type.name() == 'WEALTH' ? 'text-forest' : (row.account.type.name() == 'STOCK' ? 'text-brass-deep' : 'text-ink-subtle'))}"
+              th:classappend="${row.account.type.name() == 'LOAN' ? 'text-rust' : (row.account.type.name() == 'WEALTH' ? 'text-forest' : (row.account.type.name() == 'STOCK' ? 'text-brass-deep' : (row.account.type.name() == 'FUND' ? 'text-fund' : 'text-ink-subtle')))}"
               th:text="${row.account.type.label}">现金</span>
         <span class="flex-shrink-0 font-mono text-[10px] sm:text-[11px] text-ink-subtle" th:if="${row.account.currency != 'CNY'}" th:text="'· ' + ${row.account.currency}">USD</span>
       </div>

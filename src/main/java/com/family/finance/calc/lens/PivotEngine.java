@@ -44,7 +44,13 @@ public final class PivotEngine {
             List<List<BigDecimal>> colTotals,
             List<BigDecimal> grand,
             /** true = 查询含持仓级维度,收益按持有口径/不可归因(UI 提示) */
-            boolean holdingLevelSplit
+            boolean holdingLevelSplit,
+            /**
+             * v1.30 FR-972 · 持仓级维度下「累计收益额」按持有口径(市值 − 成本)求和,没有成本价的持仓
+             * 求不出来、只能不计入 —— 这里数出有几只(同一只按穿透拆成几份只算一次),页面写明,
+             * 免得合计看起来像全算了。不是持仓级查询恒为 0。
+             */
+            int holdingsWithoutCost
     ) {}
 
     public static Result pivot(List<Position> all, LensQuery q) {
@@ -113,13 +119,21 @@ public final class PivotEngine {
             }
         }
 
+        int withoutCost = 0;
+        if (holdingSplit) {
+            java.util.Set<Long> seen = new java.util.HashSet<>();
+            for (int i : kept) {
+                Position p = all.get(i);
+                if (p.isHolding() && p.holdingCumPnl() == null && seen.add(p.holdingId())) withoutCost++;
+            }
+        }
         return new Result(
                 rowDims.stream().map(LensRegistry.Dimension::key).toList(),
                 colDims.stream().map(LensRegistry.Dimension::key).toList(),
                 measures,
                 rowOrder.stream().map(rowKeyOf::get).toList(),
                 colOrder.stream().map(colKeyOf::get).toList(),
-                cells, rowTotals, colTotals, grand, holdingSplit);
+                cells, rowTotals, colTotals, grand, holdingSplit, withoutCost);
     }
 
     // ---------- 内部 ----------

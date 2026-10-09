@@ -428,8 +428,8 @@
     <figcaption>账户簿:一行一个账户,类型标签前置,行内可直达持仓管理 / 券商对接 / 流水档案。</figcaption>
   </figure>
   <div class="lesson reveal">
-    <h4 class="font-display font-medium">9 类账户,16 个模板可套 <span class="where2">账户 → 新建</span></h4>
-    <p>现金 / 股票 / 理财 / 加密 / 贵金属 / 房产 / 贷款 / 保险 / 其他。套模板(招行储蓄卡、余额宝、富途证券…)会帮你把平台、币种、产品类目一并填好。</p>
+    <h4 class="font-display font-medium">10 类账户,16 个模板可套 <span class="where2">账户 → 新建</span></h4>
+    <p>现金 / 股票 / 理财 / 基金 / 加密 / 贵金属 / 房产 / 贷款 / 保险 / 其他。套模板(招行储蓄卡、余额宝、富途证券、蚂蚁财富…)会帮你把平台、币种、产品类目一并填好。</p>
   </div>
   <div class="lesson reveal">
     <h4 class="font-display font-medium">每个账户填三件事 <span class="where2">主理人 · 平台 · 币种</span></h4>
@@ -786,6 +786,7 @@
       <tr><td>借钱给别人</td><td class="where">建「其他」账户记应收</td></tr>
       <tr><td>股息 / 利息到账</td><td class="where">留在账户不用记 · 打进现金则录收入</td></tr>
       <tr><td>补录一个已有钱的老账户</td><td class="where">直接建 · 自动识别为「开账基线」,不虚高收益</td></tr>
+      <tr><td>在已有账户里补录以前就有的持仓 / 存款</td><td class="where">账户详情 → 补录本金(加场外基金时选「以前就有、现在才补录」)· 算本金,不算这期收益</td></tr>
       <tr><td>新开一个空账户,从别的账户转钱进去</td><td class="where">建好后在老账户那一行「↔ 划转」· 转进来的钱不算开账基线(左手倒右手,不影响收益)</td></tr>
     </table>
   </div>
@@ -890,6 +891,14 @@
   <div class="lesson reveal">
     <h4 class="font-display font-medium">买入可联动扣现金 <span class="where2">持仓管理 → 添加持仓</span></h4>
     <p>支持美股 / A 股 / 港股(新浪主 + 腾讯备)。勾「从账户现金划转买入」并填成本,自动扣掉「股数 × 成本」;卖出同理加回。</p>
+  </div>
+  <div class="lesson reveal">
+    <h4 class="font-display font-medium">场外基金 / 货币基金 <span class="where2">持仓管理 → 添加持仓 · 场外基金</span></h4>
+    <p>人民币的基金 / 证券 / 理财 / 现金账户里都有这个入口。输代码或名字选中,填份额(或市值,按最新净值折成份额),之后跟着刷新按<b class="text-ink">份额 × 最新净值</b>自动更新。<b class="text-ink">货币基金</b>净值不动、份额每天变,按每日万份收益自动结转,账户流水里能看到每次「持仓数量变动」。以前手填市值的基金,在持仓行点「改为按净值自动估值」就能转过来。普通基金可选填<b class="text-ink">持仓成本价</b>,持仓行显示这只的持有收益(买入以来);它不影响仪表盘和报表的收益。</p>
+  </div>
+  <div class="lesson reveal">
+    <h4 class="font-display font-medium">补录以前就有的钱 <span class="where2">账户详情 → 补录本金</span></h4>
+    <p>在一直在记的账户里补录一只早就买了的基金 / 股票,或一笔漏记的存款,余额这期会多出一截 —— 记一笔「补录本金」,它就和新账户开户时的余额一样算<b class="text-ink">本金</b>(开账基线),不算这期的收益,也不算收入。加场外基金时「这笔钱从哪来」直接选「以前就有、现在才补录」也行。钱是从家里别的账户转来的,记「划转」。</p>
   </div>
   <p class="mt-5"><a class="backtop" href="#top">↑ 回目录</a></p>
 </section>

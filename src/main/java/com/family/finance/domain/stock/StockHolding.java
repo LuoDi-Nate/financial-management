@@ -81,8 +81,30 @@ public class StockHolding {
     /** 期货名义价值(原币)· 只展示,不计入余额 */
     private BigDecimal notional;
 
+    // v1.30 · 净值行(场外基金 / 货币基金):仍是 MANUAL 行,单价由系统写。见 {@link NavMode}。
+    /** {@link NavMode} 的 name();NULL = 原有行为 */
+    private String navMode;
+    /** FUND:单价是哪天的净值;MMF:收益已结转到哪一天 */
+    private java.time.LocalDate navDate;
+    /** 系统最近一次写这一行的时间 —— 与 manual_value_at 同时写;manual_value_at 更晚 = 别处改过 */
+    private LocalDateTime navCheckedAt;
+    /** 最近一次没拿到 / 没结转的原因;NULL = 正常 */
+    private String navError;
+    /** 份额是按哪天的净值从市值反推的;用户改过份额后清空 */
+    private java.time.LocalDate sharesEstimatedOn;
+
     /** 是不是券商同步来的期权 / 期货 / 债券这一类 */
     public boolean isDerivative() {
         return instrumentKind != null && !instrumentKind.isBlank();
+    }
+
+    /** v1.30 · 是不是净值行(单价由系统按净值 / 结转写,不许手改单价) */
+    public boolean isNavRow() {
+        return NavMode.of(navMode) != null;
+    }
+
+    /** v1.30 · 净值行的种类;非净值行返回 null */
+    public NavMode nav() {
+        return NavMode.of(navMode);
     }
 }

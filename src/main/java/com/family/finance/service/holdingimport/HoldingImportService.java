@@ -59,6 +59,8 @@ public class HoldingImportService {
     private final AccountValuationService valuationService;
     private final AppProperties props;
     private final com.family.finance.service.penetration.FundPenetrationService penetrationService; // v1.5
+    /** v1.30 · 命中净值行时按截图市值反推份额(不碰单价)—— 见 confirm 的 UPDATE 分支 */
+    private final com.family.finance.service.fund.FundHoldingService fundHoldingService;
 
     // ---------- 状态机 ----------
 
@@ -292,6 +294,13 @@ public class HoldingImportService {
                 case HoldingImportItem.UPDATE -> {
                     if (it.getMatchedHid() == null || it.getMarketValue() == null) break;
                     holdingMapper.findById(imp.getFamilyId(), it.getMatchedHid()).ifPresent(h -> {
+                        // v1.30 · 净值行(场外基金 / 货币基金)的单价是系统按净值写的:老逻辑「份额 = 1、单价 = 市值」
+                        //   会在下一次刷新时把单价改回净值 → 市值塌成一个净值数(5,000 元变 4.78 元)。
+                        //   改成按截图市值反推份额,单价不动(护栏 v130-IMPORT-NAV-SAFE)。
+                        if (h.isNavRow()) {
+                            fundHoldingService.applyImportedValue(imp.getFamilyId(), memberId, h, it.getMarketValue());
+                            return;
+                        }
                         h.setManualValue(it.getMarketValue());
                         h.setShares(BigDecimal.ONE);
                         h.setManualValueAt(LocalDateTime.now());

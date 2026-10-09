@@ -58,6 +58,13 @@ public class StockHoldingController {
     private final StockHoldingService holdingService;
     private final AccountValuationService valuationService;
     private final StockPriceScheduler scheduler;
+    private final com.family.finance.service.stock.ValuationRefreshService valuationRefreshService;   // v1.30
+    // v1.30 · 净值行展示 / 「改为按净值自动估值」按钮
+    private final com.family.finance.service.fund.FundHoldingService fundHoldingService;
+    private final com.family.finance.service.ledger.PrincipalAdjustmentService principalService;   // v1.30 FR-973
+    private final com.family.finance.service.fund.FundCatalog fundCatalog;
+    private final com.family.finance.repository.FundNavSnapshotMapper fundNavSnapshotMapper;
+    private final com.family.finance.repository.HoldingShareEventMapper holdingShareEventMapper;
     private final StockPriceSnapshotMapper priceMapper;
     private final BrokerLinkMapper brokerLinkMapper;   // v1.6.24 · 持仓页展示本账户的券商对接状态(1:1)
     private final AccountMapper accountMapper;
@@ -138,12 +145,62 @@ public class StockHoldingController {
             derivInfo.put(h.getId(), di);
         }
 
+        // v1.30 · 净值行(场外基金 / 货币基金):估值仍是 MANUAL 支,这里只为「写成人话」+ 估值分解单列一格
+        boolean fundAllowed = com.family.finance.service.fund.FundHoldingService.accountAllowsFunds(account);
+        Map<Long, Map<String, Object>> navInfo = new HashMap<>();
+        BigDecimal navBase = BigDecimal.ZERO;
+        java.util.Set<Long> convertible = new java.util.HashSet<>();
+        // 每行市值取估值服务的 perHoldingLines(与账户余额同一个算式,护栏 v130-FUND-ONE-PATH)—— 页面不另乘一遍
+        Map<Long, BigDecimal> lineValue = new HashMap<>();
+        Map<Long, BigDecimal> lineCost = new HashMap<>();   // v1.30 FR-971 · 成本也取同一行(成本价 × 份额)
+        if (active.stream().anyMatch(StockHolding::isNavRow)) {
+            for (var line : valuationService.perHoldingLines(account)) {
+                lineValue.put(line.holding().getId(), line.valueAcctCcy());
+                if (line.costAcctCcy() != null) lineCost.put(line.holding().getId(), line.costAcctCcy());
+            }
+        }
+        for (StockHolding h : active) {
+            if (h.isNavRow()) {
+                Map<String, Object> ni = navView(me.getFamilyId(), h, today);
+                BigDecimal v = lineValue.getOrDefault(h.getId(), BigDecimal.ZERO);
+                ni.put("value", v);
+                // 持有收益 = 市值 − 成本(都来自 perHoldingLines,与资产透视持仓级「累计收益额」同一个数)
+                BigDecimal cost = lineCost.get(h.getId());
+                if (cost != null) {
+                    ni.put("cost", cost);
+                    ni.put("pnl", v.subtract(cost));
+                    if (cost.signum() > 0) {
+                        ni.put("pnlPct", v.subtract(cost).multiply(BigDecimal.valueOf(100))
+                                .divide(cost, 2, java.math.RoundingMode.HALF_UP));
+                    }
+                }
+                navBase = navBase.add(v);
+                navInfo.put(h.getId(), ni);
+            } else if (fundAllowed && h.getValuationMode() == ValuationMode.MANUAL && !h.isDerivative()
+                    && h.getFundCode() != null && h.getFundCode().matches("\\d{6}")) {
+                try {
+                    if (fundHoldingService.convertible(me.getFamilyId(), h, account)) convertible.add(h.getId());
+                } catch (Exception e) {
+                    log.debug("convertible check failed · holding={}: {}", h.getId(), e.toString());
+                }
+            }
+        }
+        boolean hasCashRow = active.stream().anyMatch(x -> x.getValuationMode() == ValuationMode.CASH);
+        // v1.30 FR-973 · 「以前就有、现在才补录」能不能选(账户第一期不行:第一期的余额本来就整笔算本金)
+        var prior = fundAllowed ? principalService.checkBalancePeriod(me.getFamilyId(), accountId) : null;
+
         model.addAttribute("me", me);
         model.addAttribute("nav", navService.load(me));
         model.addAttribute("account", account);
         model.addAttribute("holdings", active);
         model.addAttribute("valuation", valuation);
         model.addAttribute("derivInfo", derivInfo);
+        model.addAttribute("fundAllowed", fundAllowed);
+        model.addAttribute("navInfo", navInfo);
+        model.addAttribute("navBase", navBase);
+        model.addAttribute("convertible", convertible);
+        model.addAttribute("hasCashRow", hasCashRow);
+        model.addAttribute("priorAllowed", prior != null && prior.ok());
         model.addAttribute("derivBase", derivBase);
         model.addAttribute("latestPrices", latestPrices);
         model.addAttribute("industryTags", com.family.finance.domain.lens.IndustryTag.values()); // v1.1 行业标下拉
@@ -346,17 +403,13 @@ public class StockHoldingController {
 
     @PostMapping("/accounts/{accountId}/holdings/refresh")
     public String refresh(@AuthenticationPrincipal MemberPrincipal me,
-                          @PathVariable long accountId) {
+                          @PathVariable long accountId,
+                          org.springframework.web.servlet.mvc.support.RedirectAttributes ra) {
+        // v1.30 · 收口到 ValuationRefreshService:股票各市场 + 基金净值 / 货币基金结转 + 估值写回(trigger=MANUAL)
         try {
-            // 全市场都拉一次 · 简单粗暴
-            scheduler.fetchMarket(Market.US);
-            scheduler.fetchMarket(Market.CN);
-            scheduler.fetchMarket(Market.HK);
-            scheduler.fetchMarket(Market.CRYPTO);
-            scheduler.fetchMarket(Market.METAL);
-            // v0.4.1 · 用户主动 click → trigger=MANUAL · 写 valuation event 含用户 ID
-            valuationService.refreshAllForFamily(me.getFamilyId(),
-                AccountValuationService.TriggerKind.MANUAL, me.getMemberId());
+            var r = valuationRefreshService.refreshFamily(me.getFamilyId(), me.getMemberId());
+            ra.addFlashAttribute(com.family.finance.service.stock.ValuationRefreshService.clean(r) ? "flashOk" : "flashWarn",
+                    com.family.finance.service.stock.ValuationRefreshService.summary(r));
         } catch (Exception e) {
             log.warn("refresh failed: {}", e.toString());
         }
@@ -365,6 +418,72 @@ public class StockHoldingController {
 
     // ---------- helpers ----------
 
+    /**
+     * v1.30 · 一条净值行写成人话:净值日期 / 晚到说明 / 估算提示 / 出了什么问题。
+     * 市值不在这里算 —— 调用方从估值服务的 perHoldingLines 取(与账户余额同一个算式)。
+     */
+    private Map<String, Object> navView(long familyId, StockHolding h, java.time.LocalDate today) {
+        Map<String, Object> ni = new HashMap<>();
+        // 每个键都先放好(SpEL 读 Map 里不存在的键会直接抛 EL1008E,而不是给 null —— e2e flow 44 实测抓到)
+        for (String k : List.of("value", "dateText", "checkedText", "estimated", "problem", "badge",
+                                "per10k", "yield7d", "lastAccrual", "cost", "pnl", "pnlPct")) ni.put(k, null);
+        ni.put("late", false);
+        ni.put("edited", false);
+        var kind = h.nav();
+        ni.put("mmf", kind == com.family.finance.domain.stock.NavMode.MMF);
+        ni.put("dateText", cnDate(h.getNavDate()));
+        ni.put("checkedText", h.getNavCheckedAt() == null ? null
+                : h.getNavCheckedAt().format(java.time.format.DateTimeFormatter.ofPattern("MM-dd HH:mm")));
+        if (h.getSharesEstimatedOn() != null) {
+            ni.put("estimated", "按 " + cnDate(h.getSharesEstimatedOn()) + "净值估算的份额 —— 在 App 里查到准确份额后改一下");
+        }
+        boolean edited = com.family.finance.service.fund.FundNavService.EDITED_ELSEWHERE.equals(h.getNavError());
+        ni.put("edited", edited);
+        String problem = edited ? "这只基金在别处被改过,已暂停自动更新 —— 核对份额后点「继续自动更新」" : h.getNavError();
+        String badge = null;
+        if (edited) badge = "已暂停自动更新";
+        else if (problem != null) {
+            // 净值还很新(两天内)只是这一次没拉到 →「这次没拉到」;再早的才说「停在 X 日」,免得把今天的净值说成停了
+            boolean recent = h.getNavDate() != null
+                    && java.time.temporal.ChronoUnit.DAYS.between(h.getNavDate(), today) <= 2;
+            badge = kind == com.family.finance.domain.stock.NavMode.MMF
+                    ? (recent || h.getNavDate() == null ? "这次没结转" : "结转停在 " + cnDate(h.getNavDate()))
+                    : (recent || h.getNavDate() == null ? "这次没拉到" : "净值停在 " + cnDate(h.getNavDate()));
+        } else if (kind == com.family.finance.domain.stock.NavMode.FUND && h.getNavDate() != null
+                && java.time.temporal.ChronoUnit.DAYS.between(h.getNavDate(), today)
+                   > com.family.finance.service.fund.FundNavService.STALE_DAYS) {
+            problem = "已经两周没有新净值 —— 基金可能已终止或代码有变";
+            badge = "净值停在 " + cnDate(h.getNavDate());
+        }
+        ni.put("problem", problem);
+        ni.put("badge", badge);
+        if (kind == com.family.finance.domain.stock.NavMode.FUND && h.getFundCode() != null) {
+            try {
+                var c = fundCatalog.find(familyId, h.getFundCode());
+                ni.put("late", c != null && c.lateNav());
+            } catch (Exception ignored) { ni.put("late", false); }
+        }
+        if (kind == com.family.finance.domain.stock.NavMode.MMF && h.getFundCode() != null) {
+            var inc = fundNavSnapshotMapper.findLatestIncome(h.getFundCode());
+            if (inc != null) {
+                ni.put("per10k", inc.incomePer10k());
+                ni.put("yield7d", inc.yield7d());
+            }
+            var ev = holdingShareEventMapper.findLatestByHolding(familyId, h.getId(),
+                    com.family.finance.domain.stock.ShareEventReason.MMF_ACCRUAL.name());
+            if (ev != null && ev.getDateFrom() != null && ev.getDateTo() != null) {
+                long n = java.time.temporal.ChronoUnit.DAYS.between(ev.getDateFrom(), ev.getDateTo()) + 1;
+                ni.put("lastAccrual", "+" + ev.getSharesDelta().setScale(2, java.math.RoundingMode.HALF_UP).toPlainString()
+                        + " · " + n + " 天");
+            }
+        }
+        return ni;
+    }
+
+    private static String cnDate(java.time.LocalDate d) {
+        return d == null ? null : d.getMonthValue() + " 月 " + d.getDayOfMonth() + " 日";
+    }
+
     private Account requireAccount(long familyId, long accountId) {
         Account acc = accountMapper.findById(familyId, accountId)
             .orElseThrow(() -> new IllegalArgumentException("账户不存在"));
@@ -372,7 +491,7 @@ public class StockHoldingController {
             throw new IllegalArgumentException("无权访问账户");
         }
         if (!StockHoldingService.supportsHoldings(acc.getType())) {
-            throw new IllegalArgumentException("该账户类型不支持持仓管理(支持:股票 / 加密 / 贵金属 / 理财 / 现金)· 当前 " + acc.getType());
+            throw new IllegalArgumentException("该账户类型不支持持仓管理(支持:股票 / 加密 / 贵金属 / 理财 / 基金 / 现金)· 当前 " + acc.getType());
         }
         return acc;
     }

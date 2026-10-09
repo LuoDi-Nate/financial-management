@@ -102,6 +102,8 @@ public class FamilyConfigService {
     public static final String K_BROKER_IBKR_ACCOUNTS  = "broker_ibkr_accounts";
     /** 取数基址 · 默认 IBKR 官方;只接受 *.interactivebrokers.com 的 HTTPS 或本机回环(e2e 桩)· 页面上不暴露 */
     public static final String K_BROKER_IBKR_BASE_URL  = "broker_ibkr_flex_base_url";
+    /** v1.30 · e2e 用的基金数据源桩地址(只认本机回环 · 管理页不出现 · 见 EastMoneyFundClient.normalizeBase) */
+    public static final String K_FUND_DATA_BASE_URL    = "fund_data_base_url";
     public static final String K_BROKER_FUTU_HOST      = "broker_futu_opend_host";
     public static final String K_BROKER_FUTU_PORT      = "broker_futu_opend_port";
     public static final String K_BROKER_SYNC_CRON      = "broker_sync_cron";

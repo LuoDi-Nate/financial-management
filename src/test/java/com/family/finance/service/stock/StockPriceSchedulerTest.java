@@ -47,12 +47,38 @@ class StockPriceSchedulerTest {
         fetcher = mock(StockPriceFetcher.class);
         configService = mock(FamilyConfigService.class);
         valuationService = mock(AccountValuationService.class);
-        scheduler = new StockPriceScheduler(holdingMapper, fetcher, configService, valuationService);
+        scheduler = new StockPriceScheduler(holdingMapper, fetcher, configService, valuationService,
+                org.mockito.Mockito.mock(com.family.finance.service.fund.FundNavService.class));
 
         // 默认开启,有持仓
         when(configService.getBoolean(eq(1L), eq(FamilyConfigService.K_STOCK_ENABLED), any(Boolean.class)))
             .thenReturn(true);
         when(fetcher.fetchAndPersist(any(), any(), any(LocalDate.class))).thenReturn(2);
+    }
+
+    /** v1.30 · §13 ④「跟随原有同步」:每次定时拉价后先同步基金净值 / 货基结转,再估值写回(顺序不能反) */
+    @Test
+    void cronRun_syncsFundsBeforeValuation() {
+        var funds = org.mockito.Mockito.mock(com.family.finance.service.fund.FundNavService.class);
+        var s = new StockPriceScheduler(holdingMapper, fetcher, configService, valuationService, funds);
+        when(holdingMapper.findDistinctAutoTickersByMarket("US")).thenReturn(List.of(new TickerMarket("BABA", "US")));
+
+        s.fetchUsStocks();
+
+        var order = org.mockito.Mockito.inOrder(funds, valuationService);
+        order.verify(funds).refreshAllFamilies();
+        order.verify(valuationService).refreshAllForFamily(eq(1L), eq(AccountValuationService.TriggerKind.CRON), eq(null));
+    }
+
+    @Test
+    void cronRun_fundSyncFailure_doesNotBlockValuation() {
+        var funds = org.mockito.Mockito.mock(com.family.finance.service.fund.FundNavService.class);
+        org.mockito.Mockito.doThrow(new RuntimeException("eastmoney down")).when(funds).refreshAllFamilies();
+        var s = new StockPriceScheduler(holdingMapper, fetcher, configService, valuationService, funds);
+
+        s.fetchCrypto();
+
+        verify(valuationService).refreshAllForFamily(eq(1L), eq(AccountValuationService.TriggerKind.CRON), eq(null));
     }
 
     @Test

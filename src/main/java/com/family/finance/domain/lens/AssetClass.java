@@ -56,6 +56,14 @@ public enum AssetClass {
             case PROPERTY -> REAL_ESTATE;
             case INSURANCE -> INSURANCE;
             case WEALTH -> "MONEY_FUND".equals(productCategoryCode) ? CASH_EQ : FIXED_INCOME;
+            // v1.30 · 基金账户按产品类目:货基 → 现金;债基 → 债券;其余(混合 / 股票类基金,默认 MIXED_FUND)→ 股票股权。
+            //   账户级只是兜底 —— 有持仓时由穿透给出真实的股 / 债 / 现金分布(tech-design/v1.30.md 选型十)
+            case FUND -> switch (productCategoryCode == null ? "" : productCategoryCode) {
+                case "MONEY_FUND" -> CASH_EQ;
+                case "SHORT_BOND", "LONG_BOND" -> FIXED_INCOME;
+                case "GOLD" -> ALTERNATIVE;
+                default -> EQUITY;
+            };
             case LOAN, OTHER -> null;
         };
     }

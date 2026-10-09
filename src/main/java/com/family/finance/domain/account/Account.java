@@ -70,7 +70,7 @@ public class Account {
         }
         return switch (type) {
             case CASH -> AccountLiquidity.LIQUID;
-            case WEALTH, STOCK, CRYPTO, METAL, INSURANCE -> AccountLiquidity.SEMI_LIQUID;
+            case WEALTH, STOCK, CRYPTO, METAL, INSURANCE, FUND -> AccountLiquidity.SEMI_LIQUID;   // v1.30 FUND:赎回 T+1~T+3,同理财
             case PROPERTY -> AccountLiquidity.ILLIQUID;
             case LOAN, OTHER -> AccountLiquidity.NA;
         };

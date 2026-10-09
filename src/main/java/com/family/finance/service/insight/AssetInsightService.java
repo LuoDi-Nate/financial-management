@@ -138,8 +138,10 @@ public class AssetInsightService {
 
             // —— 资产负债表 + 加权负债利率 + 提前还贷信号(全量)——
             // v1.27 · 金融盘 = 现金 + 股票 + 理财 + 加密 + 贵金属 + 保险;原来漏了贵金属、多了「其他」
+            // v1.30 · + 基金账户
             BigDecimal financialSum = sumByTypes(perf, AccountType.CASH, AccountType.STOCK,
-                    AccountType.WEALTH, AccountType.CRYPTO, AccountType.METAL, AccountType.INSURANCE);
+                    AccountType.WEALTH, AccountType.CRYPTO, AccountType.METAL, AccountType.INSURANCE,
+                    AccountType.FUND);
             BigDecimal propertySum = sumByTypes(perf, AccountType.PROPERTY);
             BigDecimal weightedLoanRate = weightedLoanRate(perf, accounts);
             BigDecimal assetAnnualReturn = kpi.annualizedInvestReturnPct();

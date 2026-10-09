@@ -197,7 +197,7 @@
       <p th:if="${!wf.identityHolds() and wf.diffExplainedByOpening()}" class="text-[11px] mt-3 px-2 py-1.5"
          style="border-left:3px solid var(--brass-deep);background:var(--card-soft)">
         <b>等式差额 <span data-priv th:text="${T(com.family.finance.service.MoneyFormat).intSigned(currencySymbol, wf.identityDiff())}">—</span></b>
-        —— 本期有账户首次出现,其开账基线属<b>外部资本纳入</b>,既不算人赚也不算钱赚,所以不进这条链。
+        —— 本期有账户首次出现、或已有账户记了「补录本金」,这部分开账基线属<b>外部资本纳入</b>,既不算人赚也不算钱赚,所以不进这条链。
       </p>
       <p th:if="${!wf.identityHolds() and !wf.diffExplainedByOpening()}" class="text-[11px] mt-3 px-2 py-1.5"
          style="border-left:3px solid var(--rust);color:var(--rust);background:rgba(156,74,42,.06)">

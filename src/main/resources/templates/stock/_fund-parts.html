@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<!--/* v1.30 · 添加场外基金页的两个 HTMX 片段(搜索结果 / 报价卡 + 表单)。
+       单独成文件:片段若写在 fund-new.html 里,整页渲染时也会被处理,而那时 hits / q 都还不存在。 */-->
+<body>
+<!--/* ── 片段:搜索结果 ── */-->
+<th:block th:fragment="results">
+  <div th:if="${#lists.isEmpty(hits) and !#strings.isEmpty(q)}" class="font-mono text-[11px] text-ink-subtle py-2">没搜到 —— 换个关键词,或输 6 位代码</div>
+  <ul th:unless="${#lists.isEmpty(hits)}" class="border border-rule divide-y divide-rule-soft bg-card">
+    <li th:each="c : ${hits}">
+      <button type="button" th:if="${c.supported()}"
+              class="w-full text-left px-3 py-2.5 hover:bg-card-soft grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-x-2 gap-y-0.5 items-baseline"
+              th:attr="hx-get=@{|/funds/${c.info().code()}/quote|(accountId=${accountId})},data-fund-code=${c.info().code()}"
+              hx-target="#fund-quote" hx-swap="innerHTML">
+        <span class="text-sm" th:text="${c.info().name()}">广发多因子混合</span>
+        <span class="font-mono text-[11px] text-ink-subtle sm:whitespace-nowrap" th:text="${c.info().code()} + ' · ' + ${c.info().type()}">002943 · 混合型-灵活</span>
+      </button>
+      <div th:unless="${c.supported()}" class="px-3 py-2.5 grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-x-2 gap-y-0.5 items-baseline opacity-60"
+           th:attr="data-fund-code=${c.info().code()},data-unsupported=${c.reason()}">
+        <span class="text-sm" th:text="${c.info().name()}">广发纳斯达克100ETF联接美元(QDII)A</span>
+        <span class="font-mono text-[11px] text-rust" th:text="${c.info().code()} + ' · ' + ${c.reason()}">000055 · 暂不支持美元份额</span>
+      </div>
+    </li>
+  </ul>
+</th:block>
+
+<!--/* ── 片段:报价卡 + 表单 ── */-->
+<th:block th:fragment="quote">
+  <div class="font-mono text-[10px] uppercase text-ink-subtle mb-2">第 2 步 · 确认是这只,再填份额</div>
+  <div th:if="${q.fund() == null or !q.ok()}" class="text-sm" style="color:var(--rust)" data-quote-error th:text="${q.error()}">拿不到净值</div>
+  <th:block th:if="${q.fund() != null and q.ok()}"
+            th:with="mmf=${q.fund().kind().name() == 'MMF'}, f=${q.fund().info()}">
+    <div class="border px-4 py-3 grid grid-cols-[1fr_auto] gap-3 items-center"
+         th:style="${mmf} ? 'border-color:var(--brass-deep);background:rgba(180,138,58,.06)' : 'border-color:var(--forest);background:rgba(47,93,80,.06)'"
+         data-quote-card th:attr="data-nav=${mmf ? 1 : q.unitNav()},data-kind=${q.fund().kind().name()}">
+      <div class="min-w-0">
+        <div class="font-display text-lg leading-snug" th:text="${f.name()}">广发多因子混合</div>
+        <div class="font-mono text-[11px] text-ink-soft mt-1" th:text="${f.code()} + ' · ' + ${f.type()}">002943 · 混合型-灵活</div>
+      </div>
+      <div class="text-right">
+        <div class="font-mono text-[10px] text-ink-subtle" th:text="${mmf} ? '每万份收益' : '最新单位净值'">最新单位净值</div>
+        <div class="font-mono text-lg tnum" data-quote-nav
+             th:text="${mmf} ? ${#numbers.formatDecimal(q.incomePer10k(), 1, 4)} : ${#numbers.formatDecimal(q.unitNav(), 1, 4)}">4.7800</div>
+        <div class="font-mono text-[11px] text-ink-subtle" data-quote-date
+             th:text="${#temporals.month(q.navDate())} + ' 月 ' + ${#temporals.day(q.navDate())} + ' 日'">9 月 30 日</div>
+      </div>
+    </div>
+    <p th:if="${q.fund().lateNav()}" class="font-mono text-[11px] text-ink-subtle mt-2">QDII、FOF 这类基金的净值通常比国内基金晚一个交易日</p>
+    <p th:if="${mmf and q.yield7d() != null}" class="font-mono text-[11px] text-ink-subtle mt-2"
+       th:text="'七日年化 ' + ${#numbers.formatDecimal(q.yield7d(), 1, 3)} + '% · 货币基金按金额记,每天按万份收益自动结转'">七日年化</p>
+
+    <form th:action="@{|/accounts/${account.id}/holdings/new-fund|}" method="post" class="mt-4 space-y-3" data-fund-form>
+      <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+      <input type="hidden" name="code" th:value="${f.code()}">
+      <div th:unless="${mmf}" class="flex flex-wrap gap-0 border border-rule w-fit text-xs" role="radiogroup">
+        <label class="px-3 py-1.5 cursor-pointer"><input type="radio" name="by" value="SHARES" checked class="mr-1">填份额</label>
+        <label class="px-3 py-1.5 cursor-pointer border-l border-rule"><input type="radio" name="by" value="VALUE" class="mr-1">不知道份额?按市值填</label>
+      </div>
+      <input th:if="${mmf}" type="hidden" name="by" value="VALUE">
+      <div>
+        <label class="font-mono text-[10px] uppercase text-ink-subtle mb-1 block" data-amount-label
+               th:text="${mmf} ? '当前金额(= 份额)' : '持有份额'">持有份额</label>
+        <input type="number" name="amount" step="0.0001" min="0.0001" required
+               class="w-full font-mono text-lg bg-paper-soft border border-rule px-4 py-2.5 tnum text-right"
+               th:placeholder="${mmf} ? '12000.00' : '1000.00'">
+      </div>
+      <!--/* FR-971 · 持仓成本价(选填,只普通基金):只用来算这一行的持有收益,不进任何收益率 */-->
+      <div th:unless="${mmf}">
+        <label class="font-mono text-[10px] uppercase text-ink-subtle mb-1 block">持仓成本价(选填 · 每份 · 人民币)</label>
+        <input type="number" name="costBasis" step="0.0001" min="0"
+               class="w-full font-mono text-sm bg-paper-soft border border-rule px-4 py-2 tnum text-right" placeholder="App 持仓详情里的「持仓成本」">
+        <p class="font-mono text-[11px] text-ink-subtle mt-1">填了就能在这一行看持有收益;不填不影响估值。仪表盘和报表的收益按记账以来的余额变化算,不用它</p>
+      </div>
+      <p class="font-mono text-[12px] text-ink-soft min-h-[1.2em]" data-fund-calc></p>
+      <!--/* FR-970 / 973 · 这笔钱从哪来 —— 决定余额的这次增加算什么。账户第一期没有「补录」:第一期的余额本来就整笔算本金 */-->
+      <fieldset th:if="${hasCashRow or priorAllowed}" class="space-y-2" data-money-from>
+        <legend class="font-mono text-[10px] uppercase text-ink-subtle mb-1">这笔钱从哪来(必选)</legend>
+        <label th:if="${hasCashRow}" class="flex gap-2 items-start text-sm leading-relaxed">
+          <input type="radio" name="moneyFrom" value="CASH" required class="mt-1 w-4 h-4 accent-[var(--ink)]">
+          <span>用这个账户里的现金买的<br><span class="font-mono text-[11px] text-ink-subtle">现金行扣掉同样的钱,账户余额不变</span></span>
+        </label>
+        <label th:if="${priorAllowed}" class="flex gap-2 items-start text-sm leading-relaxed">
+          <input type="radio" name="moneyFrom" value="PRIOR" required class="mt-1 w-4 h-4 accent-[var(--ink)]">
+          <span>以前就有,现在才补录进来<br><span class="font-mono text-[11px] text-ink-subtle">余额会增加这么多,记为补录本金 —— 算本金,不算这期的收益</span></span>
+        </label>
+        <label class="flex gap-2 items-start text-sm leading-relaxed">
+          <input type="radio" name="moneyFrom" value="NEW" required class="mt-1 w-4 h-4 accent-[var(--ink)]">
+          <span><span th:text="${priorAllowed} ? '新买的,钱从家里别的账户转来' : '不是用这个账户的现金买的'">新买的,钱从家里别的账户转来</span><br><span
+                class="font-mono text-[11px] text-ink-subtle"
+                th:text="${priorAllowed} ? '余额会增加这么多;记得在填报页记一笔划转,不然这期会被算成收益' : '余额会增加这么多 —— 这是这个账户的第一期,余额整笔算本金(开账基线),不会被算成收益'">余额会增加这么多</span></span>
+        </label>
+      </fieldset>
+      <th:block th:unless="${hasCashRow or priorAllowed}">
+        <input type="hidden" name="moneyFrom" value="NEW">
+        <p class="font-mono text-[11px] text-ink-subtle" data-first-period>这是这个账户的第一期:余额整笔算本金(开账基线),不会被算成收益</p>
+      </th:block>
+      <div class="flex justify-end">
+        <button type="submit" class="btn-ink">添加 · 以后按净值自动更新</button>
+      </div>
+    </form>
+    <script th:inline="javascript">
+      (function () {
+        var card = document.querySelector('[data-quote-card]');
+        var form = document.querySelector('[data-fund-form]');
+        if (!card || !form) return;
+        var nav = parseFloat(card.getAttribute('data-nav'));
+        var mmf = card.getAttribute('data-kind') === 'MMF';
+        var out = form.querySelector('[data-fund-calc]');
+        var costIn = form.querySelector('input[name=costBasis]');
+        var lbl = form.querySelector('[data-amount-label]');
+        var date = (card.querySelector('[data-quote-date]') || {}).textContent || '';
+        function fmt(n, d) { return n.toLocaleString('zh-CN', { minimumFractionDigits: d, maximumFractionDigits: d }); }
+        function upd() {
+          var by = (form.querySelector('input[name=by]:checked') || form.querySelector('input[name=by]') || {}).value;
+          var a = parseFloat(form.amount.value);
+          if (!mmf && lbl) lbl.textContent = by === 'VALUE' ? '当前市值(人民币)' : '持有份额';
+          if (!(a > 0)) { out.textContent = ''; return; }
+          if (mmf) { out.textContent = '¥' + fmt(a, 2) + ' · 之后每天按万份收益自动结转'; return; }
+          var shares = by === 'VALUE' ? a / nav : a;
+          var text = by === 'VALUE'
+            ? '按 ' + date + '净值 ' + nav.toFixed(4) + ' 估算:约 ' + fmt(shares, 2) + ' 份'
+            : fmt(a, 2) + ' 份 × ' + nav.toFixed(4) + ' = ¥' + fmt(a * nav, 2);
+          var cost = costIn ? parseFloat(costIn.value) : NaN;
+          if (cost >= 0 && costIn.value !== '') {
+            var pnl = shares * nav - shares * cost;
+            text += ' · 持有收益约 ' + (pnl >= 0 ? '+' : '−') + '¥' + fmt(Math.abs(pnl), 2);
+          }
+          out.textContent = text;
+        }
+        form.addEventListener('input', upd);
+        form.addEventListener('change', upd);
+        upd();
+      })();
+    </script>
+  </th:block>
+</th:block>
+
+</body>
+</html>

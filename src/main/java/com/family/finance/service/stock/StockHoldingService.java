@@ -199,6 +199,10 @@ public class StockHoldingService {
         if (h.getValuationMode() != ValuationMode.MANUAL) {
             throw new IllegalArgumentException("仅未上市(手填)持仓可用此接口更新");
         }
+        // v1.30 · 净值行的单价由系统按净值写:这里改了,下一次刷新就被盖掉,用户还以为改成功了(护栏 v130-NAV-NOT-HAND-EDITED)
+        if (h.isNavRow()) {
+            throw new IllegalArgumentException("基金的净值由系统更新,只能改份额");
+        }
         if (shares != null) {
             if (shares.signum() <= 0) throw new IllegalArgumentException("股数必须 > 0");
             h.setShares(shares);
@@ -221,6 +225,10 @@ public class StockHoldingService {
         StockHolding h = require(familyId, holdingId);
         if (h.getValuationMode() != ValuationMode.AUTO && h.getValuationMode() != ValuationMode.MANUAL) {
             throw new IllegalArgumentException("仅上市/未上市持仓可增减股数");
+        }
+        // v1.30 · 基金份额只走 FundHoldingService(要记持仓数量变动、可选现金联动);这里加份额会被记成股票收入
+        if (h.isNavRow()) {
+            throw new IllegalArgumentException("基金的份额请在持仓页「改份额」里改");
         }
         if (deltaShares == null || deltaShares.signum() == 0) return h;
         BigDecimal cur = h.getShares() == null ? BigDecimal.ZERO : h.getShares();
@@ -458,7 +466,7 @@ public class StockHoldingService {
             throw new IllegalArgumentException("无权访问账户");
         }
         if (!supportsHoldings(acc.getType())) {
-            throw new IllegalArgumentException("仅 STOCK / CRYPTO / METAL 类型账户可加持仓 · 当前类型 " + acc.getType());
+            throw new IllegalArgumentException("该账户类型不能挂持仓(支持:股票 / 现金 / 理财 / 基金 / 加密 / 贵金属)· 当前类型 " + acc.getType());
         }
         return acc;
     }
@@ -490,8 +498,9 @@ public class StockHoldingService {
     public static boolean supportsHoldings(AccountType type) {
         // v1.4 · 放开 WEALTH/CASH(基金/理财/支付宝)· 支持截图导入多真实持仓。
         // 红线不变:没有持仓的账户,AccountValuationService.holdings.isEmpty()→skip,系统绝不碰其手填余额。
+        // v1.30 · + FUND(基金账户就是为挂基金持仓加的)
         return type == AccountType.STOCK || type == AccountType.CRYPTO || type == AccountType.METAL
-                || type == AccountType.WEALTH || type == AccountType.CASH;
+                || type == AccountType.WEALTH || type == AccountType.CASH || type == AccountType.FUND;
     }
 
     private void validateMarketForAccount(AccountType accountType, Market market) {

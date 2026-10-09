@@ -1,0 +1,31 @@
+{
+  "trackName": "Capivot - 金融资产管理和资产配置可视化",
+  "sellerName": "曦 陈",
+  "version": "2.3.0",
+  "currentVersionReleaseDate": "2026-10-03T05:53:23Z",
+  "releaseDate": "2021-04-14T07:00:00Z",
+  "averageUserRating": 4.58065,
+  "userRatingCount": 62,
+  "price": 0.0,
+  "minimumOsVersion": "17.0",
+  "fileSizeBytes": "13531136",
+  "primaryGenreName": "Finance",
+  "genres": [
+    "财务",
+    "工具"
+  ],
+  "languageCodesISO2A": [
+    "ZH"
+  ],
+  "trackViewUrl": "https://apps.apple.com/cn/app/capivot-%E9%87%91%E8%9E%8D%E8%B5%84%E4%BA%A7%E7%AE%A1%E7%90%86%E5%92%8C%E8%B5%84%E4%BA%A7%E9%85%8D%E7%BD%AE%E5%8F%AF%E8%A7%86%E5%8C%96/id1558963248?uo=4",
+  "description": "【 丰富的金融产品库 】\n覆盖A股B股，沪深市债券，场内场外基金，港股，美股，数字货币等常见金融产品，可一键刷新所有资产的价格，汇率自动换算（外币转人民币）\n\n【 自定义资产大类 】\n每个人对资产大类的定义不同，你可以自由定义你的分类，可以是（股票，债券，黄金，现金），也可以是（流动资金，投资，固定资产，应收款），或者更细分的（指数基金，主动型基金，债券基金，货币）\n\n【 自定义标签组 】\n资产大类只是资产的一面，我们还通过自定义标签组的设计，让用户通过其他的角度来分析资产，比如：\n· 行业分布（科技，消费，医疗，银行，地产等）\n· 地域分布（A股，港股，美股等）\n· 持有人（自己，老婆，爸爸，妈妈等）\n· 账户（华泰证券，平安证券，蚂蚁财富，腾讯理财通等）\n\n【 资产快照功能 】\n记录当前资产总额和分布，自动生成总资产和各资产大类的历史曲线图和历史分布图\n\n【 余额记账 】\n了解资产配置并不需要繁琐的明细账，每次只需要登记最新的资产状况即可\n\n【 本地化存储 】\n我们深知个人财务信息对你的重要性，保护用户隐私是我们在设计和开发产品时最重要的考量因素，Capivot无需注册即可使用，所有数据都存储于手机本地\n\n---- 意见与反馈 ----\n\n※ 如果我们的App对你有帮助，请不要吝啬你的五星好评，最好再附上评论两句，你的鼓励是我们前进的动力。\n\n※ 使用过程中有任何问题或者反馈，可以通过以下任意途经找到我们：\n· App中：我的 - 加入群聊 / 意见与反馈（加入群聊是最快的）\n· 微信公众号/微博/小红书：栗子研究所LizLabs",
+  "releaseNotes": "- 新增 excel 格式数据导出",
+  "screenshotUrls": [
+    "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource122/v4/38/07/69/380769fb-9dae-9aad-0cea-d42947d2b27a/8878b89a-be96-463e-ae75-73cdb0cd47f7_screenshot-v3-1-5.5.jpg/392x696bb.jpg",
+    "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource112/v4/c3/e7/b9/c3e7b92f-188a-4c3d-adc8-85842b32ff33/c8a7f8cf-a7b2-4aa2-ae43-fef4a9000268_screenshot-v3-2-5.5.jpg/392x696bb.jpg",
+    "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource112/v4/4e/46/ad/4e46ad29-cb39-ab63-8dbf-6389d49a62a6/6d9ce475-65fd-485b-8233-67693ba2a5f5_screenshot-v3-3-5.5.jpg/392x696bb.jpg",
+    "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource122/v4/f3/bf/54/f3bf5462-9d8d-0e94-6ebc-d465cee4a4f8/c3ac8918-3ca8-480c-9c35-6d91afd4a28d_screenshot-v3-4-5.5.jpg/392x696bb.jpg",
+    "https://is1-ssl.mzstatic.com/image/thumb/PurpleSource112/v4/53/2c/a6/532ca691-1bec-f313-128e-b958a9f6972b/88b9a5ec-b301-49e8-a547-4719ed4a5945_screenshot-v3-5-5.5.jpg/392x696bb.jpg"
+  ],
+  "_fetched": "2026-10-05 · https://itunes.apple.com/lookup?id=1558963248&country=cn"
+}

@@ -153,10 +153,42 @@ class Ui {
     }
   }
 
-  /** 表单里的下拉可能是原生的,也可能被 lens-select 接管了 —— 自动分流。 */
+  /**
+   * 选可搜索下拉(`<select data-searchable>` + searchable-select.js · v1.30 加进来)。
+   *
+   * 组件把原生 select 藏起来,换成一个输入框 + `.ss-dropdown` 里的 `.ss-item`(mousedown 选中)。
+   * 和 pickLsel 一样走真实路径:点输入框展开 → 点那一项(按选项文字找)→ 回头确认原生 select 的值真的变了。
+   */
+  async pickSearchable(name, value, scope) {
+    const wrap = `${scope ? scope + ' ' : ''}.ss-wrap:has(select[name="${name}"])`;
+    const native = `${wrap} select[name="${name}"]`;
+    try {
+      const text = await this.page.locator(`${native} option[value="${value}"]`).first().textContent();
+      await this.page.click(`${wrap} input.ss-input`, { timeout: 12000 });
+      await this.page.waitForTimeout(250);
+      await this.page.click(`${wrap} .ss-item:has-text("${String(text).trim()}")`, { timeout: 8000 });
+      await this.page.waitForTimeout(250);
+      const got = await this.page.locator(native).inputValue();
+      return this.assert(String(got) === String(value), `可搜索下拉 ${name} 选中「${String(text).trim()}」(回写到原生 select)`,
+        `点完之后原生值是 ${got}`);
+    } catch (e) {
+      return this.assert(false, `可搜索下拉 ${name} 选 ${value}`, e.message.split('\n')[0]);
+    }
+  }
+
+  /** 表单里的下拉可能是原生的,也可能被 lens-select / searchable-select 接管了 —— 自动分流。 */
   async choose(name, value, scope) {
     const wrap = `${scope ? scope + ' ' : ''}.lsel:has(select[name="${name}"])`;
+    const ss = `${scope ? scope + ' ' : ''}.ss-wrap:has(select[name="${name}"])`;
+    // 两个组件都在 DOMContentLoaded 之后才把原生 select 换掉。刚 goto 完立刻数 wrapper 可能还是 0 →
+    // 落进原生分支,而原生 select 已经被藏起来,selectOption 干等 12 秒超时(全量跑时 flow 20 偶发)。
+    // 带了组件标记的,先等 wrapper 出现再分流。
+    const marked = `${scope ? scope + ' ' : ''}select[name="${name}"]:is([data-lsel],[data-searchable])`;
+    if (await this.page.locator(marked).count() > 0) {
+      await this.page.locator(`${wrap}, ${ss}`).first().waitFor({ state: 'attached', timeout: 5000 }).catch(() => {});
+    }
     if (await this.page.locator(wrap).count() > 0) return this.pickLsel(name, value, scope);
+    if (await this.page.locator(ss).count() > 0) return this.pickSearchable(name, value, scope);
     return this.selectByName(name, value, scope);
   }
 
