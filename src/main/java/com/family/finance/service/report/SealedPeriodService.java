@@ -399,23 +399,19 @@ public class SealedPeriodService {
      * 正/负贡献 Top3。
      *
      * <p><b>本期首次出现的账户不进正贡献</b> —— 否则"补录一个存量账户"会显示成本月大赚。
-     * 同理本期归档的不进负贡献。两类单列。</p>
+     * 同理本期归档的不进负贡献。两类单列。<b>账户间划转不是贡献</b>(v1.30.1):左手倒右手,
+     * 家庭净资产一分没动,不许让转出方成了「拉下来」的、转入的新账户成了「资本纳入」。</p>
      */
-    /** 账户余额按维值标签汇总(未分组的标签就是账户名 → 零组态下逐字一致) */
-    private static java.util.Map<String, BigDecimal> foldByLabel(
-            java.util.Map<Long, BigDecimal> byAccount, java.util.function.Function<Long, String> labelOf) {
-        java.util.Map<String, BigDecimal> out = new java.util.LinkedHashMap<>();
-        byAccount.forEach((id, v) -> out.merge(labelOf.apply(id), nz(v), BigDecimal::add));
-        return out;
-    }
-
     SealedSnapshot.Attribution buildAttribution(long familyId, FactSlice slice, Long periodId,
                                                 Period prev, PeriodFlow flow) {
         if (prev == null || flow == null) {
             return null;
         }
-        java.util.Map<Long, BigDecimal> curAcct = endByAccount(slice, periodId);
         java.util.Map<Long, BigDecimal> beforeAcct = endByAccount(slice, prev.getId());
+        java.util.Map<Long, com.family.finance.factview.AccountPeriodFact> curRow = new java.util.HashMap<>();
+        for (var r : slice.rows()) {
+            if (periodId.equals(r.periodId()) && r.endBalanceBase() != null) curRow.putIfAbsent(r.accountId(), r);
+        }
         java.util.Map<Long, String> names = slice.rows().stream()
                 .collect(java.util.stream.Collectors.toMap(
                         com.family.finance.factview.AccountPeriodFact::accountId,
@@ -427,40 +423,60 @@ public class SealedPeriodService {
          *  ① 【本期】和【上期】都要用本期的分组关系折叠。用各自期的关系会让「改了分组」
          *     长得和「钱动了」一模一样 —— 差额凭空冒出来又说不清是哪来的。
          *  ② periodId 传给 resolver = 已关账期读 period_account_group 的【该期定格】。
-         *     读当前成员关系的话,今天挪一个账户,历史封板页的贡献者列表会跟着变。
-         *
-         * 折叠放在【逐账户算完 delta 之前】:先把余额按标签汇总,再走原来那套 isNew/isGone 判定,
-         * 于是「组是不是本期新开的」自然等于「组里所有成员上期都没余额」—— 一行额外逻辑都不用写。 */
+         *     读当前成员关系的话,今天挪一个账户,历史封板页的贡献者列表会跟着变。 */
         java.util.Map<Long, com.family.finance.service.group.AccountGroupingResolver.Label> labels =
                 groupingResolver.labelsFor(familyId, periodId, null);
         java.util.function.Function<Long, String> labelOf = id -> {
             var lb = labels.get(id);
             return lb != null ? lb.value() : names.getOrDefault(id, "#" + id);
         };
-        java.util.Map<String, BigDecimal> cur = foldByLabel(curAcct, labelOf);
-        java.util.Map<String, BigDecimal> before = foldByLabel(beforeAcct, labelOf);
+
+        /* v1.30.1 · 贡献 = 余额变化 − 本期净划转 − 补录本金(= 这个账户本期的收支 + 投资损益)。
+         *
+         * 原来直接拿「期末 − 上期末」排名,账户间划转原样进了贡献:prod 2026-09 从余额宝转出一笔钱去新开的账户,
+         * 余额宝就成了「把净资产拉下来」的第一名,新账户又整笔算成「资本纳入」—— 而家庭层面那笔钱只是挪了个地方。
+         * v1.28.1 修开账基线时只修了事实层(openingOf),这里是 v1.10 另写的一套,没跟上。
+         *
+         * 三类账户分开算(逐账户先分类、再按标签折叠 —— 组里新加了一个账户,不会把它的开户余额算成组的贡献):
+         *  · 两期都有余额:贡献 = 期末 − 上期末 − (转入 − 转出) − 补录本金;
+         *  · 本期首次出现:不算贡献(第一期没有起点),它带进来的存量 = openingOf(与家庭开账基线同一个函数:
+         *    期末 − 首期转入)—— 全是从家里别的账户转进来的,就是 0,不列;
+         *  · 本期移出(归档):照旧列「上期末余额」。
+         *  已有账户本期记的补录本金同样是资本纳入,和新账户一起列在「资本纳入」那一行。 */
+        java.util.Map<String, BigDecimal> contrib = new java.util.LinkedHashMap<>();
+        java.util.Map<String, BigDecimal> openedBy = new java.util.LinkedHashMap<>();
+        java.util.Map<String, BigDecimal> archivedBy = new java.util.LinkedHashMap<>();
+        for (Long id : new java.util.TreeSet<>(union(curRow.keySet(), beforeAcct.keySet()))) {
+            var row = curRow.get(id);
+            BigDecimal before = beforeAcct.get(id);
+            String lbl = labelOf.apply(id);
+            if (row != null && before == null) {
+                BigDecimal ob = com.family.finance.factview.FactViewServiceImpl.openingOf(row);
+                if (ob != null && ob.signum() != 0) openedBy.merge(lbl, ob, BigDecimal::add);
+            } else if (row == null) {
+                archivedBy.merge(lbl, nz(before).negate(), BigDecimal::add);
+            } else {
+                BigDecimal netTransfer = nz(row.transferInBase()).subtract(nz(row.transferOutBase()));
+                BigDecimal principal = nz(row.principalAdjBase());
+                contrib.merge(lbl, row.endBalanceBase().subtract(before).subtract(netTransfer).subtract(principal),
+                        BigDecimal::add);
+                if (principal.signum() != 0) openedBy.merge(lbl + "(补录本金)", principal, BigDecimal::add);
+            }
+        }
 
         BigDecimal delta = nz(flow.nwDelta());
         List<SealedSnapshot.Contribution> pos = new ArrayList<>();
         List<SealedSnapshot.Contribution> neg = new ArrayList<>();
+        java.util.function.BiFunction<String, BigDecimal, SealedSnapshot.Contribution> mk = (id, d) ->
+                new SealedSnapshot.Contribution(id, d.setScale(2, java.math.RoundingMode.HALF_EVEN), share(d, delta));
+        contrib.forEach((id, d) -> {
+            if (d.signum() > 0) pos.add(mk.apply(id, d));
+            else if (d.signum() < 0) neg.add(mk.apply(id, d));
+        });
         List<SealedSnapshot.Contribution> opened = new ArrayList<>();
+        openedBy.forEach((id, d) -> opened.add(mk.apply(id, d)));
         List<SealedSnapshot.Contribution> archived = new ArrayList<>();
-        for (String id : new java.util.TreeSet<>(union(cur.keySet(), before.keySet()))) {
-            boolean isNew = !before.containsKey(id) && cur.containsKey(id);
-            boolean isGone = before.containsKey(id) && !cur.containsKey(id);
-            BigDecimal d = nz(cur.get(id)).subtract(nz(before.get(id)));
-            var c = new SealedSnapshot.Contribution(id,
-                    d.setScale(2, java.math.RoundingMode.HALF_EVEN), share(d, delta));
-            if (isNew) {
-                opened.add(c);
-            } else if (isGone) {
-                archived.add(c);
-            } else if (d.signum() > 0) {
-                pos.add(c);
-            } else if (d.signum() < 0) {
-                neg.add(c);
-            }
-        }
+        archivedBy.forEach((id, d) -> archived.add(mk.apply(id, d)));
         pos.sort((a, b) -> b.amount().compareTo(a.amount()));
         neg.sort(java.util.Comparator.comparing(SealedSnapshot.Contribution::amount));
         return new SealedSnapshot.Attribution(

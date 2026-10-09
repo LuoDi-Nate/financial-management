@@ -32,7 +32,7 @@ public class MetricPrefsService {
             new MetricDef("current_value", "当前价值", true, true),
             new MetricDef("xirr", "年化收益率", true, false),
             new MetricDef("cum_pnl", "累计投资损益", true, false),
-            new MetricDef("mom_delta", "本期较上期Δ", true, false),
+            new MetricDef("mom_delta", "余额变化(含划转,看赚亏用本期损益)", true, false),   // v1.30.1 · 原名「本期较上期Δ」紧挨本期损益,被当成赚亏
             new MetricDef("share_pct", "占家庭比重", true, false),
             new MetricDef("sparkline", "近况走势", true, false),
             new MetricDef("plan_actual", "预实分析", true, false),

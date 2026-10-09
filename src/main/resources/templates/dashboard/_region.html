@@ -554,7 +554,7 @@
     <!-- v0.10.4 · 指标筛选 chips:点选即时切列显隐 · localStorage 记住 · 仅 PC 表;
          可选池来源=管理页「指标设置·账户级」;勾选多于最佳列数(7)时表格自动左右横滑 -->
     <div class="flex flex-wrap items-center gap-1.5 mb-2" data-acct-chips
-         th:with="chipDefs=${ { {'xirr','收益率'},{'return_base','本位币年化'},{'cum_pnl','累计损益'},{'net_principal','累计净投入'},{'period_return','本期损益'},{'mom_delta','本期Δ'},{'max_drawdown','最大回撤'},{'share_pct','占比'},{'months_held','持有期数'},{'plan_actual','预实'},{'sparkline','近况'} } }">
+         th:with="chipDefs=${ { {'xirr','收益率'},{'return_base','本位币年化'},{'cum_pnl','累计损益'},{'net_principal','累计净投入'},{'period_return','本期损益'},{'mom_delta','余额变化'},{'max_drawdown','最大回撤'},{'share_pct','占比'},{'months_held','持有期数'},{'plan_actual','预实'},{'sparkline','近况'} } }">
       <span class="font-mono text-[10px] text-ink-subtle mr-0.5">显示指标</span>
       <button type="button" th:each="c : ${chipDefs}" th:if="${acctMetrics.contains(c[0])}"
               th:attr="data-mchip=${c[0]}" th:text="${c[1]}"
@@ -573,7 +573,7 @@
           <th class="num" data-sort="num" data-mcol="cum_pnl" th:if="${acctMetrics.contains('cum_pnl')}">累计损益</th>
           <th class="num" data-sort="num" data-mcol="net_principal" th:if="${acctMetrics.contains('net_principal')}" title="累计净投入 = Σ(收入−支出+转入−转出)">累计净投入</th>
           <th class="num" data-sort="num" data-mcol="period_return" th:if="${acctMetrics.contains('period_return')}" title="本期(as-of 期)投资损益">本期损益</th>
-          <th class="num" data-sort="num" data-mcol="mom_delta" th:if="${acctMetrics.contains('mom_delta')}">本期Δ</th>
+          <th class="num" data-sort="num" data-mcol="mom_delta" th:if="${acctMetrics.contains('mom_delta')}" title="余额较上期的变化 = 期末余额 − 上期末余额,含账户间划转与收支;看赚亏请看「本期损益」">余额变化</th>
           <th class="num" data-sort="num" data-mcol="max_drawdown" th:if="${acctMetrics.contains('max_drawdown')}" title="历史最大回撤(峰值→谷底);不足 2 期为—">最大回撤</th>
           <th class="num" data-sort="num" data-mcol="share_pct" th:if="${acctMetrics.contains('share_pct')}">占比</th>
           <th class="num" data-sort="num" data-mcol="months_held" th:if="${acctMetrics.contains('months_held')}">持有期数</th>
@@ -706,7 +706,7 @@
           <div class="flex justify-between" data-mcol="period_return" th:if="${acctMetrics.contains('period_return')}"><dt class="text-ink-subtle">本期损益</dt>
             <dd th:classappend="${account.latestPnl == null ? '' : (account.latestPnl.signum() &lt; 0 ? 'num-neg' : 'num-pos')}"
                 data-priv th:text="${account.latestPnl == null ? '—' : ((account.latestPnl.signum() &gt; 0 ? '+' : '') + #numbers.formatInteger(account.latestPnl, 1, 'COMMA'))}">—</dd></div>
-          <div class="flex justify-between" data-mcol="mom_delta" th:if="${acctMetrics.contains('mom_delta')}"><dt class="text-ink-subtle">本期Δ</dt><dd data-priv th:text="${account.momAmount == null ? '—' : ((account.momAmount.signum() &gt; 0 ? '+' : '') + #numbers.formatInteger(account.momAmount, 1, 'COMMA'))}">—</dd></div>
+          <div class="flex justify-between" data-mcol="mom_delta" th:if="${acctMetrics.contains('mom_delta')}"><dt class="text-ink-subtle" title="余额较上期的变化 = 期末余额 − 上期末余额,含账户间划转与收支;看赚亏请看「本期损益」">余额变化</dt><dd data-priv th:text="${account.momAmount == null ? '—' : ((account.momAmount.signum() &gt; 0 ? '+' : '') + #numbers.formatInteger(account.momAmount, 1, 'COMMA'))}">—</dd></div>
           <div class="flex justify-between" data-mcol="max_drawdown" th:if="${acctMetrics.contains('max_drawdown')}"><dt class="text-ink-subtle">最大回撤</dt><dd th:text="${account.maxDrawdownPct == null ? '—' : (#numbers.formatDecimal(account.maxDrawdownPct, 1, 1) + '%')}">—</dd></div>
           <div class="flex justify-between" data-mcol="share_pct" th:if="${acctMetrics.contains('share_pct')}"><dt class="text-ink-subtle">占比</dt><dd th:text="${account.sharePct == null ? '—' : (#numbers.formatDecimal(account.sharePct, 1, 1) + '%')}">—</dd></div>
           <div class="flex justify-between" data-mcol="months_held" th:if="${acctMetrics.contains('months_held')}"><dt class="text-ink-subtle">持有期数</dt><dd th:text="${account.monthsHeld == null ? '—' : account.monthsHeld}">—</dd></div>

@@ -323,8 +323,17 @@ public final class PromptBuilder {
             sb.append("- 上期余额: ").append(money(accountDiagnose.previousBalance())).append('\n');
         }
         if (accountDiagnose.monthDelta() != null) {
+            // v1.30.1 · 「本期变化」是余额差,含账户间划转;不拆开说,模型会把一笔转出当成亏损(prod 2026-09 实例)。
+            //   这一行本身逐字不动(v1.26.1 金样本守着);有划转 / 有本期损益时在下面补两行说清楚
             sb.append("- 本期变化: ").append(money(accountDiagnose.monthDelta()))
                     .append(" / ").append(accountDiagnose.monthDeltaPctLabel()).append('\n');
+            if (accountDiagnose.periodNetTransfer() != null && accountDiagnose.periodNetTransfer().signum() != 0) {
+                sb.append("  - 其中账户间划转 / 补录本金净额: ").append(money(accountDiagnose.periodNetTransfer()))
+                        .append("(家里账户之间搬钱或补录以前就有的钱,不是赚亏;本期变化是余额差,不是盈亏)").append('\n');
+            }
+            if (accountDiagnose.periodPnl() != null) {
+                sb.append("  - 本期投资损益(已剔除收支与划转): ").append(money(accountDiagnose.periodPnl())).append('\n');
+            }
         }
         if (accountDiagnose.annualizedReturn() != null) {
             sb.append("- 年化 XIRR: ").append(accountDiagnose.annualizedReturnPctLabel()).append('\n');
