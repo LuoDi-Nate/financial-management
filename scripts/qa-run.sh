@@ -9152,7 +9152,12 @@ QA1200_SEALT="$RD/src/main/resources/templates/reports/_sealed.html"
 #   读当前成员关系的话,今天挪一个账户,历史封板页的贡献者列表会跟着变。
 #   另一个坑:本期与上期必须用【同一份】分组关系折叠 ——
 #   否则「改了分组」长得和「钱动了」一模一样,差额凭空冒出来还说不清哪来的。
-{ codeonly "$QA1200_SEAL" | grep -q 'groupingResolver.labelsFor(familyId, periodId, null)'   && codeonly "$QA1200_SEAL" | grep -q 'foldByLabel(curAcct, labelOf)'   && codeonly "$QA1200_SEAL" | grep -q 'foldByLabel(beforeAcct, labelOf)'; } \
+#   v1.30.1 · 贡献改成「逐账户先算(余额变化 − 净划转 − 补录本金)、再按标签折叠」:两期的余额在同一个账户上相减,
+#   折叠只发生一次、只用本期定格的那一份关系 —— 「前后期同一份关系」由构造保证。判据跟着改:
+#   读的是本期定格(labelsFor(familyId, periodId, null)),而且不许再按上期去取一份关系。
+{ codeonly "$QA1200_SEAL" | grep -q 'groupingResolver.labelsFor(familyId, periodId, null)' \
+  && ! codeonly "$QA1200_SEAL" | grep -q 'labelsFor(familyId, prev' \
+  && codeonly "$QA1200_SEAL" | grep -q 'contrib.merge(lbl'; } \
   && log_ok "v1200-MOVERS-READ-FROZEN(封板贡献者按组折叠 · 读该期定格 · 前后期同一份关系)" \
   || log_bad "v1200-MOVERS-READ-FROZEN 封板贡献者读了当前分组或前后期用了不同关系" "历史封板会随今天改分组而变;或「改分组」被显示成「钱动了」"
 
