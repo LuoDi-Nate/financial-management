@@ -495,7 +495,9 @@ $CURL -b $COOKIE "$BASE/export.zip" -o /tmp/finance-qa.zip -w ""
 file /tmp/finance-qa.zip 2>&1 | grep -q "Zip" && log_ok "FR16-1 /export.zip 是 ZIP" || log_bad "FR16-1 不是 ZIP" "$(file /tmp/qa.zip)"
 
 cnt=$(python3 -c "import zipfile; z=zipfile.ZipFile('/tmp/finance-qa.zip'); print(len(z.infolist()))" 2>/dev/null)
-[[ "$cnt" == "9" ]] && log_ok "FR16-2 ZIP 含 9 个文件" || log_bad "FR16-2 文件数 $cnt" "expected 9"
+# v1.30 · 多一张 principal_adjustments.csv(补录本金 —— 少了它,导出的数据重算出来的收益对不上)→ 9 张 CSV + README
+[[ "$cnt" == "10" ]] && unzip -l /tmp/finance-qa.zip 2>/dev/null | grep -q 'principal_adjustments.csv' \
+  && log_ok "FR16-2 ZIP 含 10 个文件(9 张 CSV + README · 含补录本金)" || log_bad "FR16-2 文件数 $cnt" "expected 10(含 principal_adjustments.csv)"
 
 bom=$(python3 -c "import zipfile; z=zipfile.ZipFile('/tmp/finance-qa.zip'); print(z.read('families.csv')[:3].hex())" 2>/dev/null)
 [[ "$bom" == "efbbbf" ]] && log_ok "FR16-3 UTF-8 BOM 头" || log_bad "FR16-3 BOM" "got $bom"
@@ -7670,13 +7672,15 @@ QA118_SRCS="$(grep -c 'LedgerSource.parse(' "$QA118_ADS" 2>/dev/null || echo 0)"
 # v1.30 · 第 5 个构造点:持仓数量变动(holding_share_event)。这张表不存来源 —— 来源由「原因」唯一决定
 #   (货基结转=自动、截图导入=截图、其余=手动),由 ShareEventReason.source() 给出,不是写死一个值。
 QA118_DERIVED="$(grep -c 'reasonEnum().source()' "$QA118_ADS" 2>/dev/null || echo 0)"
+# v1.30 · 第 6 个构造点:补录本金(principal_adjustment 自带 source_tag 列,走 parse —— parse 数因此是 5)
 { [ -f "$QA118_MIG" ] \
   && [ "$(grep -c 'ADD COLUMN source_tag' "$QA118_MIG")" -eq 4 ] \
   && grep -q 'ALTER TABLE stock_valuation_event' "$QA118_MIG" \
   && grep -q 'ALTER TABLE cash_flow' "$QA118_MIG" \
   && grep -q 'ALTER TABLE transfer' "$QA118_MIG" \
   && grep -q 'ALTER TABLE period_snapshot' "$QA118_MIG" \
-  && [ "$QA118_SRCS" -eq 4 ] && [ "$QA118_DERIVED" -eq 1 ] \
+  && [ "$QA118_SRCS" -eq 5 ] && [ "$QA118_DERIVED" -eq 1 ] \
+  && grep -q 'source_tag' "$RD/db/migration/V69__principal_adjustment.sql" \
   && [ "$QA118_ENTRIES" -eq $((QA118_SRCS + QA118_DERIVED)) ] \
   && grep -q 'src-tag' "$RD/src/main/resources/templates/accounts/detail.html" \
   && grep -q 'e.source.group' "$RD/src/main/resources/templates/accounts/detail.html"; } \

@@ -336,7 +336,7 @@
           <p class="font-mono text-[12px] mt-2" th:if="${ni.cost != null}" data-nav-pnl>
             <span class="text-ink-subtle" th:text="'持仓成本价 ' + ${#numbers.formatDecimal(h.costBasis, 1, 4)} + ' · 持有收益 '">持仓成本价 4.0000 · 持有收益 </span>
             <span data-priv th:classappend="${ni.pnl.signum() >= 0} ? 'text-forest' : 'text-rust'"
-                  th:text="(${ni.pnl.signum() >= 0} ? '+' : '−') + ${account.currency} + ' ' + ${#numbers.formatDecimal(ni.pnl.abs(), 1, 'COMMA', 2, 'POINT')} + (${ni.pnlPct != null} ? '(' + (${ni.pnlPct.signum() >= 0} ? '+' : '') + ${ni.pnlPct} + '%)' : '')">+CNY 20,000.00(+100.00%)</span>
+                  th:text="(${ni.pnl.signum() >= 0} ? '+' : '−') + ${account.currency} + ' ' + ${#numbers.formatDecimal(ni.pnl.abs(), 1, 'COMMA', 2, 'POINT')} + (${ni.pnlPct != null} ? '(' + (${ni.pnlPct.signum() >= 0} ? '+' : '') + ${ni.pnlPct} + '%)' : '')">+CNY 780.00(+19.50%)</span>
             <span class="text-ink-subtle text-[11px]">· 买入以来,含开始记账之前那段</span>
           </p>
           <p class="font-mono text-[11px] text-ink-subtle mt-2" th:if="${ni.cost == null}" data-nav-nocost>没填持仓成本价 —— 在「改份额」里补一个,就能看这只的持有收益</p>

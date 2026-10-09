@@ -365,7 +365,7 @@
 
         <p class="font-mono text-[11px] text-ink-subtle mb-4" th:text="${cashflowSplit.narrative()}">存下的 + 投资一起把净资产推高了。</p>
         <p class="font-mono text-[10px] text-brass-deep mb-4" th:if="${cashflowSplit.hasOpening()}">
-          开账基线 = 你本来就有、这月刚新纳入记录的存量本金(新账户开户时直接填的余额,以及已有账户里记的「补录本金」),不算这月赚/赔的(已从收益里剔除)。从家里别的账户转进来的钱不算在内。</p>
+          开账基线 = 你本来就有、这月刚新纳入记录的存量本金(新账户开户时直接填的余额,以及已有账户里记的「补录本金」),不算这月赚/赔的(已从收益里剔除)。从家里别的账户转进新账户的钱不算在内。</p>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div class="p-4" style="background:var(--card-soft);border-left:3px solid var(--forest)">
