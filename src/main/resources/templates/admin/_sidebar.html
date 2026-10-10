@@ -1,41 +1,103 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
-<aside th:fragment="sidebar(active)" class="col-span-12 md:col-span-3">
-  <div class="sticky top-24">
-    <div class="eyebrow mb-4">/ADMIN · 19 项</div>
-    <nav class="flex flex-col text-sm">
-      <a th:href="@{/admin}" th:classappend="${active=='hub'?'border-l-2 border-brass bg-card-soft text-ink font-display':'border-l border-rule hover:border-ink hover:bg-card-soft text-ink-soft'}" class="py-2 px-3 no-underline">总览</a>
-      <a th:href="@{/admin/family}" th:classappend="${active=='family'?'border-l-2 border-brass bg-card-soft text-ink font-display':'border-l border-rule hover:border-ink hover:bg-card-soft text-ink-soft'}" class="py-2 px-3 no-underline">家庭设置</a>
-      <a th:href="@{/admin/members}" th:classappend="${active=='members'?'border-l-2 border-brass bg-card-soft text-ink font-display':'border-l border-rule hover:border-ink hover:bg-card-soft text-ink-soft'}" class="py-2 px-3 no-underline">成员</a>
-      <a th:href="@{/accounts}" class="py-2 px-3 border-l border-rule hover:border-ink hover:bg-card-soft text-ink-soft no-underline">账户</a>
-      <a th:href="@{/admin/account-templates}" th:classappend="${active=='templates'?'border-l-2 border-brass bg-card-soft text-ink font-display':'border-l border-rule hover:border-ink hover:bg-card-soft text-ink-subtle'}" class="py-2 px-3 no-underline">账户模板 <span class="text-rust text-[10px]">·只读</span></a>
-      <a th:href="@{/admin/cash-flow-categories}" th:classappend="${active=='categories'?'border-l-2 border-brass bg-card-soft text-ink font-display':'border-l border-rule hover:border-ink hover:bg-card-soft text-ink-subtle'}" class="py-2 px-3 no-underline">现金流类别 <span class="text-rust text-[10px]">·只读</span></a>
-      <a th:href="@{/accounts/groups}" th:classappend="${active=='account-groups'?'border-l-2 border-brass bg-card-soft text-ink font-display':'border-l border-rule hover:border-ink hover:bg-card-soft text-ink-subtle'}" class="py-2 px-3 no-underline">账户组</a>
-      <a th:href="@{/admin/product-categories}" th:classappend="${active=='product-categories'?'border-l-2 border-brass bg-card-soft text-ink font-display':'border-l border-rule hover:border-ink hover:bg-card-soft text-ink-subtle'}" class="py-2 px-3 no-underline">产品类目 <span class="text-rust text-[10px]">· 只读</span></a>
-      <a th:href="@{/admin/periods}" th:classappend="${active=='periods'?'border-l-2 border-brass bg-card-soft text-ink font-display':'border-l border-rule hover:border-ink hover:bg-card-soft text-ink-soft'}" class="py-2 px-3 no-underline">周期</a>
-      <a th:href="@{/admin/reminders}" th:classappend="${active=='reminders'?'border-l-2 border-brass bg-card-soft text-ink font-display':'border-l border-rule hover:border-ink hover:bg-card-soft text-ink-soft'}" class="py-2 px-3 no-underline">提醒</a>
-      <a th:href="@{/admin/fx}" th:classappend="${active=='fx'?'border-l-2 border-brass bg-card-soft text-ink font-display':'border-l border-rule hover:border-ink hover:bg-card-soft text-ink-soft'}" class="py-2 px-3 no-underline">汇率</a>
-      <a th:href="@{/admin/integrations}" th:classappend="${active=='integrations'?'border-l-2 border-brass bg-card-soft text-ink font-display':'border-l border-rule hover:border-ink hover:bg-card-soft text-ink-soft'}" class="py-2 px-3 no-underline">数据源接入</a>
-      <a th:href="@{/admin/broker}" th:classappend="${active=='broker'?'border-l-2 border-brass bg-card-soft text-ink font-display':'border-l border-rule hover:border-ink hover:bg-card-soft text-ink-soft'}" class="py-2 px-3 no-underline">券商同步</a>
-      <a th:href="@{/admin/ai-access}" th:classappend="${active=='ai-access'?'border-l-2 border-brass bg-card-soft text-ink font-display':'border-l border-rule hover:border-ink hover:bg-card-soft text-ink-soft'}" class="py-2 px-3 no-underline">AI 接入</a>
-      <a th:href="@{/admin/backup}" th:classappend="${active=='backup'?'border-l-2 border-brass bg-card-soft text-ink font-display':'border-l border-rule hover:border-ink hover:bg-card-soft text-ink-soft'}" class="py-2 px-3 no-underline">备份</a>
-      <a th:href="@{/admin/reconcile}" th:classappend="${active=='reconcile'?'border-l-2 border-brass bg-card-soft text-ink font-display':'border-l border-rule hover:border-ink hover:bg-card-soft text-ink-soft'}" class="py-2 px-3 no-underline">账目对账<span class="text-ink-subtle text-[10px] ml-1">· 只读</span></a>
-      <a th:href="@{/admin/audit}" th:classappend="${active=='audit'?'border-l-2 border-brass bg-card-soft text-ink font-display':'border-l border-rule hover:border-ink hover:bg-card-soft text-ink-soft'}" class="py-2 px-3 no-underline">审计</a>
-      <a th:href="@{/admin/calc-tweaks}" th:classappend="${active=='tweaks'?'border-l-2 border-brass bg-card-soft text-ink font-display':'border-l border-rule hover:border-ink hover:bg-card-soft text-ink-soft'}" class="py-2 px-3 no-underline">数值阈值</a>
-      <!--/* v1.27 · 分析设置:分析范围 · 模板 · 不参与分析的资产 · 配置锚 · 分析偏好(PRD FR-890) */-->
-      <a th:href="@{/admin/analysis}" th:classappend="${active=='analysis'?'border-l-2 border-brass bg-card-soft text-ink font-display':'border-l border-rule hover:border-ink hover:bg-card-soft text-ink-soft'}" class="py-2 px-3 no-underline">分析设置</a>
-      <a th:href="@{/admin/metrics}" th:classappend="${active=='metrics'?'border-l-2 border-brass bg-card-soft text-ink font-display':'border-l border-rule hover:border-ink hover:bg-card-soft text-ink-soft'}" class="py-2 px-3 no-underline inline-flex items-center gap-2">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/>
-          <line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/>
-          <line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/>
-          <line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>
-        </svg>
-        <span>指标设置</span>
-      </a>
+<!--/*
+  管理侧栏 · v1.31 FR-1010 ~ 1012
+
+  条目与分组的**唯一出处**是下面这份 groups 清单,PC 侧栏和手机抽屉都从它渲染 ——
+  以前只有一份 PC 列表,手机上原样竖排成 19 行、占满第一屏(维护者 2026-10-10:「上面有一大屏幕 是目录??」)。
+  分组与顺序跟管理总览页(admin/index.html)的四组一致;总览里有的条目这里一个不能少
+  (守护 v131-ADMIN-NAV-COVERS-HUB)。
+
+  key = 各页传进来的 active;没有 key 的条目(账户 / 资产打标 / 账户组)是别的页面,不会在这里高亮。
+*/-->
+<aside th:fragment="sidebar(active)" class="col-span-12 md:col-span-3 adm-side"
+       th:with="groups=${ {
+         {title:'家 · 庭 · 基 · 础', items:{
+            {key:'family',             href:'/admin/family',               label:'家庭设置',   ro:false},
+            {key:'members',            href:'/admin/members',              label:'成员',       ro:false},
+            {key:'-accounts',          href:'/accounts',                   label:'账户',       ro:false},
+            {key:'templates',          href:'/admin/account-templates',    label:'账户模板',   ro:true} } },
+         {title:'口 · 径 · 与 · 标 · 签', items:{
+            {key:'metrics',            href:'/admin/metrics',              label:'指标设置',   ro:false},
+            {key:'-tags',              href:'/lens/tags',                  label:'资产打标',   ro:false},
+            {key:'account-groups',     href:'/accounts/groups',            label:'账户组',     ro:false},
+            {key:'product-categories', href:'/admin/product-categories',   label:'产品类目',   ro:true},
+            {key:'categories',         href:'/admin/cash-flow-categories', label:'现金流类别', ro:true},
+            {key:'analysis',           href:'/admin/analysis',             label:'分析设置',   ro:false},
+            {key:'tweaks',             href:'/admin/calc-tweaks',          label:'数值阈值',   ro:false},
+            {key:'appearance',         href:'/admin/appearance',           label:'显示与外观', ro:false} } },
+         {title:'日 · 常 · 运 · 营', items:{
+            {key:'periods',            href:'/admin/periods',              label:'周期',       ro:false},
+            {key:'reminders',          href:'/admin/reminders',            label:'提醒',       ro:false},
+            {key:'fx',                 href:'/admin/fx',                   label:'汇率',       ro:false},
+            {key:'integrations',       href:'/admin/integrations',         label:'数据源接入', ro:false},
+            {key:'broker',             href:'/admin/broker',               label:'券商同步',   ro:false},
+            {key:'ai-access',          href:'/admin/ai-access',            label:'AI 接入',    ro:false} } },
+         {title:'系 · 统', items:{
+            {key:'backup',             href:'/admin/backup',               label:'备份',       ro:false},
+            {key:'audit',              href:'/admin/audit',                label:'审计',       ro:false},
+            {key:'reconcile',          href:'/admin/reconcile',            label:'账目对账',   ro:true} } }
+       } }">
+  <th:block th:with="itemCount=${#lists.size(groups[0].items) + #lists.size(groups[1].items) + #lists.size(groups[2].items) + #lists.size(groups[3].items)}">
+
+  <!-- 手机:一行切换条(当前页名 + 切换),点开是底部抽屉 · ≥768 隐藏 -->
+  <button type="button" class="adm-bar md:hidden" data-adm-open aria-haspopup="dialog" aria-controls="adm-sheet">
+    <span class="adm-bar-path">管理 <span class="adm-bar-sep">›</span>
+      <b th:if="${active == 'hub'}">总览</b>
+      <th:block th:each="g : ${groups}"><th:block th:each="it : ${g.items}"><b th:if="${it.key == active}" th:text="${it.label}">周期</b></th:block></th:block>
+    </span>
+    <span class="adm-bar-sw">切换
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+    </span>
+  </button>
+
+  <!-- PC:常驻侧栏(分组)· <768 隐藏 -->
+  <div class="hidden md:block sticky top-24">
+    <div class="eyebrow mb-3" th:text="|/ADMIN · ${itemCount} 项|">/ADMIN · 21 项</div>
+    <nav class="adm-nav flex flex-col text-sm" aria-label="管理">
+      <a th:href="@{/admin}" class="adm-link" th:classappend="${active=='hub'} ? ' on'" th:attr="aria-current=${active=='hub'} ? 'page'">总览</a>
+      <th:block th:each="g : ${groups}">
+        <div class="adm-group" th:text="${g.title}">家 · 庭 · 基 · 础</div>
+        <th:block th:each="it : ${g.items}">
+          <a th:href="@{${it.href}}" class="adm-link" th:classappend="${it.key == active} ? ' on'"
+             th:attr="aria-current=${it.key == active} ? 'page'"><span th:text="${it.label}">周期</span><span th:if="${it.ro}" class="adm-ro">只读</span></a>
+          <!-- v1.31 FR-1002 · PC 上本页目录挂在当前项下面(toc.js 自动填,页面没目录就一直空着、不占位) -->
+          <nav th:if="${it.key == active}" class="adm-toc" data-toc-host aria-label="本页目录"></nav>
+        </th:block>
+      </th:block>
     </nav>
   </div>
+
+  <!-- 手机抽屉(打开时由下面的脚本挪到 body 下 —— main 是 z-10 的层叠上下文,留在里面盖不住右下浮钮) -->
+  <div class="toc-sheet-mask adm-mask" id="adm-mask"></div>
+  <div class="toc-sheet adm-sheet" id="adm-sheet" role="dialog" aria-modal="true" aria-label="管理 · 全部设置">
+    <div class="toc-sheet-handle"></div>
+    <div class="toc-sheet-row"><span class="toc-head" th:text="|管 理 · ${itemCount} 项|">管 理 · 21 项</span>
+      <button class="toc-sheet-x" type="button" data-adm-close aria-label="关闭">×</button></div>
+    <a th:href="@{/admin}" class="adm-sheet-link" th:classappend="${active=='hub'} ? ' on'">总览</a>
+    <th:block th:each="g : ${groups}">
+      <div class="adm-group" th:text="${g.title}">家 · 庭 · 基 · 础</div>
+      <div class="adm-sheet-grid">
+        <a th:each="it : ${g.items}" th:href="@{${it.href}}" class="adm-sheet-link"
+           th:classappend="${it.key == active} ? ' on'"><span th:text="${it.label}">周期</span><span th:if="${it.ro}" class="adm-ro">只读</span></a>
+      </div>
+    </th:block>
+  </div>
+  <script>
+    (function () {
+      var sheet = document.getElementById('adm-sheet'), mask = document.getElementById('adm-mask');
+      if (!sheet || !mask) return;
+      document.body.appendChild(mask); document.body.appendChild(sheet);
+      function close() { sheet.classList.remove('open'); mask.classList.remove('open'); document.body.classList.remove('adm-open'); }
+      function open() { sheet.classList.add('open'); mask.classList.add('open'); document.body.classList.add('adm-open'); }
+      document.querySelectorAll('[data-adm-open]').forEach(function (b) { b.addEventListener('click', open); });
+      sheet.querySelectorAll('[data-adm-close]').forEach(function (b) { b.addEventListener('click', close); });
+      mask.addEventListener('click', close);
+      document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
+    })();
+  </script>
+  </th:block>
 </aside>
 </body>
 </html>

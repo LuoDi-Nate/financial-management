@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>v1.31 Preview · 手机上的设置页能用了</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..700&family=JetBrains+Mono:wght@300;400;500&family=Noto+Serif+SC:wght@300;400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/style.css">
+<style>
+  body{background:var(--paper-deep);margin:0}
+  .wrap{max-width:1340px;margin:0 auto;padding:28px 20px 80px;position:relative;z-index:2}
+  .mono{font-family:'JetBrains Mono',monospace;font-feature-settings:"tnum" 1}
+  .serif{font-family:'Fraunces','Noto Serif SC',serif}
+  h1,h2,h3{font-family:'Fraunces','Noto Serif SC',serif;font-weight:500;margin:0}
+  .note{font-size:12.5px;color:var(--ink-soft);line-height:1.8}
+  .zone{margin-top:46px}
+  .zone-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+  .zone-no{font-family:'JetBrains Mono',monospace;font-size:18px;color:var(--paper);background:var(--brass-deep);line-height:1;padding:5px 10px}
+  .zone-t{font-family:'Fraunces','Noto Serif SC',serif;font-size:21px}
+  .zone-fr{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink-subtle);letter-spacing:.06em}
+  .zone-line{height:2px;background:var(--brass-deep);opacity:.35;margin:10px 0 16px}
+  .row{display:flex;gap:26px;flex-wrap:wrap;align-items:flex-start}
+  .col{display:flex;flex-direction:column;gap:8px;align-items:center}
+  .cap{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.12em;color:var(--ink-soft)}
+  .cap.bad{color:var(--rust)} .cap.good{color:var(--forest)}
+  .side-note{max-width:330px;font-size:12.5px;line-height:1.85;color:var(--ink-soft)}
+  .side-note b{color:var(--ink)}
+  .side-note li{margin-bottom:6px}
+
+  /* —— 手机外框(iPhone 黑框)—— */
+  .phone{width:390px;height:844px;border:12px solid #111;border-radius:46px;background:var(--paper);position:relative;overflow:hidden;box-shadow:0 18px 40px -18px rgba(0,0,0,.45)}
+  .phone::before{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:120px;height:26px;background:#111;border-radius:0 0 16px 16px;z-index:50}
+  .phone.short{height:auto;min-height:500px}
+  .phone img{display:block;width:100%}
+  .screen{position:absolute;inset:0;overflow:hidden}
+  /* 顶栏(与线上一致的简化版)*/
+  .tb{height:61px;border-top:4px solid var(--ink);border-bottom:1px solid var(--rule);display:flex;align-items:center;justify-content:space-between;padding:12px 20px 0 22px;background:var(--paper)}
+  .tb .brand{display:flex;align-items:center;gap:8px}
+  .tb .logo{width:26px;height:26px;background:var(--ink);border:2px solid var(--brass)}
+  .tb .bn{font-family:'Fraunces','Noto Serif SC',serif;font-size:18px}
+  .tb .ver{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--brass-deep);letter-spacing:.1em}
+  .tb .r{display:flex;gap:12px;align-items:center}
+  .tb .hb{width:32px;height:32px;border:1px solid var(--rule);display:flex;align-items:center;justify-content:center}
+  .tb .av{width:30px;height:30px;border-radius:50%;background:var(--ink);color:var(--paper);display:flex;align-items:center;justify-content:center;font-size:13px}
+  .pg{padding:14px 16px 0}
+
+  /* —— 管理切换条(FR-1010)—— */
+  .adm-bar{display:flex;align-items:center;justify-content:space-between;border:1px solid var(--rule);background:var(--card);padding:0 12px;height:44px;margin:0 0 16px}
+  .adm-bar .path{font-size:13.5px;color:var(--ink-soft)}
+  .adm-bar .path b{color:var(--ink);font-family:'Fraunces','Noto Serif SC',serif;font-weight:500;font-size:15px}
+  .adm-bar .sw{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.1em;color:var(--brass-deep);display:flex;align-items:center;gap:4px}
+  .eyebrow2{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.3em;color:var(--brass-deep);margin-bottom:6px}
+  .h1m{font-family:'Fraunces','Noto Serif SC',serif;font-size:30px;line-height:1.15}
+  .lead{font-size:13px;color:var(--ink-soft);line-height:1.7;margin-top:6px}
+  .pcard{border:1px solid var(--rule);background:var(--card);padding:14px 14px;margin-top:14px}
+  .opt4{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+  .opt4 div{border:1px solid var(--rule);background:var(--paper);padding:8px 9px;font-size:12px;line-height:1.5}
+  .opt4 div b{display:block;font-family:'Fraunces','Noto Serif SC',serif;font-weight:500;font-size:14px}
+  .opt4 div.on{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+  .k{font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.14em;color:var(--ink-subtle)}
+
+  /* —— 底部抽屉(与线上 .toc-sheet 同款)—— */
+  .mask{position:absolute;inset:0;background:rgba(26,23,20,.4);z-index:30}
+  .sheet{position:absolute;left:0;right:0;bottom:0;z-index:40;background:var(--card);border-radius:16px 16px 0 0;box-shadow:0 -8px 32px rgba(0,0,0,.22);padding:8px 6px 18px;max-height:72%;overflow:hidden}
+  .sheet .hd{width:40px;height:4px;border-radius:2px;background:var(--rule);margin:6px auto 6px}
+  .sheet .rw{display:flex;justify-content:space-between;align-items:center;padding:2px 12px 6px}
+  .sheet .rw .t{font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.2em;color:var(--ink-subtle)}
+  .sheet .rw .x{font-size:20px;color:var(--ink-soft)}
+  .grp{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.24em;color:var(--brass-deep);padding:10px 14px 4px}
+  .it{display:flex;align-items:center;justify-content:space-between;min-height:42px;padding:0 14px;font-size:14.5px;border-left:2px solid transparent}
+  .it.on{border-left-color:var(--brass-deep);background:var(--card-soft);font-family:'Fraunces','Noto Serif SC',serif;font-weight:600;color:var(--brass-deep)}
+  .it small{font-size:10px;color:var(--rust)}
+  .it.sub{padding-left:30px;font-size:13.5px;color:var(--ink-soft);min-height:38px}
+  .cols2{display:grid;grid-template-columns:1fr 1fr}
+  .cols2 .it{min-height:38px}
+
+  /* —— 浮钮栈(与线上 #float-dock 同款)—— */
+  .dock{position:absolute;right:14px;bottom:18px;display:flex;flex-direction:column;gap:10px;z-index:45}
+  .fab{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 12px rgba(0,0,0,.22)}
+  .fab.ink{background:var(--ink);color:var(--paper)}
+  .fab.paper{background:var(--card);color:var(--ink-soft);border:1px solid var(--rule)}
+  .fab.hl{outline:3px solid var(--brass);outline-offset:3px}
+
+  /* —— 表格行 → 小卡(FR-1020/1021)—— */
+  .mcard{border:1px solid var(--rule);background:var(--card);padding:12px 14px;margin-bottom:8px}
+  .mcard .h{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+  .mcard .h .who{font-family:'Fraunces','Noto Serif SC',serif;font-size:18px;white-space:nowrap}
+  .mcard .kv{display:grid;grid-template-columns:auto 1fr auto 1fr;column-gap:10px;row-gap:4px;margin-top:8px;font-size:13px;align-items:baseline}
+  .mcard .kv .k{white-space:nowrap}
+  .mcard .kv .v{font-family:'JetBrains Mono',monospace;font-size:12.5px;white-space:nowrap}
+  .mcard .act{display:flex;gap:8px;margin-top:10px}
+  .mcard .act input{flex:1;min-width:0;border:1px solid var(--rule);background:var(--paper);height:36px;padding:0 10px;font-size:13px;font-family:inherit}
+  .mcard .act .btn{height:36px;padding:0 12px;border:1px solid var(--rust);color:var(--rust);font-size:12.5px;display:flex;align-items:center;white-space:nowrap}
+  .tag{display:inline-block;white-space:nowrap;font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.06em;padding:2px 7px;border:1px solid var(--rule);color:var(--ink-soft);background:var(--paper-soft)}
+  .tag.rust{background:rgba(159,74,58,.12);color:var(--rust);border-color:var(--rust)}
+  .tag.green{background:var(--forest-soft);color:var(--forest);border-color:var(--forest)}
+  .tcard{display:grid;grid-template-columns:1fr auto;gap:2px 10px;border-bottom:1px solid var(--rule-soft);padding:10px 2px}
+  .tcard .tag{align-self:start;justify-self:end}
+  .tcard .n{font-family:'Fraunces','Noto Serif SC',serif;font-size:15.5px}
+  .tcard .c{font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--ink-soft)}
+  .tcard .o{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--ink-subtle)}
+  .day{display:flex;align-items:baseline;gap:8px;margin:14px 2px 6px}
+  .day b{font-family:'Fraunces','Noto Serif SC',serif;font-weight:500;font-size:16px}
+  .day span{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--ink-subtle)}
+  .acard{border:1px solid var(--rule);background:var(--card);padding:10px 12px;margin-bottom:6px}
+  .acard .h{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .acard .tm{font-family:'JetBrains Mono',monospace;font-size:12px;white-space:nowrap}
+  .acard .by{font-size:12px;color:var(--ink-soft);margin-left:auto;white-space:nowrap}
+  .acard .d{font-size:13px;line-height:1.6;margin-top:5px;word-break:break-word}
+
+  /* —— 账户详情 —— */
+  .btn2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+  .btn2 div{height:42px;border:1px solid var(--ink);display:flex;align-items:center;justify-content:center;font-size:13px;white-space:nowrap;gap:6px}
+  .btn2 div.dark{background:var(--ink);color:var(--paper)}
+  .tl{border:1px solid var(--rule);background:var(--card);height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 14px;margin-bottom:6px}
+  .tl b{font-family:'Fraunces','Noto Serif SC',serif;font-weight:500;font-size:16px}
+  .tl .r{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink-soft)}
+  .more{border:1px dashed var(--brass-deep);color:var(--brass-deep);height:44px;display:flex;align-items:center;justify-content:center;font-size:13px;margin-top:4px}
+
+  /* —— PC 侧栏(FR-1002/1011)—— */
+  .pc{width:760px;border:1px solid #bbb;background:var(--paper);box-shadow:0 18px 40px -18px rgba(0,0,0,.35)}
+  .pc .chrome{height:30px;background:#e8e3d8;border-bottom:1px solid #cfc6b4;display:flex;align-items:center;gap:6px;padding:0 10px}
+  .pc .chrome i{width:10px;height:10px;border-radius:50%;display:inline-block}
+  .pc .chrome .url{margin-left:14px;background:#fff;border:1px solid #d5ccba;border-radius:4px;height:18px;flex:1;font-family:'JetBrains Mono',monospace;font-size:10px;color:#777;display:flex;align-items:center;padding:0 8px}
+  .pc .body{display:grid;grid-template-columns:200px 1fr;gap:26px;padding:22px 24px}
+  .snav .g{font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.24em;color:var(--brass-deep);margin:14px 0 4px}
+  .snav a{display:block;padding:5px 10px;font-size:13px;color:var(--ink-soft);border-left:1px solid var(--rule);text-decoration:none}
+  .snav a.on{border-left:2px solid var(--brass);background:var(--card-soft);color:var(--ink);font-family:'Fraunces','Noto Serif SC',serif}
+  .snav a.toc{padding:3px 10px 3px 24px;font-size:11.5px;color:var(--ink-subtle);border-left:2px solid var(--brass)}
+  .snav a.toc.cur{color:var(--brass-deep);font-weight:600}
+  .snav a.new{position:relative}
+  .snav a.new::after{content:'补';font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--forest);border:1px solid var(--forest);padding:0 3px;margin-left:6px}
+  .pctable{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:10px}
+  .pctable th{font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.14em;color:var(--ink-subtle);text-align:left;padding:6px 8px;border-bottom:1px solid var(--ink)}
+  .pctable td{padding:8px;border-bottom:1px solid var(--rule-soft);white-space:nowrap}
+  .pcfab{position:absolute;right:16px;bottom:16px;border:1px solid var(--rule);background:var(--card);padding:6px 12px;font-size:12px;display:flex;align-items:center;gap:6px;box-shadow:0 3px 12px rgba(0,0,0,.12)}
+
+  .legend{display:flex;gap:18px;flex-wrap:wrap;font-size:12px;color:var(--ink-soft);margin-top:8px}
+  .legend span::before{content:'';display:inline-block;width:10px;height:10px;margin-right:6px;vertical-align:-1px}
+  .legend .b::before{background:var(--rust)} .legend .g::before{background:var(--forest)}
+  .hlbox{outline:2px dashed var(--brass-deep);outline-offset:3px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="eyebrow">v1.31 · preview · 手机 390 宽 · 改前(beta 实拍)/ 改后(样稿)</div>
+  <h1 style="font-size:34px;margin-top:6px">手机上的设置页能用了</h1>
+  <p class="note" style="max-width:860px;margin-top:8px">
+    只改排法、不改任何数字和功能。左边「改前」是 2026-10-10 在 beta 上用手机视口实拍的截图;右边「改后」是样稿,
+    字体、配色、纸张风格都沿用线上,只动布局。对应 FR 写在每一节标题右边,完整清单见 <span class="mono">prd/v1.31.md</span>。
+  </p>
+  <div class="legend"><span class="b">改前的问题</span><span class="g">改后</span></div>
+
+  <!-- ① 管理子页首屏 -->
+  <section class="zone">
+    <div class="zone-head"><span class="zone-no">1</span><span class="zone-t">打开任何设置页,第一眼就是这页的内容</span><span class="zone-fr">FR-1010 · 1011</span></div>
+    <div class="zone-line"></div>
+    <div class="row">
+      <div class="col">
+        <div class="phone"><img src="shots/before-periods-top.jpg" alt="改前:周期管理首屏"></div>
+        <div class="cap bad">改前 · 周期管理首屏全是菜单,标题在第 843px</div>
+      </div>
+      <div class="col">
+        <div class="phone"><div class="screen">
+          <div class="tb"><div class="brand"><div class="logo"></div><div><div class="bn">账房</div><div class="ver">◇ v1.31.0</div></div></div><div class="r"><div class="hb">≡</div><div class="av">迪</div></div></div>
+          <div class="pg">
+            <div class="adm-bar"><span class="path">管理 › <b>周期</b></span><span class="sw">切换 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span></div>
+            <div class="eyebrow2">周 · 期 · 管 · 理</div>
+            <div class="h1m">所有周期 · 24 期</div>
+            <div class="lead">关闭周期会自动触发指标重算。已关闭周期可「重新打开」,必须填写理由,且会写入审计日志。</div>
+            <div class="pcard">
+              <div class="k">账 · 期 · 节 · 奏</div>
+              <div class="serif" style="font-size:19px;margin-top:2px">账期什么时候关</div>
+              <div class="opt4">
+                <div class="on"><span class="k">默认</span><b>立即关账</b>新月份一开始,上月立刻锁上。</div>
+                <div><span class="k">推荐</span><b>月底过完再给 2 天</b>完整上月账单要等月底过完才出。</div>
+                <div><span class="k">宽松</span><b>月底过完再给 5 天</b>信用卡账单日晚于月末的家庭适用。</div>
+                <div><span class="k">自己掌握</span><b>我自己关</b>你决定什么时候关。</div>
+              </div>
+            </div>
+          </div>
+          <div class="dock"><div class="fab paper"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="7" y="2" width="10" height="20" rx="2"/></svg></div><div class="fab ink hl"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="8" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="20" y2="12"/><line x1="8" y1="18" x2="20" y2="18"/><line x1="3.5" y1="6" x2="3.51" y2="6"/><line x1="3.5" y1="12" x2="3.51" y2="12"/><line x1="3.5" y1="18" x2="3.51" y2="18"/></svg></div><div class="fab paper"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></div></div>
+        </div></div>
+        <div class="cap good">改后 · 菜单收成一行「管理 › 周期 ▾」</div>
+      </div>
+      <div class="col">
+        <div class="phone"><div class="screen">
+          <div class="tb"><div class="brand"><div class="logo"></div><div><div class="bn">账房</div><div class="ver">◇ v1.31.0</div></div></div><div class="r"><div class="hb">≡</div><div class="av">迪</div></div></div>
+          <div class="pg"><div class="adm-bar"><span class="path">管理 › <b>周期</b></span><span class="sw">切换</span></div><div class="h1m">所有周期 · 24 期</div></div>
+          <div class="mask"></div>
+          <div class="sheet" style="max-height:86%">
+            <div class="hd"></div>
+            <div class="rw"><span class="t">管 理 · 21 项</span><span class="x">×</span></div>
+            <div class="it" style="min-height:36px">总览</div>
+            <div class="grp">家 · 庭 · 基 · 础</div>
+            <div class="cols2"><div class="it">家庭设置</div><div class="it">成员</div><div class="it">账户</div><div class="it">账户模板 <small>只读</small></div></div>
+            <div class="grp">口 · 径 · 与 · 标 · 签</div>
+            <div class="cols2"><div class="it">指标设置</div><div class="it">资产打标</div><div class="it">账户组</div><div class="it">产品类目 <small>只读</small></div><div class="it">现金流类别 <small>只读</small></div><div class="it">分析设置</div><div class="it">数值阈值</div><div class="it">显示与外观</div></div>
+            <div class="grp">日 · 常 · 运 · 营</div>
+            <div class="cols2"><div class="it on">周期</div><div class="it">提醒</div><div class="it">汇率</div><div class="it">数据源接入</div><div class="it">券商同步</div><div class="it">AI 接入</div></div>
+            <div class="grp">系 · 统</div>
+            <div class="cols2"><div class="it">备份</div><div class="it">审计</div><div class="it">账目对账 <small>只读</small></div></div>
+          </div>
+        </div></div>
+        <div class="cap good">改后 · 点「切换」:按总览页的 4 组列出 21 项</div>
+      </div>
+      <div class="side-note">
+        <ul>
+          <li><b>切换条只占一行</b>(44px),标题和第一块内容回到首屏。</li>
+          <li>抽屉按<b>管理总览页现有的 4 组</b>排,两列放下 21 项,一屏看全,不用再划。</li>
+          <li>侧栏补上总览里有、侧栏一直缺的<b>资产打标</b>、<b>显示与外观</b>(FR-1012)。</li>
+          <li>右下角那一列浮钮里多了<b>目录钮</b>(高亮的那个),和仪表盘现在的一样。</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ② 周期表 → 卡片 -->
+  <section class="zone">
+    <div class="zone-head"><span class="zone-no">2</span><span class="zone-t">表格在手机上「一行一张小卡」</span><span class="zone-fr">FR-1020 · 1021 · 1022 · 1030 · 1031</span></div>
+    <div class="zone-line"></div>
+    <div class="row">
+      <div class="col">
+        <div class="phone"><img src="shots/before-periods-table.jpg" alt="改前:周期表"></div>
+        <div class="cap bad">改前 · 区间折 4 行、标签折 3 行、「重新打开」在框外</div>
+      </div>
+      <div class="col">
+        <div class="phone"><div class="screen" style="padding:40px 16px 0;background:var(--paper)">
+          <div class="k" style="margin-bottom:8px">所 有 周 期 · 第 1 / 2 页</div>
+          <div class="mcard">
+            <div class="h"><span class="who">2041 · 02</span><span class="tag rust">CLOSED · 已结束</span></div>
+            <div class="kv"><span class="k">区间</span><span class="v">02-01 → 02-28</span><span class="k">关闭</span><span class="v">2026-09-18 17:02</span></div>
+            <div class="act"><input placeholder="必填理由"><span class="btn">重新打开</span></div>
+          </div>
+          <div class="mcard">
+            <div class="h"><span class="who">2041 · 01</span><span class="tag rust">CLOSED · 已结束</span></div>
+            <div class="kv"><span class="k">区间</span><span class="v">01-01 → 01-31</span><span class="k">关闭</span><span class="v">2026-08-13 22:59</span></div>
+            <div class="act"><input placeholder="必填理由"><span class="btn">重新打开</span></div>
+          </div>
+          <div class="mcard">
+            <div class="h"><span class="who">2040 · 12</span><span class="tag rust">CLOSED · 已结束</span></div>
+            <div class="kv"><span class="k">区间</span><span class="v">12-01 → 12-31</span><span class="k">关闭</span><span class="v">2026-08-13 20:10</span></div>
+            <div class="act"><input placeholder="必填理由"><span class="btn">重新打开</span></div>
+          </div>
+          <div class="mcard">
+            <div class="h"><span class="who">2026 · 10</span><span class="tag green">OPEN · 填报中</span></div>
+            <div class="kv"><span class="k">区间</span><span class="v">10-01 → 10-31</span><span class="k">关闭</span><span class="v">—</span></div>
+          </div>
+          <div class="mcard">
+            <div class="h"><span class="who">2040 · 11</span><span class="tag rust">CLOSED · 已结束</span></div>
+            <div class="kv"><span class="k">区间</span><span class="v">11-01 → 11-30</span><span class="k">关闭</span><span class="v">2026-08-13 20:02</span></div>
+            <div class="act"><input placeholder="必填理由"><span class="btn">重新打开</span></div>
+          </div>
+        </div></div>
+        <div class="cap good">改后 · 一屏 5 期,理由框 + 按钮占满整行</div>
+      </div>
+      <div class="side-note">
+        <p><b>每张小卡同一个排法</b>(所有卡片化的表都一样):</p>
+        <ul>
+          <li>第一行 = <b>这一行是谁</b>(期号)+ 状态标签靠右;</li>
+          <li>中间 = 其余字段,「字段名 值」两列;</li>
+          <li>最下 = 操作,输入框和按钮<b>占满整行</b>。</li>
+        </ul>
+        <p>标签永远一行;日期、区间、时间不在中间断开。PC 上照旧是表格。</p>
+        <p>同一套排法用在:汇率历史、备份记录、账户模板、产品类目、现金流类别、提醒日志、AI 接入两张表、审计、使用手册与券商向导的对照表、一次性支出表。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ③ 账户模板 / 产品类目 -->
+  <section class="zone">
+    <div class="zone-head"><span class="zone-no">3</span><span class="zone-t">名称不再一字一行竖着排</span><span class="zone-fr">FR-1020 · 1030</span></div>
+    <div class="zone-line"></div>
+    <div class="row">
+      <div class="col">
+        <div class="phone"><img src="shots/before-templates.jpg" alt="改前:账户模板表"></div>
+        <div class="cap bad">改前 · 名称列只剩约 20px</div>
+      </div>
+      <div class="col">
+        <div class="phone"><div class="screen" style="padding:40px 16px 0;background:var(--paper)">
+          <div class="eyebrow2">账 · 户 · 模 · 板</div>
+          <div class="h1m" style="font-size:26px">17 个内置模板</div>
+          <div class="pcard" style="padding:4px 12px">
+            <div class="tcard"><span class="n">招商银行</span><span class="tag">CASH</span><span class="c">cmb_savings</span><span class="o">顺序 1</span></div>
+            <div class="tcard"><span class="n">工商银行</span><span class="tag">CASH</span><span class="c">icbc_savings</span><span class="o">顺序 2</span></div>
+            <div class="tcard"><span class="n">信用卡(通用)</span><span class="tag">LOAN</span><span class="c">credit_card</span><span class="o">顺序 5</span></div>
+            <div class="tcard"><span class="n">支付宝(余额 + 余额宝)</span><span class="tag">CASH</span><span class="c">alipay</span><span class="o">顺序 6</span></div>
+            <div class="tcard"><span class="n">基金账户(蚂蚁财富 / 天天基金 / 京东金融)</span><span class="tag">FUND</span><span class="c">ant_fortune</span><span class="o">顺序 9</span></div>
+            <div class="tcard"><span class="n">银行理财(R3 以下产品)</span><span class="tag">WEALTH</span><span class="c">bank_wealth</span><span class="o">顺序 10</span></div>
+            <div class="tcard"><span class="n">年金险账户</span><span class="tag">INSURANCE</span><span class="c">annuity_insurance</span><span class="o">顺序 15</span></div>
+            <div class="tcard"><span class="n">增额终身寿账户</span><span class="tag">INSURANCE</span><span class="c">whole_life_insurance</span><span class="o">顺序 16</span></div>
+          </div>
+        </div></div>
+        <div class="cap good">改后 · 名称一行、类型标签完整</div>
+      </div>
+      <div class="side-note">
+        <ul>
+          <li>名称占满一整行,代码、顺序放第二行小字。</li>
+          <li><b>INSURANCE / PROPERTY</b> 这类长标签不再被截。</li>
+          <li>产品类目同理:名称一行,风险星级「★★★ (3)」不拆开。</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ④ 目录:审计按天 + AI 接入两级 -->
+  <section class="zone">
+    <div class="zone-head"><span class="zone-no">4</span><span class="zone-t">长页都有「本页目录」</span><span class="zone-fr">FR-1000 ~ 1006</span></div>
+    <div class="zone-line"></div>
+    <div class="row">
+      <div class="col">
+        <div class="phone"><div class="screen" style="padding:40px 14px 0;background:var(--paper)">
+          <div class="adm-bar"><span class="path">管理 › <b>审计</b></span><span class="sw">切换</span></div>
+          <div class="day"><b>10 月 9 日</b><span>23 条</span></div>
+          <div class="acard"><div class="h"><span class="tm">22:16</span><span class="tag">FAMILY_UPDATE</span><span class="by">王二狗</span></div><div class="d">LLM 测试连接 · deepseek/deepseek-chat · 成功</div></div>
+          <div class="acard"><div class="h"><span class="tm">20:50</span><span class="tag">ACCOUNT_CREATE</span><span class="by">迪娃</span></div><div class="d">创建账户 e2e · 基金账户</div></div>
+          <div class="acard"><div class="h"><span class="tm">20:49</span><span class="tag">FAMILY_UPDATE</span><span class="by">迪娃</span></div><div class="d">券商同步配置 · tigerId=空 · tigerKey=未配 · futuOpenD=已填 · ibkrToken=已配 · cron=0 45 16 * * MON-FRI</div></div>
+          <div class="acard"><div class="h"><span class="tm">20:49</span><span class="tag">BROKER_LINK</span><span class="by">迪娃</span></div><div class="d">关联 盈透 前快照 · 0 笔持仓</div></div>
+          <div class="acard"><div class="h"><span class="tm">20:47</span><span class="tag">LOGO_UPLOAD</span><span class="by">迪娃</span></div><div class="d">Logo 上传 · webp · 4422 bytes</div></div>
+          <div class="mask"></div>
+          <div class="sheet">
+            <div class="hd"></div>
+            <div class="rw"><span class="t">目 录 · 本 页</span><span class="x">×</span></div>
+            <div class="it on">10 月 9 日 · 23 条</div>
+            <div class="it">10 月 8 日 · 31 条</div>
+            <div class="it">10 月 6 日 · 12 条</div>
+            <div class="it">10 月 4 日 · 9 条</div>
+            <div class="it">9 月 30 日 · 25 条</div>
+          </div>
+        </div></div>
+        <div class="cap good">审计 · 按天分组,目录 = 日期</div>
+      </div>
+      <div class="col">
+        <div class="phone"><div class="screen" style="padding:40px 14px 0;background:var(--paper)">
+          <div class="adm-bar"><span class="path">管理 › <b>AI 接入</b></span><span class="sw">切换</span></div>
+          <div class="eyebrow2">A I · 接 · 入</div>
+          <div class="h1m">AI 接入</div>
+          <div class="lead">AI 相关的设置都在这一页,从上往下依次是:大模型 · 超级 Agent · 让 AI 读你的账本 · AI 收到了什么。</div>
+          <div class="mask"></div>
+          <div class="sheet" style="max-height:66%">
+            <div class="hd"></div>
+            <div class="rw"><span class="t">目 录 · 本 页</span><span class="x">×</span></div>
+            <div class="it">看 AI 收到了什么</div>
+            <div class="it">AI 健康</div>
+            <div class="it on">大模型</div>
+            <div class="it">超级 Agent</div>
+            <div class="it">让 AI 读你的账本</div>
+            <div class="it sub">接入点</div>
+            <div class="it sub">AI 能调什么</div>
+            <div class="it sub">最近调用</div>
+          </div>
+        </div></div>
+        <div class="cap good">AI 接入(13 屏)· 两级目录</div>
+      </div>
+      <div class="side-note">
+        <ul>
+          <li><b>手机</b>:和仪表盘现在的目录一模一样 —— 右下目录钮 → 底部抽屉 → 点哪跳哪,滚动时高亮当前一节。</li>
+          <li><b>不够长的页面不出目录钮</b>(约 2 屏以内,或不到 3 个小节)。</li>
+          <li>条目名就是页面上已有的小节标题,不新造词。</li>
+          <li>审计是一张长单,没有小节可跳,所以<b>按天分组</b>,目录就是日期。</li>
+          <li>加目录的全部页面与条目:PRD 附录 B(使用手册、账户详情、打标、填报、待办、账户簿、券商向导、提醒、周期、持仓管理、管理总览、数据源、分析设置、数值阈值、券商同步、成员、支出类目、资产透视……)。</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ⑤ 账户详情 -->
+  <section class="zone">
+    <div class="zone-head"><span class="zone-no">5</span><span class="zone-t">账户详情:时间线先收起、按钮 2 × 2、图表标签不再叠成黑条</span><span class="zone-fr">FR-1042 · 1050 · 1060</span></div>
+    <div class="zone-line"></div>
+    <div class="row">
+      <div class="col">
+        <div class="phone"><div class="screen" style="padding:40px 14px 0;background:var(--paper)">
+          <div class="pcard" style="margin-top:0">
+            <div class="serif" style="font-size:17px">余额时序</div>
+            <svg viewBox="0 0 330 150" width="100%" height="150" style="margin-top:6px">
+              <g stroke="#DBD0BC" stroke-width="1"><line x1="34" y1="20" x2="325" y2="20"/><line x1="34" y1="60" x2="325" y2="60"/><line x1="34" y1="100" x2="325" y2="100"/><line x1="34" y1="130" x2="325" y2="130"/></g>
+              <g font-family="JetBrains Mono" font-size="8" fill="#A09486"><text x="0" y="23">20万</text><text x="0" y="63">15万</text><text x="0" y="103">10万</text><text x="6" y="133">0</text></g>
+              <polyline fill="none" stroke="#6B5139" stroke-width="2.4" points="38,118 60,116 82,112 104,104 126,96 148,92 170,84 192,80 214,62 236,58 258,50 280,46 302,40 322,36"/>
+              <g fill="#6B5139"><circle cx="38" cy="118" r="3"/><circle cx="104" cy="104" r="2"/><circle cx="170" cy="84" r="2"/><circle cx="236" cy="58" r="2"/><circle cx="322" cy="36" r="3.4"/></g>
+              <g font-family="JetBrains Mono" font-size="9" fill="#1A1714"><text x="30" y="110">¥2.1万</text><text x="160" y="76">¥9.8万</text><text x="282" y="28">¥16.4万</text></g>
+            </svg>
+            <div class="k" style="margin-top:2px">示意数据 · 点多时只标放得下的:首 · 末 · 最高 · 最低优先</div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin:16px 2px 8px"><span class="serif" style="font-size:20px">流水时间线</span><span class="k">185 个月 · 190 笔</span></div>
+          <div class="tl"><b>2026 · 10</b><span class="tag green">OPEN</span><span class="r">2 笔 · 净 +¥3,200</span></div>
+          <div class="tl"><b>2026 · 09</b><span class="tag">CLOSED</span><span class="r">1 笔 · 净 +¥0</span></div>
+          <div class="tl"><b>2026 · 08</b><span class="tag">CLOSED</span><span class="r">1 笔 · 净 +¥0</span></div>
+          <div class="tl" style="opacity:.6"><b>…</b><span class="r">共 12 个月</span></div>
+          <div class="more">展开更早的 173 个月</div>
+          <div class="btn2"><div>持仓管理</div><div>看资产体检</div><div>编辑</div><div class="dark">导出本账户 CSV</div></div>
+        </div></div>
+        <div class="cap good">改后 · 示意(金额为样例)</div>
+      </div>
+      <div class="side-note">
+        <p><b>改前</b>:这页 15.7 屏,其中 10 屏是 185 个月全展开的时间线;余额时序 185 个点每点一个标签,手机和 PC 上都叠成一条黑带;底部四个按钮挤一行,「持仓管理」一字一行。</p>
+        <ul>
+          <li>时间线默认<b>最近 12 个月</b>,「展开更早的 N 个月」;筛选后显示全部结果;标题旁总数照旧。</li>
+          <li>图表<b>金额仍然直接标在点上</b>,只是放不下的就不标(首末、最高最低优先)—— 不退回成只能悬停看数。</li>
+          <li>底部按钮手机上 2 × 2,文字一行。</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ⑥ PC 管理侧栏 -->
+  <section class="zone">
+    <div class="zone-head"><span class="zone-no">6</span><span class="zone-t">PC:侧栏分组 + 本页目录挂在当前项下面</span><span class="zone-fr">FR-1002 · 1003 · 1011 · 1012</span></div>
+    <div class="zone-line"></div>
+    <div class="row">
+      <div class="col">
+        <div class="pc" style="position:relative">
+          <div class="chrome"><i style="background:#e0675b"></i><i style="background:#e5b94c"></i><i style="background:#69b35c"></i><span class="url">/admin/ai-access</span></div>
+          <div class="body">
+            <nav class="snav">
+              <a>总览</a>
+              <div class="g">家 · 庭 · 基 · 础</div>
+              <a>家庭设置</a><a>成员</a><a>账户</a><a>账户模板</a>
+              <div class="g">口 · 径 · 与 · 标 · 签</div>
+              <a>指标设置</a><a class="new">资产打标</a><a>账户组</a><a>产品类目</a><a>现金流类别</a><a>分析设置</a><a>数值阈值</a><a class="new">显示与外观</a>
+              <div class="g">日 · 常 · 运 · 营</div>
+              <a>周期</a><a>提醒</a><a>汇率</a><a>数据源接入</a><a>券商同步</a>
+              <a class="on">AI 接入</a>
+              <a class="toc">看 AI 收到了什么</a><a class="toc">AI 健康</a><a class="toc cur">大模型</a><a class="toc">超级 Agent</a><a class="toc">让 AI 读你的账本</a>
+              <div class="g">系 · 统</div>
+              <a>备份</a><a>审计</a><a>账目对账</a>
+            </nav>
+            <div>
+              <div class="eyebrow2">A I · 接 · 入</div>
+              <div class="h1m" style="font-size:28px">AI 接入</div>
+              <div class="lead">AI 相关的设置都在这一页。</div>
+              <div class="pcard" style="height:150px"><div class="k">A I 大 模 型 · 资 产 体 检 / 月 报 / 调 仓 建 议 / 截 图 识 别 / 超 级 A G E N T</div><div class="note" style="margin-top:10px">(内容区不变)</div></div>
+              <div class="pcard" style="height:120px"><div class="k">用 · 哪 · 个 · 模 · 型</div></div>
+              <table class="pctable"><tr><th>期号</th><th>区间</th><th>状态</th><th>关闭时间</th><th></th></tr>
+                <tr><td>2041-02</td><td class="mono">02-01 → 02-28</td><td><span class="tag rust">CLOSED · 已结束</span></td><td class="mono">2026-09-18 17:02</td><td style="color:var(--rust)">重新打开</td></tr></table>
+              <div class="k" style="margin-top:6px">↑ PC 上表格照旧(示意)</div>
+            </div>
+          </div>
+          <div class="pcfab" style="display:none">本页目录</div>
+        </div>
+        <div class="cap good">管理子页 · 目录挂在侧栏当前项下,随滚动高亮</div>
+      </div>
+      <div class="side-note">
+        <ul>
+          <li>侧栏按总览页的 <b>4 组</b>加组名,条目和顺序与总览一致。</li>
+          <li>补上的两项(标「补」):<b>资产打标</b>、<b>显示与外观</b>。</li>
+          <li><b>管理子页</b>:本页目录挂在当前项下面,不另开一栏、不挤内容。</li>
+          <li><b>其它长页</b>(账户详情、填报、使用手册、打标……):右下角「本页目录」小钮,点开从右侧滑出;仪表盘 / 报表 / 体检的常驻目录栏不变。</li>
+          <li>PC 上表格不卡片化。</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="zone">
+    <div class="zone-head"><span class="zone-no">7</span><span class="zone-t">其余零碎</span><span class="zone-fr">FR-1040 · 1041 · 1043 · 1051 · 1070</span></div>
+    <div class="zone-line"></div>
+    <ul class="note" style="max-width:900px">
+      <li>手机上任何页面都<b>不再横向滚动</b>:使用手册对照表(原来撑出 147px)、「手填市值」单股估值输入框(撑出 125px)。两张有意横滑的宽表(交叉透视、本期 vs 上期)保持横滑。</li>
+      <li>汇率历史默认最近 12 期,「展开全部 N 期」;「手填覆盖」从目录直达。</li>
+      <li>「显示名 · DISPLAY NAME」这类双语字段名放不下时只换行,不压输入框。</li>
+      <li>触屏上「改名 / 加细类 / 停用 / 删除」、筛选 chip、菜单项的<b>可点区域至少 32px 高</b> —— 字不放大,扩点击区。</li>
+    </ul>
+  </section>
+
+</div>
+</body>
+</html>

@@ -28,15 +28,15 @@
       </p>
       <form th:action="@{/admin/family/close-rhythm}" method="post" id="rhythm-form">
         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <!--/* v1.31 · 手机上 2 × 2(原来四张卡竖排一张一屏,账期表被推到第 3 屏)*/-->
+        <div class="grid grid-cols-2 md:grid-cols-4 auto-rows-fr gap-2 md:gap-3">
           <label th:each="opt : ${ {
                     {'T0','默认 · 当前行为','立即关账','新月份一开始,上月立刻锁上。月底最后几天的消费要自己补算进去。','拿到完整账单时已经改不了了。'},
                     {'T2','推荐','月底过完再给 2 天','完整上月账单要等月底过完才出 —— 这 2 天就是拿来填它的。','上月的报表、AI 月报、指标也会晚 2 天出。'},
                     {'T5','宽松','月底过完再给 5 天','信用卡账单日晚于月末的家庭适用。','同上,晚 5 天。'},
                     {'MANUAL','自己掌握','我自己关','你决定什么时候关。兜底:到下下个月开始时,系统还是会关掉它。','一直不关的话,报表和月报就永远出不来。'}
                  } }"
-                 class="rhythm-opt border border-rule bg-paper px-4 py-3 cursor-pointer flex flex-col"
-                 style="min-height:172px"
+                 class="rhythm-opt border border-rule bg-paper px-3 md:px-4 py-3 cursor-pointer flex flex-col min-h-[150px] md:min-h-[172px]"
                  th:classappend="${(opt[0] == 'T0'     and closeDelayDays == 0 and autoCloseEnabled)
                                 or (opt[0] == 'T2'     and closeDelayDays == 2 and autoCloseEnabled)
                                 or (opt[0] == 'T5'     and closeDelayDays == 5 and autoCloseEnabled)
@@ -131,8 +131,9 @@
     </div>
 
     <!-- 历史周期表 -->
-    <div class="paper-card overflow-x-auto">
-      <table class="ledger-table">
+    <!-- v1.31 FR-1020 · 手机上一行一张小卡(期号 + 状态 / 区间 + 关闭时间 / 理由 + 重新打开)-->
+    <div class="paper-card overflow-x-auto m-cards-wrap">
+      <table class="ledger-table m-cards">
         <thead>
           <tr>
             <th>期号</th>
@@ -144,10 +145,10 @@
         </thead>
         <tbody>
         <tr th:each="p : ${periods}">
-          <td class="font-display" th:text="${#temporals.format(p.periodStart,'yyyy-MM')}">2026-04</td>
-          <td class="text-xs text-ink-soft"
+          <td class="font-display m-title whitespace-nowrap" th:text="${#temporals.format(p.periodStart,'yyyy-MM')}">2026-04</td>
+          <td class="text-xs text-ink-soft font-mono whitespace-nowrap" data-label="区间"
               th:text="|${#temporals.format(p.periodStart,'MM-dd')} → ${#temporals.format(p.periodEnd,'MM-dd')}|">04-01 → 04-30</td>
-          <td>
+          <td class="m-badge">
             <span class="pill pill-forest" th:if="${p.status.name() == 'OPEN'}"
                   style="background:rgba(47,93,80,.12);color:var(--forest);border-color:var(--forest)">OPEN · 进行中</span>
             <span class="pill pill-rust" th:if="${p.status.name() == 'CLOSED'}"
@@ -162,9 +163,9 @@
                     th:text="| · 还剩 ${graceLeftById.get(p.id)} 天|"> · 还剩 2 天</span>
             </div>
           </td>
-          <td class="text-xs"
+          <td class="text-xs font-mono whitespace-nowrap" data-label="关闭"
               th:text="${p.closedAt != null ? #temporals.format(p.closedAt,'yyyy-MM-dd HH:mm') : '—'}">—</td>
-          <td class="text-right">
+          <td class="text-right m-act">
             <form th:if="${p.status.name() == 'CLOSED'}" th:action="@{/admin/periods/{id}/reopen(id=${p.id})}" method="post"
                   onsubmit="return confirm('重新打开这一期?\n\n这些会在你再次关账时重新计算:\n· 该期的账户分类定格(资产类型 / 行业 / 平台等)\n· 该期的账户组定格\n· 该期的 AI 月度复盘解读(现在就会清掉)\n· 该期之后每一期的净资产变化 / 收益率 / 归因\n· 填报完成状态(家人需要重新签收)\n\n继续吗?');">
               <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>

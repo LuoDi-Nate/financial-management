@@ -145,7 +145,7 @@ worktree 的工作目录里没有 `.githooks/`(那是 master 上的文件),hook 
 | 报表 | `/reports` | **月度封板快照**(v1.10 三区):一区 本期封板(资产负债表/资金流瀑布/环比同比/归因)· 二区 结构与风险(集中度/流动性分层)· 三区 趋势(**range 只作用于此**)· 账期筛选 + 长文目录 TOC | `reports/*` · `_toc` |
 | 目标 | `/goals` | FIRE 退休 / 教育 / 应急金 · 三情景预测 | `goals/*` |
 | 资产体检 | `/checkup` | 4 维诊断(配置/风险/流动性/收益)+ AI 调仓 · **长文目录 TOC** · v1.27 分析范围切换(`?scope=`)+ AI 模板选择行(`?tpl=`)+ AI 页脚「换模板 / 定制这个模板」 | `checkup/*` · `_toc` · `_analysis-footer` |
-| 管理 | `/admin` | **所有运营参数热改**(品牌/成员/周期/提醒/汇率/数据源/券商/AI/阈值/aksk/key)· 改即生效不重启 · 按「用户要完成的事」分入口:数据源接入 = 系统拉的公共数据(行情/汇率/贵金属/宏观)· 券商同步 = 自己的券商凭据(`/admin/broker`,v1.26)· AI 接入 = 大模型与超级 Agent · **分析设置 = 怎么分析我家**(`/admin/analysis`,v1.27:默认范围 / 模板 / 不参与的账户 / 配置锚含自定义 / 分析偏好;模板定制页 `/admin/analysis/template/new?from=&back=`,存完回来处重跑) | `admin/*` |
+| 管理 | `/admin` | **所有运营参数热改**(品牌/成员/周期/提醒/汇率/数据源/券商/AI/阈值/aksk/key)· 改即生效不重启 · 按「用户要完成的事」分入口:数据源接入 = 系统拉的公共数据(行情/汇率/贵金属/宏观)· 券商同步 = 自己的券商凭据(`/admin/broker`,v1.26)· AI 接入 = 大模型与超级 Agent · **分析设置 = 怎么分析我家**(`/admin/analysis`,v1.27:默认范围 / 模板 / 不参与的账户 / 配置锚含自定义 / 分析偏好;模板定制页 `/admin/analysis/template/new?from=&back=`,存完回来处重跑)· **侧栏条目只有一份清单**(`admin/_sidebar.html` 的 groups,四组与总览页一致;PC 是分组侧栏,手机是一行「管理 › 当前页 · 切换」+ 底部抽屉,v1.31)—— 加设置页:总览页加卡片 + 清单里加一项 + 页面 include 侧栏,护栏 `v131-ADMIN-NAV` 盯着 | `admin/*` |
 | 公开 | `/`(landing) `/login` `/onboarding` | 落地页(含工程数字带)/ 登录 / 首次引导 | `landing.html`(`data-stat`)· `auth/*` · `onboarding/*` |
 
 ---
@@ -236,6 +236,7 @@ worktree 的工作目录里没有 `.githooks/`(那是 master 上的文件),hook 
 
 | L21 · 加账户类型(v1.30 是第三次:METAL v0.14 / INSURANCE v0.17 / FUND v1.30) | 给 `AccountType` 加取值 | ① 枚举谓词(`isInvestment` / `isLiability` / `expectsFlowsToExplainBalance`)显式归类 + `AccountTypeSemanticsTest`;② 编译器抓得到的穷尽 switch(流动性 / 资产类别 / 托管形态 / 默认类目 / 风险档 / 排序);③ **编译器抓不到的**:模板里的类型字面量链(账户页 / 详情 / 填报行的标签色)、`BenchmarkAggregator` 兜底表、`AllocationDiff` 桶、金融盘清单、`supportsHoldings`、产品类目 `applicable_types`;④ 迁移放宽 `ck_account_type` / `ck_account_template_type`;⑤ **老 jar 不认识新取值** → 写 `db/rollback/vX.Y.sql` 把它改回旧类型 | `v130-FUND-TYPE-SWEPT` · `v130-FUND-ROLLBACK-SQL` · `AccountTypeSemanticsTest` |
 | L22 · 补录本金(v1.30) | 改「外部投入」的口径 / 加新的「本来就有」入口 / 动 `principal_adjustment` | ① **只从事实层进指标**:`FactMapper.queryBase` 的 `padj` 子查询 → `FactProjector`(本期收益扣掉;第一期归零)→ `FactViewServiceImpl`(账户累计净投入 / 账户 XIRR / `openingBaseline`)。别处不许读这张表算钱(填报页「未解释差额」当已知流入是本账户视角的解释,允许);② 新加一种「本来就有」的入口,金额要按 HALF_EVEN 到分(与估值写回的余额舍入同向)、只许记开着的期、第一期不许记;③ 导出 / 清演示数据 / 家庭隔离审计都要带上表;④ 回滚 jar 时表被忽略 = 那几期退回「算成收益」(与之前一致),不需要回滚 SQL | `v130-PRINCIPAL-ONE-PATH` · `v130-PRINCIPAL-FIRST-PERIOD` · `v130-PRINCIPAL-ENTRY` · `PrincipalAdjustmentMetricsTest` · e2e flow 45 |
+| L23 · 手机上的表格与设置页(v1.31) | 新增 / 改**会在手机上显示的表格**;新增设置页 | 表格:同一份 `<table>` 加 `m-cards` + 单元格角色类(`m-title` 这一行是谁 / `m-badge` 状态标签 / 普通格带 `data-label` / `m-act` 操作整行 / `m-full` 长文本),**不另写一份手机 DOM**;操作格不许 `m-hide`;有意横滑的宽表(交叉透视、本期 vs 上期)除外。设置页:侧栏清单(`admin/_sidebar.html`)加一项、页面 include 侧栏。手机验收用 `ui.phone(fn)`(390×844 触屏;只改视口宽度看不到右下浮钮) | `v131-ADMIN-NAV` · `v131-MOBILE-CARDS` · e2e flow 47 |
 
 **新链怎么加**:出现"改 A 漏了 B"事故 → 加一行(触发/必须同步/守护)+ `qa-run.sh` 加静态 grep 把它网住,下次它自己 fail。
 

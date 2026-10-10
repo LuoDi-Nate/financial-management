@@ -11417,6 +11417,39 @@ QA1301_ADS="$RD/src/main/java/com/family/finance/service/checkup/AccountDiagnose
   && log_ok "v1301-BALANCE-DELTA-LABEL(「余额变化」改名 + 悬停写清含划转、看赚亏看本期损益 · 仪表盘与报表 PC / 手机)" \
   || log_bad "v1301-BALANCE-DELTA-LABEL 余额变化又被叫成像赚亏的名字" "see dashboard/_region.html · reports/_region.html"
 
+# ── v1.31 · 手机上的设置页(prd/v1.31.md · 维护者 2026-10-10「上面有一大屏幕 是目录??」「表格/换行/tag 惨不忍睹」)──
+#   原来管理侧栏只有一份 PC 列表,手机上原样竖排 19 行占满第一屏;侧栏与总览页条目各写各的,总览里有两项侧栏没有。
+#   守:①侧栏条目只有一份清单(PC 侧栏与手机抽屉都从它渲染)② 它 ⊇ 管理总览页的全部卡片 ③ 所有设置页都挂着它
+QA131_SB="$RD/src/main/resources/templates/admin/_sidebar.html"
+QA131_HUB_MISS=""
+for h in $(grep -o 'th:href="@{/[^}]*}" class="group' "$RD/src/main/resources/templates/admin/index.html" | sed 's/th:href="@{\([^}]*\)}".*/\1/'); do
+  grep -q "href:'$h'" "$QA131_SB" || QA131_HUB_MISS="$QA131_HUB_MISS $h"
+done
+QA131_NOSB=""
+for f in "$RD"/src/main/resources/templates/admin/*.html; do
+  case "$(basename "$f")" in _*|index.html|analysis-template.html) continue;; esac
+  grep -q "_sidebar :: sidebar(" "$f" || QA131_NOSB="$QA131_NOSB $(basename "$f")"
+done
+{ [ -z "$QA131_HUB_MISS" ] && [ -z "$QA131_NOSB" ] \
+  && [ "$(grep -c 'th:each="it : ${g.items}"' "$QA131_SB")" -ge 2 ] \
+  && [ "$(grep -c 'th:href="@{/admin' "$QA131_SB")" -le 2 ] \
+  && grep -q 'class="adm-bar md:hidden"' "$QA131_SB" && grep -q 'class="hidden md:block sticky' "$QA131_SB" \
+  && [ -f "$RD/scripts/e2e/flows/47-mobile-admin-nav.cjs" ]; } \
+  && log_ok "v131-ADMIN-NAV(管理侧栏一份清单渲染 PC 侧栏 + 手机切换抽屉 · ⊇ 总览页全部卡片 · 所有设置页都挂着 · flow 47)" \
+  || log_bad "v131-ADMIN-NAV 管理导航缺项 / 某设置页没挂侧栏 / 又写回了两份列表" "缺总览项:$QA131_HUB_MISS · 没挂侧栏:$QA131_NOSB · see admin/_sidebar.html"
+#   表格在手机上一行一张小卡:样式在 style.css 的 table.m-cards(只在 <768 生效);周期表按角色标好格子;
+#   标签(.pill)永远一行 —— 「CLOSED · 已结束」原来在 390 宽里折成 3 行
+QA131_CSS="$RD/src/main/resources/static/css/style.css"
+QA131_PER="$RD/src/main/resources/templates/admin/periods.html"
+{ grep -q '^\.pill { white-space: nowrap; }' "$QA131_CSS" \
+  && awk '/@media \(max-width: 767.98px\) \{/{f=1} f&&/table\.m-cards > thead \{ display: none; \}/{ok=1} END{exit !ok}' "$QA131_CSS" \
+  && grep -q 'class="ledger-table m-cards"' "$QA131_PER" \
+  && grep -q 'm-title' "$QA131_PER" && grep -q 'class="m-badge"' "$QA131_PER" && grep -q 'm-act"' "$QA131_PER" \
+  && grep -q 'data-label="区间"' "$QA131_PER" && grep -q 'data-label="关闭"' "$QA131_PER" \
+  && ! grep -q 'm-hide[^"]*">[^<]*<form' "$QA131_PER"; } \
+  && log_ok "v131-MOBILE-CARDS(周期表手机上一期一卡 · 区间 / 关闭时间不断行 · 理由 + 重新打开整行 · 标签不折行)" \
+  || log_bad "v131-MOBILE-CARDS 周期表在手机上又挤回 5 列,或标签又会在中间折行" "see style.css table.m-cards · admin/periods.html"
+
 echo
 echo "═══════════════════════════════════════"
 echo " 总结: PASS=$PASS  FAIL=$FAIL  SKIP=$SKIP"

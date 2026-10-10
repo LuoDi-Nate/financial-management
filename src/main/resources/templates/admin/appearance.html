@@ -17,11 +17,10 @@
 <div class="fixed top-0 left-0 right-0 h-1 bg-ink z-40"></div>
 <header th:replace="~{fragments/nav :: nav('admin', ${me}, ${nav})}"></header>
 
-<main class="max-w-[1080px] mx-auto px-4 sm:px-6 lg:px-10 py-5 sm:py-10 relative z-10">
-  <div class="font-mono text-[10px] tracking-[0.18em] uppercase text-ink-subtle mb-4">
-    <a th:href="@{/admin}" class="hover:text-ink no-underline">管理</a>
-    <span class="mx-2 text-rule">/</span><span class="text-ink">显示与外观</span>
-  </div>
+<!--/* v1.31 FR-1012 · 挂上和其它设置页同一套管理侧栏(原来只有面包屑,从这页回不到别的设置项)*/-->
+<main class="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10 py-5 sm:py-10 relative z-10 grid grid-cols-12 gap-8">
+  <aside th:replace="~{admin/_sidebar :: sidebar('appearance')}"></aside>
+  <section class="col-span-12 md:col-span-9">
 
   <div class="mb-6">
     <h1 class="font-display text-4xl font-medium">显示与外观</h1>
@@ -102,6 +101,7 @@
       字号在<b class="text-ink">右上角</b>那个「A A」按钮里调(标准 / 大 / 特大),同样只影响你自己这台设备。
     </p>
   </div>
+  </section>
 </main>
 
 <footer th:replace="~{fragments/layout :: footer}"></footer>

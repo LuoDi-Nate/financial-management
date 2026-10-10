@@ -2690,3 +2690,85 @@ html.privacy .peek [data-peek-copy]{ opacity:.4; }
 .pc-row { scroll-margin-top: 96px; }
 .pc-row:target > td { background: var(--brass-soft); }
 .pc-row:target > td:first-child { box-shadow: inset 3px 0 0 var(--brass-deep); }
+
+/* ═══ v1.31 · 手机易用性(prd/v1.31.md)═══════════════════════════════════════════
+   断点与 tailwind md 同源:<768 = 手机排法。 */
+
+/* —— FR-1030 · 标签永远一行:放不下整个换到下一行,不在标签内部折 —— */
+.pill { white-space: nowrap; }
+
+/* —— FR-1010 ~ 1012 · 管理侧栏 —— */
+.adm-link { display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-left: 1px solid var(--rule);
+  color: var(--ink-soft); text-decoration: none; }
+.adm-link:hover { border-left-color: var(--ink); background: var(--card-soft); }
+.adm-link.on { border-left: 2px solid var(--brass); background: var(--card-soft); color: var(--ink);
+  font-family: "Fraunces", "Noto Serif SC", serif; }
+.adm-ro { font-size: calc(10px * var(--fs-scale,1)); color: var(--rust); white-space: nowrap; }
+.adm-ro::before { content: '· '; }
+.adm-group { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: calc(10px * var(--fs-scale,1));
+  letter-spacing: .2em; color: var(--brass-text); padding: 12px 12px 3px; white-space: nowrap; }
+/* 分组后侧栏变长:矮屏上 sticky 的侧栏不许比视口高(否则底下几项永远够不着),超出就自己滚 */
+.adm-side .sticky { max-height: calc(100vh - 7rem); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+/* PC 侧栏里的本页目录(toc.js 填):挂在当前项下,左边线接着当前项的铜线 */
+.adm-toc:empty { display: none; }
+.adm-toc { border-left: 2px solid var(--brass); padding: 2px 0 6px; }
+.adm-toc a { display: block; padding: 4px 12px 4px 24px; font-size: calc(12px * var(--fs-scale,1)); color: var(--ink-subtle);
+  text-decoration: none; line-height: 1.45; }
+.adm-toc a.toc-sub { padding-left: 36px; font-size: calc(11.5px * var(--fs-scale,1)); }
+.adm-toc a:hover { color: var(--ink); }
+.adm-toc a[aria-current="true"] { color: var(--brass-text); font-weight: 600; }
+/* 手机切换条 */
+.adm-bar { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 12px;
+  min-height: 44px; padding: 0 12px; border: 1px solid var(--rule); background: var(--card); text-align: left; cursor: pointer; }
+.adm-bar-path { font-size: calc(13.5px * var(--fs-scale,1)); color: var(--ink-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.adm-bar-path b { color: var(--ink); font-family: "Fraunces", "Noto Serif SC", serif; font-weight: 500; font-size: calc(15px * var(--fs-scale,1)); }
+.adm-bar-sep { color: var(--ink-faint); margin: 0 2px; }
+.adm-bar-sw { display: inline-flex; align-items: center; gap: 4px; font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: calc(11px * var(--fs-scale,1)); letter-spacing: .1em; color: var(--brass-text); white-space: nowrap; }
+@media (max-width: 767.98px) { .adm-side { margin-bottom: -14px; } }
+/* 手机抽屉:沿用 .toc-sheet 的外观与收起动画,只是层级抬到右下浮钮之上(脚本已把它挪到 body 下) */
+.adm-mask { z-index: 10000; }
+.adm-sheet { z-index: 10001; max-height: 86vh; }
+body.adm-open #float-dock { display: none !important; }
+.adm-sheet .adm-group { padding: 12px 14px 2px; }
+.adm-sheet-grid { display: grid; grid-template-columns: 1fr 1fr; }
+.adm-sheet-link { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 40px; padding: 0 14px;
+  border-left: 2px solid transparent; font-size: calc(14.5px * var(--fs-scale,1)); color: var(--ink); text-decoration: none; }
+.adm-sheet-link.on { border-left-color: var(--brass-deep); background: var(--card-soft); color: var(--brass-text);
+  font-family: "Fraunces", "Noto Serif SC", serif; font-weight: 600; }
+.adm-sheet-link .adm-ro::before { content: ''; }
+
+/* —— FR-1020 ~ 1022 · 表格在手机上「一行一张小卡」——————————————————————————
+   用法:<table class="ledger-table m-cards">,单元格按角色加类:
+     m-title  这一行是谁(期号 / 名称)—— 卡片第一行左
+     m-badge  状态 / 类型标签 —— 卡片第一行右
+     (无类)  普通字段 —— 两列「字段名 值」,字段名取 data-label
+     m-full   独占一整行的字段(长说明、详情)
+     m-act    操作 —— 卡片最底下占满一行,输入框自动拉满
+     m-hide   手机上不显示(只用于 PC 上重复的信息,不许藏操作 —— FR-1022)
+   PC(≥768)上这些类全部不生效,表格照旧。 */
+@media (max-width: 767.98px) {
+  table.m-cards, table.m-cards > tbody { display: block; width: 100%; }
+  table.m-cards > thead { display: none; }
+  table.m-cards > tbody > tr { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); column-gap: 12px; row-gap: 6px;
+    align-items: baseline; padding: 12px 14px; border-bottom: 1px solid var(--rule-soft); }
+  table.m-cards > tbody > tr:hover > td { background: none; }
+  table.m-cards > tbody > tr > td { display: block; padding: 0; border: 0; min-width: 0; text-align: left; white-space: nowrap;
+    font-size: calc(13px * var(--fs-scale,1)); }
+  table.m-cards > tbody > tr > td[data-label]::before { content: attr(data-label); margin-right: 6px; font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: calc(10px * var(--fs-scale,1)); letter-spacing: .12em; color: var(--ink-subtle); }
+  table.m-cards > tbody > tr > td.m-title { grid-column: 1; font-size: calc(17px * var(--fs-scale,1)); white-space: normal; }
+  table.m-cards > tbody > tr > td.m-title { grid-row: 1; }
+  table.m-cards > tbody > tr > td.m-badge { grid-row: 1; grid-column: 2; justify-self: end; text-align: right; white-space: normal; }
+  table.m-cards > tbody > tr > td.m-full { grid-column: 1 / -1; white-space: normal; word-break: break-word; }
+  table.m-cards > tbody > tr > td.m-act { grid-column: 1 / -1; white-space: normal; margin-top: 2px; }
+  table.m-cards > tbody > tr > td.m-act form { display: flex; gap: 8px; align-items: stretch; width: 100%; }
+  table.m-cards > tbody > tr > td.m-act input[type="text"] { flex: 1 1 auto; min-width: 0; min-height: 36px; font-size: 13px; }
+  table.m-cards > tbody > tr > td.m-act button { min-height: 36px; white-space: nowrap; }
+  table.m-cards > tbody > tr > td.m-hide { display: none; }
+  /* 大字号(右上角 AA 调到「大 / 特大」)下两列放不下一个完整日期时间 → 普通字段改成一行一个 */
+  html[data-fs="lg"] table.m-cards > tbody > tr > td:not(.m-title):not(.m-badge),
+  html[data-fs="xl"] table.m-cards > tbody > tr > td:not(.m-title):not(.m-badge) { grid-column: 1 / -1; }
+  /* 卡片化以后不需要横向滚动;外层若写了 overflow-x-auto,手机上让它别出滚动条 */
+  .m-cards-wrap { overflow-x: visible !important; }
+}
