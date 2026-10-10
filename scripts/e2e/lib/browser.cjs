@@ -304,16 +304,7 @@ class Ui {
   info(msg) { this.report.info(msg); }
 }
 
-/** 开浏览器 + 登录。viewport 给 PC;移动端断言用 withMobile。 */
-async function open(report, { width = 1440, height = 900 } = {}) {
-  const browser = await chromium.launch({ executablePath: CHROME, args: ['--no-sandbox'] });
-  const ctx = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1 });
-  const page = await ctx.newPage();
-  const ui = new Ui(page, report);
-  ui._consoleErrors = [];
-  page.on('console', m => { if (m.type() === 'error') ui._consoleErrors.push(m.text()); });
-  page.on('pageerror', e => ui._consoleErrors.push(String(e)));
-
+async function login(page) {
   await page.goto(BASE + '/login', { waitUntil: 'networkidle', timeout: NAV_TIMEOUT });
   await page.fill('input[name=username]', USER);
   await page.fill('input[name=password]', PASS);
@@ -321,6 +312,44 @@ async function open(report, { width = 1440, height = 900 } = {}) {
     page.waitForNavigation({ waitUntil: 'networkidle', timeout: NAV_TIMEOUT }).catch(() => {}),
     page.click('button[type=submit]'),
   ]);
+}
+
+function watchConsole(ui) {
+  ui._consoleErrors = [];
+  ui.page.on('console', m => { if (m.type() === 'error') ui._consoleErrors.push(m.text()); });
+  ui.page.on('pageerror', e => ui._consoleErrors.push(String(e)));
+}
+
+/**
+ * v1.31 · 在**真手机**环境里跑一段:390×844、触屏(isMobile + hasTouch)。
+ *
+ * 为什么不是 setViewportSize(390, 844):右下那一列浮钮(#float-dock:目录 / 横屏 / 隐私眼)
+ * 只在 `@media (pointer: coarse)` 下出现 —— 光改视口宽度模拟不出触屏,
+ * 那样的「手机验收」看不到目录钮、也看不到浮钮压没压住按钮。
+ * 同一个浏览器实例里另开一个 context(不另起浏览器 —— beta 只有 3.5G),跑完就关。
+ */
+Ui.prototype.phone = async function (fn) {
+  const ctx = await this.page.context().browser().newContext({
+    viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+  const ui = new Ui(await ctx.newPage(), this.report);
+  ui.flow = this.flow;
+  watchConsole(ui);
+  try {
+    await login(ui.page);
+    return await fn(ui);
+  } finally {
+    await ctx.close().catch(() => {});
+  }
+};
+
+/** 开浏览器 + 登录。viewport 给 PC;真手机(触屏)断言用 ui.phone(fn)。 */
+async function open(report, { width = 1440, height = 900 } = {}) {
+  const browser = await chromium.launch({ executablePath: CHROME, args: ['--no-sandbox'] });
+  const ctx = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1 });
+  const page = await ctx.newPage();
+  const ui = new Ui(page, report);
+  watchConsole(ui);
+  await login(page);
   ui._close = async () => { await ctx.close(); await browser.close(); };
   return ui;
 }
