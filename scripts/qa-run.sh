@@ -2752,9 +2752,11 @@ $CURL -b $COOKIE "$BASE/admin/calc-tweaks" -o "$TMP" -w ""
 #   v1.26 · 原来写死「15 项」—— 之后加了 AI 接入 / 对账 / 账户组…… 页头一直写着 15,实际 17 条,护栏照样绿。
 #   改成结构性:页头的数字必须等于侧栏里除「总览」外的链接数,加 / 删入口时不改页头就红。
 SB=src/main/resources/templates/admin/_sidebar.html
-QA_SB_N=$(( $(grep -o 'th:href="@{' "$SB" | wc -l) - 1 ))
+# v1.31 起条目是一份清单(href:'…'),页头数字从清单长度算出来(itemCount),不再手写 —— 手写的数字就是会漂的那种
+QA_SB_N=$(grep -o "href:'" "$SB" | wc -l)
 { grep -q "/admin/integrations" "$SB" \
   && grep -q "/admin/metrics" "$SB" \
+  && grep -q '|/ADMIN · ${itemCount} 项|' "$SB" \
   && grep -q "/ADMIN · ${QA_SB_N} 项" "$SB"; } \
   && log_ok "v04-CFG-8 admin sidebar 集成+指标设置入口 + 页头项数与实际一致(${QA_SB_N} 项)" \
   || log_bad "v04-CFG-8 sidebar 页头项数不对" "侧栏实际 ${QA_SB_N} 项(不含总览),页头写的是:$(grep -o '/ADMIN · [0-9]* 项' "$SB")"
@@ -5953,7 +5955,7 @@ for f in service/ask/runtime/LocalToolLoopRuntime.java service/ask/runtime/Manag
   java_code_only "$RD/src/main/java/com/family/finance/$f" | grep -q '「数据源接入」' && QA1245_STALE="$QA1245_STALE ${f##*/}"
 done
 #   v1.26 · 券商同步单独成入口,插在两者之间 —— 三个「对外连接」连成一段(数据源 → 券商 → AI),AI 仍紧挨着接入类
-QA1245_SB_ORDER="$(grep -oE '/admin/(integrations|broker|ai-access)\}' "$QA1245_SB" | tr -d '}' | tr '\n' ' ')"
+QA1245_SB_ORDER="$(grep -oE "/admin/(integrations|broker|ai-access)['}]" "$QA1245_SB" | tr -d "}'" | tr '\n' ' ')"
 { ! grep -qE 'llm/key|llm-catalog|initTriple' "$QA1245_INT" \
   && ! grep -q '@PostMapping("/llm' "$RD/src/main/java/com/family/finance/web/admin/IntegrationsController.java" \
   && grep -q "admin/_llm-settings :: section" "$QA1245_AI" \
@@ -6155,7 +6157,7 @@ QA_BK_STALE="$(grep -rnE '数据源接入 → (④ )?券商|数据源接入 → 
   && ! grep -qE 'name="(tigerKey|ibkrToken|futuHost)"' "$QA_BK_INT" \
   && grep -q '@{/admin/broker}' "$QA_BK_INT" \
   && grep -q 'name="ibkrToken"' "$QA_BK_TPL" && grep -q 'id="ibkr"' "$QA_BK_TPL" && grep -q 'ctxAccountId' "$QA_BK_TPL" \
-  && grep -q '@{/admin/broker}' "$RD/src/main/resources/templates/admin/_sidebar.html" \
+  && grep -qE "@\{/admin/broker\}|href:'/admin/broker'" "$RD/src/main/resources/templates/admin/_sidebar.html" \
   && [ -z "$QA_BK_MISSING" ] \
   && grep -q 'id="ibkrEmpty"' "$QA_BK_LNK" \
   && [ -z "$QA_BK_UNLINKED" ] \
@@ -10787,7 +10789,7 @@ QA127_CARD_OK=1; for w in 分析范围 分析模板 不参与分析的资产 配
 $CURL -b "$QA127_C" "$BASE/admin/analysis" -o "$TMP" -w ""
 QA127_SEC=0; for id in scope templates excluded anchor preferences; do grep -q "id=\"$id\"" "$TMP" && QA127_SEC=$((QA127_SEC+1)); done
 { [ "$QA127_CARD_OK" = 1 ] && [ "$QA127_SEC" = 5 ] \
-  && grep -q "@{/admin/analysis}" "$RD/src/main/resources/templates/admin/_sidebar.html" \
+  && grep -qE "@\{/admin/analysis\}|href:'/admin/analysis'" "$RD/src/main/resources/templates/admin/_sidebar.html" \
   && grep -q '</html>' "$TMP"; } \
   && log_ok "v127-SETTINGS-ENTRY(管理首页卡片点名五块 · 侧栏有 · 分析设置五节齐 · 页面渲染到底)" \
   || log_bad "v127-SETTINGS-ENTRY 分析设置入口不全" "卡片五词=$QA127_CARD_OK · 页面五节=$QA127_SEC"

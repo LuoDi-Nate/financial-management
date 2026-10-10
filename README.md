@@ -131,7 +131,7 @@
 | 前端 | Thymeleaf + HTMX 1.9 + Chart.js 4 + ECharts(无 SPA、无构建管线) |
 | 认证 | Spring Security + bcrypt + Session Cookie |
 | 部署 | **Docker compose 一键(v0.7,推荐)** · 或 Linux systemd + nginx 反代 :80 → :20000 · macOS launchd(可选)直连 :20000 |
-| 测试 | JUnit 5 · **1179 单元** / 944 e2e 断言(27 条浏览器主线,真浏览器 + 真 DB)/ **973 黑盒回归**护栏 —— 每条护栏守的是哪个坑,见 [QA case 库](docs/qa-cases.md) |
+| 测试 | JUnit 5 · **1179 单元** / 979 e2e 断言(28 条浏览器主线,真浏览器 + 真 DB)/ **975 黑盒回归**护栏 —— 每条护栏守的是哪个坑,见 [QA case 库](docs/qa-cases.md) |
 
 ## 快速开始(自托管部署)
 
@@ -377,10 +377,11 @@ bash scripts/regression-data.sh # 数据层/口径回归(原 e2e.sh · curl 端�
 每版做了什么、为什么那么做,都写在各自的文档里;这里只放入口,不复述。
 
 <details>
-<summary><b>展开全部 47 个版本</b>(v0.1 → v1.30)</summary>
+<summary><b>展开全部 48 个版本</b>(v0.1 → v1.31)</summary>
 
 | 版本 | 文档 |
 |---|---|
+| `v1.31` | [PRD](prd/v1.31.md)(第一批已实施)· [技术设计](tech-design/v1.31.md) · [预览](preview/v1.31/) |
 | `v1.30` | [PRD](prd/v1.30.md)(已评审)· [技术设计](tech-design/v1.30.md)(已评审 · 已实施)· [预览](preview/v1.30/) · [竞品报告 · Capivot](docs/research/capivot/README.md) |
 | `v1.29` | [PRD](prd/v1.29.md) · [技术设计](tech-design/v1.29.md) · [预览](preview/v1.29/) |
 | `v1.28` | [PRD](prd/v1.28.md) · [技术设计](tech-design/v1.28.md) · [预览](preview/v1.28/) |
@@ -469,7 +470,7 @@ financial-management/
 ├── docs/qa-cases.md                      # QA case 库
 ├── icons/                                # 用户可替换的图标源 PNG
 └── scripts/
-    ├── qa-run.sh                         # 黑盒回归护栏(973 条)
+    ├── qa-run.sh                         # 黑盒回归护栏(975 条)
     ├── e2e/run.cjs                       # 端到端(真浏览器点 + 回库查真值)
     └── release-shots.cjs                 # 发版截图(隐私模式默认开)
 ```
