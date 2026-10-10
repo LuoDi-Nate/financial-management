@@ -6,7 +6,7 @@
       "name": "admin-sidebar",
       "wait": 1200,
       "waitFor": ".adm-nav",
-      "eval": "[].forEach.call(document.querySelectorAll('[data-agent-fab], #agent-fab, #ask-float'), function(e){ e.style.display='none'; }); window.scrollTo(0,0);",
+      "eval": "[].forEach.call(document.querySelectorAll('[data-agent-fab], #agent-fab, #ask-float'), function(e){ e.style.display='none'; }); var s=document.querySelector('.adm-side .sticky'); s.style.maxHeight='none'; s.style.position='static'; window.scrollTo(0,0);",
       "selector": "aside.adm-side .sticky"
     }
   ],
