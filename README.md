@@ -96,8 +96,8 @@
 
 > 完整发布记录与截图见 [Releases](https://github.com/LuoDi-Nate/financial-management/releases)(本段每版只留 2–4 行,细节不搬过来)。
 
-**[v1.31.0](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.31.0) · 手机上的设置页能用了(第一批)**
-手机上打开设置页,顶部不再是竖排一整屏的菜单,收成一行「管理 › 当前页 · 切换」,点开按四组列出全部设置项;周期管理的账期表在手机上一期一张卡,区间、关闭时间不再折行;状态标签全站不折行。其余页面按同一套做法陆续改。
+**[v1.31.0](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.31.0) – [v1.31.1](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.31.1) · 手机上的设置页能用了(第一批)**
+手机上打开设置页,顶部不再是竖排一整屏的菜单,收成一行「管理 › 当前页 · 切换」,点开按四组列出全部设置项;周期管理的账期表在手机上一期一张卡,区间、关闭时间不再折行;状态标签全站不折行。其余页面按同一套做法陆续改。v1.31.1 修了 Docker 部署下「管理 → 备份」一直显示「0 次备份」([#29](https://github.com/LuoDi-Nate/financial-management/issues/29))。
 
 **[v1.30.0](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.30.0) – [v1.30.1](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.30.1) · 场外基金按代码自动估值 · 货币基金每天结转**
 「添加持仓」里输基金代码 / 名称 / 拼音选中,先看到全名和最新净值再填份额,之后跟着刷新按净值自动更新;货币基金按每日万份收益自动结转,份额变化写进流水;新账户类型「基金账户」([#25](https://github.com/LuoDi-Nate/financial-management/issues/25))。基金可选填成本价看持有收益;已有账户里补录以前就有的钱记「补录本金」,算本金不算收益。v1.30.1 修了报表「本期归因」把账户间划转算成「推上去 / 拉下来」,账户列表「本期Δ」改名「余额变化」。
