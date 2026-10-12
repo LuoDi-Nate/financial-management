@@ -11,7 +11,15 @@
       <div>
         <div class="eyebrow mb-2">备 · 份 · 与 · 恢 · 复</div>
         <h1 class="font-display text-4xl font-medium">数据安守</h1>
-        <p class="text-ink-soft text-sm mt-2">每周日凌晨 03:00 通过 mysqldump 自动备份。保留 8 周。</p>
+        <!--/* v1.31.1 · issue #29 续:原来写死 systemd 的「每周日 03:00 · /var/backup/finance/」——
+               Docker 用户看到的是另一回事(备份容器每天一次、存在数据卷里),而且这页在 Docker 下永远「0 次」。
+               现在两种部署都往 backup_log 写,文案按最近一条记录是哪种来写;一条都没有就两种都说清。*/-->
+        <p class="text-ink-soft text-sm mt-2" th:if="${!#lists.isEmpty(logs) and logs[0].kind == 'DAILY'}" data-backup-mode="docker">
+          Docker 部署:备份容器每天自动做一次 mysqldump,失败 5 分钟后重试;能解压、里面有建表语句才算成功。默认保留 56 天。</p>
+        <p class="text-ink-soft text-sm mt-2" th:if="${!#lists.isEmpty(logs) and logs[0].kind != 'DAILY'}" data-backup-mode="systemd">
+          每周日凌晨 03:00 通过 mysqldump 自动备份。保留 8 周。</p>
+        <p class="text-ink-soft text-sm mt-2" th:if="${#lists.isEmpty(logs)}" data-backup-mode="none">
+          还没有备份记录。systemd 部署每周日凌晨 03:00 自动备份;Docker 部署由备份容器每天备份一次 —— 两种都会记在这里。</p>
       </div>
       <a th:href="@{/export.zip}" class="btn-ink text-xs"><svg class="inline-block align-[-2px] mr-1" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>导出 CSV 包</a>
     </div>
@@ -25,16 +33,25 @@
         <div class="font-mono text-xs num-pos mt-1"
              th:if="${!#lists.isEmpty(logs) and logs[0].status == 'SUCCESS'}"
              th:text="|✓ 成功 · ${logs[0].sizeBytes != null ? (logs[0].sizeBytes / 1024 / 1024) + ' MB' : ''}|">✓ 成功</div>
+        <!--/* v1.31.1 · 最近一次是失败的,这里原来什么都不写 —— 只剩一个日期,看着像成功了 */-->
+        <div class="font-mono text-xs text-rust mt-1"
+             th:if="${!#lists.isEmpty(logs) and logs[0].status == 'FAILED'}">✗ 失败 · 原因见下表「错误」</div>
       </div>
       <div class="kpi-card">
         <span class="kpi-eyebrow">保留</span>
-        <div class="font-display text-2xl mt-1 tnum">8 周</div>
-        <div class="font-mono text-xs text-ink-soft mt-1">滚动删除最旧</div>
+        <div class="font-display text-2xl mt-1 tnum">56 天</div>
+        <div class="font-mono text-xs text-ink-soft mt-1">滚动删除最旧 · 默认值</div>
       </div>
       <div class="kpi-card">
         <span class="kpi-eyebrow">存储位置</span>
-        <div class="font-display text-2xl mt-1">本地磁盘</div>
-        <div class="font-mono text-xs text-ink-soft mt-1">/var/backup/finance/</div>
+        <th:block th:if="${!#lists.isEmpty(logs) and logs[0].kind == 'DAILY'}">
+          <div class="font-display text-2xl mt-1">Docker 数据卷</div>
+          <div class="font-mono text-xs text-ink-soft mt-1">backups 卷 · 容器内 /data/backups/</div>
+        </th:block>
+        <th:block th:unless="${!#lists.isEmpty(logs) and logs[0].kind == 'DAILY'}">
+          <div class="font-display text-2xl mt-1">本地磁盘</div>
+          <div class="font-mono text-xs text-ink-soft mt-1">/var/backup/finance/</div>
+        </th:block>
       </div>
     </div>
 
@@ -60,7 +77,7 @@
             <span class="pill" th:if="${b.status == 'FAILED'}" style="background:var(--rust-soft);color:var(--rust);border-color:var(--rust)">FAILED</span>
             <span class="pill" th:if="${b.status == 'RUNNING'}">RUNNING</span>
           </td>
-          <td class="text-xs" th:text="${b.kind}">WEEKLY</td>
+          <td class="text-xs" th:text="${b.kind == 'DAILY' ? '每天 · Docker' : (b.kind == 'WEEKLY' ? '每周' : (b.kind == 'MANUAL' ? '手动' : b.kind))}">每周</td>
           <td class="text-xs text-ink-soft" th:text="${b.locationLocal}">—</td>
           <td class="text-xs text-ink-soft" th:text="${b.locationRemote != null ? b.locationRemote : '—'}">—</td>
           <td class="num" th:text="${b.sizeBytes != null ? (b.sizeBytes / 1024) + ' KB' : '—'}">—</td>

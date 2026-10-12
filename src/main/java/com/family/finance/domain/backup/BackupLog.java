@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
 public class BackupLog {
     private Long id;
     private Long familyId;
-    private String kind;            // WEEKLY / MANUAL
+    private String kind;            // WEEKLY(systemd 周备)/ MANUAL / DAILY(Docker 备份容器 · V70)
     private String status;          // SUCCESS / FAILED / RUNNING
     private Long sizeBytes;
     private String locationLocal;

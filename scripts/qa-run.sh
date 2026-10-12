@@ -11451,6 +11451,22 @@ QA131_PER="$RD/src/main/resources/templates/admin/periods.html"
   && ! grep -q 'm-hide[^"]*">[^<]*<form' "$QA131_PER"; } \
   && log_ok "v131-MOBILE-CARDS(周期表手机上一期一卡 · 区间 / 关闭时间不断行 · 理由 + 重新打开整行 · 标签不折行)" \
   || log_bad "v131-MOBILE-CARDS 周期表在手机上又挤回 5 列,或标签又会在中间折行" "see style.css table.m-cards · admin/periods.html"
+# ── v1.31.1 · issue #29 续:Docker 下「管理 → 备份」永远「最近 0 次备份」(用户 2026-10-10)──
+#   backup_log 只有 systemd 的 deploy/backup.sh 在写;Docker 的备份容器(docker/backup.sh)每天备份却从不写 —— 页面只读这张表,
+#   文案还写死了 systemd 的「每周日 03:00 · /var/backup/finance/」。
+#   守:①备份容器每个周期写一行(类型 DAILY,给每个家庭都写)、成功失败都写、不是每次重试写一行 ② 库允许 DAILY
+#       ③ 备份页文案按部署方式写,没有记录时两种都说清
+QA1311_BK="$RD/docker/backup.sh"
+QA1311_PAGE="$RD/src/main/resources/templates/admin/backup.html"
+QA1311_DUMP="$(awk '/^dump_once\(\) \{/{f=1} f{print} f&&/^}$/{exit}' "$QA1311_BK")"
+{ grep -q "INSERT INTO backup_log" "$QA1311_BK" && grep -q "'DAILY'" "$QA1311_BK" && grep -q "FROM family" "$QA1311_BK" \
+  && [ "$(grep -c 'log_row SUCCESS' "$QA1311_BK")" = 1 ] && [ "$(grep -c 'log_row FAILED' "$QA1311_BK")" = 1 ] \
+  && ! grep -q 'log_row' <<<"$QA1311_DUMP" \
+  && grep -q 'BACKUP_ONCE' "$QA1311_BK" \
+  && grep -qh "CHECK (kind IN ('WEEKLY','MANUAL','DAILY'))" "$RD"/db/migration/V*.sql \
+  && grep -q 'data-backup-mode="docker"' "$QA1311_PAGE" && grep -q 'data-backup-mode="none"' "$QA1311_PAGE"; } \
+  && log_ok "v1311-BACKUP-DOCKER-LOGS(Docker 备份容器每个周期写一行 backup_log · DAILY · 成功失败都记 · 备份页文案按部署方式写)" \
+  || log_bad "v1311-BACKUP-DOCKER-LOGS Docker 下备份页又会是「0 次备份」,或文案又写死成 systemd 的" "see docker/backup.sh log_row · admin/backup.html · V70"
 
 echo
 echo "═══════════════════════════════════════"
