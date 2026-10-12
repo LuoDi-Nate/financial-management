@@ -495,9 +495,11 @@ $CURL -b $COOKIE "$BASE/export.zip" -o /tmp/finance-qa.zip -w ""
 file /tmp/finance-qa.zip 2>&1 | grep -q "Zip" && log_ok "FR16-1 /export.zip 是 ZIP" || log_bad "FR16-1 不是 ZIP" "$(file /tmp/qa.zip)"
 
 cnt=$(python3 -c "import zipfile; z=zipfile.ZipFile('/tmp/finance-qa.zip'); print(len(z.infolist()))" 2>/dev/null)
-# v1.30 · 多一张 principal_adjustments.csv(补录本金 —— 少了它,导出的数据重算出来的收益对不上)→ 9 张 CSV + README
-[[ "$cnt" == "10" ]] && unzip -l /tmp/finance-qa.zip 2>/dev/null | grep -q 'principal_adjustments.csv' \
-  && log_ok "FR16-2 ZIP 含 10 个文件(9 张 CSV + README · 含补录本金)" || log_bad "FR16-2 文件数 $cnt" "expected 10(含 principal_adjustments.csv)"
+# v1.30 · 多一张 principal_adjustments.csv(补录本金 —— 少了它,导出的数据重算出来的收益对不上)
+# v1.32 · 再多两张:fixed_flows.csv / fixed_flow_occurrences.csv(固定收支是家庭数据,PRD v1.32 §8)→ 11 张 CSV + README
+[[ "$cnt" == "12" ]] && unzip -l /tmp/finance-qa.zip 2>/dev/null | grep -q 'principal_adjustments.csv' \
+  && unzip -l /tmp/finance-qa.zip 2>/dev/null | grep -q 'fixed_flow_occurrences.csv' \
+  && log_ok "FR16-2 ZIP 含 12 个文件(11 张 CSV + README · 含补录本金 · 固定收支)" || log_bad "FR16-2 文件数 $cnt" "expected 12(含 principal_adjustments.csv / fixed_flows.csv / fixed_flow_occurrences.csv)"
 
 bom=$(python3 -c "import zipfile; z=zipfile.ZipFile('/tmp/finance-qa.zip'); print(z.read('families.csv')[:3].hex())" 2>/dev/null)
 [[ "$bom" == "efbbbf" ]] && log_ok "FR16-3 UTF-8 BOM 头" || log_bad "FR16-3 BOM" "got $bom"
@@ -3138,18 +3140,23 @@ WIZ17="$RD/src/main/resources/templates/accounts/_template-wizard.html"
   && log_ok "v17-WIZARD 模板卡点击回填表单(data-tpl-* + tpl-card 点击 handler + 隐藏 templateId + type 去 searchable 便于赋值),非死展示" \
   || log_bad "v17-WIZARD 模板卡未驱动表单" "see _template-wizard.html data-tpl-*/tpl-selected/tplId/click handler"
 
-# v17-LOAN-PROMPT 贷款趋势预测从「开账静默外推」改为「填报行内显式接受/保持上月」+ 兼容闸(committed==prev)
+# v17-LOAN-PROMPT 贷款趋势预测从「开账静默外推」改为「填报页显式接受/保持上月」+ 兼容闸(committed==prev)
+#   v1.32 起提示条从贷款行(_row.html)挪进了「本月收支」下面的固定收支那一行(_fixed-flows.html · FR-1117 / 1120):
+#   意图不变(人点了才写、两个按钮还是那两个方法),守的位置跟着换 —— 见 AGENTS 第 8 节「两条护栏可能编码互相矛盾的意图」
 POJ="$RD/src/main/java/com/family/finance/service/PeriodOpener.java"
 ESJ="$RD/src/main/java/com/family/finance/service/EntryService.java"
-ROW17="$RD/src/main/resources/templates/entry/_row.html"
+FF17="$RD/src/main/resources/templates/entry/_fixed-flows.html"
+FFC17="$RD/src/main/java/com/family/finance/web/fixedflow/FixedFlowEntryController.java"
 { ! grep -q 'applyLoanPrefill' "$POJ" \
   && grep -q 'predictLoanBalance' "$POJ" \
   && grep -q 'static boolean loanPromptVisible' "$ESJ" \
   && grep -q 'acceptLoanPrediction' "$ESJ" \
   && grep -q 'accept-loan-prediction' "$RD/src/main/java/com/family/finance/web/entry/EntryController.java" \
-  && grep -qF 'showLoanPrompt' "$ROW17" && grep -q '按上两月趋势' "$ROW17"; } \
-  && log_ok "v17-LOAN-PROMPT 贷款不再静默外推(删 applyLoanPrefill)· PeriodOpener 延续 prev · 填报行提示条(接受/保持上月)· acceptLoanPrediction 复刻旧逻辑 · loanPromptVisible 兼容闸(committed==prev 屏蔽老账期)" \
-  || log_bad "v17-LOAN-PROMPT 贷款显式接受缺件" "see PeriodOpener(删applyLoanPrefill/留predictLoanBalance)/EntryService.loanPromptVisible+acceptLoanPrediction/EntryController/_row.html"
+  && grep -q 'isShowLoanPrompt()' "$RD/src/main/java/com/family/finance/service/fixedflow/FixedFlowSummaryService.java" \
+  && grep -q 'entryService.acceptLoanPrediction(' "$FFC17" && grep -q 'entryService.submitBalance(' "$FFC17" \
+  && grep -q '按上两月差值,本月预计还到' "$FF17" && grep -q 'data-ff-accept' "$FF17" && grep -q 'data-ff-keep' "$FF17"; } \
+  && log_ok "v17-LOAN-PROMPT 贷款不再静默外推(删 applyLoanPrefill)· 显式「接受 / 保持上月」(v1.32 起在固定收支那一行,调的仍是 acceptLoanPrediction / submitBalance)· loanPromptVisible 兼容闸" \
+  || log_bad "v17-LOAN-PROMPT 贷款显式接受缺件" "see PeriodOpener/EntryService.loanPromptVisible+acceptLoanPrediction/FixedFlowEntryController/_fixed-flows.html"
 
 # v11-LENS-1 资产透视底座:V45 三列+lens_board · 枚举 · 注册表(≥8维5度量)· 唯一网关 · 纯函数引擎
 V45L="$RD/db/migration/V45__asset_lens.sql"
@@ -11467,6 +11474,67 @@ QA1311_DUMP="$(awk '/^dump_once\(\) \{/{f=1} f{print} f&&/^}$/{exit}' "$QA1311_B
   && grep -q 'data-backup-mode="docker"' "$QA1311_PAGE" && grep -q 'data-backup-mode="none"' "$QA1311_PAGE"; } \
   && log_ok "v1311-BACKUP-DOCKER-LOGS(Docker 备份容器每个周期写一行 backup_log · DAILY · 成功失败都记 · 备份页文案按部署方式写)" \
   || log_bad "v1311-BACKUP-DOCKER-LOGS Docker 下备份页又会是「0 次备份」,或文案又写死成 systemd 的" "see docker/backup.sh log_row · admin/backup.html · V70"
+
+# ── v1.32 · issue #38 固定收支 + issue #29 立即备份(prd/v1.32.md · tech-design/v1.32.md)──
+section "v1.32 · 固定收支(设一次 · 到日子一键确认 · 贷款试算并入)+ 立即备份"
+QA132_SVC="$RD/src/main/java/com/family/finance/service/fixedflow"
+QA132_CONF="$QA132_SVC/FixedFlowConfirmService.java"
+# ① 一条写入路径:固定收支只经 EntryService 写流水 / 划转 / 快照,自己不插行(选型二)
+{ ! for f in "$QA132_SVC"/*.java; do java_code_only "$f"; done | grep -qE 'cashFlowMapper\.insert|transferMapper\.insert|snapshotMapper\.upsert' \
+  && grep -q 'entryService.recordExpense(' "$QA132_CONF" && grep -q 'entryService.recordIncome(' "$QA132_CONF" \
+  && grep -q 'entryService.addTransfer(' "$QA132_CONF" && grep -q 'entryService.setLoanBalanceBySystem(' "$QA132_CONF" \
+  && grep -q 'LedgerSource.FIXED_FLOW' "$QA132_CONF" \
+  && grep -q 'public static final class WriteReceipt' "$RD/src/main/java/com/family/finance/service/EntryService.java"; } \
+  && log_ok "v132-ONE-WRITE-PATH(确认只调 EntryService 既有方法 · 写入回执带来源 FIXED_FLOW 与 id · 服务自己不插流水)" \
+  || log_bad "v132-ONE-WRITE-PATH 固定收支长出了第二条写入路径" "see FixedFlowConfirmService · EntryService.WriteReceipt"
+# ② 按差值与「接受」同一个函数;那段外推算式全仓只在 PeriodOpener 里
+QA132_EXTRAP="$(grep -rlF 'prev.add(prev.subtract(' "$RD/src/main/java" | grep -v 'PeriodOpener.java' || true)"
+{ grep -q 'public static BigDecimal predictLoanBalance' "$RD/src/main/java/com/family/finance/service/PeriodOpener.java" \
+  && grep -q 'PeriodOpener.predictLoanBalance' "$QA132_SVC/FixedFlowCalc.java" \
+  && grep -q 'PeriodOpener.predictLoanBalance' "$RD/src/main/java/com/family/finance/service/EntryService.java" \
+  && [ -z "$QA132_EXTRAP" ]; } \
+  && log_ok "v132-LOAN-SAME-FUNCTION(还款 · 按上两月差值 与 贷款「接受」同一个 predictLoanBalance · 外推算式只此一份)" \
+  || log_bad "v132-LOAN-SAME-FUNCTION 贷款按差值另写了一份算法" "多出来的:$QA132_EXTRAP"
+# ③ 信用卡账单 / 交保费只记划转(支出翻倍那个坑)
+QA132_TR="$(awk '/if \(f.writesTransfer\(\)\) \{/{f=1} f{print} f&&/\} else \{/{exit}' "$QA132_CONF")"
+{ grep -q 'entryService.addTransfer(' <<<"$QA132_TR" && ! grep -q 'recordExpense' <<<"$QA132_TR" \
+  && grep -q 'creditCardBill_isOnlyATransfer_neverAnExpense' "$RD/src/test/java/com/family/finance/service/fixedflow/FixedFlowConfirmServiceTest.java"; } \
+  && log_ok "v132-CARD-IS-TRANSFER(信用卡账单 / 交保费只记一笔划转、不记支出 · 单测钉住)" \
+  || log_bad "v132-CARD-IS-TRANSFER 信用卡还款又会记成支出(刷卡时已经算过一次)" "see FixedFlowConfirmService writesTransfer 分支"
+# ④ 系统从不自己记:固定收支服务里没有定时任务,确认端点都是 POST
+{ ! for f in "$QA132_SVC"/*.java; do java_code_only "$f"; done | grep -q '@Scheduled' \
+  && ! grep -q '@GetMapping' "$RD/src/main/java/com/family/finance/web/fixedflow/FixedFlowEntryController.java"; } \
+  && log_ok "v132-NO-SILENT-WRITE(没有定时入账 · 确认 / 撤销都是人点的 POST)" \
+  || log_bad "v132-NO-SILENT-WRITE 固定收支出现了不经人确认的写入" "see service/fixedflow · FixedFlowEntryController"
+# ⑤ 贷款提示条挪进摘要:_row.html 不再有接受表单,只剩一行指路
+QA132_ROW="$RD/src/main/resources/templates/entry/_row.html"
+{ ! grep -q 'accept-loan-prediction' "$QA132_ROW" && grep -q 'data-ff-loan-hint' "$QA132_ROW" \
+  && grep -q "entry/_fixed-flows :: bar(" "$RD/src/main/resources/templates/entry/index.html" \
+  && grep -q 'data-ff-entry' "$RD/src/main/resources/templates/entry/index.html"; } \
+  && log_ok "v132-LOAN-PROMPT-MOVED(贷款行变短:提示条挪进「本月收支」下面那一行 · 标题行有「固定收支」入口)" \
+  || log_bad "v132-LOAN-PROMPT-MOVED 贷款提示又回到行内,或填报页没有固定收支入口" "see entry/_row.html · entry/index.html"
+# ⑥ 新表进隔离审计 / 导出 / 清演示数据
+{ grep -q 'fixed_flow fixed_flow_occurrence' "$RD/scripts/family-isolation-audit.py" \
+  && grep -q '"fixed_flows.csv"' "$RD/src/main/java/com/family/finance/service/export/CsvExportService.java" \
+  && grep -q '"fixed_flow_occurrences.csv"' "$RD/src/main/java/com/family/finance/service/export/CsvExportService.java" \
+  && [ "$(grep -l 'TRUNCATE TABLE fixed_flow;' "$RD/docker/clean-dev-data.sh" "$RD/deploy/deploy.sh" "$RD/deploy/_deploy-macos.sh" | wc -l)" -eq 3 ] \
+  && [ "$(grep -l 'TRUNCATE TABLE fixed_flow_occurrence;' "$RD/docker/clean-dev-data.sh" "$RD/deploy/deploy.sh" "$RD/deploy/_deploy-macos.sh" | wc -l)" -eq 3 ]; } \
+  && log_ok "v132-FAMILY-TABLES(两张新表进隔离审计 · 导出 CSV 包 · 三处清演示数据)" \
+  || log_bad "v132-FAMILY-TABLES 固定收支的表漏了隔离审计 / 导出 / 清演示数据" "see family-isolation-audit.py · CsvExportService · clean-dev-data.sh"
+# ⑦ 立即备份:锁 + 间隔 + 超时 + 校验 + 原话 + 文件名落进自动备份的滚动删除前缀 + systemd 可写白名单 + 部署方式由控制器给
+QA132_BK="$RD/src/main/java/com/family/finance/service/backup/BackupNowService.java"
+{ grep -q 'lock.tryLock()' "$QA132_BK" && grep -q 'MIN_GAP = Duration.ofSeconds(60)' "$QA132_BK" \
+  && grep -q 'destroyForcibly' "$QA132_BK" && grep -q 'CREATE TABLE' "$QA132_BK" && grep -q 'MYSQL_PWD' "$QA132_BK" \
+  && grep -q '"dump-manual-"' "$QA132_BK" && grep -q '"finance-manual-"' "$QA132_BK" \
+  && grep -q "name 'dump-\*.sql.gz'" "$RD/deploy/backup.sh" && grep -q "name 'finance-\*.sql.gz'" "$RD/docker/backup.sh" \
+  && grep -q 'ReadWritePaths=.*-/var/backup/finance' "$RD/deploy/finance.service" \
+  && grep -q 'backupMode' "$RD/src/main/java/com/family/finance/web/admin/AdminController.java" \
+  && grep -q 'data-backup-now' "$RD/src/main/resources/templates/admin/backup.html" \
+  && ! grep -q "logs\[0\].kind == 'DAILY'" "$RD/src/main/resources/templates/admin/backup.html"; } \
+  && log_ok "v132-BACKUP-NOW(立即备份:同一时间一个 · 1 分钟间隔 · 10 分钟超时 · 能解压且有建表才算 · 失败记原话 · 跟自动备份同一个目录同一套滚动删除)" \
+  || log_bad "v132-BACKUP-NOW 立即备份缺件(锁 / 间隔 / 校验 / 原话 / 目录白名单 / 部署方式)" "see BackupNowService · finance.service · admin/backup.html"
+[ -f "$RD/scripts/e2e/flows/48-fixed-flows.cjs" ] \
+  && log_ok "v132-E2E(flow 48:页面 + 库两层,13 段)" || log_bad "v132-E2E 缺 flow 48" "scripts/e2e/flows/48-fixed-flows.cjs"
 
 echo
 echo "═══════════════════════════════════════"

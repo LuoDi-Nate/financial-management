@@ -117,6 +117,8 @@ worktree 的工作目录里没有 `.githooks/`(那是 master 上的文件),hook 
   - **分析模板**(`AnalysisTemplate`)—— AI 的角度:侧重(1–4)· 立场 · 固定范围 · 指定锚 · 补充要求(≤500 字)。**内置 5 个随代码走**(`BuiltinTemplates`,改了加 version);「我的模板」存**完整副本**(`analysis_template`)。**只改 AI 的说法,不改任何数字、不改规则卡片**。「综合体检 · 全部资产 · 没偏好」= v1.26 提示词逐字(金样本 `golden/v1261`)。
   - **分析偏好**(`analysis_preference`)—— 家里人写给 AI 的句子,只进提示词,先过真名映射,压在所有材料之后并带「数字以系统为准」。**写入只有两条:分析设置页、超级 Agent 确认卡上用户点「记住」**(`{{remember:…}}` 正文标记,工具表里没有写能力)。
   - **有效目标**(配置锚)—— 范围内没有房产 / 保险的桶不参与,其余按原比例放大到 100;现金、投资桶始终参与;「其他」类不进四桶;自定义锚没填不出对照。
+- **固定收支**(v1.32 · issue #38 · 见 L24):每期(或每年固定几个月)都会发生的那一笔的**设置**(`fixed_flow`)—— 收入 / 支出 / 还款(贷款月供 · 信用卡账单)/ 交保费;金额固定,或五种自动计算(`FixedFlowCalc`:按上两月差值 = 原贷款试算、月供按年利率拆、全额还上期、按保单保费、近 3 期平均)。**系统只算不记**:到了日子(现算,`FixedFlowSchedule`)出现在填报页「本月收支」下面那一行,人点「确认」才经 `EntryService` 既有方法写进去(来源 `FIXED_FLOW`),和手动记的完全一样;每期结果(确认 / 这期没有 / 就是导入的那笔)在 `fixed_flow_occurrence`,两张表都**不进任何金额计算**。信用卡账单与交保费只记划转(不算支出);没设固定还款的贷款照旧出趋势建议(同一个 `predictLoanBalance`)。
+- **立即备份**(v1.32 · issue #29):「管理 → 备份」按钮,应用自己跑 `mysqldump` 写进与自动备份同一个目录(systemd 的 unit 可写白名单要含 `/var/backup/finance`),与 Docker 备份同一套校验;v1.33 删除账户前也调它。
 - **看 AI 收到了什么**(v1.28 · 见 L20):
   - **发出去的内容**(`llm_prompt_record` + 按 (家庭, sha256) 去重的 `llm_system_prompt`)—— 一次调用真正交给大模型的「规矩」(system)与「你家的数据」(user)原文。**只在 `LlmRouter.invoke(familyId, PromptTrace, …)` 的调用循环里写**(超级 Agent 在发出那一刻经 `AskTurn.onPromptSent` 写;托管 Agent 的规矩在「更新 / 创建 Agent」成功时存一份)。结果带编号(内存缓存条目 / 缓存行 `prompt_record_id` / JSON 的 `peek`);**页面只读记录,不重拼**;没记录的老结果照实说「那时还没开始记录」。
   - **>_ 面板**(`fragments/_prompt-peek.html` · `PromptPeekView` · `js/prompt-peek.js`)—— 卡片头的终端面板;「你的设置带来的」段落按 `AnalysisPromptBlocks.H_*` 标题标色写来源;命令 `rules / data / mine / copy / help / exit` 都有按钮;开关 `ai_prompt_peek`(管理 → AI 接入,缺省开)。
@@ -140,7 +142,7 @@ worktree 的工作目录里没有 `.githooks/`(那是 master 上的文件),hook 
 | tab / 页 | 路由 | 干什么 | 关键文件 |
 |---|---|---|---|
 | 仪表盘 | `/dashboard` | 净资产/趋势(CPI+M2 线)/配置环/KPI 横条/**人赚vs钱赚拆解**/AI 洞察 | `dashboard/index.html` + `_region.html` · `DashboardController` · `CashflowSplitView` |
-| 填报 | `/entry` | 每月录入:账户余额快照 + 收支 + 划转;**收入侧结构化**(现金/股票·联动持仓);退休目标折叠于此 | `entry/index.html` + `_row.html` + `_income-stock.html` · `EntryController`/`EntryService` |
+| 填报 | `/entry` | 每月录入:账户余额快照 + 收支 + 划转;**收入侧结构化**(现金/股票·联动持仓);**「本月收支」下面一行固定收支**(v1.32:到日子的一键确认 · 贷款趋势建议也在这里 · 标题行「固定收支」进管理页);退休目标折叠于此 | `entry/index.html` + `_row.html` + `_income-stock.html` + `_fixed-flows.html` · `EntryController`/`EntryService` · `FixedFlowEntryController` |
 | 账户 | `/accounts` | **10 类**账户簿(现金/股票/理财/基金/加密/贵金属/房产/负债/保险/其他) · 按成员归集 · 划转/体检/账本/导出(时间线含「# 持仓数量」)· 能挂持仓的账户 → 持仓管理(v1.30「添加持仓 · 场外基金」→ `/accounts/{id}/holdings/new-fund`;手填基金「改为按净值自动估值」→ `/to-nav`) | `accounts/*` · `stock/holdings.html` · `stock/fund-new.html` + `_fund-parts.html` · `StockHoldingController` · `FundHoldingController` |
 | 报表 | `/reports` | **月度封板快照**(v1.10 三区):一区 本期封板(资产负债表/资金流瀑布/环比同比/归因)· 二区 结构与风险(集中度/流动性分层)· 三区 趋势(**range 只作用于此**)· 账期筛选 + 长文目录 TOC | `reports/*` · `_toc` |
 | 目标 | `/goals` | FIRE 退休 / 教育 / 应急金 · 三情景预测 | `goals/*` |
@@ -236,6 +238,7 @@ worktree 的工作目录里没有 `.githooks/`(那是 master 上的文件),hook 
 
 | L21 · 加账户类型(v1.30 是第三次:METAL v0.14 / INSURANCE v0.17 / FUND v1.30) | 给 `AccountType` 加取值 | ① 枚举谓词(`isInvestment` / `isLiability` / `expectsFlowsToExplainBalance`)显式归类 + `AccountTypeSemanticsTest`;② 编译器抓得到的穷尽 switch(流动性 / 资产类别 / 托管形态 / 默认类目 / 风险档 / 排序);③ **编译器抓不到的**:模板里的类型字面量链(账户页 / 详情 / 填报行的标签色)、`BenchmarkAggregator` 兜底表、`AllocationDiff` 桶、金融盘清单、`supportsHoldings`、产品类目 `applicable_types`;④ 迁移放宽 `ck_account_type` / `ck_account_template_type`;⑤ **老 jar 不认识新取值** → 写 `db/rollback/vX.Y.sql` 把它改回旧类型 | `v130-FUND-TYPE-SWEPT` · `v130-FUND-ROLLBACK-SQL` · `AccountTypeSemanticsTest` |
 | L22 · 补录本金(v1.30) | 改「外部投入」的口径 / 加新的「本来就有」入口 / 动 `principal_adjustment` | ① **只从事实层进指标**:`FactMapper.queryBase` 的 `padj` 子查询 → `FactProjector`(本期收益扣掉;第一期归零)→ `FactViewServiceImpl`(账户累计净投入 / 账户 XIRR / `openingBaseline`)。别处不许读这张表算钱(填报页「未解释差额」当已知流入是本账户视角的解释,允许);② 新加一种「本来就有」的入口,金额要按 HALF_EVEN 到分(与估值写回的余额舍入同向)、只许记开着的期、第一期不许记;③ 导出 / 清演示数据 / 家庭隔离审计都要带上表;④ 回滚 jar 时表被忽略 = 那几期退回「算成收益」(与之前一致),不需要回滚 SQL | `v130-PRINCIPAL-ONE-PATH` · `v130-PRINCIPAL-FIRST-PERIOD` · `v130-PRINCIPAL-ENTRY` · `PrincipalAdjustmentMetricsTest` · e2e flow 45 |
+| L24 · 系统替人记一笔(v1.32 固定收支) | 加任何「按设置 / 按规则帮人写一笔流水、划转、余额」的入口(固定收支确认、将来的同类能力) | ① **只经 `EntryService` 既有方法**,带 `WriteReceipt`(来源标签 + 回填写进去的 id),不在别处插 `cash_flow` / `transfer` / `period_snapshot`;② **人点了才写**,不加定时入账;③ 一次写多样东西要在一个事务里,重复点挡在库(唯一键先占位);④ 记下写了哪几笔、贷款余额写前写后,撤销按 id 删、只在值没被人改过时还原;⑤ 新表进隔离审计 / 导出 / 清演示数据 | `v132-ONE-WRITE-PATH` · `v132-NO-SILENT-WRITE` · `v132-FAMILY-TABLES` · `FixedFlowConfirmServiceTest` · e2e flow 48 |
 | L23 · 手机上的表格与设置页(v1.31) | 新增 / 改**会在手机上显示的表格**;新增设置页 | 表格:同一份 `<table>` 加 `m-cards` + 单元格角色类(`m-title` 这一行是谁 / `m-badge` 状态标签 / 普通格带 `data-label` / `m-act` 操作整行 / `m-full` 长文本),**不另写一份手机 DOM**;操作格不许 `m-hide`;有意横滑的宽表(交叉透视、本期 vs 上期)除外。设置页:侧栏清单(`admin/_sidebar.html`)加一项、页面 include 侧栏。手机验收用 `ui.phone(fn)`(390×844 触屏;只改视口宽度看不到右下浮钮) | `v131-ADMIN-NAV` · `v131-MOBILE-CARDS` · e2e flow 47 |
 
 **新链怎么加**:出现"改 A 漏了 B"事故 → 加一行(触发/必须同步/守护)+ `qa-run.sh` 加静态 grep 把它网住,下次它自己 fail。

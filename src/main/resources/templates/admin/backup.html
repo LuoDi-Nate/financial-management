@@ -53,7 +53,7 @@
              th:text="${#lists.isEmpty(logs) ? '—' : #temporals.format(logs[0].startedAt,'M月d日 HH:mm')}">5 月 4 日 03:00</div>
         <div class="font-mono text-xs num-pos mt-1"
              th:if="${!#lists.isEmpty(logs) and logs[0].status == 'SUCCESS'}"
-             th:text="|✓ 成功 · ${logs[0].sizeBytes != null ? (logs[0].sizeBytes / 1024 / 1024) + ' MB' : ''}|">✓ 成功</div>
+             th:text="|✓ 成功 · ${logs[0].sizeBytes == null ? '' : (logs[0].sizeBytes >= 1048576 ? (logs[0].sizeBytes / 1024 / 1024) + ' MB' : (logs[0].sizeBytes / 1024) + ' KB')}|">✓ 成功</div>
         <!--/* v1.31.1 · 最近一次是失败的,这里原来什么都不写 —— 只剩一个日期,看着像成功了 */-->
         <div class="font-mono text-xs text-rust mt-1"
              th:if="${!#lists.isEmpty(logs) and logs[0].status == 'FAILED'}">✗ 失败 · 原因见下表「错误」</div>

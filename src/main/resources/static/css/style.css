@@ -2844,3 +2844,19 @@ body.adm-open #float-dock { display: none !important; }
   .ff-l3 button { width: 100%; min-height: 36px; justify-content: center; }
   .ff-amt-in { width: 6.5rem; }
 }
+@media (max-width: 767.98px) {
+  /* 手机上摘要那一行要放得下「固定收支 · N 笔待确认 · 共 ¥X · 管理」:展开 / 收起两个字让给左边的箭头 */
+  .ff-toggle { display: none; }
+}
+@media (min-width: 768px) {
+  /* PC 上按钮挪到第一行右边:一笔两行(名称 · 种类 · 金额 | 按钮 / 账户 · 算式),不是三行 */
+  .ff-form, .ff-row-sug, .ff-row-done { display: grid; grid-template-columns: minmax(0,1fr) auto; column-gap: 18px; align-items: center; }
+  .ff-form > *, .ff-row-sug > *, .ff-row-done > * { grid-column: 1; }
+  .ff-form > .ff-l3, .ff-row-sug > .ff-l3, .ff-row-done > .ff-l3 { grid-column: 2; grid-row: 1; margin-top: 0; }
+  .ff-row-done > .ff-l3 { display: flex; }
+}
+/* 管理页「固定收支」:改 / 停用 两个动作在手机卡片里也排成一行 */
+.ff-acts { display: inline-flex; align-items: center; gap: 14px; }
+@media (max-width: 767.98px) {
+  table.m-cards > tbody > tr > td.m-act .ff-acts form { display: inline; width: auto; }
+}

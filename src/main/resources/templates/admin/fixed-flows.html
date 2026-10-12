@@ -40,11 +40,11 @@
     <div th:if="${total > 0}" class="paper-card overflow-x-auto m-cards-wrap">
       <table class="ledger-table m-cards" data-ff-table>
         <thead>
-          <tr><th>名称</th><th>金额</th><th>账户</th><th>周期</th><th class="num">几号</th><th>负责人</th><th></th></tr>
+          <tr><th>名称</th><th></th><th>金额</th><th>账户</th><th>周期</th><th class="num">几号</th><th>负责人</th><th></th></tr>
         </thead>
         <tbody>
           <th:block th:each="g : ${groups}" th:if="${!#lists.isEmpty(g.value)}">
-            <tr class="ff-grp"><td colspan="7" class="m-full font-mono text-[10px] tracking-[0.24em] text-brass-deep pt-4"
+            <tr class="ff-grp"><td colspan="8" class="m-full font-mono text-[10px] tracking-[0.24em] text-brass-deep pt-4"
                 th:text="${g.key == 'INCOME' ? '收 · 入' : (g.key == 'EXPENSE' ? '支 · 出' : (g.key == 'REPAY' ? '还 · 款' : '交 · 保 · 费'))}">收 · 入</td></tr>
             <tr th:each="r : ${g.value}" th:classappend="${!r.flow.active} ? ' opacity-50' : ''"
                 th:attr="data-ff-row=${r.flow.id}">
@@ -62,7 +62,7 @@
               <td data-label="周期" th:text="${r.cycleLabel}">每月</td>
               <td data-label="几号" class="num font-mono" th:text="${r.flow.dayOfMonth}">10</td>
               <td data-label="负责人" th:text="${r.ownerName}">迪娃</td>
-              <td class="m-act whitespace-nowrap">
+              <td class="m-act whitespace-nowrap"><div class="ff-acts">
                 <a th:href="@{/admin/fixed-flows/{id}/edit(id=${r.flow.id}, back=${back})}" class="brass-link text-xs mr-2" data-ff-edit>改</a>
                 <form th:if="${r.flow.active}" th:action="@{/admin/fixed-flows/{id}/disable(id=${r.flow.id})}" method="post" class="inline">
                   <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
@@ -73,7 +73,7 @@
                   <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
                   <button type="submit" class="text-xs text-brass-deep hover:underline">重新启用</button>
                 </form>
-              </td>
+              </div></td>
             </tr>
           </th:block>
         </tbody>
