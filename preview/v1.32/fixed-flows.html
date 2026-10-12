@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>v1.32 Preview · 固定收支</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..700&family=JetBrains+Mono:wght@300;400;500&family=Noto+Serif+SC:wght@300;400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/style.css">
+<style>
+  body{background:var(--paper-deep);margin:0}
+  .wrap{max-width:1340px;margin:0 auto;padding:28px 20px 80px;position:relative;z-index:2}
+  .mono{font-family:'JetBrains Mono',monospace;font-feature-settings:"tnum" 1}
+  .serif{font-family:'Fraunces','Noto Serif SC',serif}
+  h1,h2,h3{font-family:'Fraunces','Noto Serif SC',serif;font-weight:500;margin:0}
+  .note{font-size:12.5px;color:var(--ink-soft);line-height:1.8}
+  .zone{margin-top:46px}
+  .zone-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+  .zone-no{font-family:'JetBrains Mono',monospace;font-size:18px;color:var(--paper);background:var(--brass-deep);line-height:1;padding:5px 10px}
+  .zone-t{font-family:'Fraunces','Noto Serif SC',serif;font-size:21px}
+  .zone-fr{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink-subtle);letter-spacing:.06em}
+  .zone-line{height:2px;background:var(--brass-deep);opacity:.35;margin:10px 0 16px}
+  .row{display:flex;gap:26px;flex-wrap:wrap;align-items:flex-start}
+  .col{display:flex;flex-direction:column;gap:8px}
+  .cap{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.12em;color:var(--forest)}
+  .side-note{max-width:340px;font-size:12.5px;line-height:1.85;color:var(--ink-soft)}
+  .side-note b{color:var(--ink)}
+  .side-note li{margin-bottom:6px}
+  .k{font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.14em;color:var(--ink-subtle)}
+  .card{border:1px solid var(--rule);background:var(--card);padding:16px 18px}
+  .btn-ink{background:var(--ink);color:var(--paper);border:1px solid var(--ink);padding:6px 12px;font-size:12px;letter-spacing:.04em;white-space:nowrap;display:inline-flex;align-items:center;gap:5px}
+  .btn-paper{background:transparent;color:var(--ink);border:1px solid var(--ink);padding:5px 11px;font-size:12px;white-space:nowrap;display:inline-flex;align-items:center}
+  .btn-ghost{background:transparent;color:var(--ink-soft);border:1px solid var(--rule);padding:5px 10px;font-size:12px;white-space:nowrap}
+  .link{color:var(--brass-deep);font-size:12px;text-decoration:underline;text-underline-offset:3px}
+  .tag{display:inline-block;white-space:nowrap;font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.06em;padding:2px 7px;border:1px solid var(--rule);color:var(--ink-soft);background:var(--paper-soft)}
+  .t-in{background:var(--forest-soft);color:var(--forest);border-color:var(--forest)}
+  .t-out{background:var(--rust-soft);color:var(--rust);border-color:var(--rust)}
+  .t-loan{background:rgba(60,74,90,.12);color:var(--slate);border-color:var(--slate)}
+  .t-ins{background:var(--brass-soft);color:var(--brass-deep);border-color:var(--brass)}
+  .t-sug{background:transparent;color:var(--brass-deep);border-style:dashed;border-color:var(--brass-deep)}
+  .due{font-family:'JetBrains Mono',monospace;font-size:10.5px;padding:1px 6px;white-space:nowrap}
+  .due.now{color:var(--paper);background:var(--rust)}
+  .due.later{color:var(--ink-subtle);border:1px solid var(--rule-soft)}
+  .av{display:inline-flex;width:20px;height:20px;border-radius:50%;color:#fff;font-size:11px;align-items:center;justify-content:center;flex-shrink:0}
+  .av.w{background:#3f5a4c}.av.d{background:#5c4a7a}.av.g{background:#3c5a7a}
+  .amt{font-family:'JetBrains Mono',monospace;font-size:15px;white-space:nowrap}
+  .sub{font-size:11.5px;color:var(--ink-subtle);line-height:1.6}
+
+  /* —— 本期固定收支卡(PC)—— */
+  .ff{border:1px solid var(--rule);border-left:4px solid var(--brass-deep);background:var(--card);width:900px}
+  .ff-h{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--rule)}
+  .ff-h .t{font-family:'Fraunces','Noto Serif SC',serif;font-size:19px}
+  .ff-h .cnt{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--rust)}
+  .ff-r{display:grid;grid-template-columns:150px 70px 120px 1fr auto;gap:12px;align-items:center;padding:12px 18px;border-bottom:1px solid var(--rule-soft)}
+  .ff-r .nm{font-family:'Fraunces','Noto Serif SC',serif;font-size:15.5px;display:flex;align-items:center;gap:8px}
+  .ff-r .act{display:flex;gap:6px;align-items:center;justify-content:flex-end}
+  .ff-r.done{background:rgba(79,107,71,.05)}
+  .ff-r.done .nm{color:var(--ink-soft)}
+  .ff-r.sug{background:rgba(176,134,66,.06)}
+  .ff-r.later{opacity:.72}
+  .ok{color:var(--forest);font-size:12.5px;white-space:nowrap}
+  .hint{grid-column:1/-1;margin-top:-4px;font-size:12px;color:var(--brass-deep);display:flex;gap:10px;align-items:center;background:rgba(176,134,66,.08);padding:6px 10px}
+  .amt-in{width:96px;border:1px solid var(--brass-deep);background:#fffdf7;font-family:'JetBrains Mono',monospace;font-size:14px;padding:4px 8px;text-align:right}
+  .diff{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--rust)}
+
+  /* —— 手机外框 —— */
+  .phone{width:390px;height:844px;border:12px solid #111;border-radius:46px;background:var(--paper);position:relative;overflow:hidden;box-shadow:0 18px 40px -18px rgba(0,0,0,.45)}
+  .phone::before{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:120px;height:26px;background:#111;border-radius:0 0 16px 16px;z-index:50}
+  .screen{position:absolute;inset:0;overflow:hidden;padding:40px 12px 0}
+  .m-ff{border:1px solid var(--rule);border-left:4px solid var(--brass-deep);background:var(--card)}
+  .m-ff .ff-h{padding:12px 12px;flex-wrap:wrap}
+  .m-r{padding:11px 12px;border-bottom:1px solid var(--rule-soft)}
+  .m-r .l1{display:flex;align-items:center;gap:8px}
+  .m-r .l1 .nm{font-family:'Fraunces','Noto Serif SC',serif;font-size:15.5px;flex:1;min-width:0}
+  .m-r .l2{display:flex;justify-content:space-between;align-items:center;margin-top:5px;font-size:12px;color:var(--ink-subtle)}
+  .m-r .l3{display:flex;gap:8px;margin-top:9px}
+  .m-r .l3 .btn-ink,.m-r .l3 .btn-paper{flex:1;justify-content:center;min-height:36px}
+  .m-r.done{background:rgba(79,107,71,.05)}
+  .m-r.sug{background:rgba(176,134,66,.06)}
+
+  /* —— 表单 / 管理页 —— */
+  .form{width:430px}
+  .lbl{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--ink-subtle);letter-spacing:.08em;margin-bottom:4px}
+  .inp{border:none;border-bottom:1px solid var(--rule);background:transparent;padding:6px 2px;font-size:14px;width:100%;font-family:inherit}
+  .chk{display:flex;gap:8px;align-items:flex-start;font-size:13px;margin-top:12px;padding:10px 12px;border:1px dashed var(--brass-deep);background:rgba(176,134,66,.06)}
+  .chk .box{width:15px;height:15px;border:1.5px solid var(--ink);background:var(--ink);flex-shrink:0;margin-top:2px;position:relative}
+  .chk .box::after{content:'';position:absolute;left:4px;top:1px;width:4px;height:8px;border:solid var(--paper);border-width:0 2px 2px 0;transform:rotate(45deg)}
+  .seg{display:inline-flex;border:1px solid var(--rule)}
+  .seg span{padding:6px 12px;font-size:12.5px}
+  .seg .on{background:var(--ink);color:var(--paper)}
+  .mg{width:880px}
+  .mg table{width:100%;border-collapse:collapse;font-size:13px}
+  .mg th{font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.14em;color:var(--ink-subtle);text-align:left;padding:6px 8px;border-bottom:1px solid var(--ink);font-weight:400}
+  .mg td{padding:9px 8px;border-bottom:1px solid var(--rule-soft);white-space:nowrap}
+  .grp{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.24em;color:var(--brass-deep);padding:14px 8px 4px!important;border-bottom:none!important}
+  .off td{color:var(--ink-faint,#A09486)}
+  .tiny-card{border:1px solid var(--rule);background:var(--card);padding:14px 16px;width:420px}
+  .navbar{display:flex;gap:18px;align-items:center;border:1px solid var(--rule);background:var(--paper);padding:10px 16px;font-size:12.5px;letter-spacing:.08em;width:520px}
+  .badge{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--rust);margin-left:2px}
+  .banner{border:1px solid var(--rust);background:#fff8f3;padding:12px 16px;display:flex;align-items:center;gap:14px;width:620px;font-size:14px}
+  .imp td{padding:8px 8px;border-bottom:1px solid var(--rule-soft);font-size:13px;white-space:nowrap}
+  .imp .cb{width:14px;height:14px;border:1.5px solid var(--ink);display:inline-block;vertical-align:-2px}
+  .imp .cb.on{background:var(--ink)}
+  .dup td{color:var(--ink-subtle);background:rgba(160,148,134,.08)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="eyebrow">v1.32 · preview · 固定收支(issue #38 + 贷款还款提示并入)· 金额均为样例</div>
+  <h1 style="font-size:34px;margin-top:6px">每期都有的那几笔,设一次,到日子一键确认</h1>
+  <p class="note" style="max-width:900px;margin-top:8px">
+    四种:<span class="tag t-in">收入</span> <span class="tag t-out">支出</span> <span class="tag t-loan">还款</span> <span class="tag t-ins">交保费</span>。
+    系统<b>从不自己记</b>:到了日子列出来,人点「确认」才写进去,写进去的和手动记一笔完全一样。原来贷款行的「按上两月趋势…」挪进同一张卡,作为一行<span class="tag t-sug">建议</span>。
+  </p>
+
+  <!-- ① 填报页卡片 · PC -->
+  <section class="zone">
+    <div class="zone-head"><span class="zone-no">1</span><span class="zone-t">填报页 ·「本期固定收支」卡(第一步最上面)</span><span class="zone-fr">FR-1110 ~ 1115 · 1120 ~ 1122 · 1151</span></div>
+    <div class="zone-line"></div>
+    <div class="row">
+      <div class="col">
+        <div class="ff">
+          <div class="ff-h">
+            <span class="t">本期固定收支</span><span class="cnt">3 笔待确认</span>
+            <span class="k">2026 · 10 · 截止 10 月 31 日</span>
+            <span style="flex:1"></span>
+            <span class="btn-ink">全部确认(3)</span><span class="link">管理</span>
+          </div>
+          <!-- 已确认 -->
+          <div class="ff-r done">
+            <span class="nm"><span class="av d">迪</span>工资</span>
+            <span class="tag t-in">收入</span>
+            <span class="amt">¥25,000</span>
+            <span class="sub">→ 工商银行-备用金 · 10 号</span>
+            <span class="act"><span class="ok">✓ 已记 · 工商银行 收入 ¥25,000</span><span class="link">撤销</span></span>
+          </div>
+          <!-- 待确认 · 金额改过 -->
+          <div class="ff-r">
+            <span class="nm"><span class="av g">共</span>物业费</span>
+            <span class="tag t-out">支出</span>
+            <span><input class="amt-in" value="520"></span>
+            <span class="sub">← 招商银行 · 住房物业 · <span class="due now">5 号 · 待确认</span><br><span class="diff">比上次多 ¥40</span> · <span class="link">以后都按 ¥520?</span></span>
+            <span class="act"><span class="btn-ink">确认</span><span class="btn-ghost">这期没有</span></span>
+          </div>
+          <!-- 待确认 · 导入里可能有 -->
+          <div class="ff-r">
+            <span class="nm"><span class="av w">王</span>车位月保</span>
+            <span class="tag t-out">支出</span>
+            <span class="amt">¥300</span>
+            <span class="sub">← 支付宝-余额宝 · 交通出行 · <span class="due now">8 号 · 待确认</span></span>
+            <span class="act"><span class="btn-ink">确认</span><span class="btn-ghost">这期没有</span></span>
+            <div class="hint">导入的账单里有一笔 ¥300(10-08 · 停车场月卡)可能就是它 <span class="btn-paper" style="padding:2px 9px">就是它</span><span class="k">点了 = 标为已确认,不再另记一笔</span></div>
+          </div>
+          <!-- 还款 -->
+          <div class="ff-r">
+            <span class="nm"><span class="av g">共</span>房贷-招行</span>
+            <span class="tag t-loan">还款</span>
+            <span class="amt">¥6,320</span>
+            <span class="sub">← 工资卡 · <span class="due now">20 号 · 待确认</span><br>确认 = 工资卡记一笔「还贷」¥6,320 + 房贷余额按趋势更新到 −1,179,800</span>
+            <span class="act"><span class="btn-ink">确认</span><span class="btn-ghost">这期没有</span></span>
+          </div>
+          <!-- 贷款趋势建议(没设固定还款)-->
+          <div class="ff-r sug">
+            <span class="nm"><span class="av d">迪</span>车贷-平安</span>
+            <span class="tag t-sug">建议</span>
+            <span class="amt">−86,000</span>
+            <span class="sub">按上两月趋势,本月预计还到 −86,000(较上月 −3,000)<br>原来在贷款行里的那条提示,按钮和结果都不变</span>
+            <span class="act"><span class="btn-ink">接受</span><span class="btn-ghost">保持上月</span><span class="link">设成固定还款</span></span>
+          </div>
+          <!-- 还没到 -->
+          <div class="ff-r later">
+            <span class="nm"><span class="av d">迪</span>视频会员</span>
+            <span class="tag t-out">支出</span>
+            <span class="amt">¥25</span>
+            <span class="sub">← 招行信用卡 · 文化休闲 · <span class="due later">28 号</span></span>
+            <span class="act"><span class="btn-paper">提前确认</span><span class="btn-ghost">这期没有</span></span>
+          </div>
+        </div>
+        <div class="cap">PC · 卡片在「第一步 · 本月收支」最上面</div>
+      </div>
+      <div class="side-note">
+        <ul>
+          <li><b>到了日子</b>的标红「待确认」;没到的标「28 号」,也能提前确认。「全部确认」只确认已到日子的。</li>
+          <li>当场改金额 → 标出「比上次多 ¥40」,问「以后都按 ¥520?」(默认不改)。</li>
+          <li>确认后显示<b>记成了什么</b>,能撤销(那一笔删掉、余额回去)。</li>
+          <li><b>还款</b>一次确认 = 「还贷」支出 + 贷款余额,两样都是今天已有的写法。</li>
+          <li>没设固定还款的贷款:原来贷款行里的趋势提示挪进来,多一个「设成固定还款」。<b>一个贷款只出一行。</b></li>
+          <li>先导入了账单的:提示「可能就是它」,点了不再另记。</li>
+          <li>年缴的保费不在本期,就不出现(管理页里看得到)。</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ② 手机 -->
+  <section class="zone">
+    <div class="zone-head"><span class="zone-no">2</span><span class="zone-t">手机上:一笔一行,按钮整行点得中</span><span class="zone-fr">FR-1110 · 1111 · v1.31 卡片排法</span></div>
+    <div class="zone-line"></div>
+    <div class="row">
+      <div class="phone"><div class="screen">
+        <div class="m-ff">
+          <div class="ff-h"><span class="t" style="font-family:'Fraunces','Noto Serif SC',serif;font-size:18px">本期固定收支</span><span class="cnt" style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--rust)">3 笔待确认</span><span style="flex:1"></span><span class="link">管理</span>
+            <span class="btn-ink" style="width:100%;justify-content:center;min-height:38px;margin-top:6px">全部确认(3)</span></div>
+          <div class="m-r done"><div class="l1"><span class="av d">迪</span><span class="nm">工资</span><span class="tag t-in">收入</span></div>
+            <div class="l2"><span>→ 工商银行-备用金 · 10 号</span><span class="amt" style="font-size:14px">¥25,000</span></div>
+            <div class="l2"><span class="ok">✓ 已记</span><span class="link">撤销</span></div></div>
+          <div class="m-r"><div class="l1"><span class="av g">共</span><span class="nm">物业费</span><span class="tag t-out">支出</span></div>
+            <div class="l2"><span>← 招商银行 · <span class="due now">5 号 · 待确认</span></span><span class="amt" style="font-size:14px">¥480</span></div>
+            <div class="l3"><span class="btn-ink">确认</span><span class="btn-paper">这期没有</span></div></div>
+          <div class="m-r"><div class="l1"><span class="av w">王</span><span class="nm">车位月保</span><span class="tag t-out">支出</span></div>
+            <div class="l2"><span>← 支付宝-余额宝 · <span class="due now">8 号 · 待确认</span></span><span class="amt" style="font-size:14px">¥300</span></div>
+            <div class="l3"><span class="btn-ink">确认</span><span class="btn-paper">这期没有</span></div></div>
+          <div class="m-r"><div class="l1"><span class="av g">共</span><span class="nm">房贷-招行</span><span class="tag t-loan">还款</span></div>
+            <div class="l2"><span>← 工资卡 · <span class="due now">20 号 · 待确认</span></span><span class="amt" style="font-size:14px">¥6,320</span></div>
+            <div class="l3"><span class="btn-ink">确认</span><span class="btn-paper">这期没有</span></div></div>
+          <div class="m-r sug"><div class="l1"><span class="av d">迪</span><span class="nm">车贷-平安</span><span class="tag t-sug">建议</span></div>
+            <div class="l2"><span>按上两月趋势,本月预计还到</span><span class="amt" style="font-size:14px">−86,000</span></div>
+            <div class="l3"><span class="btn-ink">接受</span><span class="btn-paper">保持上月</span></div></div>
+        </div>
+      </div></div>
+      <div class="side-note">
+        <ul>
+          <li>每笔:第一行「谁 · 名称 · 种类」,第二行「账户 · 几号 · 金额」,第三行两个按钮<b>占满整行</b>。</li>
+          <li>和 v1.31 周期表同一套卡片排法,标签不折行。</li>
+          <li>贷款行里只剩一行小字「本期还款 · 待确认 ↑」,点了跳回这张卡。</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ③ 配置入口 -->
+  <section class="zone">
+    <div class="zone-head"><span class="zone-no">3</span><span class="zone-t">配置入口:记账时顺手勾 · 集中管理页 · 账户页</span><span class="zone-fr">FR-1130 ~ 1133 · 1105</span></div>
+    <div class="zone-line"></div>
+    <div class="row">
+      <div class="col">
+        <div class="card form">
+          <div class="k" style="margin-bottom:10px">记 一 笔 支 出(逐 笔 模 式)</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+            <div><div class="lbl">金额 ¥</div><input class="inp mono" value="480"></div>
+            <div><div class="lbl">支出账户</div><input class="inp" value="招商银行 · 现金"></div>
+            <div><div class="lbl">类目</div><input class="inp" value="住房物业 › 物业"></div>
+            <div><div class="lbl">备注</div><input class="inp" value="物业费"></div>
+          </div>
+          <div class="chk"><span class="box"></span><span><b>每月都有,设成固定</b><br><span class="sub">名称、金额、账户、类目照这一笔;每月 12 号(今天)出现在「本期固定收支」里</span></span></div>
+          <div style="margin-top:12px"><span class="btn-ink">+ 加一笔</span></div>
+        </div>
+        <div class="cap">① 记账时顺手设 —— 最省事的入口</div>
+      </div>
+      <div class="col">
+        <div class="card mg">
+          <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:8px"><span class="serif" style="font-size:22px">固定收支</span><span class="k">7 条 · 1 条已停</span><span style="flex:1"></span><span class="btn-ink">+ 加一条</span></div>
+          <table>
+            <tr><th>名称</th><th>金额</th><th>账户</th><th>类目</th><th>周期</th><th>几号</th><th>负责人</th><th></th></tr>
+            <tr><td colspan="8" class="grp">收 · 入</td></tr>
+            <tr><td>工资</td><td class="mono">¥25,000</td><td>→ 工商银行-备用金</td><td>工资</td><td>每月</td><td class="mono">10</td><td><span class="av d">迪</span></td><td class="link">改</td></tr>
+            <tr><td colspan="8" class="grp">支 · 出</td></tr>
+            <tr><td>物业费</td><td class="mono">¥480</td><td>← 招商银行</td><td>住房物业</td><td>每月</td><td class="mono">5</td><td><span class="av g">共</span></td><td class="link">改</td></tr>
+            <tr><td>车位月保</td><td class="mono">¥300</td><td>← 支付宝-余额宝</td><td>交通出行</td><td>每月</td><td class="mono">8</td><td><span class="av w">王</span></td><td class="link">改</td></tr>
+            <tr><td>视频会员</td><td class="mono">¥25</td><td>← 招行信用卡</td><td>文化休闲</td><td>每月</td><td class="mono">28</td><td><span class="av d">迪</span></td><td class="link">改</td></tr>
+            <tr><td colspan="8" class="grp">还 · 款</td></tr>
+            <tr><td>房贷-招行</td><td class="mono">¥6,320</td><td>工资卡 → 房贷-招行</td><td>还贷</td><td>每月 · 到 2044-06</td><td class="mono">20</td><td><span class="av g">共</span></td><td class="link">改</td></tr>
+            <tr><td colspan="8" class="grp">交 · 保 · 费</td></tr>
+            <tr><td>年金险</td><td class="mono">¥12,000</td><td>工资卡 → 年金险账户</td><td>—</td><td>每年 3 月 · 还剩 7 期</td><td class="mono">15</td><td><span class="av w">王</span></td><td class="link">改</td></tr>
+            <tr class="off"><td>健身房月卡</td><td class="mono">¥199</td><td>← 支付宝-余额宝</td><td>运动健身</td><td>已停用 · 2026-08</td><td class="mono">1</td><td><span class="av w">王</span></td><td class="link">启用</td></tr>
+          </table>
+          <div style="margin-top:14px;border-top:1px dashed var(--rule);padding-top:12px">
+            <div class="k" style="margin-bottom:8px">加 一 条</div>
+            <div class="seg"><span>收入</span><span class="on">支出</span><span>还款</span><span>交保费</span></div>
+            <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:12px">
+              <div><div class="lbl">名称</div><input class="inp" placeholder="如 物业费"></div>
+              <div><div class="lbl">金额 ¥</div><input class="inp mono" placeholder="480"></div>
+              <div><div class="lbl">从哪个账户付</div><input class="inp" placeholder="选账户"></div>
+              <div><div class="lbl">类目</div><input class="inp" placeholder="选类目"></div>
+              <div><div class="lbl">周期</div><div class="seg"><span class="on">每月</span><span>每年…月</span></div></div>
+              <div><div class="lbl">几号</div><input class="inp mono" placeholder="5"></div>
+              <div><div class="lbl">负责人</div><input class="inp" placeholder="默认账户主理人"></div>
+              <div><div class="lbl">到哪期为止(可空)</div><input class="inp mono" placeholder="—"></div>
+            </div>
+          </div>
+        </div>
+        <div class="cap">② 集中管理页 · 入口:卡片右上「管理」· 管理总览「家庭基础」· 管理侧栏</div>
+      </div>
+      <div class="col">
+        <div class="tiny-card">
+          <div class="k">房 贷 - 招 行 · 账 户 详 情</div>
+          <div style="margin-top:8px;font-size:14px">每期还款 <b class="mono">¥6,320</b> · 从 工资卡 还 · 每月 20 号 <span class="link">改</span></div>
+          <div class="sub" style="margin-top:4px">没设的贷款这里写:「每期还多少?<span class="link">设固定还款</span>」—— 默认从「默认还款来源」还</div>
+        </div>
+        <div class="tiny-card" style="margin-top:10px">
+          <div class="k">年 金 险 · 保 单 登 记</div>
+          <div style="margin-top:8px;font-size:14px">每期保费 <b class="mono">¥12,000</b> · 年缴 · 生效 2024-03 · 已缴 3 / 10 期</div>
+          <div style="margin-top:8px"><span class="btn-paper">设成固定交保费</span> <span class="sub">每年 3 月出现在卡片里,缴完 10 期自动停</span></div>
+        </div>
+        <div class="cap" style="margin-top:8px">③ 账户页 · 贷款 / 保险账户直接设</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ④ 提醒时机 -->
+  <section class="zone">
+    <div class="zone-head"><span class="zone-no">4</span><span class="zone-t">提醒时机:到了日子当天起,进到三个现有的地方</span><span class="zone-fr">FR-1140 ~ 1142 · 1115</span></div>
+    <div class="zone-line"></div>
+    <div class="row">
+      <div class="col">
+        <div class="navbar"><span>仪表盘</span><span>填报<span class="badge">·5</span></span><span>账户</span><span>报表</span><span>我的待办<span class="badge">·2</span></span></div>
+        <div class="sub">导航徽标 = 没填的账户 + 到期没确认的固定收支;「我的待办」只算负责人是我的</div>
+        <div class="banner" style="margin-top:10px"><span class="tag t-out">未结账</span><span>本期还有 2 个账户未填 · <b>3 笔固定收支待确认</b></span><span style="flex:1"></span><span class="btn-paper">前往填报 →</span></div>
+        <div class="sub">仪表盘那条提示后面加一句</div>
+        <div class="card" style="width:620px;margin-top:10px;font-size:13px;border-left:4px solid var(--rust)">上期(9 月)有 <b>2 笔固定收支</b>没确认就关账了 —— 物业费 ¥480 · 车位月保 ¥300 <span class="link">看看</span>
+          <div class="sub">没确认的不会补记;如果钱实际扣了,上期的余额里已经体现,只是没有这一笔流水</div></div>
+        <div class="sub">关账后,下期卡片顶部提一句</div>
+      </div>
+      <div class="side-note">
+        <ul>
+          <li><b>到了日子当天起</b>才算「待确认」,没到的不催。</li>
+          <li>截止前 N 天的<b>短信不改</b>:阿里云审过的模板只有 4 个变量,改字要重新报备;站内 banner 加一句。</li>
+          <li><b>不加新渠道、不按笔推送</b> —— 提醒都落在你本来就会看的地方。</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ⑤ 导入去重 + 总额模式 -->
+  <section class="zone">
+    <div class="zone-head"><span class="zone-no">5</span><span class="zone-t">不记两遍:导入去重 · 总额模式只列清单</span><span class="zone-fr">FR-1150 · 1151 · 1160</span></div>
+    <div class="zone-line"></div>
+    <div class="row">
+      <div class="col">
+        <div class="card" style="width:560px">
+          <div class="k" style="margin-bottom:6px">支 付 宝 账 单 · 待 导 入(节 选)</div>
+          <table class="imp" style="border-collapse:collapse;width:100%">
+            <tr><td><span class="cb on"></span></td><td class="mono">10-03</td><td>盒马鲜生</td><td>餐饮美食</td><td class="mono">¥156.40</td><td></td></tr>
+            <tr class="dup"><td><span class="cb"></span></td><td class="mono">10-08</td><td>停车场月卡</td><td>交通出行</td><td class="mono">¥300.00</td><td><span class="tag">已作为固定支出记过 · 车位月保</span></td></tr>
+            <tr><td><span class="cb on"></span></td><td class="mono">10-09</td><td>滴滴出行</td><td>交通出行</td><td class="mono">¥32.50</td><td></td></tr>
+          </table>
+          <div class="sub" style="margin-top:6px">同账户、同金额的那一行默认不勾;要导就自己勾回来</div>
+        </div>
+        <div class="cap">先确认、后导入</div>
+      </div>
+      <div class="col">
+        <div class="card" style="width:460px">
+          <div class="k" style="margin-bottom:8px">支 出 · 每 人 填 一 个 总 数</div>
+          <div style="display:flex;gap:10px;align-items:flex-end"><div style="flex:1"><div class="lbl">迪娃 本月支出总额 ¥</div><input class="inp mono" placeholder="0.00"></div><span class="btn-ink">保存</span></div>
+          <div class="sub" style="margin-top:10px;border-left:3px solid var(--brass-deep);padding-left:10px">本期固定支出 <b class="mono">¥7,125</b>(物业 ¥480 · 月保 ¥300 · 会员 ¥25 · 房贷 ¥6,320)—— 填总数时别漏了</div>
+          <div class="sub" style="margin-top:6px">这种模式下固定支出和「还贷」只做清单、不单独入账(总数里本来就含它们);收入、交保费、贷款余额照常确认</div>
+        </div>
+        <div class="cap">总额模式</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="zone">
+    <div class="zone-head"><span class="zone-no">6</span><span class="zone-t">刻意不做</span><span class="zone-fr">PRD §4</span></div>
+    <div class="zone-line"></div>
+    <ul class="note" style="max-width:920px">
+      <li><b>到日子系统自己记</b>:金额会变、可能和导入重复;贷款预填 v0.17.x 就是因为「用户不知道系统替他改了数」才改成让人点的。</li>
+      <li><b>账户间固定划转(定投)</b>:撞「刻意不做」的定投提醒。交保费是唯一例外 —— 合同规定必须交的钱,不是投资决定。</li>
+      <li><b>金额每期都变的估一个</b>(水电燃气)、<b>从流水自动认订阅</b>(v1.24 推迟的那条)、<b>预算</b>、<b>信用卡 / 银行账单导入</b>。</li>
+    </ul>
+  </section>
+
+</div>
+</body>
+</html>
