@@ -118,30 +118,13 @@
             aria-label="刷新">⟳</button>
   </div>
 
-  <!-- v0.17.x · 贷款趋势预测行内提示条(仅"未确认 且 当前=上月值"时显示;老账期/已确认不出)-->
-  <div th:if="${row.showLoanPrompt and period.status.name() != 'CLOSED'}" class="mt-3 paper-card p-3 bg-card-soft" style="border-left:4px solid var(--brass-deep)">
-    <div class="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-brass-deep shrink-0" aria-hidden="true"><path d="M3 3v18h18"/><path d="M19 9l-5 5-4-4-3 3"/></svg>
-      <span class="text-ink-soft">按上两月趋势,本月预计还到
-        <b class="text-ink tnum" data-priv th:text="${row.loanSuggestionLabel}">-980,000</b>
-        <span class="text-ink-subtle">(较上月 <span data-priv th:text="${row.loanSuggestionDeltaLabel}">-10,000</span>)</span>
-      </span>
-      <span class="flex gap-2 ml-auto">
-        <form th:hx-post="@{/entry/{id}/accept-loan-prediction(id=${row.account.id})}"
-              th:hx-target="'#entry-block-' + ${row.account.id}" hx-swap="outerHTML" method="post">
-          <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
-          <input type="hidden" name="periodId" th:value="${period.id}">
-          <button type="submit" class="btn-ink text-xs px-3 py-1">接受</button>
-        </form>
-        <form th:hx-post="@{/entry/{id}/balance(id=${row.account.id})}"
-              th:hx-target="'#entry-block-' + ${row.account.id}" hx-swap="outerHTML" method="post">
-          <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
-          <input type="hidden" name="periodId" th:value="${period.id}">
-          <input type="hidden" name="newBalance" th:value="${row.previousSnapshot.endBalance}">
-          <button type="submit" class="btn-paper text-xs px-3 py-1">保持上月</button>
-        </form>
-      </span>
-    </div>
+  <!--/* v1.32 FR-1117 · 贷款趋势提示条从这里挪进了「本月收支」下面的固定收支那一行(按钮与结果不变:
+         「接受」仍调 acceptLoanPrediction、「保持上月」仍按上月末提交余额)。这一行只留一句指路 ——
+         填报页变短,而且同一笔贷款不会在两个地方各出一次。 */-->
+  <div th:if="${period.status.name() != 'CLOSED' and fixedSummary != null and fixedSummary.loanPendingIds != null
+                 and fixedSummary.loanPendingIds.contains(row.account.id)}"
+       class="mt-2 font-mono text-[11px]" data-ff-loan-hint>
+    <a href="#fixed-flows" class="text-brass-deep no-underline hover:underline">本期还款 · 待确认 ↑</a>
   </div>
 
   <!-- v1.6 UED review B2-2 · 填报区折叠。

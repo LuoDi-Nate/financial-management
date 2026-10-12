@@ -48,6 +48,7 @@ public class AccountController {
     private final com.family.finance.repository.BrokerLinkMapper brokerLinkMapper; // v0.15.x 券商托管徽章
     private final com.family.finance.service.broker.ibkr.IbkrFlexClient ibkrClient;     // v1.26 · IBKR 口令到期标记
     private final InsurancePolicyMapper insurancePolicyMapper; // v0.17 保单登记旁表
+    private final com.family.finance.service.fixedflow.FixedFlowService fixedFlowService;   // v1.32 FR-1133
 
     @GetMapping
     public String index(@AuthenticationPrincipal MemberPrincipal me,
@@ -144,8 +145,13 @@ public class AccountController {
 
     @PostMapping("/{id}/archive")
     public String archive(@AuthenticationPrincipal MemberPrincipal me,
-                          @PathVariable("id") long accountId) {
-        accountService.archive(me, accountId);
+                          @PathVariable("id") long accountId,
+                          org.springframework.web.servlet.mvc.support.RedirectAttributes ra) {
+        int stopped = accountService.archive(me, accountId);
+        if (stopped > 0) {
+            // v1.32 FR-1134 · 归档时提示一句:用到它的固定收支停了,别以为下个月还会出现
+            ra.addFlashAttribute("archiveNote", "已归档 · 用到它的 " + stopped + " 条固定收支已一起停用(在「管理 → 固定收支」里能看到)");
+        }
         return "redirect:/accounts";
     }
 
@@ -175,6 +181,8 @@ public class AccountController {
         // v0.17 · 保险账户带保单登记(非保险为 null,详情页不渲染保单段)
         model.addAttribute("insurancePolicy",
                 insurancePolicyMapper.findByAccount(me.getFamilyId(), accountId).orElse(null));
+        // v1.32 FR-1133 / FR-1105 · 贷款 / 保险账户:每期还款 / 交保费那一行,没有就给「设固定还款 / 设成固定交保费」
+        model.addAttribute("fixedLines", fixedFlowService.linesForTarget(me.getFamilyId(), accountId));
         // v1.20 · 这个账户属于哪个分组(null = 未分组)· 顺带给出去管理的入口
         model.addAttribute("accountGroupName",
                 accountGroupService.occupiedBy(me.getFamilyId(), null).get(accountId));

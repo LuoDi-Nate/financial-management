@@ -38,6 +38,8 @@ public class AccountService {
     private final PeriodMapper periodMapper;
     private final SnapshotMapper snapshotMapper;
     private final AuditLogService auditLogService;
+    /** v1.32 FR-1134 · 归档时把用到它的固定收支一起停用 */
+    private final com.family.finance.service.fixedflow.FixedFlowService fixedFlowService;
     private final ProductCategoryService productCategoryService;
     /** v1.28.1 · 账户页顶上按类型的合计要先换成本位币再加(issue #25:加密货币按 USD 数加、却标 ¥) */
     private final com.family.finance.repository.FxMapper fxMapper;
@@ -215,12 +217,15 @@ public class AccountService {
                         + existing.getDisplayName());
     }
 
+    /** @return 一起停用了几条固定收支(v1.32 FR-1134,归档后账户簿顶部提示一句) */
     @Transactional
-    public void archive(MemberPrincipal me, long accountId) {
+    public int archive(MemberPrincipal me, long accountId) {
         accountMapper.archive(me.getFamilyId(), accountId);
         eventPublisher.publishEvent(new com.family.finance.service.lens.LensStaleEvent(me.getFamilyId())); // v1.1.1 透视缓存后台换新
         auditLogService.record(me.getFamilyId(), me.getMemberId(), AuditLogType.ACCOUNT_ARCHIVE,
                 "account", accountId, "归档账户");
+        // 归档账户不参与任何统计 —— 固定收支再往它身上记,钱就会在报表里消失(recordExpense 也会拒)
+        return fixedFlowService.onAccountArchived(me.getFamilyId(), me.getMemberId(), accountId);
     }
 
     @Transactional

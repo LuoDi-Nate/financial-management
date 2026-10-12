@@ -48,7 +48,10 @@ ProtectHome=read-only
 # · /var/finance/futu-opend = OpenD 安装文件家目录(持久,不放私有 /tmp,重启不丢;见 FUTU_OPEND_HOME)
 # · /home/finance = OpenD 运行时按 getpwuid 家目录建 ~/.com.futunn.FutuOpenD(无视 $HOME),
 #   ProtectHome=read-only 会锁死它 → 必须放开;其它 home(/root 等)仍只读。
-ReadWritePaths=/opt/finance/logs /var/finance/uploads /var/finance/futu-opend /home/finance /tmp
+# · /var/backup/finance = v1.32「管理 → 备份 → 立即备份」由应用自己跑 mysqldump 写到这里(与每周自动备份同一个目录,
+#   一起按保留天数滚动删除);deploy.sh 建这个目录时属主就是 finance。前缀「-」= 目录不存在时忽略
+#   (否则整个服务起不来 —— 白名单里有不存在的路径,systemd 会拒绝建挂载命名空间)。
+ReadWritePaths=/opt/finance/logs /var/finance/uploads /var/finance/futu-opend /home/finance /tmp -/var/backup/finance
 
 [Install]
 WantedBy=multi-user.target

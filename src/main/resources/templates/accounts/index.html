@@ -7,6 +7,9 @@
 <header th:replace="~{fragments/nav :: nav('accounts', ${me}, ${nav})}"></header>
 
 <main class="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10 py-5 sm:py-10 relative z-10">
+  <!--/* v1.32 FR-1134 · 归档时用到它的固定收支一起停了,说一句 */-->
+  <div th:if="${archiveNote}" data-archive-note class="border-l-2 border-brass-deep bg-brass-soft/40 px-4 py-2.5 text-[13px] mb-5"
+       th:text="${archiveNote}">已归档</div>
   <section class="mb-8 flex items-end justify-between flex-wrap gap-6">
     <div>
       <div class="eyebrow mb-2">账 · 户 · 全 · 览</div>

@@ -72,6 +72,7 @@ public class DashboardController {
     private final com.family.finance.service.group.AccountRowGrouper accountRowGrouper;       // v1.20 账户组折叠
     private final com.family.finance.service.group.AccountGroupService accountGroupService;   // v1.20 FR-486 筛选器快选
     private final com.family.finance.service.lens.LensMetaService lensMetaService; // v1.1 资产透视内嵌
+    private final com.family.finance.service.fixedflow.FixedFlowSummaryService fixedFlowSummaryService; // v1.32 FR-1140
 
     @GetMapping("/dashboard")
     public String dashboard(@AuthenticationPrincipal MemberPrincipal me,
@@ -290,6 +291,8 @@ public class DashboardController {
         // v1.2 F · 模板只消费"未填个数" → 由全行装配(listRows 含流水,~百ms)换成 todo 计数轻查询
         model.addAttribute("pendingCount", currentOpen == null ? 0
                 : snapshotTodoMapper.countPendingByPeriod(me.getFamilyId(), currentOpen.getId()));
+        // v1.32 FR-1140 · 「未结账」条后面加「· M 笔固定收支待确认」(当天起算,与导航徽标同一个判据)
+        model.addAttribute("fixedPendingCount", fixedFlowSummaryService.pendingCount(me.getFamilyId()));
 
         // v0.3 FR-50d · 目标进度条带数据(失败容忍 · 不阻塞 dashboard 渲染)
         //

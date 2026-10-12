@@ -51,6 +51,8 @@ public class CsvExportService {
     private final FxMapper fxMapper;
     /** v1.30 · 补录本金 —— 备份要完整:少了它,导出的数据重算出来的收益会对不上 */
     private final com.family.finance.repository.PrincipalAdjustmentMapper principalAdjustmentMapper;
+    /** v1.32 · 固定收支的设置 + 每期结果(家庭数据,导出要带上 · PRD v1.32 §8) */
+    private final com.family.finance.repository.FixedFlowMapper fixedFlowMapper;
 
     public void writeZip(long familyId, OutputStream out) throws IOException {
         try (ZipOutputStream zip = new ZipOutputStream(out)) {
@@ -168,11 +170,39 @@ public class CsvExportService {
                 }
             });
 
+            // v1.32 · 固定收支:设置(含停用的)+ 每期结果。钱不在这两张表里(在 cash_flows / transfers / snapshots),
+            // 这里只是「哪几笔是固定收支确认来的」
+            var fixedFlows = fixedFlowMapper.findAllByFamily(familyId);
+            writeEntry(zip, "fixed_flows.csv", writer -> {
+                line(writer, "id", "name", "kind", "repay_kind", "amount_mode", "auto_method", "amount", "account_id",
+                        "target_account_id", "category_code", "expense_category_id", "cycle", "months", "day_of_month",
+                        "owner_member_id", "start_month", "end_month", "note", "disabled_at", "disabled_reason", "created_at");
+                for (var f : fixedFlows) {
+                    line(writer, s(f.getId()), e(f.getName()), e(f.getKind()), e(f.getRepayKind()), e(f.getAmountMode()),
+                            e(f.getAutoMethod()), s(f.getAmount()), s(f.getAccountId()), s(f.getTargetAccountId()),
+                            e(f.getCategoryCode()), s(f.getExpenseCategoryId()), e(f.getCycle()), e(f.getMonths()),
+                            s(f.getDayOfMonth()), s(f.getOwnerMemberId()), s(f.getStartMonth()), s(f.getEndMonth()),
+                            e(f.getNote()), ts(f.getDisabledAt()), e(f.getDisabledReason()), ts(f.getCreatedAt()));
+                }
+            });
+            var occurrences = fixedFlowMapper.findAllOccurrencesByFamily(familyId);
+            writeEntry(zip, "fixed_flow_occurrences.csv", writer -> {
+                line(writer, "id", "fixed_flow_id", "period_id", "due_date", "status", "amount", "principal", "interest",
+                        "cash_flow_id", "interest_cash_flow_id", "transfer_id", "loan_balance_before", "loan_balance_after",
+                        "formula", "member_id", "created_at");
+                for (var o : occurrences) {
+                    line(writer, s(o.getId()), s(o.getFixedFlowId()), s(o.getPeriodId()), s(o.getDueDate()), e(o.getStatus()),
+                            s(o.getAmount()), s(o.getPrincipal()), s(o.getInterest()), s(o.getCashFlowId()),
+                            s(o.getInterestCashFlowId()), s(o.getTransferId()), s(o.getLoanBalanceBefore()),
+                            s(o.getLoanBalanceAfter()), e(o.getFormula()), s(o.getMemberId()), ts(o.getCreatedAt()));
+                }
+            });
+
             writeEntry(zip, "README.txt", writer -> {
                 writer.write("家庭账房 v0.1 数据导出\n");
                 writer.write("导出时间: " + STAMP.format(LocalDateTime.now()) + "\n");
                 writer.write("家庭: " + family.getName() + " (id=" + family.getId() + ")\n\n");
-                writer.write("9 张 CSV 表格使用 UTF-8 编码,带 BOM,Excel 可直接打开。\n");
+                writer.write("11 张 CSV 表格使用 UTF-8 编码,带 BOM,Excel 可直接打开。\n");
                 writer.write("文件清单:\n");
                 writer.write("  families.csv     家庭基础信息\n");
                 writer.write("  members.csv      成员(不含密码哈希)\n");
@@ -183,6 +213,8 @@ public class CsvExportService {
                 writer.write("  transfers.csv    跨账户转账(含草稿)\n");
                 writer.write("  fx_rates.csv     汇率快照\n");
                 writer.write("  principal_adjustments.csv  补录本金(以前就有、某期才补录的钱 · 算本金不算收益)\n");
+                writer.write("  fixed_flows.csv            固定收支的设置(含停用的)\n");
+                writer.write("  fixed_flow_occurrences.csv 固定收支每期的结果(确认 / 这期没有 / 关联)· 钱在 cash_flows / transfers / snapshots 里\n");
             });
         }
     }

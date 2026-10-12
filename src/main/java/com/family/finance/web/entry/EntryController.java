@@ -71,6 +71,10 @@ public class EntryController {
     private final com.family.finance.service.stock.StockHoldingService stockHoldingService;
     /** v0.12.2 · 收入列表本位币换算(账户币种 → 本位币,与 dashboard 人赚同源) */
     private final com.family.finance.service.FxService fxService;
+    /** v1.32 · 固定收支:摘要行 + 记一笔时顺手设 */
+    private final com.family.finance.service.fixedflow.FixedFlowSummaryService fixedFlowSummaryService;
+    private final com.family.finance.service.fixedflow.FixedFlowConfirmService fixedFlowConfirmService;
+    private final com.family.finance.repository.FixedFlowMapper fixedFlowMapper;
 
     @GetMapping("/entry")
     public String entry(@AuthenticationPrincipal MemberPrincipal me,
@@ -212,6 +216,12 @@ public class EntryController {
             incomeBaseTotal = incomeBaseTotal.add(b);
         }
         model.addAttribute("baseCurrency", baseCcy);
+        // v1.32 · 固定收支那一行(FR-1110 ~ 1121):锚这一期;贷款建议沿用账户行上今天那条提示的判据
+        model.addAttribute("fixedSummary", fixedFlowSummaryService.build(me.getFamilyId(), me.getMemberId(), period,
+                rows, mineOnly, baseCcy, today));
+        // 流水列表上标「固定」(FR-1115):这一期由固定收支确认 / 关联来的那几笔
+        model.addAttribute("fixedCashFlowIds", new java.util.HashSet<>(
+                fixedFlowMapper.cashFlowIdsOfPeriod(me.getFamilyId(), period.getId())));
         model.addAttribute("incomeBaseById", incomeBaseById);
         model.addAttribute("incomeBaseTotal", incomeBaseTotal.setScale(2, java.math.RoundingMode.HALF_EVEN));
 
@@ -388,9 +398,22 @@ public class EntryController {
                                @RequestParam String categoryCode,
                                @RequestParam BigDecimal amount,
                                @RequestParam(required = false) String note,
+                               /* v1.32 FR-1131 · 「每月都有,设成固定」 */
+                               @RequestParam(defaultValue = "false") boolean makeFixed,
                                org.springframework.web.servlet.mvc.support.RedirectAttributes ra) {
         var before = balanceGuard.snapshot(me.getFamilyId(), accountId, periodId);
-        entryService.recordIncome(me.getFamilyId(), me.getMemberId(), periodId, accountId, categoryCode, amount, note);
+        if (makeFixed) {
+            try {
+                var r = fixedFlowConfirmService.recordAndMakeFixed(me.getFamilyId(), me.getMemberId(), periodId,
+                        com.family.finance.domain.fixedflow.FixedFlow.INCOME, accountId, categoryCode, amount, note,
+                        null, true, false);
+                ra.addFlashAttribute("fixedNote", r.message());
+            } catch (IllegalArgumentException | IllegalStateException e) {
+                ra.addFlashAttribute("fixedError", "没记上:" + e.getMessage());
+            }
+        } else {
+            entryService.recordIncome(me.getFamilyId(), me.getMemberId(), periodId, accountId, categoryCode, amount, note);
+        }
         guardNote(me.getFamilyId(), ra, before, periodId);
         return "redirect:/entry?period=" + periodId;
     }
@@ -443,10 +466,19 @@ public class EntryController {
                                 /* v1.24 FR-613 · 「这笔是一次性的」。默认 false ——
                                  * 绝大多数笔不是,每次都要判断一下就守不住 10 分钟/月 了。 */
                                 @RequestParam(defaultValue = "false") boolean oneOff,
+                                /* v1.32 FR-1131 · 「每月都有,设成固定」 */
+                                @RequestParam(defaultValue = "false") boolean makeFixed,
                                 org.springframework.web.servlet.mvc.support.RedirectAttributes ra) {
         try {
-            entryService.recordExpense(me.getFamilyId(), me.getMemberId(), periodId, accountId,
-                    categoryCode, amount, note, expenseCategoryId, affectsBalance, oneOff);
+            if (makeFixed) {
+                var r = fixedFlowConfirmService.recordAndMakeFixed(me.getFamilyId(), me.getMemberId(), periodId,
+                        com.family.finance.domain.fixedflow.FixedFlow.EXPENSE, accountId, categoryCode, amount, note,
+                        expenseCategoryId, affectsBalance, oneOff);
+                ra.addFlashAttribute("fixedNote", r.message());
+            } else {
+                entryService.recordExpense(me.getFamilyId(), me.getMemberId(), periodId, accountId,
+                        categoryCode, amount, note, expenseCategoryId, affectsBalance, oneOff);
+            }
         } catch (IllegalArgumentException | IllegalStateException e) {
             ra.addFlashAttribute("flashError", e.getMessage());
         }

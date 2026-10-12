@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<body>
+<!--/*
+  v1.32 · 填报页「第一步 · 本月收支」下面那一行:固定收支(PRD FR-1110 ~ 1121 · preview/v1.32 ①②)。
+
+  默认收起只占一行(review ③「填报页会不会太长」);展开只列到了日子的,没到的、已确认的再各收一层。
+  所有按钮都是普通表单 POST,带 periodId(L16 显式选期),做完回到同一期、停在 #fixed-flows。
+  金额文字带 data-priv(隐私模式糊掉);可改的金额是输入框。
+*/-->
+<div th:fragment="bar(s, period, mineOnly)" id="fixed-flows" class="ff" data-fixed-flows>
+
+  <div th:if="${fixedNote}" data-fixed-note class="ff-flash ff-flash-ok" th:text="${fixedNote}">已确认</div>
+  <div th:if="${fixedError}" data-fixed-error class="ff-flash ff-flash-err" th:text="${fixedError}">出错了</div>
+
+  <!-- 一条都没设、也没有贷款建议:只剩一个小入口 -->
+  <div th:if="${s.empty}" class="ff-sum ff-sum-empty" data-ff-empty>
+    <a th:href="@{/admin/fixed-flows/new(back=${'/entry?period=' + period.id})}" class="ff-add">+ 设固定收支</a>
+    <span class="ff-sub">工资、物业、月保、房贷……每期都有的那几笔,设一次,到日子一键确认</span>
+  </div>
+
+  <!--/* 「全部确认」(FR-1112 · 只确认到了日子、算得出来的):表单放在 details 外面,按钮在摘要行里用 form= 指过来 ——
+         <summary> 里不能放 <form>,而按钮要在收起时也看得见(preview ①:默认一行就有「全部确认(3)」)。 */-->
+  <form th:if="${!s.empty and s.open and s.confirmableCount > 0}" id="ff-confirm-all" th:action="@{/entry/fixed/confirm-all}"
+        method="post" hidden data-ff-confirm-all>
+    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+    <input type="hidden" name="periodId" th:value="${period.id}">
+    <input type="hidden" name="mine" th:value="${mineOnly}">
+  </form>
+
+  <details th:unless="${s.empty}" class="ff-box" data-ff-box th:open="${fixedNote != null or fixedError != null}">
+    <summary class="ff-sum" th:classappend="${s.pendingCount == 0 and s.suggestCount == 0 and #lists.isEmpty(s.later) and !#lists.isEmpty(s.done)} ? ' ff-sum-ok' : ''">
+      <span class="ff-chev" aria-hidden="true">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
+      </span>
+      <span class="ff-nm">固定收支</span>
+      <th:block th:if="${s.pendingCount > 0}">
+        <span class="ff-cnt" data-ff-pending th:text="${s.pendingCount} + ' 笔待确认'">3 笔待确认</span>
+        <span class="ff-total" data-priv th:text="'共 ' + ${s.pendingTotalLabel}">共 ¥7,100</span>
+      </th:block>
+      <span th:if="${s.pendingCount == 0 and s.suggestCount > 0}" class="ff-cnt"
+            th:text="${s.suggestCount} + ' 笔贷款还款建议'">1 笔贷款还款建议</span>
+      <span th:if="${s.pendingCount > 0 and s.suggestCount > 0}" class="ff-sub" th:text="'· ' + ${s.suggestCount} + ' 笔贷款建议'">· 1 笔贷款建议</span>
+      <th:block th:if="${s.pendingCount == 0 and s.suggestCount == 0}">
+        <span th:if="${#lists.isEmpty(s.later) and !#lists.isEmpty(s.done)}" class="ff-ok"
+              th:text="'本期 ' + ${#lists.size(s.done)} + ' 笔都确认了'">本期 6 笔都确认了</span>
+        <span th:if="${s.nextUpcoming != null}" class="ff-sub">
+          下一笔 <span th:text="${s.nextUpcoming.dueLabel}">28 号</span>
+          <span th:text="${s.nextUpcoming.name}">视频会员</span>
+          <span data-priv th:if="${s.nextUpcoming.amount != null}" th:text="${s.nextUpcoming.amountLabel}">¥25</span></span>
+        <span th:if="${s.nextUpcoming == null and #lists.isEmpty(s.done) and #lists.isEmpty(s.due)}" class="ff-sub">这一期没有</span>
+      </th:block>
+      <span th:if="${s.lastPeriodMissed > 0}" class="ff-sub" data-ff-missed
+            th:text="'· 上期(' + ${s.lastPeriodLabel} + ')' + ${s.lastPeriodMissed} + ' 笔没确认,没记'">· 上期 2 笔没确认</span>
+      <span class="ff-spacer"></span>
+      <button th:if="${s.open and s.confirmableCount > 0}" type="submit" form="ff-confirm-all" class="btn-ink text-xs ff-all-btn"
+              data-ff-confirm-all-btn th:text="'全部确认(' + ${s.confirmableCount} + ')'"
+              title="只确认到了日子的;系统从不自己记,不确认就不会有这笔">全部确认(3)</button>
+      <span class="ff-toggle"><span class="ff-when-closed">展开</span><span class="ff-when-open">收起</span></span>
+      <a th:href="@{/admin/fixed-flows(back=${'/entry?period=' + period.id})}" class="ff-link" data-ff-manage>管理</a>
+    </summary>
+
+    <!-- 到了日子的:待确认 + 贷款建议 + 总数模式下的清单 -->
+    <div th:each="it : ${s.due}" class="ff-row" data-ff-item
+         th:classappend="${it.state == 'SUGGEST'} ? ' ff-row-sug' : (${it.state == 'LIST'} ? ' ff-row-list' : '')"
+         th:attr="data-ff-flow=${it.flow != null ? it.flow.id : null}, data-ff-loan=${it.loanAccountId}, data-ff-state=${it.state}">
+
+      <!-- 贷款建议:按钮还是今天那两个(结果逐字相同,FR-1120) -->
+      <th:block th:if="${it.state == 'SUGGEST'}">
+        <div class="ff-l1">
+          <span class="ff-av" th:classappend="'avatar-' + ${(ownerColorMap != null and ownerColorMap.get(it.ownerName) != null ? ownerColorMap.get(it.ownerName) : 0) % 5}"
+                th:text="${#strings.substring(it.ownerName, 0, 1)}">迪</span>
+          <span class="ff-name" th:text="${it.name}">车贷</span>
+          <span class="ff-tag ff-tag-sug">建议</span>
+          <span class="ff-amt" data-priv th:text="${it.suggestLabel}">−86,000</span>
+        </div>
+        <div class="ff-l2">按上两月差值,本月预计还到 <b data-priv th:text="${it.suggestLabel}">−86,000</b>(较上月 <span data-priv th:text="${it.suggestDeltaLabel}">−3,000</span>)· 还没设固定还款</div>
+        <div class="ff-l3" th:if="${s.open}">
+          <form th:action="@{/entry/fixed/loan/{id}/accept(id=${it.loanAccountId})}" method="post" data-ff-accept>
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+            <input type="hidden" name="periodId" th:value="${period.id}">
+            <input type="hidden" name="mine" th:value="${mineOnly}">
+            <button type="submit" class="btn-ink text-xs">接受</button>
+          </form>
+          <form th:action="@{/entry/fixed/loan/{id}/keep(id=${it.loanAccountId})}" method="post" data-ff-keep>
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+            <input type="hidden" name="periodId" th:value="${period.id}">
+            <input type="hidden" name="mine" th:value="${mineOnly}">
+            <input type="hidden" name="newBalance" th:value="${it.keepBalance}">
+            <button type="submit" class="btn-paper text-xs">保持上月</button>
+          </form>
+          <a th:href="@{/admin/fixed-flows/new(loan=${it.loanAccountId}, back=${'/entry?period=' + period.id})}" class="ff-link" data-ff-make-repay>设成固定还款</a>
+        </div>
+      </th:block>
+
+      <!-- 待确认 / 清单 -->
+      <th:block th:unless="${it.state == 'SUGGEST'}">
+        <form th:action="@{/entry/fixed/{id}/confirm(id=${it.flow.id})}" method="post" class="ff-form" data-ff-form>
+          <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+          <input type="hidden" name="periodId" th:value="${period.id}">
+          <input type="hidden" name="mine" th:value="${mineOnly}">
+          <div class="ff-l1">
+            <span class="ff-av" th:classappend="'avatar-' + ${(ownerColorMap != null and ownerColorMap.get(it.ownerName) != null ? ownerColorMap.get(it.ownerName) : 0) % 5}"
+                  th:text="${#strings.substring(it.ownerName, 0, 1)}">共</span>
+            <span class="ff-name" th:text="${it.name}">物业费</span>
+            <span class="ff-tag" th:classappend="'ff-tag-' + ${it.kindCss}" th:text="${it.kindLabel}">支出</span>
+            <span class="ff-amt">
+              <input th:if="${it.editable and s.open}" type="number" step="0.01" min="0.01" name="amount" class="ff-amt-in"
+                     th:value="${it.amount}" th:attr="data-orig=${it.amount}" data-ff-amount aria-label="金额">
+              <span th:unless="${it.editable and s.open}" data-priv th:text="${it.amountLabel}">¥300</span>
+              <span th:if="${it.calc}" class="ff-calc" th:title="${it.formula != null ? it.formula : it.problem}">算</span>
+            </span>
+          </div>
+          <div class="ff-l2">
+            <span th:text="${it.detail}">← 招商银行 · 5 号</span>
+            <span th:if="${it.split != null}" class="ff-split" data-priv th:text="'· ' + ${it.split}">· 还贷(本金)¥2,394</span>
+            <span th:if="${it.diffLabel != null}" class="ff-diff" data-priv th:text="'· ' + ${it.diffLabel}">· 比上次多 ¥40</span>
+            <span th:if="${it.state == 'LIST'}" class="ff-sub">· 支出按「每人一个总数」填 —— 算进你填的总数就行,这里不单独记</span>
+          </div>
+          <div th:if="${it.calc and it.formula != null}" class="ff-formula" data-priv th:text="${it.formula}">按上月 … 与上上月 … 的差值</div>
+          <div th:if="${it.problem != null}" class="ff-problem" th:text="${it.problem}">算不出来</div>
+          <label th:if="${it.rememberable and it.editable and s.open}" class="ff-remember" hidden data-ff-remember>
+            <input type="checkbox" name="remember" value="true"> 以后都按 <span data-ff-remember-amt></span>?
+          </label>
+          <div class="ff-l3" th:if="${s.open and it.state == 'DUE'}">
+            <button th:if="${it.confirmable}" type="submit" class="btn-ink text-xs" data-ff-confirm>确认</button>
+            <button type="submit" class="btn-paper text-xs" data-ff-skip
+                    th:formaction="@{/entry/fixed/{id}/skip(id=${it.flow.id})}">这期没有</button>
+          </div>
+        </form>
+        <!-- 先导入、后确认:导入的账单里有一笔同账户同金额的(FR-1151) -->
+        <form th:if="${it.importMatchId != null and s.open}" th:action="@{/entry/fixed/{id}/link(id=${it.flow.id})}" method="post"
+              class="ff-hint" data-ff-link>
+          <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+          <input type="hidden" name="periodId" th:value="${period.id}">
+          <input type="hidden" name="mine" th:value="${mineOnly}">
+          <input type="hidden" name="cashFlowId" th:value="${it.importMatchId}">
+          <span data-priv th:text="${it.importMatchLabel}">导入的账单里有一笔 ¥300 可能就是它</span>
+          <button type="submit" class="btn-paper text-xs">就是它</button>
+        </form>
+      </th:block>
+    </div>
+
+    <!-- 还没到日子的 -->
+    <details th:if="${!#lists.isEmpty(s.later)}" class="ff-fold" data-ff-later>
+      <summary th:text="'还有 ' + ${#lists.size(s.later)} + ' 笔没到日子'">还有 2 笔没到日子</summary>
+      <div th:each="it : ${s.later}" class="ff-row ff-row-later" data-ff-item th:attr="data-ff-flow=${it.flow.id}, data-ff-state=${it.state}">
+        <div class="ff-l1">
+          <span class="ff-name" th:text="${it.name}">视频会员</span>
+          <span class="ff-tag" th:classappend="'ff-tag-' + ${it.kindCss}" th:text="${it.kindLabel}">支出</span>
+          <span class="ff-amt" data-priv th:text="${it.amountLabel}">¥25</span>
+        </div>
+        <div class="ff-l2"><span th:text="${it.detail}">← 招商银行 · 28 号</span></div>
+      </div>
+    </details>
+
+    <!-- 已确认 / 这期没有 / 就是导入的那笔 -->
+    <details th:if="${!#lists.isEmpty(s.done)}" class="ff-fold" data-ff-done>
+      <summary th:text="'已确认 ' + ${#lists.size(s.done)} + ' 笔'">已确认 1 笔</summary>
+      <div th:each="it : ${s.done}" class="ff-row ff-row-done" data-ff-item
+           th:attr="data-ff-flow=${it.flow.id}, data-ff-state=${it.state}, data-ff-occ=${it.occurrenceId}, data-ff-occ-status=${it.occurrenceStatus}">
+        <div class="ff-l1">
+          <span class="ff-name" th:text="${it.name}">工资</span>
+          <span class="ff-tag" th:classappend="'ff-tag-' + ${it.kindCss}" th:text="${it.kindLabel}">收入</span>
+          <span class="ff-amt" data-priv th:text="${it.amountLabel}">¥25,000</span>
+        </div>
+        <div class="ff-l2"><span class="ff-ok" data-priv th:text="${it.resultText}">记成了收入 → 工商银行</span></div>
+        <form th:if="${it.undoable}" th:action="@{/entry/fixed/occ/{id}/undo(id=${it.occurrenceId})}" method="post" class="ff-l3" data-ff-undo>
+          <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+          <input type="hidden" name="periodId" th:value="${period.id}">
+          <input type="hidden" name="mine" th:value="${mineOnly}">
+          <button type="submit" class="btn-ghost text-xs" onclick="return confirm('撤销这一笔?记进去的会删掉,余额跟着回去。')">撤销</button>
+        </form>
+      </div>
+    </details>
+  </details>
+
+  <script>
+    (function () {
+      // 改了金额 → 小字问「以后都按 ¥新金额?」(FR-1113 · 只对固定金额 / 月供出现)
+      document.querySelectorAll('[data-ff-form]').forEach(function (f) {
+        var inp = f.querySelector('[data-ff-amount]');
+        var lab = f.querySelector('[data-ff-remember]');
+        if (!inp || !lab) return;
+        inp.addEventListener('input', function () {
+          var changed = inp.value !== '' && Number(inp.value) !== Number(inp.getAttribute('data-orig'));
+          lab.hidden = !changed;
+          var amt = lab.querySelector('[data-ff-remember-amt]');
+          if (amt) amt.textContent = '¥' + (inp.value || '');
+        });
+      });
+    })();
+  </script>
+</div>
+</body>
+</html>

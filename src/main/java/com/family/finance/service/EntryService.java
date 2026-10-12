@@ -238,7 +238,7 @@ public class EntryService {
             insertCashFlow(period, account, memberId, line);
         }
         for (TransferLine line : transferLines == null ? List.<TransferLine>of() : transferLines) {
-            insertTransfer(period, familyId, accountId, line.toAccountId(), line.amount(), line.toAmount(), line.note(), memberId, false);
+            insertTransfer(period, familyId, accountId, line.toAccountId(), line.amount(), line.toAmount(), line.note(), memberId, false, null);
         }
 
         adjustLoanDraft(period, account, normalizedBalance, memberId);
@@ -347,6 +347,18 @@ public class EntryService {
     @Transactional
     public EntryRow recordIncome(long familyId, long memberId, long periodId,
                                  long accountId, String categoryCode, BigDecimal amount, String note) {
+        return recordIncome(familyId, memberId, periodId, accountId, categoryCode, amount, note, null);
+    }
+
+    /**
+     * v1.32 · 带写入回执的收入录入:同一个方法、同样的校验与余额联动,只是来源标成回执里的
+     * (固定收支 = {@code FIXED_FLOW}),并把插进去的流水 id 填回回执 —— 撤销时按 id 精确删。
+     * {@code receipt == null} 与原方法逐字相同。
+     */
+    @Transactional
+    public EntryRow recordIncome(long familyId, long memberId, long periodId,
+                                 long accountId, String categoryCode, BigDecimal amount, String note,
+                                 WriteReceipt receipt) {
         Period period = requireOpenPeriod(familyId, periodId);
         Account account = requireAccount(familyId, accountId);
         if (account.getType().isLiability()) {
@@ -356,7 +368,8 @@ public class EntryService {
         BigDecimal amt = positiveMoney(amount);
         creditAccountBalance(familyId, period, account, memberId, amt,
                 "+收入 " + cat.getDisplayName() + " " + money(amt));
-        insertCashFlow(period, account, memberId, new CashFlowLine(CashFlowKind.INCOME, categoryCode, amt, note));
+        insertCashFlow(period, account, memberId, new CashFlowLine(CashFlowKind.INCOME, categoryCode, amt, note),
+                null, true, false, receipt);
         snapshotTodoMapper.markDone(familyId, periodId, accountId, memberId);
         auditLogService.record(familyId, memberId, AuditLogType.SYSTEM, "account", accountId,
                 "收入录入 " + cat.getDisplayName() + " " + money(amt) + " → " + account.getDisplayName());
@@ -431,6 +444,18 @@ public class EntryService {
     public EntryRow recordExpense(long familyId, long memberId, long periodId,
                                   long accountId, String categoryCode, BigDecimal amount, String note,
                                   Long expenseCategoryId, boolean affectsBalance, boolean oneOff) {
+        return recordExpense(familyId, memberId, periodId, accountId, categoryCode, amount, note,
+                expenseCategoryId, affectsBalance, oneOff, null);
+    }
+
+    /**
+     * v1.32 · 带写入回执的支出录入(固定收支确认用):校验、余额联动、分类写入规则一条不少,
+     * 只是来源标成回执里的,并把插进去的流水 id 填回回执。{@code receipt == null} 与上面逐字相同。
+     */
+    public EntryRow recordExpense(long familyId, long memberId, long periodId,
+                                  long accountId, String categoryCode, BigDecimal amount, String note,
+                                  Long expenseCategoryId, boolean affectsBalance, boolean oneOff,
+                                  WriteReceipt receipt) {
         Period period = requireOpenPeriod(familyId, periodId);
         Account account = requireAccount(familyId, accountId);
         if (!expenseCategoryAllowedOn(account.getType(), categoryCode)) {
@@ -453,7 +478,7 @@ public class EntryService {
         }
         Long catId = expenseCategoryService.isUsable(familyId, expenseCategoryId) ? expenseCategoryId : null;
         insertCashFlow(period, account, memberId,
-                new CashFlowLine(CashFlowKind.EXPENSE, categoryCode, amt, note), catId, affectsBalance, oneOff);
+                new CashFlowLine(CashFlowKind.EXPENSE, categoryCode, amt, note), catId, affectsBalance, oneOff, receipt);
         snapshotTodoMapper.markDone(familyId, periodId, accountId, memberId);
         auditLogService.record(familyId, memberId, AuditLogType.SYSTEM, "account", accountId,
                 "支出录入 " + cat.getDisplayName() + " " + money(amt) + " ← " + account.getDisplayName());
@@ -678,6 +703,22 @@ public class EntryService {
                                 BigDecimal toAmount,   // v0.8 · 跨币种到账金额(转入账户币种);null=同币种
                                 String note,
                                 boolean confirmDuplicate) {
+        return addTransfer(familyId, memberId, periodId, fromAccountId, toAccountId, amount, toAmount, note,
+                confirmDuplicate, null);
+    }
+
+    /** v1.32 · 带写入回执的划转(信用卡账单 / 交保费确认用);{@code receipt == null} 与上面逐字相同。 */
+    @Transactional
+    public EntryRow addTransfer(long familyId,
+                                long memberId,
+                                long periodId,
+                                long fromAccountId,
+                                long toAccountId,
+                                BigDecimal amount,
+                                BigDecimal toAmount,
+                                String note,
+                                boolean confirmDuplicate,
+                                WriteReceipt receipt) {
         Period period = requireOpenPeriod(familyId, periodId);
         Account fromAccount = requireAccount(familyId, fromAccountId);
         Account toAccount = requireAccount(familyId, toAccountId);
@@ -693,7 +734,7 @@ public class EntryService {
         creditAccountBalance(familyId, period, toAccount, memberId, effToAmount,
                 "↳ 收到来自 " + fromAccount.getDisplayName() + " " + money(effToAmount));
         Transfer created = insertTransfer(period, familyId, fromAccountId, toAccountId, amount,
-                crossCcy ? effToAmount : null, note, memberId, confirmDuplicate);
+                crossCcy ? effToAmount : null, note, memberId, confirmDuplicate, receipt);
         // v1.2 · 再平衡计划核销事件(AFTER_COMMIT 消费 · 纯本地规则 · 失败不影响划转)
         if (created != null && created.getId() != null) {
             eventPublisher.publishEvent(new com.family.finance.service.review.RebalancePlanService.TransferCreatedEvent(
@@ -1108,12 +1149,12 @@ public class EntryService {
 
     private void insertCashFlow(Period period, Account account, long memberId,
                                 CashFlowLine line, Long expenseCategoryId, boolean affectsBalance) {
-        insertCashFlow(period, account, memberId, line, expenseCategoryId, affectsBalance, false);
+        insertCashFlow(period, account, memberId, line, expenseCategoryId, affectsBalance, false, null);
     }
 
     private void insertCashFlow(Period period, Account account, long memberId,
                                 CashFlowLine line, Long expenseCategoryId, boolean affectsBalance,
-                                boolean oneOff) {
+                                boolean oneOff, WriteReceipt receipt) {
         /* v1.22 · 【只有收入侧的 0 才跳过】。
          * 原来这里对所有 kind 都「金额为 0 就直接 return」—— 于是一笔 0 元的支出
          * (全额优惠券 / 积分抵扣)被<b>静默丢弃</b>:用户在确认页上勾了它,
@@ -1135,7 +1176,7 @@ public class EntryService {
         BigDecimal amount = line.kind() == CashFlowKind.EXPENSE
                 ? expenseMoney(line.amount())
                 : positiveMoney(line.amount());
-        cashFlowMapper.insertOwned(period.getFamilyId(), CashFlow.builder()
+        CashFlow row = CashFlow.builder()
                 .periodId(period.getId())
                 .accountId(account.getId())
                 .kind(line.kind())
@@ -1144,14 +1185,18 @@ public class EntryService {
                 .occurredAt(period.getPeriodEnd())
                 .note(blankToNull(line.note()))
                 .submittedBy(memberId)
-                .sourceTag(com.family.finance.domain.ledger.LedgerSource.MANUAL.name())   // v1.18
+                // v1.18 · 来源;v1.32 起固定收支确认写 FIXED_FLOW(经写入回执带进来),其余照旧 MANUAL
+                .sourceTag(receipt != null ? receipt.sourceTag()
+                        : com.family.finance.domain.ledger.LedgerSource.MANUAL.name())
                 .expenseCategoryId(CONSUMPTION.equals(line.categoryCode()) ? expenseCategoryId : null)
                 .affectsBalance(affectsBalance)
                 /* v1.24 FR-613 · 只有【消费】才谈得上一次性 —— 还贷 / 利息 / 给亲属
                  * 不进「钱花在哪」,给它们打一次性标记没有任何读它的地方。
                  * 与 expenseCategoryId 同一条规则:脏数据挡在写入口,不留给读口径去 if。 */
                 .oneOff(CONSUMPTION.equals(line.categoryCode()) && oneOff)
-                .build());
+                .build();
+        cashFlowMapper.insertOwned(period.getFamilyId(), row);
+        if (receipt != null) receipt.cashFlowIds.add(row.getId());
     }
 
     /** v1.21 · 「日常开支」这个性质码 —— 只有它下面的笔才谈得上「钱花在哪」 */
@@ -1165,7 +1210,8 @@ public class EntryService {
                                     BigDecimal toAmount,
                                     String note,
                                     long memberId,
-                                    boolean confirmDuplicate) {
+                                    boolean confirmDuplicate,
+                                    WriteReceipt receipt) {
         if (fromAccountId == toAccountId) {
             throw new IllegalArgumentException("转出/转入账户不能相同");
         }
@@ -1186,9 +1232,11 @@ public class EntryService {
                 .note(blankToNull(note))
                 .submittedBy(memberId)
                 .draft(false)
-                .sourceTag(com.family.finance.domain.ledger.LedgerSource.MANUAL.name())   // v1.18
+                .sourceTag(receipt != null ? receipt.sourceTag()
+                        : com.family.finance.domain.ledger.LedgerSource.MANUAL.name())   // v1.18 · v1.32 回执
                 .build();
         transferMapper.insertOwned(period.getFamilyId(), transfer);
+        if (receipt != null) receipt.transferIds.add(transfer.getId());
         return transfer;
     }
 
@@ -1312,6 +1360,59 @@ public class EntryService {
 
     private String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value;
+    }
+
+    /**
+     * v1.32 · 写入回执:调用方带进来一个来源标签,写入方法把这次插进去的流水 / 划转 id 填回来。
+     *
+     * <p>为什么不让固定收支自己插行(tech-design v1.32 选型二):那就成了<b>第二条写入路径</b>,
+     * 现金行联动、补录期传导、负债账户不记还贷、只在消费上写分类 —— 这些规矩得再抄一遍,漏一条就是静默算错。
+     * 回执只在一次调用里活着,不是 ThreadLocal:谁带了回执,在签名上看得见。</p>
+     */
+    public static final class WriteReceipt {
+        private final String sourceTag;
+        private final java.util.List<Long> cashFlowIds = new java.util.ArrayList<>();
+        private final java.util.List<Long> transferIds = new java.util.ArrayList<>();
+
+        public WriteReceipt(String sourceTag) { this.sourceTag = sourceTag; }
+
+        public String sourceTag() { return sourceTag; }
+        public java.util.List<Long> cashFlowIds() { return cashFlowIds; }
+        public java.util.List<Long> transferIds() { return transferIds; }
+        public Long lastCashFlowId() { return cashFlowIds.isEmpty() ? null : cashFlowIds.get(cashFlowIds.size() - 1); }
+        public Long lastTransferId() { return transferIds.isEmpty() ? null : transferIds.get(transferIds.size() - 1); }
+    }
+
+    /**
+     * v1.32 · 系统按规则写一笔贷款本期余额(固定收支「还款 · 贷款月供」确认 / 撤销用)。
+     *
+     * <p>写快照的那几行与 {@link #acceptLoanPrediction} 相同(SYSTEM_ADJUST、标填好、审计、透视换新),
+     * 多做一件 {@code acceptLoanPrediction} 没做的:补录期传导(v1.23),双开期时进行期的延续值跟着变。
+     * <b>不起草</b>那笔 {@code is_draft=1} 的还款划转 —— 它任何口径都不读,付款那边的钱由固定收支另记成「还贷」。
+     * {@code acceptLoanPrediction} 本身一行不改(PRD v1.32 FR-1120:没设固定还款的贷款,结果与今天逐字相同)。</p>
+     */
+    @Transactional
+    public void setLoanBalanceBySystem(long familyId, long memberId, long periodId, long accountId,
+                                       BigDecimal newBalance, String note) {
+        Period period = requireOpenPeriod(familyId, periodId);
+        Account loan = requireAccount(familyId, accountId);
+        if (loan.getType() != AccountType.LOAN) {
+            throw new IllegalArgumentException("「" + loan.getDisplayName() + "」不是贷款账户");
+        }
+        BigDecimal balance = normalizeBalance(loan, newBalance);
+        snapshotMapper.upsertOwned(familyId, PeriodSnapshot.builder()
+                .periodId(periodId)
+                .accountId(accountId)
+                .endBalance(balance)
+                .submittedBy(memberId)
+                .note(note)
+                .sourceTag(com.family.finance.domain.ledger.LedgerSource.SYSTEM_ADJUST.name())
+                .build());
+        propagateCarriedForward(period, accountId, balance, memberId);
+        snapshotTodoMapper.markDone(familyId, periodId, accountId, memberId);
+        auditLogService.record(familyId, memberId, AuditLogType.SNAPSHOT_WRITE, "account", accountId,
+                note + " · 余额 → " + MoneyFormat.format2(loan.getCurrency(), balance));
+        eventPublisher.publishEvent(new com.family.finance.service.lens.LensStaleEvent(familyId));
     }
 
     public record CashFlowLine(CashFlowKind kind, String categoryCode, BigDecimal amount, String note) {

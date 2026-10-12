@@ -134,8 +134,19 @@
         <p class="text-xs text-ink-soft mt-1" th:if="${expenseMode == 'ITEMIZED'}">收支都逐笔录到账户(直接入账/出账 + 留流水)· 先录收支、最后核对余额</p>
         <p class="text-xs text-ink-soft mt-1" th:unless="${expenseMode == 'ITEMIZED'}">收入逐笔录到账户(直接入账 + 留流水 · 股票收入不虚高收益率)· 支出填一个总数 · 家庭总额 = SUM(成员)</p>
       </div>
-      <span class="font-mono text-[10px] text-ink-subtle">+15s</span>
+      <div class="flex items-center gap-3">
+        <!--/* v1.32 FR-1130 · 收支模块里的小入口(维护者 review ①「是否在收支模块会有一个小入口」)。
+               与「批量导入」同一种按钮,放在这一块的标题行上 —— 不用往下滚就看得见。 */-->
+        <a th:href="@{/admin/fixed-flows(back=${'/entry?period=' + period.id})}" data-ff-entry
+           class="btn-ghost text-xs no-underline whitespace-nowrap"
+           style="border-color:var(--brass-deep);color:var(--brass-deep)">固定收支</a>
+        <span class="font-mono text-[10px] text-ink-subtle">+15s</span>
+      </div>
     </div>
+
+    <!-- v1.32 · 固定收支:默认只占一行(FR-1110)· 贷款趋势建议也在这里(FR-1117 / 1120) -->
+    <div class="px-6 pt-5" th:if="${fixedSummary != null}"
+         th:insert="~{entry/_fixed-flows :: bar(${fixedSummary}, ${period}, ${mineOnly})}"></div>
 
     <div class="p-6 space-y-6">
       <!-- 收入侧 · 类型优先(现金 / 股票)· FR-150 -->
@@ -178,6 +189,11 @@
               <input name="note" maxlength="80" placeholder="如 6 月工资" class="w-full h-9 font-mono text-xs bg-paper border border-rule px-3">
             </div>
             <button type="submit" class="btn-ink text-sm h-9 px-4">+ 加一笔</button>
+            <!--/* v1.32 FR-1131 · 记账时顺手设:勾上提交 = 记这一笔 + 照它建一条固定收入(几号 = 今天) */-->
+            <label class="flex items-center gap-1.5 text-[11.5px] text-ink-soft whitespace-nowrap cursor-pointer h-9" data-make-fixed>
+              <input type="checkbox" name="makeFixed" value="true">
+              每月都有,设成固定
+            </label>
           </form>
           <p class="font-mono text-[10px] text-ink-subtle">工资 / 奖金 / 利息 → 现金账户,直接入账 + 留流水。</p>
         </div>
@@ -245,6 +261,7 @@
             <span class="font-mono text-[10px] text-ink-subtle" th:if="${e.submittedAt != null}"
                   th:text="${#temporals.format(e.submittedAt, 'MM-dd')}" th:title="${'填报于 ' + #temporals.format(e.submittedAt, 'yyyy-MM-dd HH:mm')}">07-17</span>
             <span class="pill pill-forest text-[9px]">已入账 + 流水</span>
+            <span th:if="${fixedCashFlowIds != null and fixedCashFlowIds.contains(e.id)}" class="pill pill-brass text-[9px]" title="来自「固定收支」的确认">固定</span>
             <form th:action="@{/entry/income/{id}/delete(id=${e.id})}" method="post" class="inline ml-auto sm:ml-0">
               <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
               <input type="hidden" name="periodId" th:value="${period.id}">
@@ -337,6 +354,11 @@
             <input type="checkbox" name="oneOff" value="true">
             这笔是一次性的
           </label>
+          <!--/* v1.32 FR-1131 · 记账时顺手设:勾上提交 = 记这一笔 + 照它建一条固定支出(几号 = 今天) */-->
+          <label class="flex items-center gap-1.5 text-[11.5px] text-ink-soft whitespace-nowrap cursor-pointer" data-make-fixed>
+            <input type="checkbox" name="makeFixed" value="true">
+            每月都有,设成固定
+          </label>
           <th:block th:insert="~{fragments/_kpi-info :: i(
               '勾上 = 这笔不算进「常态月均」—— 适合换手机、装修、一次旅行这种「这个月有、下个月没有」的钱。
 不勾(默认)= 照常算。
@@ -418,6 +440,7 @@
                   th:title="${'交易 ' + #temporals.format(e.occurredAt, 'yyyy-MM-dd')
                              + (e.submittedAt != null ? ' · 填报于 ' + #temporals.format(e.submittedAt, 'yyyy-MM-dd HH:mm') : '')}">09-08</span>
             <span class="pill text-[9px] flow-eff" style="background:rgba(159,74,58,.10);color:var(--rust);border-color:var(--rust)">已出账 + 流水</span>
+            <span th:if="${fixedCashFlowIds != null and fixedCashFlowIds.contains(e.id)}" class="pill pill-brass text-[9px]" title="来自「固定收支」的确认">固定</span>
             <form th:action="@{/entry/expense/{id}/delete(id=${e.id})}" method="post" class="inline ml-auto sm:ml-0">
               <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
               <input type="hidden" name="periodId" th:value="${period.id}">
@@ -460,6 +483,12 @@
           <p class="font-mono text-[10px] text-ink-subtle mt-1"
              th:if="${myPrevCashflow != null and myPrevCashflow.totalExpenseInput != null}"
              th:text="'↳ 上期你填的 · ¥' + ${#numbers.formatInteger(myPrevCashflow.totalExpenseInput, 0, 'COMMA')}">↳ 上期 · ¥0</p>
+          <!--/* v1.32 FR-1160 · 总数模式下固定支出不单独入账(总数里本来就含它们),这里提醒一句别漏 */-->
+          <p th:if="${fixedSummary != null and fixedSummary.totalModeExpenseLabel != null}" data-ff-total-hint
+             class="text-[11.5px] text-ink-soft mt-2 border-l-2 border-brass-deep pl-2.5 max-w-[46rem]">
+            本期固定支出 <b class="font-mono" data-priv th:text="${fixedSummary.totalModeExpenseLabel}">¥7,085</b>
+            <span class="text-ink-subtle" data-priv th:text="'(' + ${fixedSummary.totalModeBreakdown} + ')'">(物业 ¥480 · 月保 ¥300)</span>
+            —— 填总数时别漏了</p>
         </div>
       </form>
 
@@ -633,6 +662,10 @@
         <div class="font-mono text-[11px] text-ink-soft tracking-wider mt-1">
           截止 <b class="text-ink tnum" th:text="${#temporals.format(period.periodEnd, 'M 月 d 日')}">5 月 31 日</b>
           · 家庭已填 <b class="text-ink tnum" th:text="${(filledMembers != null ? filledMembers.size() : 0) + '/' + totalMembers + ' 人'}">2/4 人</b>
+          <!--/* v1.32 FR-1141 · 站内提醒加一句(短信模板不动 —— 阿里云审过的 4 个变量) */-->
+          <a th:if="${fixedSummary != null and fixedSummary.pendingCount > 0}" href="#fixed-flows" data-ff-progress
+             class="text-rust no-underline hover:underline"
+             th:text="'· ' + ${fixedSummary.pendingCount} + ' 笔固定收支待确认'">· 3 笔固定收支待确认</a>
         </div>
         <div class="flex gap-2 mt-2 items-center">
           <span th:if="${iFilled}" class="pill pill-forest text-[10px] inline-flex items-center gap-1"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>我已填</span>
