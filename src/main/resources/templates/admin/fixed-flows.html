@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<!--
+  v1.32 · 固定收支(PRD v1.32 FR-1132 · preview/v1.32 ③)
+
+  按种类分组列出全家的固定收支;新增 / 修改 / 停用(停用不影响已经记过的)。
+  表格手机上一行一张卡(v1.31 m-cards,L23)。
+-->
+<head th:replace="~{fragments/layout :: head('固定收支 · 管理 · 家庭账房')}"></head>
+<body class="min-h-screen relative">
+<div class="fixed top-0 left-0 right-0 h-1 bg-ink z-40"></div>
+<header th:replace="~{fragments/nav :: nav('admin', ${me}, ${nav})}"></header>
+<main class="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10 py-5 sm:py-10 relative z-10 grid grid-cols-12 gap-8">
+  <aside th:replace="~{admin/_sidebar :: sidebar('fixed-flows')}"></aside>
+  <section class="col-span-12 md:col-span-9">
+
+    <div class="mb-6 flex items-end justify-between flex-wrap gap-4">
+      <div>
+        <div class="eyebrow mb-2">家 · 庭 · 基 · 础</div>
+        <h1 class="font-display text-4xl font-medium">固定收支 <span class="font-mono text-sm text-ink-subtle" th:text="${total} + ' 条'">8 条</span></h1>
+        <p class="text-sm text-ink-soft mt-2 max-w-2xl">
+          每期都有的那几笔(工资、物业、月保、房贷、交保费……)设一次,以后到了日子出现在填报页「本月收支」下面那一行,<b class="text-ink">一键确认</b>。
+          系统只算不记 —— 不点确认就不会有这一笔;写进去的和手动记的完全一样。
+        </p>
+      </div>
+      <div class="flex items-center gap-2">
+        <a th:if="${back != null}" th:href="${back}" class="btn-paper text-xs no-underline">← 回填报页</a>
+        <a th:href="@{/admin/fixed-flows/new(back=${back})}" class="btn-ink text-xs no-underline" data-ff-new>+ 加一条</a>
+      </div>
+    </div>
+
+    <div th:if="${ffNote}" class="border-l-2 border-forest px-4 py-2.5 text-[13px] mb-5" style="background:rgba(79,107,71,.07)" th:text="${ffNote}">已保存</div>
+    <div th:if="${ffError}" class="border-l-2 border-rust bg-rust/[0.05] px-4 py-2.5 text-[13px] mb-5" th:text="${ffError}">出错了</div>
+
+    <div th:if="${total == 0}" class="paper-card p-8 text-center text-ink-soft" data-ff-empty-list>
+      <p>还没有固定收支。</p>
+      <p class="text-sm mt-2">从「+ 加一条」开始;或者在填报页记一笔收入 / 支出时勾「每月都有,设成固定」。贷款、保险账户的详情页也能一键设。</p>
+    </div>
+
+    <div th:if="${total > 0}" class="paper-card overflow-x-auto m-cards-wrap">
+      <table class="ledger-table m-cards" data-ff-table>
+        <thead>
+          <tr><th>名称</th><th></th><th>金额</th><th>账户</th><th>周期</th><th class="num">几号</th><th>负责人</th><th></th></tr>
+        </thead>
+        <tbody>
+          <th:block th:each="g : ${groups}" th:if="${!#lists.isEmpty(g.value)}">
+            <tr class="ff-grp"><td colspan="8" class="m-full font-mono text-[10px] tracking-[0.24em] text-brass-deep pt-4"
+                th:text="${g.key == 'INCOME' ? '收 · 入' : (g.key == 'EXPENSE' ? '支 · 出' : (g.key == 'REPAY' ? '还 · 款' : '交 · 保 · 费'))}">收 · 入</td></tr>
+            <tr th:each="r : ${g.value}" th:classappend="${!r.flow.active} ? ' opacity-50' : ''"
+                th:attr="data-ff-row=${r.flow.id}">
+              <td class="m-title">
+                <span th:text="${r.flow.name}">工资</span>
+                <span th:if="${r.flow.repayKind == 'LOAN'}" class="font-mono text-[10px] text-ink-subtle"> · 贷款月供</span>
+                <span th:if="${r.flow.repayKind == 'CARD'}" class="font-mono text-[10px] text-ink-subtle"> · 信用卡账单</span>
+              </td>
+              <td class="m-badge">
+                <span th:if="${!r.flow.active}" class="pill text-[10px]"
+                      th:text="${r.flow.disabledReason == 'ACCOUNT_ARCHIVED' ? '已停用 · 账户归档' : '已停用'}">已停用</span>
+              </td>
+              <td data-label="金额" class="font-mono" data-priv th:text="${r.amountLabel}">¥25,000</td>
+              <td data-label="账户" th:text="${r.targetName == null ? (r.flow.kind == 'INCOME' ? '→ ' + r.accountName : '← ' + r.accountName) : r.accountName + ' → ' + r.targetName}">→ 工商银行</td>
+              <td data-label="周期" th:text="${r.cycleLabel}">每月</td>
+              <td data-label="几号" class="num font-mono" th:text="${r.flow.dayOfMonth}">10</td>
+              <td data-label="负责人" th:text="${r.ownerName}">迪娃</td>
+              <td class="m-act whitespace-nowrap"><div class="ff-acts">
+                <a th:href="@{/admin/fixed-flows/{id}/edit(id=${r.flow.id}, back=${back})}" class="brass-link text-xs mr-2" data-ff-edit>改</a>
+                <form th:if="${r.flow.active}" th:action="@{/admin/fixed-flows/{id}/disable(id=${r.flow.id})}" method="post" class="inline">
+                  <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                  <button type="submit" class="text-xs text-rust hover:underline" data-ff-disable
+                          onclick="return confirm('停用这条固定收支?已经记过的不受影响,以后不再出现。')">停用</button>
+                </form>
+                <form th:unless="${r.flow.active}" th:action="@{/admin/fixed-flows/{id}/enable(id=${r.flow.id})}" method="post" class="inline">
+                  <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                  <button type="submit" class="text-xs text-brass-deep hover:underline">重新启用</button>
+                </form>
+              </div></td>
+            </tr>
+          </th:block>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</main>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

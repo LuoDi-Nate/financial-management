@@ -1,39 +1,97 @@
 {
-  "_comment": "v1.31.0 · 手机上的设置页:管理子页收成一行「管理 › 当前页 · 切换」+ 底部抽屉(按总览四组),周期表手机上一期一卡,标签不折行。核心叙事全在手机:①周期管理首屏(切换条 + 标题 + 账期节奏 2×2)②点「切换」弹出的抽屉 ③账期列表的卡片。PC 只拍分组后的侧栏。这几页没有金额,隐私模式开不开都一样。",
+  "_comment": "v1.33.0 · 固定收支(#38)+ 立即备份(#29)+ 删除账户(#39)。分两轮拍:A 轮(删之前)= 填报页固定收支一行(展开)· 管理页固定收支清单 · 「示例·旧储蓄卡」的删除面板(PC + 手机上半 / 确认区)· 备份页「立即备份」;中间用浏览器把「示例·旧储蓄卡」删进回收站;B 轮 = 回收站(PC + 手机)· 报表封板抬头的「删除账户…后重算」。固定收支与示例账户的历史是截图前临时造的(金额是编的),截完整库还原。",
   "pc": [
     {
-      "path": "/admin/periods",
-      "name": "admin-sidebar",
+      "path": "/entry",
+      "name": "fixed-flows-bar",
+      "wait": 1500,
+      "waitFor": "[data-fixed-flows]",
+      "eval": "[].forEach.call(document.querySelectorAll('[data-agent-fab], #agent-fab, #ask-float'), function(e){ e.style.display='none'; }); var b=document.querySelector('[data-ff-box]'); if(b) b.open=true; var el=document.querySelector('[data-fixed-flows]'); window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - 120);",
+      "selector": "[data-fixed-flows]",
+      "round": "A"
+    },
+    {
+      "path": "/admin/fixed-flows",
+      "name": "fixed-flows-admin",
       "wait": 1200,
-      "waitFor": ".adm-nav",
-      "eval": "[].forEach.call(document.querySelectorAll('[data-agent-fab], #agent-fab, #ask-float'), function(e){ e.style.display='none'; }); var s=document.querySelector('.adm-side .sticky'); s.style.maxHeight='none'; s.style.position='static'; window.scrollTo(0,0);",
-      "selector": "aside.adm-side .sticky"
+      "waitFor": "[data-ff-table]",
+      "eval": "[].forEach.call(document.querySelectorAll('[data-agent-fab], #agent-fab, #ask-float'), function(e){ e.style.display='none'; }); window.scrollTo(0,0);",
+      "selector": "main section",
+      "round": "A"
+    },
+    {
+      "path": "/accounts/177/delete",
+      "name": "delete-panel",
+      "wait": 1500,
+      "waitFor": "[data-account-delete]",
+      "eval": "[].forEach.call(document.querySelectorAll('[data-agent-fab], #agent-fab, #ask-float'), function(e){ e.style.display='none'; }); var h=document.querySelector('header'); if(h){ h.style.position='static'; } window.scrollTo(0,0);",
+      "selector": "[data-account-delete]",
+      "round": "A"
+    },
+    {
+      "path": "/admin/trash",
+      "name": "trash",
+      "wait": 1200,
+      "waitFor": "[data-trash-table]",
+      "eval": "[].forEach.call(document.querySelectorAll('[data-agent-fab], #agent-fab, #ask-float'), function(e){ e.style.display='none'; }); var d=document.querySelector('[data-trash-restore-box]'); if(d) d.open=true; window.scrollTo(0,0);",
+      "selector": "main section",
+      "round": "B"
+    },
+    {
+      "path": "/reports",
+      "name": "report-trace",
+      "wait": 2000,
+      "waitFor": "select[data-base]",
+      "eval": "[].forEach.call(document.querySelectorAll('[data-agent-fab], #agent-fab, #ask-float'), function(e){ e.style.display='none'; }); var t=document.querySelector('[data-trash-trace]'); var c=t.closest('.paper-card'); c.setAttribute('data-shot','1'); window.scrollTo(0, c.getBoundingClientRect().top + window.scrollY - 140);",
+      "selector": "[data-shot]",
+      "round": "B"
+    },
+    {
+      "path": "/admin/backup",
+      "name": "backup-now",
+      "wait": 1200,
+      "waitFor": "[data-backup-now]",
+      "eval": "[].forEach.call(document.querySelectorAll('[data-agent-fab], #agent-fab, #ask-float'), function(e){ e.style.display='none'; }); var f=document.querySelector('[data-backup-now]'); var c=f.parentElement.parentElement; c.setAttribute('data-shot','1'); window.scrollTo(0,0);",
+      "selector": "[data-shot]",
+      "round": "A"
     }
   ],
   "mobile": [
     {
-      "path": "/admin/periods",
-      "name": "periods-top",
-      "wait": 1200,
-      "waitFor": ".adm-bar",
-      "eval": "window.scrollTo(0,0);",
-      "full": false
-    },
-    {
-      "path": "/admin/periods",
-      "name": "admin-switch-sheet",
+      "path": "/entry",
+      "name": "fixed-flows-row",
       "wait": 1500,
-      "waitFor": ".adm-bar",
-      "eval": "window.scrollTo(0,0); document.querySelector('[data-adm-open]').click();",
-      "full": false
+      "waitFor": "[data-fixed-flows]",
+      "eval": "var b=document.querySelector('[data-ff-box]'); if(b) b.open=true; var el=document.querySelector('[data-fixed-flows]'); window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - 80);",
+      "full": false,
+      "round": "A"
     },
     {
-      "path": "/admin/periods",
-      "name": "periods-cards",
+      "path": "/accounts/177/delete",
+      "name": "delete-panel-top",
+      "wait": 1500,
+      "waitFor": "[data-account-delete]",
+      "eval": "window.scrollTo(0,0);",
+      "full": false,
+      "round": "A"
+    },
+    {
+      "path": "/accounts/177/delete",
+      "name": "delete-panel-confirm",
+      "wait": 1500,
+      "waitFor": "[data-adel-form]",
+      "eval": "var f=document.querySelector('[data-adel-form]'); window.scrollTo(0, f.getBoundingClientRect().top + window.scrollY - 40); [].forEach.call(document.querySelectorAll('body *'), function(e){ var cs=getComputedStyle(e); if(cs.position==='fixed'){ var r=e.getBoundingClientRect(); if(r.top>window.innerHeight-260) e.style.display='none'; } });",
+      "full": false,
+      "round": "A"
+    },
+    {
+      "path": "/admin/trash",
+      "name": "trash-cards",
       "wait": 1200,
-      "waitFor": "table.m-cards",
-      "eval": "var t=document.querySelector('table.m-cards'); window.scrollTo(0, t.getBoundingClientRect().top + window.scrollY - 70); [].forEach.call(document.querySelectorAll('body *'), function(e){ var cs=getComputedStyle(e); if(cs.position==='fixed'){ var r=e.getBoundingClientRect(); if(r.top>window.innerHeight-260) e.style.display='none'; } });",
-      "full": false
+      "waitFor": "[data-trash-table]",
+      "eval": "var t=document.querySelector('[data-trash-table]'); window.scrollTo(0, t.getBoundingClientRect().top + window.scrollY - 70);",
+      "full": false,
+      "round": "B"
     }
   ]
 }

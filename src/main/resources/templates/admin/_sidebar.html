@@ -17,6 +17,7 @@
             {key:'family',             href:'/admin/family',               label:'家庭设置',   ro:false},
             {key:'members',            href:'/admin/members',              label:'成员',       ro:false},
             {key:'-accounts',          href:'/accounts',                   label:'账户',       ro:false},
+            {key:'fixed-flows',        href:'/admin/fixed-flows',          label:'固定收支',   ro:false},
             {key:'templates',          href:'/admin/account-templates',    label:'账户模板',   ro:true} } },
          {title:'口 · 径 · 与 · 标 · 签', items:{
             {key:'metrics',            href:'/admin/metrics',              label:'指标设置',   ro:false},
@@ -37,7 +38,8 @@
          {title:'系 · 统', items:{
             {key:'backup',             href:'/admin/backup',               label:'备份',       ro:false},
             {key:'audit',              href:'/admin/audit',                label:'审计',       ro:false},
-            {key:'reconcile',          href:'/admin/reconcile',            label:'账目对账',   ro:true} } }
+            {key:'reconcile',          href:'/admin/reconcile',            label:'账目对账',   ro:true},
+            {key:'trash',              href:'/admin/trash',                label:'回收站',     ro:false} } }
        } }">
   <th:block th:with="itemCount=${#lists.size(groups[0].items) + #lists.size(groups[1].items) + #lists.size(groups[2].items) + #lists.size(groups[3].items)}">
 
@@ -54,7 +56,7 @@
 
   <!-- PC:常驻侧栏(分组)· <768 隐藏 -->
   <div class="hidden md:block sticky top-24">
-    <div class="eyebrow mb-3" th:text="|/ADMIN · ${itemCount} 项|">/ADMIN · 21 项</div>
+    <div class="eyebrow mb-3" th:text="|/ADMIN · ${itemCount} 项|">/ADMIN · 23 项</div>
     <nav class="adm-nav flex flex-col text-sm" aria-label="管理">
       <a th:href="@{/admin}" class="adm-link" th:classappend="${active=='hub'} ? ' on'" th:attr="aria-current=${active=='hub'} ? 'page'">总览</a>
       <th:block th:each="g : ${groups}">

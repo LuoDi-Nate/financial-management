@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<!--
+  v1.32 · 加一条 / 改一条固定收支(PRD v1.32 FR-1100 ~ 1108 · preview/v1.32 ③)
+
+  表单按种类变:选了「还款」才出现「贷款月供 / 信用卡账单」与自动算法;选了「交保费」才出现保险账户。
+  每种只有一组账户 / 类目输入是启用的(其余 disabled,不会被提交)—— 同名字段不会互相覆盖。
+  服务端 FixedFlowService.validate 再判一次,前端只是引导。
+-->
+<head th:replace="~{fragments/layout :: head('固定收支 · 管理 · 家庭账房')}"></head>
+<body class="min-h-screen relative">
+<div class="fixed top-0 left-0 right-0 h-1 bg-ink z-40"></div>
+<header th:replace="~{fragments/nav :: nav('admin', ${me}, ${nav})}"></header>
+<main class="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10 py-5 sm:py-10 relative z-10 grid grid-cols-12 gap-8">
+  <aside th:replace="~{admin/_sidebar :: sidebar('fixed-flows')}"></aside>
+  <section class="col-span-12 md:col-span-9">
+    <div class="mb-5">
+      <a th:href="@{/admin/fixed-flows(back=${back})}" class="font-mono text-[11px] text-brass-deep no-underline">← 固定收支</a>
+      <h1 class="font-display text-3xl font-medium mt-2" th:text="${form.id == null ? '加一条固定收支' : '改「' + form.name + '」'}">加一条固定收支</h1>
+    </div>
+
+    <div th:if="${formError}" data-ff-form-error class="border-l-2 border-rust bg-rust/[0.05] px-4 py-2.5 text-[13px] mb-5 max-w-2xl" th:text="${formError}">出错了</div>
+
+    <form th:action="@{/admin/fixed-flows/save}" method="post" class="bracket-card max-w-2xl space-y-5" data-ff-edit-form
+          th:attr="data-rated=${#strings.listJoin(ratedLoanIds, ',')}">
+      <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+      <input type="hidden" name="id" th:value="${form.id}">
+      <input type="hidden" name="back" th:value="${back}">
+
+      <!-- 种类 -->
+      <div>
+        <div class="ffe-lbl">是什么</div>
+        <div class="ffe-seg" role="radiogroup">
+          <label th:each="k : ${ { {'INCOME','收入'}, {'EXPENSE','支出'}, {'REPAY','还款'}, {'PREMIUM','交保费'} } }">
+            <input type="radio" name="kind" th:value="${k[0]}" th:checked="${form.kind == k[0]}" data-ffe-kind>
+            <span th:text="${k[1]}">收入</span>
+          </label>
+        </div>
+      </div>
+
+      <div>
+        <label class="ffe-lbl" for="ffe-name">名称</label>
+        <input id="ffe-name" name="name" maxlength="60" class="ffe-inp" th:value="${form.name}" placeholder="如 物业费 / 工资 / 房贷">
+      </div>
+
+      <!-- 收入 -->
+      <div class="ffe-grid" data-ffe-for="INCOME">
+        <div>
+          <label class="ffe-lbl">入账账户</label>
+          <select name="accountId" class="ffe-inp">
+            <option th:each="a : ${incomeAccounts}" th:value="${a.id}" th:selected="${form.accountId == a.id}"
+                    th:text="${a.displayName} + ' · ' + ${a.type.label}">工资卡</option>
+          </select>
+        </div>
+        <div>
+          <label class="ffe-lbl">收入类目</label>
+          <select name="categoryCode" class="ffe-inp">
+            <option th:each="c : ${incomeCategories}" th:value="${c.code}" th:selected="${form.categoryCode == c.code}"
+                    th:text="${c.displayName}">工资</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- 支出 -->
+      <div class="ffe-grid" data-ffe-for="EXPENSE">
+        <div>
+          <label class="ffe-lbl">从哪个账户付</label>
+          <select name="accountId" class="ffe-inp">
+            <option th:each="a : ${expenseAccounts}" th:value="${a.id}" th:selected="${form.accountId == a.id}"
+                    th:text="${a.displayName} + ' · ' + ${a.type.label}">招商银行</option>
+          </select>
+        </div>
+        <div>
+          <label class="ffe-lbl">性质</label>
+          <select name="categoryCode" class="ffe-inp">
+            <option th:each="c : ${expenseNatures}" th:value="${c.code}" th:selected="${form.categoryCode == c.code}"
+                    th:text="${c.displayName}">日常开支</option>
+          </select>
+        </div>
+        <div th:if="${!#lists.isEmpty(expenseCats)}">
+          <label class="ffe-lbl">消费分类(选填 · 日常开支才有)</label>
+          <select name="expenseCategoryId" class="ffe-inp">
+            <option value="">未分类</option>
+            <option th:each="c : ${expenseCats}" th:value="${c.key}" th:selected="${form.expenseCategoryId == c.key}"
+                    th:text="${c.value}">居住 › 物业</option>
+          </select>
+        </div>
+        <p class="ffe-hint sm:col-span-2">还贷 / 利息请选「还款」:那样能按贷款自动算,确认时同时减贷款余额。</p>
+      </div>
+
+      <!-- 还款 -->
+      <div class="ffe-grid" data-ffe-for="REPAY">
+        <div>
+          <label class="ffe-lbl">还哪个</label>
+          <select name="targetAccountId" class="ffe-inp" data-ffe-loan>
+            <option th:each="a : ${loanAccounts}" th:value="${a.id}" th:selected="${form.targetAccountId == a.id}"
+                    th:text="${a.displayName}">房贷</option>
+          </select>
+          <p th:if="${#lists.isEmpty(loanAccounts)}" class="ffe-hint">还没有贷款 / 信用卡账户。</p>
+        </div>
+        <div>
+          <label class="ffe-lbl">从哪个账户还</label>
+          <select name="accountId" class="ffe-inp">
+            <option th:each="a : ${payerAccounts}" th:value="${a.id}" th:selected="${form.accountId == a.id}"
+                    th:text="${a.displayName} + ' · ' + ${a.type.label}">工资卡</option>
+          </select>
+        </div>
+        <div class="sm:col-span-2">
+          <div class="ffe-lbl">还的是</div>
+          <div class="ffe-seg">
+            <label><input type="radio" name="repayKind" value="LOAN" th:checked="${form.repayKind != 'CARD'}" data-ffe-repay><span>贷款月供</span></label>
+            <label><input type="radio" name="repayKind" value="CARD" th:checked="${form.repayKind == 'CARD'}" data-ffe-repay><span>信用卡账单</span></label>
+          </div>
+          <p class="ffe-hint">信用卡账单 = 刷卡消费已经记在卡上,还款只记一笔划转、不再算支出;贷款月供 = 付款账户记「还贷」(+ 利息),贷款余额跟着减。</p>
+        </div>
+      </div>
+
+      <!-- 交保费 -->
+      <div class="ffe-grid" data-ffe-for="PREMIUM">
+        <div>
+          <label class="ffe-lbl">交到哪个保险账户</label>
+          <select name="targetAccountId" class="ffe-inp">
+            <option th:each="a : ${insuranceAccounts}" th:value="${a.id}" th:selected="${form.targetAccountId == a.id}"
+                    th:text="${a.displayName}">年金险</option>
+          </select>
+          <p th:if="${#lists.isEmpty(insuranceAccounts)}" class="ffe-hint">没有保险账户 —— 消费型保险请选「支出」。</p>
+        </div>
+        <div>
+          <label class="ffe-lbl">从哪个账户付</label>
+          <select name="accountId" class="ffe-inp">
+            <option th:each="a : ${payerAccounts}" th:value="${a.id}" th:selected="${form.accountId == a.id}"
+                    th:text="${a.displayName} + ' · ' + ${a.type.label}">工资卡</option>
+          </select>
+        </div>
+        <p class="ffe-hint sm:col-span-2">交保费记成一笔划转(付款账户 → 保险账户),不算支出。</p>
+      </div>
+
+      <!-- 金额 -->
+      <div>
+        <div class="ffe-lbl">金额</div>
+        <label class="ffe-opt">
+          <input type="radio" name="amountMode" value="FIXED" th:checked="${form.amountMode != 'AUTO'}" data-ffe-mode>
+          <b>固定金额</b> <span class="ffe-hint">每期一样;某期当场改了会问「以后都按新金额?」</span>
+        </label>
+        <label class="ffe-opt">
+          <input type="radio" name="amountMode" value="AUTO" th:checked="${form.amountMode == 'AUTO'}" data-ffe-mode>
+          <b>自动计算</b>
+          <select name="autoMethod" class="ffe-inp mt-2" data-ffe-method>
+            <option value="LOAN_DIFF" data-for="REPAY-LOAN" th:selected="${form.autoMethod == 'LOAN_DIFF'}">按上月和上上月的差值(就是原来贷款的试算)</option>
+            <option value="LOAN_RATE" data-for="REPAY-LOAN" th:selected="${form.autoMethod == 'LOAN_RATE'}">月供固定,按年利率拆本金 / 利息</option>
+            <option value="CARD_FULL" data-for="REPAY-CARD" th:selected="${form.autoMethod == 'CARD_FULL'}">全额还上期账单</option>
+            <option value="POLICY" data-for="PREMIUM" th:selected="${form.autoMethod == 'POLICY'}">按保单每期保费</option>
+            <option value="AVG3" data-for="INCOME EXPENSE" th:selected="${form.autoMethod == 'AVG3'}">近 3 期平均(水电、话费这种每期有点变的)</option>
+          </select>
+          <span class="ffe-hint block mt-1" data-ffe-method-hint></span>
+        </label>
+        <div class="mt-3" data-ffe-amount-wrap>
+          <label class="ffe-lbl" data-ffe-amount-label>金额 ¥</label>
+          <input type="number" step="0.01" min="0.01" name="amount" class="ffe-inp ffe-num" th:value="${form.amount}" data-ffe-amount>
+        </div>
+      </div>
+
+      <!-- 周期 -->
+      <div class="ffe-grid">
+        <div>
+          <div class="ffe-lbl">多久一次</div>
+          <div class="ffe-seg">
+            <label><input type="radio" name="cycle" value="MONTHLY" th:checked="${form.cycle != 'YEARLY'}" data-ffe-cycle><span>每月</span></label>
+            <label><input type="radio" name="cycle" value="YEARLY" th:checked="${form.cycle == 'YEARLY'}" data-ffe-cycle><span>每年的某几个月</span></label>
+          </div>
+        </div>
+        <div>
+          <label class="ffe-lbl" for="ffe-day">每月几号</label>
+          <input id="ffe-day" type="number" min="1" max="31" name="dayOfMonth" class="ffe-inp ffe-num" th:value="${form.dayOfMonth}" required>
+          <p class="ffe-hint">当月没有这一天就取最后一天;到了这天起出现在填报页</p>
+        </div>
+        <div class="sm:col-span-2" data-ffe-months>
+          <div class="ffe-lbl">哪几个月</div>
+          <div class="flex flex-wrap gap-2">
+            <label th:each="m : ${#numbers.sequence(1, 12)}" class="ffe-chip">
+              <input type="checkbox" name="months" th:value="${m}" th:checked="${form.months != null and #lists.contains(form.months, m)}">
+              <span th:text="${m} + ' 月'">3 月</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="ffe-grid">
+        <div>
+          <label class="ffe-lbl">负责人</label>
+          <select name="ownerMemberId" class="ffe-inp">
+            <option value="" th:selected="${form.ownerMemberId == null}">共同</option>
+            <option th:each="m : ${members}" th:value="${m.id}" th:selected="${form.ownerMemberId == m.id}" th:text="${m.displayName}">迪娃</option>
+          </select>
+        </div>
+        <div>
+          <label class="ffe-lbl" for="ffe-end">到哪期为止(可空)</label>
+          <input id="ffe-end" type="month" name="endMonth" class="ffe-inp" th:value="${form.endMonth}">
+        </div>
+      </div>
+
+      <div>
+        <label class="ffe-lbl" for="ffe-note">备注(选填)</label>
+        <input id="ffe-note" name="note" maxlength="255" class="ffe-inp" th:value="${form.note}">
+      </div>
+
+      <div class="flex items-center gap-3 pt-2">
+        <button type="submit" class="btn-ink" data-ffe-save>保存</button>
+        <a th:href="${back != null ? back : '/admin/fixed-flows'}" class="btn-paper no-underline">取消</a>
+      </div>
+    </form>
+  </section>
+</main>
+<style>
+  .ffe-lbl { display:block; font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:.08em; color:var(--ink-subtle); margin-bottom:4px; }
+  .ffe-inp { width:100%; border:1px solid var(--rule); background:var(--paper); padding:7px 10px; font-size:14px; }
+  .ffe-num { max-width:12rem; font-family:'JetBrains Mono',monospace; text-align:right; }
+  .ffe-grid { display:grid; grid-template-columns:1fr; gap:14px; }
+  @media (min-width:640px) { .ffe-grid { grid-template-columns:1fr 1fr; } }
+  .ffe-seg { display:inline-flex; flex-wrap:wrap; border:1px solid var(--rule); }
+  .ffe-seg label { position:relative; cursor:pointer; }
+  .ffe-seg input { position:absolute; opacity:0; pointer-events:none; }
+  .ffe-seg span { display:inline-block; padding:7px 14px; font-size:13px; }
+  .ffe-seg input:checked + span { background:var(--ink); color:var(--paper); }
+  .ffe-seg input:focus-visible + span { outline:2px solid var(--brass-deep); outline-offset:-2px; }
+  .ffe-opt { display:block; border:1px solid var(--rule); padding:10px 12px; margin-top:8px; background:var(--paper); cursor:pointer; }
+  .ffe-opt:has(input:checked) { border-color:var(--ink); box-shadow:inset 0 0 0 1px var(--ink); }
+  .ffe-hint { font-size:12px; color:var(--ink-subtle); line-height:1.6; margin-top:4px; }
+  .ffe-chip { display:inline-flex; align-items:center; gap:4px; border:1px solid var(--rule); padding:4px 10px; font-size:13px; cursor:pointer; }
+  [data-ffe-for][hidden], [data-ffe-months][hidden], [data-ffe-amount-wrap][hidden] { display:none !important; }
+</style>
+<script>
+  (function () {
+    var form = document.querySelector('[data-ff-edit-form]');
+    if (!form) return;
+    var rated = (form.getAttribute('data-rated') || '').split(',').filter(Boolean);
+    function val(name) { var x = form.querySelector('input[name="' + name + '"]:checked'); return x ? x.value : null; }
+    function refresh() {
+      var kind = val('kind') || 'EXPENSE';
+      var repay = val('repayKind') || 'LOAN';
+      var mode = val('amountMode') || 'FIXED';
+      // 只有当前种类那一组输入是启用的(其余 disabled = 不提交,同名字段不打架)
+      form.querySelectorAll('[data-ffe-for]').forEach(function (g) {
+        var on = g.getAttribute('data-ffe-for') === kind;
+        g.hidden = !on;
+        g.querySelectorAll('input,select').forEach(function (el) { el.disabled = !on; });
+      });
+      var key = kind === 'REPAY' ? 'REPAY-' + repay : kind;
+      var sel = form.querySelector('[data-ffe-method]');
+      var firstOk = null, curOk = false;
+      Array.prototype.forEach.call(sel.options, function (o) {
+        var ok = (o.getAttribute('data-for') || '').split(' ').indexOf(key) >= 0;
+        o.hidden = !ok; o.disabled = !ok;
+        if (ok && !firstOk) firstOk = o;
+        if (ok && o.selected) curOk = true;
+      });
+      if (!curOk && firstOk) firstOk.selected = true;
+      sel.disabled = mode !== 'AUTO';
+      var m = sel.value;
+      var hint = form.querySelector('[data-ffe-method-hint]');
+      var loanSel = form.querySelector('[data-ffe-loan]');
+      var hasRate = loanSel && rated.indexOf(loanSel.value) >= 0;
+      hint.textContent = mode !== 'AUTO' ? '' :
+        m === 'LOAN_DIFF' ? '本期还的本金 = 上月末欠款 − 上上月末欠款(只记本金;想把利息也记准用「按年利率拆」)' :
+        m === 'LOAN_RATE' ? (hasRate ? '利息 = 上月末欠款 × 年利率 ÷ 12,本金 = 月供 − 利息(年利率取自贷款账户)'
+                                     : '这笔贷款还没填年利率 —— 先去贷款账户的编辑页填上') :
+        m === 'CARD_FULL' ? '金额 = 信用卡上月末欠款' :
+        m === 'POLICY' ? '金额 = 保单登记的每期保费,改保单就跟着变' :
+        m === 'AVG3' ? '金额 = 这一条最近 3 次确认的平均;还没确认过时先按下面的起始金额' : '';
+      // 金额框:固定 → 金额;月供 → 月供;近 3 期平均 → 起始金额;其余自动算的不要金额
+      var wrap = form.querySelector('[data-ffe-amount-wrap]');
+      var amt = form.querySelector('[data-ffe-amount]');
+      var lab = form.querySelector('[data-ffe-amount-label]');
+      var need = mode !== 'AUTO' || m === 'LOAN_RATE' || m === 'AVG3';
+      wrap.hidden = !need; amt.disabled = !need; amt.required = need;
+      lab.textContent = mode !== 'AUTO' ? '金额 ¥' : m === 'LOAN_RATE' ? '每月月供 ¥' : '起始金额 ¥';
+      var yearly = val('cycle') === 'YEARLY';
+      var months = form.querySelector('[data-ffe-months]');
+      months.hidden = !yearly;
+      months.querySelectorAll('input').forEach(function (el) { el.disabled = !yearly; });
+    }
+    form.addEventListener('change', refresh);
+    refresh();
+  })();
+</script>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

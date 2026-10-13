@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<!--
+  v1.33 · 管理 → 系统 →「回收站」(PRD FR-1230 ~ 1234 · preview/v1.33 ④)
+
+  删掉的账户一直留在这里,直到手动「彻底清除」。恢复 = 原样放回(轻量确认,不打字);
+  彻底清除要打「彻底清除「X」」(同样有复制按钮)。表格手机上一行一张卡(L23 m-cards)。
+-->
+<head th:replace="~{fragments/layout :: head('回收站 · 管理 · 家庭账房')}"></head>
+<body class="min-h-screen relative">
+<div class="fixed top-0 left-0 right-0 h-1 bg-ink z-40"></div>
+<header th:replace="~{fragments/nav :: nav('admin', ${me}, ${nav})}"></header>
+<main class="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10 py-5 sm:py-10 relative z-10 grid grid-cols-12 gap-8">
+  <aside th:replace="~{admin/_sidebar :: sidebar('trash')}"></aside>
+  <section class="col-span-12 md:col-span-9">
+    <div class="mb-6">
+      <div class="eyebrow mb-2">系 · 统 · 回 · 收 · 站</div>
+      <h1 class="font-display text-4xl font-medium">删掉的账户都在这里</h1>
+      <p class="text-sm text-ink-soft mt-2 max-w-2xl">
+        <b class="text-ink">恢复</b> = 原样放回:账户和它的数据、被改记成本金进出的划转、目标绑定、计划条目都还原,报表和仪表盘按恢复后的数据重算。
+        <b class="text-ink">彻底清除</b>之后只能从备份恢复。回收站里的账户一直保留,直到手动清除。
+      </p>
+    </div>
+
+    <div th:if="${trashNote}" data-trash-note class="border-l-2 border-forest px-4 py-2.5 text-[13px] mb-3" style="background:rgba(79,107,71,.07)" th:text="${trashNote}">已恢复</div>
+    <div th:if="${trashNotes}" data-trash-notes class="border-l-2 border-rust bg-rust/[0.05] px-4 py-2.5 text-[12.5px] mb-3">
+      <div class="font-medium mb-1">这些没能放回(原来的东西已经变了):</div>
+      <div th:each="n : ${trashNotes}" th:text="'· ' + ${n}">· 目标已经删了</div>
+    </div>
+    <div th:if="${trashError}" data-trash-error class="border-l-2 border-rust bg-rust/[0.05] px-4 py-2.5 text-[13px] mb-3" th:text="${trashError}">出错了</div>
+
+    <div th:if="${#lists.isEmpty(items)}" class="paper-card p-8 text-center text-ink-soft" data-trash-empty>
+      回收站是空的。账户簿 ⋯ 菜单或账户编辑页底部的「删除账户」会把账户移到这里。
+    </div>
+
+    <div th:unless="${#lists.isEmpty(items)}" class="paper-card overflow-x-auto m-cards-wrap">
+      <table class="ledger-table m-cards" data-trash-table>
+        <thead><tr><th>账户</th><th></th><th>删除</th><th>改写过的账期</th><th>牵连划转</th><th></th></tr></thead>
+        <tbody>
+        <tr th:each="t : ${items}" th:attr="data-trash-row=${t.id}, data-trash-account=${t.accountId}">
+          <td class="m-title font-display text-[15px]" th:text="${t.accountName}">测试账户</td>
+          <td class="m-badge">
+            <span th:if="${t.active}" class="pill text-[10px]">在回收站</span>
+            <span th:if="${t.restored}" class="pill pill-forest text-[10px]">已恢复</span>
+            <span th:if="${t.purged}" class="pill text-[10px]">已清除</span>
+          </td>
+          <td data-label="删除" class="text-xs" th:text="${names.getOrDefault(t.deletedBy, '?')} + ' · ' + ${#temporals.format(t.deletedAt, 'yyyy-MM-dd HH:mm')}">迪娃 · 2026-10-12 22:15</td>
+          <td data-label="账期" class="font-mono text-xs" th:text="${t.rangeLabel != null ? t.rangeLabel : '没有历史'}">2025-01 至 2026-09 共 21 个账期</td>
+          <td data-label="划转" class="font-mono text-xs" th:text="${t.transferCount} + ' 笔 / ' + ${t.counterpartCount} + ' 个账户'">4 笔 / 4 个账户</td>
+          <td class="m-act">
+            <details th:if="${t.active}" class="trash-act" data-trash-restore-box>
+              <summary class="btn-paper text-xs inline-flex">恢复</summary>
+              <div class="trash-pop">
+                <div class="text-[12.5px] text-ink-soft leading-relaxed">会放回:<span th:text="${t.summary}">余额 21 期 …</span>
+                  <th:block th:if="${t.transferCount > 0}"> · <span th:text="${t.transferCount}">4</span> 笔划转从本金进出还原成划转</th:block></div>
+                <div class="text-[12px] text-ink-subtle mt-1">原来的东西后来变了(对方账户被删、目标被删……)的那几项会放不回,恢复后逐条列出来。</div>
+                <form th:action="@{/admin/trash/{id}/restore(id=${t.id})}" method="post" class="mt-2" data-trash-restore>
+                  <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                  <button type="submit" class="btn-ink text-xs">恢复「<span th:text="${t.accountName}">测试账户</span>」</button>
+                </form>
+              </div>
+            </details>
+            <details th:if="${t.active}" class="trash-act" data-trash-purge-box>
+              <summary class="btn-ghost text-xs inline-flex" style="color:var(--rust);border-color:var(--rust)">彻底清除</summary>
+              <div class="trash-pop">
+                <div class="text-[12.5px] text-ink-soft">清除后不能恢复(只能从备份恢复)。请原样输入:</div>
+                <div class="flex items-center gap-2 mt-1 flex-wrap">
+                  <code class="font-mono text-[13px] bg-paper-deep px-2 py-1" data-trash-purge-phrase th:text="'彻底清除「' + ${t.accountName} + '」'">彻底清除「测试账户」</code>
+                  <button type="button" class="btn-ghost text-xs" data-trash-copy>复制这段话</button>
+                </div>
+                <form th:action="@{/admin/trash/{id}/purge(id=${t.id})}" method="post" class="mt-2 flex gap-2 flex-wrap" data-trash-purge>
+                  <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+                  <input type="text" name="phrase" class="field-input" style="min-width:16rem" autocomplete="off" data-trash-purge-input>
+                  <button type="submit" class="btn-ink text-xs" style="background:var(--rust);border-color:var(--rust)">彻底清除</button>
+                </form>
+              </div>
+            </details>
+            <span th:if="${t.restored}" class="text-xs text-ink-subtle"
+                  th:text="'恢复于 ' + ${#temporals.format(t.restoredAt, 'yyyy-MM-dd HH:mm')} + (${t.restoreNotes != null} ? ' · 有没放回的项' : '')">恢复于</span>
+            <span th:if="${t.purged}" class="text-xs text-ink-subtle" th:text="'清除于 ' + ${#temporals.format(t.purgedAt, 'yyyy-MM-dd HH:mm')}">清除于</span>
+          </td>
+        </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</main>
+<style>
+  .trash-act { display: inline-block; margin-right: 6px; vertical-align: top; }
+  .trash-act > summary { list-style: none; cursor: pointer; }
+  .trash-act > summary::-webkit-details-marker { display: none; }
+  .trash-pop { margin-top: 8px; border: 1px solid var(--rule); background: var(--card); padding: 10px 12px; max-width: 34rem; white-space: normal; }
+</style>
+<script th:inline="none">
+  document.querySelectorAll('[data-trash-copy]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var box = b.closest('.trash-pop');
+      var text = box.querySelector('[data-trash-purge-phrase]').textContent;
+      var inp = box.querySelector('[data-trash-purge-input]');
+      function done() { b.textContent = '已复制'; }
+      if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(done, function () {});
+      else { inp.value = ''; var t = document.createElement('textarea'); t.value = text; document.body.appendChild(t); t.select();
+             try { document.execCommand('copy'); done(); } catch (e) {} document.body.removeChild(t); }
+    });
+  });
+</script>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

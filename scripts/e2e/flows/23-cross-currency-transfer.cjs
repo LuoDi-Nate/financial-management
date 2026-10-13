@@ -7,8 +7,10 @@
  * 全程从页面发起:在填报页展开人民币账户 → 在搜索式下拉里【打字搜】目标账户 → 填两个金额 → 点「划转」;
  * 看美元账户那一行;展开它的本期流水、点 ✕、读确认框、确认删除;到「数据安守」页点导出、打开 CSV。
  *
- * 前置:beta 上没有美元现金账户,用 test银行卡 临时改成美元(与提交者的场景一致:现金账户、美元记账)。
- * cleanup 把币种、划转、两边余额全部还原,并核对余额与跑之前逐分相同。
+ * 前置:beta 上没有美元现金账户 —— 自己建一个临时的美元现金账户(与提交者的场景一致:现金账户、美元记账)。
+ *   原来借用 beta 上的「test银行卡」临时改成美元;v1.33 有了删除账户,维护者验收时把那张卡删进了回收站,
+ *   这条 flow 就读不到它了(2026-10-13)。e2e 不该依赖维护者手里会动的数据。
+ * cleanup 删掉临时账户和它的行、还原人民币账户的余额,并核对与跑之前逐分相同。
  */
 const { execFileSync } = require('child_process');
 const fs = require('fs');
@@ -18,8 +20,7 @@ const db = require('../lib/db.cjs');
 const fx = require('../lib/fixture.cjs');
 
 const FROM = 2;              // 工商银行-备用金 · CNY
-const TO = 14;               // test银行卡 · 临时改成 USD
-const TO_NAME = 'test银行卡';
+const TO_NAME = 'e2e23美元现金';   // 临时建的美元现金账户(id 在 state.to)
 const SENT = 1000;
 const RECEIVED = 100;
 
@@ -60,15 +61,17 @@ module.exports = {
     ui.flow = this.name;
 
     // ── 前置 ──────────────────────────────────────────────────────────
-    state.cur = db.one(`SELECT currency FROM account WHERE id=${TO} AND family_id=${fx.FAM}`);
+    db.raw(`INSERT INTO account (family_id, display_name, type, currency, display_order)
+            VALUES (${fx.FAM}, '${TO_NAME}', 'CASH', 'USD', 995)`);
+    state.to = db.num(`SELECT MAX(id) FROM account WHERE family_id=${fx.FAM} AND display_name='${TO_NAME}'`);
+    const TO = state.to;
     state.maxTid = db.num(`SELECT COALESCE(MAX(id),0) FROM transfer`);
     state.pid = fx.currentPeriod();
     state.bal = {};
     for (const a of [FROM, TO]) {
       state.bal[a] = db.one(`SELECT end_balance FROM period_snapshot WHERE period_id=${state.pid} AND account_id=${a}`);
     }
-    db.raw(`UPDATE account SET currency='USD' WHERE id=${TO} AND family_id=${fx.FAM}`);
-    report.info(`前置:${TO_NAME} 临时改成美元账户(原 ${state.cur})· 进行期 #${state.pid}`);
+    report.info(`前置:临时美元现金账户 ${TO_NAME} #${TO} · 进行期 #${state.pid}`);
 
     // ── 1 · 划转前的读数 ─────────────────────────────────────────────
     report.section('1 · 在填报页做一笔跨币种划转(页面操作)');
@@ -177,24 +180,27 @@ module.exports = {
   },
 
   async cleanup(ui, report) {
+    const TO = state.to;
+    if (!TO) return;
     if (state.maxTid != null) {
       db.raw(`DELETE FROM transfer WHERE id > ${state.maxTid} AND from_account_id=${FROM} AND to_account_id=${TO}`);
     }
-    if (state.cur) db.raw(`UPDATE account SET currency='${state.cur}' WHERE id=${TO} AND family_id=${fx.FAM}`);
     if (state.bal && state.pid) {
-      for (const a of [FROM, TO]) {
-        const now = db.one(`SELECT end_balance FROM period_snapshot WHERE period_id=${state.pid} AND account_id=${a}`);
-        if (now !== state.bal[a]) {
-          if (state.bal[a] === null) db.raw(`DELETE FROM period_snapshot WHERE period_id=${state.pid} AND account_id=${a}`);
-          else db.raw(`UPDATE period_snapshot SET end_balance=${state.bal[a]} WHERE period_id=${state.pid} AND account_id=${a}`);
-        }
-        const fin = db.one(`SELECT end_balance FROM period_snapshot WHERE period_id=${state.pid} AND account_id=${a}`);
-        if (fin === state.bal[a]) report.info(`还原:账户 ${a} 本期余额与跑之前相同`);
-        else report.fail(this.name, `还原:账户 ${a} 本期余额没回到原值`, `${fin} ≠ ${state.bal[a]}`);
+      const now = db.one(`SELECT end_balance FROM period_snapshot WHERE period_id=${state.pid} AND account_id=${FROM}`);
+      if (now !== state.bal[FROM]) {
+        if (state.bal[FROM] === null) db.raw(`DELETE FROM period_snapshot WHERE period_id=${state.pid} AND account_id=${FROM}`);
+        else db.raw(`UPDATE period_snapshot SET end_balance=${state.bal[FROM]} WHERE period_id=${state.pid} AND account_id=${FROM}`);
       }
+      const fin = db.one(`SELECT end_balance FROM period_snapshot WHERE period_id=${state.pid} AND account_id=${FROM}`);
+      if (fin === state.bal[FROM]) report.info(`还原:账户 ${FROM} 本期余额与跑之前相同`);
+      else report.fail(this.name, `还原:账户 ${FROM} 本期余额没回到原值`, `${fin} ≠ ${state.bal[FROM]}`);
     }
-    const left = db.num(`SELECT COUNT(*) FROM transfer WHERE id > ${state.maxTid || 0} AND from_account_id=${FROM} AND to_account_id=${TO}`);
-    const cur = db.one(`SELECT currency FROM account WHERE id=${TO}`);
-    report.info(`还原:测试划转残留 ${left} 条 · ${TO_NAME} 币种 ${cur}`);
+    for (const sql of [`DELETE FROM snapshot_todo WHERE account_id=${TO}`, `DELETE FROM period_snapshot WHERE account_id=${TO}`,
+                       `DELETE FROM cash_flow WHERE account_id=${TO}`, `DELETE FROM transfer WHERE from_account_id=${TO} OR to_account_id=${TO}`,
+                       `DELETE FROM account_group_member WHERE account_id=${TO}`,
+                       `DELETE FROM account WHERE id=${TO} AND family_id=${fx.FAM} AND display_name='${TO_NAME}'`]) {
+      try { db.raw(sql); } catch (e) { report.info(`还原跳过:${sql.slice(0, 60)} · ${String(e.message).slice(0, 80)}`); }
+    }
+    report.info(`还原:临时美元账户已删 · 残留 ${db.num(`SELECT COUNT(*) FROM account WHERE display_name='${TO_NAME}'`)} 个`);
   },
 };

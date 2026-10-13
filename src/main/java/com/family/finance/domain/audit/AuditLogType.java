@@ -5,6 +5,10 @@ public enum AuditLogType {
     ACCOUNT_UPDATE,
     ACCOUNT_ARCHIVE,
     ACCOUNT_RESTORE,
+    /** v1.33 · 删除账户(移进回收站)/ 从回收站恢复 / 彻底清除 */
+    ACCOUNT_DELETE,
+    ACCOUNT_TRASH_RESTORE,
+    ACCOUNT_TRASH_PURGE,
     FAMILY_UPDATE,
     PERIOD_OPEN,
     PERIOD_CLOSE,

@@ -231,8 +231,11 @@ public class PeriodOpener {
      * v0.11.2 · LOAN 预填余额:趋势外推 prev + (prev − prevPrev),但**夹到 ≤ 0**(贷款=欠款,不为正)。
      *   prevPrev 为 null(仅一期历史)→ 直接沿用 prev。修 bug2:-72000 → 0 后外推成 +72000 的错。
      *   例:房贷 -990000←-1000000 → 外推 -980000(不夹);还平 0←-72000 → 外推 +72000 → 夹到 0。
+     *
+     * <p>v1.32 · 改成 public:固定收支的「还款 · 按上两月差值」直接调它({@code FixedFlowCalc.loanDiff}),
+     * 不另写一份 —— PRD v1.32 FR-1108 要求与点「接受」逐分相同,同一个函数是最直接的保证。</p>
      */
-    static BigDecimal predictLoanBalance(BigDecimal prev, BigDecimal prevPrev) {
+    public static BigDecimal predictLoanBalance(BigDecimal prev, BigDecimal prevPrev) {
         BigDecimal predicted = (prevPrev == null) ? prev : prev.add(prev.subtract(prevPrev));
         return predicted.signum() > 0 ? BigDecimal.ZERO : predicted;
     }

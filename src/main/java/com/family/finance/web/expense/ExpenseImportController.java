@@ -59,6 +59,7 @@ public class ExpenseImportController {
     private static final String DRAFT_PERIOD = "v121ImportPeriod";
 
     private final BillImportService importService;
+    private final com.family.finance.service.fixedflow.FixedFlowImportDedupe fixedFlowImportDedupe;   // v1.32 FR-1150
     private final BillCommitService commitService;
     private final ExpenseCategoryService categoryService;
     private final PeriodMapper periodMapper;
@@ -304,6 +305,8 @@ public class ExpenseImportController {
             ExpenseSource ch = ExpenseSource.valueOf(channel.toUpperCase(java.util.Locale.ROOT));
             var draft = importService.parseFile(me.getFamilyId(), ch, file.getBytes(),
                     file.getOriginalFilename(), zipPassword, defaultAccountId);
+            // v1.32 FR-1150 · 先确认、后导入:和本期已确认的固定支出同账户同金额的那一行,默认不勾、写明原因
+            draft = fixedFlowImportDedupe.markConfirmed(me.getFamilyId(), periodId, draft);
             session.setAttribute(DRAFT_KEY, draft);
             session.setAttribute(DRAFT_PERIOD, periodId);
         } catch (BillImportService.ImportException e) {

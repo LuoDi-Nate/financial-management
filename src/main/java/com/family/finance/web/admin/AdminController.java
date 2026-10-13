@@ -57,6 +57,7 @@ public class AdminController {
     private final AuditMapper auditMapper;
     private final FxService fxService;
     private final AdminService adminService;
+    private final com.family.finance.service.backup.BackupNowService backupNowService;
     /** v1.15 FR-382 · 名字映射的唯一出口(含已归档);仅活跃列表只留给"面向未来的选择/分母" */
     private final com.family.finance.service.member.MemberDirectory memberDirectory;
     private final com.family.finance.service.member.MemberReferenceScanner referenceScanner;
@@ -532,7 +533,30 @@ public class AdminController {
     public String backup(@AuthenticationPrincipal MemberPrincipal me, Model model) {
         model.addAttribute("logs", backupLogMapper.recent(me.getFamilyId(), 8));
         model.addAttribute("now", LocalDateTime.now());
+        // v1.32 · 部署方式由这里给,不再按「最新一条记录的类型」猜 —— 最新一条是「手动」时 Docker 用户会看到 systemd 的文案
+        model.addAttribute("backupMode", backupNowService.isDocker() ? "docker" : "systemd");
+        model.addAttribute("backupDir", backupNowService.dir().toString());
+        model.addAttribute("backupDirWritable", backupNowService.dirWritable());
         return "admin/backup";
+    }
+
+    /**
+     * v1.32 FR-1170 ~ 1173 · 立即备份。同步跑完再回来(几秒到几十秒):成功 / 失败都有一行「手动」记录,
+     * 失败原因是 mysqldump 的原话;正在备份 / 不到 1 分钟 → 不跑,直接说为什么。
+     */
+    @PostMapping("/backup/now")
+    public String backupNow(@AuthenticationPrincipal MemberPrincipal me, RedirectAttributes ra) {
+        try {
+            var r = backupNowService.runNow(me.getFamilyId(), me.getMemberId());
+            if (r.ok()) {
+                ra.addFlashAttribute("backupNote", "已备份 · " + r.file() + " · " + (r.bytes() / 1024) + " KB");
+            } else {
+                ra.addFlashAttribute("backupError", "备份失败:" + r.error());
+            }
+        } catch (IllegalStateException e) {
+            ra.addFlashAttribute("backupError", e.getMessage());
+        }
+        return "redirect:/admin/backup";
     }
 
     // ---------------------------------------------------------------------

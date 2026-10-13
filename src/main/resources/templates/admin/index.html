@@ -197,6 +197,15 @@
       </div>
       <span class="font-mono text-xs text-brass tracking-widest opacity-0 group-hover:opacity-100 transition">→</span>
     </a>
+    <!--/* v1.32 FR-1132 · 每期都有的那几笔 —— 卡片上点名「工资 / 物业 / 房贷 / 保费」,用户带着这些词来找(L9 判据 ①) */-->
+    <a th:href="@{/admin/fixed-flows}" class="group bg-card hover:bg-card-soft transition p-6 flex justify-between items-start">
+      <div>
+        <div class="eyebrow-ink mb-2">家庭 · 固定收支</div>
+        <h3 class="font-display text-xl">固定收支</h3>
+        <p class="text-sm text-ink-soft mt-2 leading-relaxed">工资 · 物业 · 房贷月供 · 信用卡账单 · 保费 —— 设一次,到日子一键确认</p>
+      </div>
+      <span class="font-mono text-xs text-brass tracking-widest opacity-0 group-hover:opacity-100 transition">→</span>
+    </a>
     <a th:href="@{/admin/account-templates}" class="group bg-card hover:bg-card-soft transition p-6 flex justify-between items-start">
       <div>
         <div class="eyebrow-ink mb-2">家庭 · 建户模板</div>
@@ -365,6 +374,15 @@
         <h3 class="font-display text-xl">账目对账 <span class="font-mono text-[10px] text-ink-subtle align-middle">· 只读</span></h3>
         <p class="text-sm text-ink-soft mt-2 leading-relaxed">这一期的余额变动能不能被流水解释 · 只报不改</p>
       </div>
+    </a>
+    <!--/* v1.33 FR-1230 · 删掉的账户在这里:恢复 / 彻底清除 */-->
+    <a th:href="@{/admin/trash}" class="group bg-card hover:bg-card-soft transition p-6 flex justify-between items-start">
+      <div>
+        <div class="eyebrow-ink mb-2">系统 · 回收站</div>
+        <h3 class="font-display text-xl">回收站</h3>
+        <p class="text-sm text-ink-soft mt-2 leading-relaxed">删掉的账户 · 原样恢复 / 彻底清除</p>
+      </div>
+      <span class="font-mono text-xs text-brass tracking-widest opacity-0 group-hover:opacity-100 transition">→</span>
     </a>
   </section>
 

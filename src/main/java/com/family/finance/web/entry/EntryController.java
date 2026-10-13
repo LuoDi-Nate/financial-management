@@ -28,6 +28,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.util.MultiValueMap;
@@ -71,6 +72,10 @@ public class EntryController {
     private final com.family.finance.service.stock.StockHoldingService stockHoldingService;
     /** v0.12.2 · 收入列表本位币换算(账户币种 → 本位币,与 dashboard 人赚同源) */
     private final com.family.finance.service.FxService fxService;
+    /** v1.32 · 固定收支:摘要行 + 记一笔时顺手设 */
+    private final com.family.finance.service.fixedflow.FixedFlowSummaryService fixedFlowSummaryService;
+    private final com.family.finance.service.fixedflow.FixedFlowConfirmService fixedFlowConfirmService;
+    private final com.family.finance.repository.FixedFlowMapper fixedFlowMapper;
 
     @GetMapping("/entry")
     public String entry(@AuthenticationPrincipal MemberPrincipal me,
@@ -212,6 +217,12 @@ public class EntryController {
             incomeBaseTotal = incomeBaseTotal.add(b);
         }
         model.addAttribute("baseCurrency", baseCcy);
+        // v1.32 · 固定收支那一行(FR-1110 ~ 1121):锚这一期;贷款建议沿用账户行上今天那条提示的判据
+        model.addAttribute("fixedSummary", fixedFlowSummaryService.build(me.getFamilyId(), me.getMemberId(), period,
+                rows, mineOnly, baseCcy, today));
+        // 流水列表上标「固定」(FR-1115):这一期由固定收支确认 / 关联来的那几笔
+        model.addAttribute("fixedCashFlowIds", new java.util.HashSet<>(
+                fixedFlowMapper.cashFlowIdsOfPeriod(me.getFamilyId(), period.getId())));
         model.addAttribute("incomeBaseById", incomeBaseById);
         model.addAttribute("incomeBaseTotal", incomeBaseTotal.setScale(2, java.math.RoundingMode.HALF_EVEN));
 
@@ -388,9 +399,22 @@ public class EntryController {
                                @RequestParam String categoryCode,
                                @RequestParam BigDecimal amount,
                                @RequestParam(required = false) String note,
+                               /* v1.32 FR-1131 · 「每月都有,设成固定」 */
+                               @RequestParam(defaultValue = "false") boolean makeFixed,
                                org.springframework.web.servlet.mvc.support.RedirectAttributes ra) {
         var before = balanceGuard.snapshot(me.getFamilyId(), accountId, periodId);
-        entryService.recordIncome(me.getFamilyId(), me.getMemberId(), periodId, accountId, categoryCode, amount, note);
+        if (makeFixed) {
+            try {
+                var r = fixedFlowConfirmService.recordAndMakeFixed(me.getFamilyId(), me.getMemberId(), periodId,
+                        com.family.finance.domain.fixedflow.FixedFlow.INCOME, accountId, categoryCode, amount, note,
+                        null, true, false);
+                ra.addFlashAttribute("fixedNote", r.message());
+            } catch (IllegalArgumentException | IllegalStateException e) {
+                ra.addFlashAttribute("fixedError", "没记上:" + e.getMessage());
+            }
+        } else {
+            entryService.recordIncome(me.getFamilyId(), me.getMemberId(), periodId, accountId, categoryCode, amount, note);
+        }
         guardNote(me.getFamilyId(), ra, before, periodId);
         return "redirect:/entry?period=" + periodId;
     }
@@ -443,10 +467,19 @@ public class EntryController {
                                 /* v1.24 FR-613 · 「这笔是一次性的」。默认 false ——
                                  * 绝大多数笔不是,每次都要判断一下就守不住 10 分钟/月 了。 */
                                 @RequestParam(defaultValue = "false") boolean oneOff,
+                                /* v1.32 FR-1131 · 「每月都有,设成固定」 */
+                                @RequestParam(defaultValue = "false") boolean makeFixed,
                                 org.springframework.web.servlet.mvc.support.RedirectAttributes ra) {
         try {
-            entryService.recordExpense(me.getFamilyId(), me.getMemberId(), periodId, accountId,
-                    categoryCode, amount, note, expenseCategoryId, affectsBalance, oneOff);
+            if (makeFixed) {
+                var r = fixedFlowConfirmService.recordAndMakeFixed(me.getFamilyId(), me.getMemberId(), periodId,
+                        com.family.finance.domain.fixedflow.FixedFlow.EXPENSE, accountId, categoryCode, amount, note,
+                        expenseCategoryId, affectsBalance, oneOff);
+                ra.addFlashAttribute("fixedNote", r.message());
+            } else {
+                entryService.recordExpense(me.getFamilyId(), me.getMemberId(), periodId, accountId,
+                        categoryCode, amount, note, expenseCategoryId, affectsBalance, oneOff);
+            }
         } catch (IllegalArgumentException | IllegalStateException e) {
             ra.addFlashAttribute("flashError", e.getMessage());
         }
@@ -559,7 +592,7 @@ public class EntryController {
                 transferLines(params),
                 params.getFirst("note")
         );
-        response.setHeader("HX-Trigger", "refresh-row-" + accountId);
+        selfRefresh(response, accountId);
         return rowFragment(me, row, periodId, model);
     }
 
@@ -572,7 +605,7 @@ public class EntryController {
                                        Model model) {
         long periodId = longParam(params, "periodId", () -> periodService.requireCurrentOpen(me.getFamilyId()).getId());
         EntryRow row = entryService.acceptLoanPrediction(me.getFamilyId(), me.getMemberId(), periodId, accountId);
-        response.setHeader("HX-Trigger", "refresh-row-" + accountId);
+        selfRefresh(response, accountId);
         return rowFragment(me, row, periodId, model);
     }
 
@@ -590,7 +623,7 @@ public class EntryController {
                 kind, categoryCode, amount, note);
         // 触发自身 hx-get refresh,确保 ledger details 用 GET 路径完整渲染(POST fragment 路径在 fragment 内嵌套时
         // 会丢失 row.ledger 子元素求值结果,这里走 self-refresh 兜底)
-        response.setHeader("HX-Trigger", "refresh-row-" + accountId);
+        selfRefresh(response, accountId);
         return rowFragment(me, row, periodId, model);
     }
 
@@ -616,21 +649,33 @@ public class EntryController {
     @PostMapping("/entry/cash-flow/{id}/delete")
     public String deleteCashFlow(@AuthenticationPrincipal MemberPrincipal me,
                                  @PathVariable("id") long cashFlowId,
+                                 @RequestHeader(value = "HX-Request", required = false) String hxRequest,
+                                 @RequestHeader(value = "Referer", required = false) String referer,
                                  HttpServletResponse response,
                                  Model model) {
         EntryRow row = entryService.softDeleteCashFlow(me.getFamilyId(), me.getMemberId(), cashFlowId);
-        response.setHeader("HX-Trigger", "refresh-row-" + row.account().getId());
+        if (hxRequest == null) return backToAccountPage(referer, row.account().getId());   // 账户详情页的 ✕ 是整页表单
+        selfRefresh(response, row.account().getId());
         return rowFragment(me, row, row.currentSnapshot() == null ? null : row.currentSnapshot().getPeriodId(), model);
     }
 
-    /** v0.2 FR-32 · 软删转账 */
+    /**
+     * v0.2 FR-32 · 软删转账。
+     *
+     * <p>两处会调:填报页流水明细的 ⋮(HTMX,换这一行)和账户详情页的 ✕(整页表单)。
+     * 整页表单原来也拿到这一行的 HTML 片段 —— 浏览器跳到 /entry/…/delete,看到一张没有样式、没有导航的半截页面
+     * (2026-10-13 删除账户真实用例顺带抓到)。整页请求现在回到那个账户的详情页。</p>
+     */
     @PostMapping("/entry/transfer/{id}/delete")
     public String deleteTransfer(@AuthenticationPrincipal MemberPrincipal me,
                                  @PathVariable("id") long transferId,
+                                 @RequestHeader(value = "HX-Request", required = false) String hxRequest,
+                                 @RequestHeader(value = "Referer", required = false) String referer,
                                  HttpServletResponse response,
                                  Model model) {
         EntryRow row = entryService.softDeleteTransfer(me.getFamilyId(), me.getMemberId(), transferId);
-        response.setHeader("HX-Trigger", "refresh-row-" + row.account().getId());
+        if (hxRequest == null) return backToAccountPage(referer, row.account().getId());
+        selfRefresh(response, row.account().getId());
         return rowFragment(me, row, row.currentSnapshot() == null ? null : row.currentSnapshot().getPeriodId(), model);
     }
 
@@ -650,6 +695,34 @@ public class EntryController {
         long effectivePeriodId = periodId == null ? periodService.requireCurrentOpen(me.getFamilyId()).getId() : periodId;
         response.setHeader("HX-Trigger", "refresh-row-" + toAccountId);
         return rowFragment(me, row, effectivePeriodId, model);
+    }
+
+    /**
+     * 「这一行自己刷新」:只发 refresh-row-{id},<b>不再用 POST 的返回替换这一行</b>(HX-Reswap: none)。
+     *
+     * <p>2026-10-13 删除账户真实用例抓到(v0.1 起就有):HTMX 在<b>换内容之前</b>就处理 HX-Trigger ——
+     * 这一行先发出 GET /refresh,紧接着 POST 的返回把这一行整块换掉;GET 回来时要换的那个元素已经不在页面上,
+     * 控制台报 htmx:swapError(reading 'querySelector'),那次「用 GET 完整渲染流水明细」的刷新其实从来没成功过。
+     * 现在 POST 不换,由 GET 换(行还在页面上)—— 刷新真的生效,控制台干净。</p>
+     *
+     * <p>划转那几个端点刷新的是<b>对方</b>那一行,不受影响,照旧用 POST 的返回换自己这一行。</p>
+     */
+    /** 整页删除之后回到点 ✕ 的那个账户详情页(只认本站 /accounts/{数字} 路径,别的一律回到这一笔所在的账户) */
+    static String backToAccountPage(String referer, long fallbackAccountId) {
+        if (referer != null) {
+            try {
+                String path = java.net.URI.create(referer).getPath();
+                if (path != null && path.matches("/accounts/\\d+")) return "redirect:" + path;
+            } catch (IllegalArgumentException ignored) {
+                // 坏的 Referer 就用兜底
+            }
+        }
+        return "redirect:/accounts/" + fallbackAccountId;
+    }
+
+    private static void selfRefresh(HttpServletResponse response, long accountId) {
+        response.setHeader("HX-Trigger", "refresh-row-" + accountId);
+        response.setHeader("HX-Reswap", "none");
     }
 
     @PostMapping("/entry/{periodId}/complete")
