@@ -55,7 +55,7 @@
 
   <!-- PC:常驻侧栏(分组)· <768 隐藏 -->
   <div class="hidden md:block sticky top-24">
-    <div class="eyebrow mb-3" th:text="|/ADMIN · ${itemCount} 项|">/ADMIN · 21 项</div>
+    <div class="eyebrow mb-3" th:text="|/ADMIN · ${itemCount} 项|">/ADMIN · 22 项</div>
     <nav class="adm-nav flex flex-col text-sm" aria-label="管理">
       <a th:href="@{/admin}" class="adm-link" th:classappend="${active=='hub'} ? ' on'" th:attr="aria-current=${active=='hub'} ? 'page'">总览</a>
       <th:block th:each="g : ${groups}">

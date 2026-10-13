@@ -12,7 +12,6 @@ import com.family.finance.domain.snapshot.PeriodSnapshot;
 import com.family.finance.repository.AccountMapper;
 import com.family.finance.repository.FixedFlowMapper;
 import com.family.finance.repository.InsurancePolicyMapper;
-import com.family.finance.repository.MemberMapper;
 import com.family.finance.repository.PeriodMapper;
 import com.family.finance.repository.SnapshotMapper;
 import com.family.finance.service.AuditLogService;
@@ -68,7 +67,7 @@ class FixedFlowConfirmServiceTest {
 
     @BeforeEach
     void setUp() {
-        FixedFlowSummaryService summary = new FixedFlowSummaryService(mapper, accounts, mock(MemberMapper.class), periods,
+        FixedFlowSummaryService summary = new FixedFlowSummaryService(mapper, accounts, mock(com.family.finance.service.member.MemberDirectory.class), periods,
                 snapshots, mock(InsurancePolicyMapper.class), ledger, mock(FxService.class));
         svc = new FixedFlowConfirmService(mapper, accounts, periods, snapshots, entry, summary, ledger,
                 mock(AuditLogService.class), mock(FixedFlowService.class));

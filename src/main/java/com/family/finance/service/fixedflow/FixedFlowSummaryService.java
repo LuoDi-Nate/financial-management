@@ -5,14 +5,12 @@ import com.family.finance.domain.family.ExpenseEntryMode;
 import com.family.finance.domain.fixedflow.FixedFlow;
 import com.family.finance.domain.fixedflow.FixedFlowOccurrence;
 import com.family.finance.domain.insurance.InsurancePolicy;
-import com.family.finance.domain.member.Member;
 import com.family.finance.domain.period.Period;
 import com.family.finance.domain.period.PeriodStatus;
 import com.family.finance.domain.snapshot.PeriodSnapshot;
 import com.family.finance.repository.AccountMapper;
 import com.family.finance.repository.FixedFlowMapper;
 import com.family.finance.repository.InsurancePolicyMapper;
-import com.family.finance.repository.MemberMapper;
 import com.family.finance.repository.PeriodMapper;
 import com.family.finance.repository.SnapshotMapper;
 import com.family.finance.service.EntryRow;
@@ -51,7 +49,8 @@ public class FixedFlowSummaryService {
 
     private final FixedFlowMapper mapper;
     private final AccountMapper accountMapper;
-    private final MemberMapper memberMapper;
+    /** 含已归档成员 —— 负责人可能是后来归档的人(v1.15 名录,护栏 v115) */
+    private final com.family.finance.service.member.MemberDirectory memberDirectory;
     private final PeriodMapper periodMapper;
     private final SnapshotMapper snapshotMapper;
     private final InsurancePolicyMapper policyMapper;
@@ -166,8 +165,7 @@ public class FixedFlowSummaryService {
         List<FixedFlow> all = mapper.findAllByFamily(familyId);
         Map<Long, Account> accounts = accountMapper.findAllByFamily(familyId).stream()
                 .collect(Collectors.toMap(Account::getId, Function.identity(), (a, b) -> a));
-        Map<Long, String> members = memberMapper.findAllByFamily(familyId).stream()
-                .collect(Collectors.toMap(Member::getId, Member::getDisplayName, (a, b) -> a));
+        Map<Long, String> members = memberDirectory.nameMap(familyId);
         Map<Long, FixedFlowOccurrence> occ = new HashMap<>();
         for (FixedFlowOccurrence o : mapper.findOccurrencesByPeriod(familyId, period.getId())) occ.put(o.getFixedFlowId(), o);
 

@@ -7032,7 +7032,9 @@ MINOR=$(printf '%s' "$APPV" | cut -d. -f1,2)
 #   是单测造的家庭,「净资产 100 万远大于阈值 5」是讲判据,而「同一时刻 checkup ¥5399878」
 #   是 prod 实测。机器分不出来,硬扫会得到一条天天红的护栏,然后被人关掉(这一版刚为
 #   「误报会让告警被关掉」付过代价)。要收得先由维护者逐条裁定哪些是真的。
-QA111_SYNTH='53,210|48,765|61,234|40,000|35,000|1,234,567\.89|123,456\.78|1,234,567|1,234,568|1,000,000|2,000,000|1,140,000|1,520,000|99,999,999|10,950,000|1,200,000|1,500,000|1,140,580|4,917,500|7,745,000|1,552,823|1,628,895|3,181,718|3,762,836|17,901,892|0,891,892,893,890|7,747,000|111,221.91|111,222.95|1,280\.00|12,845\.30|3,182\.50|1,046\.03|5,000\.00|1,250\.00|1,000,022\.53|12,001\.89|5,000\.02|12,000\.00'
+QA111_SYNTH='53,210|48,765|61,234|40,000|35,000|1,234,567\.89|123,456\.78|1,234,567|1,234,568|1,000,000|2,000,000|1,140,000|1,520,000|99,999,999|10,950,000|1,200,000|1,500,000|1,140,580|4,917,500|7,745,000|1,552,823|1,628,895|3,181,718|3,762,836|17,901,892|0,891,892,893,890|7,747,000|111,221.91|111,222.95|1,280\.00|12,845\.30|3,182\.50|1,046\.03|5,000\.00|1,250\.00|1,000,022\.53|12,001\.89|5,000\.02|12,000\.00|1,190,000|1,195,600|1,186,700|3,886\.44'
+#   v1.32 登记的最后四项:prd/v1.32.md 与 preview 里编的房贷示例(上月 / 上上月欠款、按年利率拆的那一笔),
+#   单测 FixedFlowCalcTest 照抄同一组编的数核对利息 —— 不是任何环境里的真实余额。
 #   v1.30 登记的最后七项:前三项是 prd/v1.30.md「关键文案」表里编的示例(按市值反推份额、手动改份额那两行);
 #   后四项是货基逐日结转单测的复利结果,以及持仓页 / 确认框模板里的占位示例。
 # 【基线 · 待裁定】把扫描面扩到源码/模板时一次性捞出来的存量(v1.19)。
@@ -10561,8 +10563,10 @@ QA124_JUDGE=$(grep -rn "ONE_OFF" "$RD/src/main/java" --include="*.java" \
 
 # v1240-ONEOFF-NOT-BALANCE · one_off 是纯分析期标记,不许进任何余额链路。
 #   affects_balance 有过「一个标记要同时退出三条链」的教训,这个标记刻意只有一条链。
+#   v1.32 · FixedFlowConfirmService 进白名单:「记一笔时顺手设成固定」把表单上两个勾原样转交 EntryService.recordExpense
+#   (和 EntryController 同一种转交,自己不碰余额)
 { ! grep -rn "one_off\|oneOff" "$RD/src/main/java" --include="*.java" \
-      | grep -vE "/test/|ExpenseNature|NormalExpense|ExpenseAttribution|ExpenseSectionView|CashFlow\.java|CashFlowMapper|ExpenseFlowMapper|EntryService|BillCommitService|ExpenseImportController|EntryController|ReviewInsightService" \
+      | grep -vE "/test/|ExpenseNature|NormalExpense|ExpenseAttribution|ExpenseSectionView|CashFlow\.java|CashFlowMapper|ExpenseFlowMapper|EntryService|BillCommitService|ExpenseImportController|EntryController|ReviewInsightService|FixedFlowConfirmService" \
       | grep -qiE "balance|snapshot|nav|networth|xirr" ; } \
   && log_ok "v1240-ONEOFF-NOT-BALANCE(one_off 不出现在余额/快照/净值路径上)" \
   || log_bad "v1240-ONEOFF-NOT-BALANCE 一次性标记渗进了余额链路" "它只该影响常态月均;碰了余额就是静默改钱"

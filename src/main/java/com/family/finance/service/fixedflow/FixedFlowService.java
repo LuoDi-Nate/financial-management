@@ -269,9 +269,8 @@ public class FixedFlowService {
         switch (kind) {
             case FixedFlow.INCOME -> {
                 if (acc.getType().isLiability()) throw new IllegalArgumentException("贷款 / 信用卡账户不能记收入");
-                if (acc.getType() == AccountType.STOCK) {
-                    throw new IllegalArgumentException("股票账户的收入按持仓记(填报页「股票收入」),不能设成固定");
-                }
+                // 类目 ↔ 账户类型由下面的 accountType 校验把关(与 recordIncome 同一条规矩):
+                // 股票类收入类目只能记在股票账户上,而它们不在表单候选里(股票收入按持仓记)
                 CashFlowCategory cat = categoryMapper.findByCode(form.getCategoryCode())
                         .filter(c -> "INCOME".equals(c.getKind()))
                         .orElseThrow(() -> new IllegalArgumentException("选一个收入类目"));

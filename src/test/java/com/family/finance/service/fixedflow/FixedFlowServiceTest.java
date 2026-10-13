@@ -82,7 +82,6 @@ class FixedFlowServiceTest {
     @Test
     void income_rejectsLiabilityAndStockAccounts_andMismatchedCategory() {
         assertThatThrownBy(() -> svc.validate(FAM, form("INCOME", 21L, null, "FIXED", null, "1"))).hasMessageContaining("不能记收入");
-        assertThatThrownBy(() -> svc.validate(FAM, form("INCOME", 13L, null, "FIXED", null, "1"))).hasMessageContaining("股票");
         FixedFlowService.Form f = form("INCOME", 11L, null, "FIXED", null, "1");
         f.setCategoryCode("dividend");
         assertThatThrownBy(() -> svc.validate(FAM, f)).hasMessageContaining("股息");

@@ -4,10 +4,8 @@ import com.family.finance.auth.MemberPrincipal;
 import com.family.finance.domain.account.Account;
 import com.family.finance.domain.account.AccountType;
 import com.family.finance.domain.fixedflow.FixedFlow;
-import com.family.finance.domain.member.Member;
 import com.family.finance.repository.AccountMapper;
 import com.family.finance.repository.CashFlowCategoryMapper;
-import com.family.finance.repository.MemberMapper;
 import com.family.finance.service.NavService;
 import com.family.finance.service.expense.ExpenseCategoryService;
 import com.family.finance.service.fixedflow.FixedFlowSchedule;
@@ -45,7 +43,7 @@ public class FixedFlowAdminController {
 
     private final FixedFlowService fixedFlowService;
     private final AccountMapper accountMapper;
-    private final MemberMapper memberMapper;
+    private final com.family.finance.service.member.MemberDirectory memberDirectory;
     private final CashFlowCategoryMapper categoryMapper;
     private final ExpenseCategoryService expenseCategoryService;
     private final NavService navService;
@@ -189,7 +187,8 @@ public class FixedFlowAdminController {
         model.addAttribute("expenseNatures", categoryMapper.listExpenseOrdered().stream()
                 .filter(c -> "consumption".equals(c.getCode()) || "to_relatives".equals(c.getCode())).toList());
         model.addAttribute("expenseCats", flatCats(fam));
-        model.addAttribute("members", memberMapper.findActiveByFamily(fam));
+        // 编辑候选 = 活跃成员 ∪ 当前负责人(负责人后来归档了也不会被静默改派)
+        model.addAttribute("members", memberDirectory.selectableWith(fam, form.getOwnerMemberId()));
         return "admin/fixed-flow-form";
     }
 
@@ -209,8 +208,7 @@ public class FixedFlowAdminController {
     }
 
     private Map<Long, String> membersById(long fam) {
-        return memberMapper.findAllByFamily(fam).stream()
-                .collect(Collectors.toMap(Member::getId, Member::getDisplayName, (a, b) -> a));
+        return memberDirectory.nameMap(fam);
     }
 
     static String cycleLabel(FixedFlow f) {
