@@ -18,21 +18,23 @@
     <span class="mx-2 text-rule">/</span><span class="text-ink">调整顺序</span>
   </div>
 
-  <div class="flex items-start justify-between gap-4 mb-5">
+  <!-- 标题行只放「标题 + 完成」,说明整行放下面:手机上说明不被「完成」挤窄,长账户名也不会把标题折成「…持仓顺 / 序」 -->
+  <div class="flex items-start justify-between gap-4">
     <div class="min-w-0 flex-1">
-      <h1 class="font-display text-3xl font-medium tracking-tight" th:text="${account.displayName} + ' · 持仓顺序'">某券商账户 · 持仓顺序</h1>
-      <p class="text-sm text-ink-soft mt-2">按住一只拖到想要的位置,松手就保存(手机上长按拿起)。持仓页、填报页的股票收入、截图导入比对、资产打标都按这个顺序;之后新加的排在最后。</p>
+      <h1 class="font-display text-3xl font-medium tracking-tight">持仓顺序</h1>
+      <div class="sort-head-sub" th:text="${account.displayName} + ' · ' + ${#lists.size(holdings)} + ' 只持仓'">某券商账户 · 3 只持仓</div>
     </div>
     <a th:href="@{|/accounts/${account.id}/holdings|}" class="btn-ink text-xs no-underline whitespace-nowrap" data-ho-done>完成</a>
   </div>
+  <p class="text-sm text-ink-soft mt-3 mb-5">按住一只拖到想要的位置,松手就保存(手机上长按拿起)。持仓页、填报页的股票收入、截图导入比对、资产打标都按这个顺序;之后新加的排在最后。</p>
 
   <div class="sort-board" data-sort-board data-holding-order-board
        th:attr="data-save-url=@{|/accounts/${account.id}/holdings/order/save|}">
     <div class="sort-quick mb-3">
-      <span class="font-mono text-[10px] tracking-[0.14em] text-ink-subtle mr-1">一键排</span>
-      <button type="button" class="btn-paper text-xs" data-sort-by="value">按市值从大到小</button>
-      <button type="button" class="btn-paper text-xs" data-sort-by="name">按名称</button>
-      <button type="button" class="btn-paper text-xs" data-sort-by="id">按添加先后</button>
+      <span class="sort-quick-label">一键排</span>
+      <button type="button" class="btn-paper sort-quick-btn" data-sort-by="value">按市值从大到小</button>
+      <button type="button" class="btn-paper sort-quick-btn" data-sort-by="name">按名称</button>
+      <button type="button" class="btn-paper sort-quick-btn" data-sort-by="id">按添加先后</button>
     </div>
     <div class="sort-list" data-sort-list>
       <div th:each="h : ${holdings}" class="sort-card" tabindex="0" data-ho-row

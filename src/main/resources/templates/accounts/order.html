@@ -18,20 +18,22 @@
     <span class="mx-2 text-rule">/</span><span class="text-ink">调整顺序</span>
   </div>
 
-  <div class="flex items-start justify-between gap-4 mb-5">
+  <!-- 标题行只放「标题 + 完成」,说明整行放下面(手机上不被「完成」挤窄)—— 和持仓顺序页同一个版式 -->
+  <div class="flex items-start justify-between gap-4">
     <div class="min-w-0 flex-1">
       <h1 class="font-display text-3xl font-medium tracking-tight">账户顺序</h1>
-      <p class="text-sm text-ink-soft mt-2">按住一个账户拖到想要的位置,松手就保存(手机上长按拿起)。账户簿、填报页、仪表盘都按这个顺序;按成员分组,组内排。</p>
+      <div class="sort-head-sub" th:text="${total} + ' 个在用账户 · 按成员分组'">21 个在用账户 · 按成员分组</div>
     </div>
     <a th:href="@{/accounts}" class="btn-ink text-xs no-underline whitespace-nowrap" data-ao-done>完成</a>
   </div>
+  <p class="text-sm text-ink-soft mt-3 mb-5">按住一个账户拖到想要的位置,松手就保存(手机上长按拿起)。账户簿、填报页、仪表盘都按这个顺序;只能在同一个成员的组里排。</p>
 
   <div class="sort-board" data-sort-board data-account-order-board th:attr="data-save-url=@{/accounts/order/save}">
     <div class="sort-quick mb-4">
-      <span class="font-mono text-[10px] tracking-[0.14em] text-ink-subtle mr-1">每组一键排</span>
-      <button type="button" class="btn-paper text-xs" data-sort-by="type">按类型</button>
-      <button type="button" class="btn-paper text-xs" data-sort-by="name">按名称</button>
-      <button type="button" class="btn-paper text-xs" data-sort-by="id">按添加先后</button>
+      <span class="sort-quick-label">每组一键排</span>
+      <button type="button" class="btn-paper sort-quick-btn" data-sort-by="type">按类型</button>
+      <button type="button" class="btn-paper sort-quick-btn" data-sort-by="name">按名称</button>
+      <button type="button" class="btn-paper sort-quick-btn" data-sort-by="id">按添加先后</button>
     </div>
     <section th:each="group : ${ownerGroups}" class="sort-group" data-ao-group>
       <div class="sort-group-head">

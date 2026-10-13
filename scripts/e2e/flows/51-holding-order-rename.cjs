@@ -115,6 +115,7 @@ module.exports = {
     await ui.click('[data-holding-order]', '点「调整顺序」');
     await ui.page.waitForLoadState('networkidle').catch(() => {});
     await ui.rendered('调整顺序页');
+    await ui.sameSize('[data-sort-board] [data-sort-by]', '一键排法三个按钮同宽同高');
     const sortCard = (id) => `[data-sort-list] [data-sort-id="${id}"]`;
     await dragCard(ui.page, sortCard(c), sortCard(a));
     let shown = await rowIds(ui.page, '[data-sort-list] [data-sort-id]');
@@ -207,6 +208,7 @@ module.exports = {
     await ui.click('[data-account-order]', '账户簿点「调整顺序」');
     await ui.page.waitForLoadState('networkidle').catch(() => {});
     await ui.rendered('账户顺序页');
+    await ui.sameSize('[data-sort-board] [data-sort-by]', '每组一键排三个按钮同宽同高');
     const g0 = '[data-ao-group] >> nth=0';
     const grpIds = await ui.page.locator(g0).evaluate(g => [...g.querySelectorAll('[data-sort-id]')].map(e => Number(e.getAttribute('data-sort-id'))));
     await ui.assert(grpIds.length >= 3, '第一个成员组至少 3 个账户', grpIds.join(','));
@@ -234,6 +236,9 @@ module.exports = {
       await m.page.waitForLoadState('networkidle').catch(() => {});
       const over = await m.page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
       await m.assert(over <= 1, '调整顺序页没有横向溢出', `${over}px`);
+      await m.sameSize('[data-sort-board] [data-sort-by]', '手机:一键排法三个按钮同宽同高(一行三个,不折行)');
+      const qb = await m.page.locator('[data-sort-board] [data-sort-by]').evaluateAll(els => els.map(e => [Math.round(e.getBoundingClientRect().top), e.scrollWidth <= e.clientWidth + 1]));
+      await m.assert(new Set(qb.map(q => q[0])).size === 1 && qb.every(q => q[1]), '手机:三个按钮在同一行、文字没被截', JSON.stringify(qb));
       const h = await m.page.locator('[data-sort-list] [data-sort-id]').first().evaluate(e => e.getBoundingClientRect().height);
       await m.assert(h >= 44, '每张卡 ≥ 44px 高(手指拿得住)', `${Math.round(h)}px`);
       const ids0 = await rowIds(m.page, '[data-sort-list] [data-sort-id]');
