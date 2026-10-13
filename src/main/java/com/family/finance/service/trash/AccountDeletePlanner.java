@@ -172,9 +172,11 @@ public class AccountDeletePlanner {
         if (closed > 0) others.add("AI 月度复盘(涉及的 " + closed + " 个已关账月份的存稿)和 AI 调仓建议会重新生成");
 
         // ── 确认语 ──
+        // 一句完整的话:有牵连的划转 → 首行与逐笔之间用逗号、最后一笔句号;没有 → 首行就是句号(维护者 2026-10-13:别以逗号结尾)
         StringBuilder phrase = new StringBuilder("我知晓删除「").append(acc.getDisplayName()).append("」");
-        if (range != null) phrase.append("会改写 ").append(range).append(",");
-        for (TransferImpact ti : impacts) phrase.append('\n').append(ti.phraseLine());
+        phrase.append(range != null ? "会改写 " + range : "不会改写任何账期");
+        for (TransferImpact ti : impacts) phrase.append(",\n").append(ti.phraseLine());
+        phrase.append("。");
 
         return new DeletePlan(acc, periods, closed, range, snapshots,
                 num(inc.get("n")), MoneyFormat.format2(ccy, dec(inc.get("total"))),

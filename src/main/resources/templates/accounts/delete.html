@@ -26,8 +26,8 @@
 
       <div th:if="${deleteError}" class="adel-err" data-delete-error th:text="${deleteError}">备份失败</div>
       <div th:if="${!backupDirWritable}" class="adel-err" data-backup-dir-warn>
-        删除前要先备份,而应用对备份目录 <span th:text="${backupDir}">/var/backup/finance</span> 没有写权限 —— 现在点删除会被挡下(不会删任何东西)。
-        在服务器上运行一次 sudo chown finance:finance <span th:text="${backupDir}">/var/backup/finance</span> 即可。
+        应用对备份目录 <span th:text="${backupDir}">/var/backup/finance</span> 没有写权限 ——「删除(先备份)」会被挡下(不会删任何东西)。
+        在服务器上运行一次 sudo chown finance:finance <span th:text="${backupDir}">/var/backup/finance</span> 即可;不需要备份的话,用下面的「不备份,直接删除」。
       </div>
 
       <!-- ① 和归档的区别 -->
@@ -85,7 +85,7 @@
         <span class="ln warn" th:each="w : ${plan.warnings}" th:text="'    · ' + ${w}">· 它是本期最后一个没填的账户</span>
         <span class="ln" th:each="o : ${plan.others}" th:text="'    · ' + ${o}">· 目标解绑</span>
       </th:block>
-      <span class="ln ok"># 删除前会先做一次立即备份,备份成功才会删</span>
+      <span class="ln ok"># 「删除(先备份)」先做一次立即备份,成功才删;「不备份,直接删除」跳过备份 —— 两种删掉的都在回收站里,能恢复</span>
 
       <!-- 确认区 -->
       <form th:action="@{/accounts/{id}/delete(id=${plan.account.id})}" method="post" class="confirm" data-adel-form>
@@ -99,6 +99,7 @@
                   placeholder="在这里粘贴或输入上面那段话"></textarea>
         <div class="acts">
           <button type="submit" class="del" data-adel-submit disabled>删除(先备份)</button>
+          <button type="submit" name="skipBackup" value="1" class="del-nobk" data-adel-submit-nobackup disabled>不备份,直接删除</button>
           <a th:href="@{/accounts}" class="cancel no-underline" data-adel-cancel>取消</a>
           <span class="match warn" data-adel-match>还没输入</span>
         </div>
@@ -113,6 +114,7 @@
     var expected = form.querySelector('[data-adel-phrase]').textContent;
     var input = form.querySelector('[data-adel-input]');
     var btn = form.querySelector('[data-adel-submit]');
+    var btnNoBk = form.querySelector('[data-adel-submit-nobackup]');
     var match = form.querySelector('[data-adel-match]');
     // 与服务端 AccountDeletePlanner.normalizePhrase 同一个规则:统一换行、去掉每行行尾空白和空行
     function norm(s) {
@@ -127,6 +129,7 @@
       if (got.length > want.length) bad += got.length - want.length;
       var ok = bad === 0 && got.length === want.length;
       btn.disabled = !ok;
+      btnNoBk.disabled = !ok;
       input.classList.toggle('ok', ok);
       match.className = 'match ' + (ok ? 'ok' : 'warn');
       match.textContent = ok ? '✓ 一字不差' : (input.value.trim() === '' ? '还没输入' : '还差 ' + bad + ' 行没对上');
@@ -146,7 +149,12 @@
         document.body.removeChild(t);
       }
     });
-    form.addEventListener('submit', function () { btn.disabled = true; btn.textContent = '正在备份、删除…'; });
+    // 点的是哪个按钮就改哪个的字;按钮在提交之后再禁用(先禁用的话 skipBackup 就带不上了)
+    form.addEventListener('submit', function (e) {
+      var by = e.submitter;
+      if (by) by.textContent = by === btnNoBk ? '正在删除…' : '正在备份、删除…';
+      setTimeout(function () { btn.disabled = true; btnNoBk.disabled = true; }, 0);
+    });
     check();
   })();
 </script>

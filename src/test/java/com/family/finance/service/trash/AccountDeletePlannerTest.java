@@ -86,14 +86,14 @@ class AccountDeletePlannerTest {
         assertThat(plan.transfers().get(1).rewriteLabel()).isEqualTo("−¥112.00");
         assertThat(plan.phrase()).isEqualTo("""
                 我知晓删除「测试账户」会改写 2025-01 至 2025-06 共 3 个账期,
-                202501 账期 工资卡 的转账 111.00 元也会受到影响
-                202502 账期 余额宝 的转账 112.00 元也会受到影响
-                202506 账期 招行理财 的转账 50,000.00 元也会受到影响""");
+                202501 账期 工资卡 的转账 111.00 元也会受到影响,
+                202502 账期 余额宝 的转账 112.00 元也会受到影响,
+                202506 账期 招行理财 的转账 50,000.00 元也会受到影响。""");
         assertThat(plan.counterpartCount()).isEqualTo(3);
     }
 
     @Test
-    void accountWithoutHistory_phraseIsJustTheFirstPart() {
+    void accountWithoutHistory_phraseIsOneSentence_endingWithAFullStop() {
         AccountMapper accounts = mock(AccountMapper.class);
         AccountTrashMapper trash = mock(AccountTrashMapper.class);
         acc(accounts, X, "空账户");
@@ -105,8 +105,26 @@ class AccountDeletePlannerTest {
         when(periods.findBalancePeriod(anyLong())).thenReturn(Optional.empty());
         var plan = new AccountDeletePlanner(accounts, trash, periods, mock(PrincipalAdjustmentMapper.class),
                 mock(SnapshotTodoMapper.class), mock(FamilyMapper.class), mock(FactViewService.class)).plan(FAM, X);
-        assertThat(plan.phrase()).isEqualTo("我知晓删除「空账户」");
+        assertThat(plan.phrase()).isEqualTo("我知晓删除「空账户」不会改写任何账期。");
         assertThat(plan.rangeLabel()).isNull();
+    }
+
+    @Test
+    void historyButNoTransfers_firstLineEndsWithAFullStop_notAComma() {
+        AccountMapper accounts = mock(AccountMapper.class);
+        AccountTrashMapper trash = mock(AccountTrashMapper.class);
+        PeriodMapper periods = mock(PeriodMapper.class);
+        acc(accounts, X, "银行卡");
+        period(periods, 101, "2025-01-01", PeriodStatus.CLOSED);
+        period(periods, 102, "2025-02-01", PeriodStatus.OPEN);
+        when(trash.affectedPeriodIds(FAM, X)).thenReturn(List.of(101L, 102L));
+        when(trash.flowTotals(eq(FAM), eq(X), anyString())).thenReturn(Map.of("n", 0L, "total", BigDecimal.ZERO));
+        when(trash.liveTransfers(FAM, X)).thenReturn(List.of());
+        when(periods.findLatestClosedAsOf(anyLong(), any())).thenReturn(Optional.empty());
+        when(periods.findBalancePeriod(anyLong())).thenReturn(Optional.empty());
+        var plan = new AccountDeletePlanner(accounts, trash, periods, mock(PrincipalAdjustmentMapper.class),
+                mock(SnapshotTodoMapper.class), mock(FamilyMapper.class), mock(FactViewService.class)).plan(FAM, X);
+        assertThat(plan.phrase()).isEqualTo("我知晓删除「银行卡」会改写 2025-01 至 2025-02 共 2 个账期。");
     }
 
     private static void acc(AccountMapper m, long id, String name) {

@@ -160,19 +160,19 @@
             <span class="ln">    · 再平衡计划「2026-09」里涉及它的 1 条会移走(进度 2/3 → 2/2)</span>
             <span class="ln">    · 目标「应急金」解绑它(目标还绑着 2 个账户)</span>
             <span class="ln">    · AI 月度复盘(20 个已关账月的存稿)和 AI 调仓建议会重新生成</span>
-            <span class="ln ok"># 删除前会先做一次立即备份,备份成功才会删</span>
+            <span class="ln ok"># 「删除(先备份)」先做一次立即备份,成功才删;「不备份,直接删除」跳过备份 —— 两种删掉的都在回收站里,能恢复</span>
 
             <div class="confirm">
               <span class="ln">请把下面这段话原样输进框里(一字不差):</span>
               <div class="phrase">我知晓删除「测试账户」会改写 2025-01 至 2026-09 共 21 个账期,
-202501 账期 工资卡 的转账 111.00 元也会受到影响
-202502 账期 余额宝 的转账 112.00 元也会受到影响
-202506 账期 招行理财 的转账 50,000.00 元也会受到影响
-202603 账期 房贷-招行 的转账 6,280.00 元也会受到影响<span class="copy">复制这段话</span></div>
+202501 账期 工资卡 的转账 111.00 元也会受到影响,
+202502 账期 余额宝 的转账 112.00 元也会受到影响,
+202506 账期 招行理财 的转账 50,000.00 元也会受到影响,
+202603 账期 房贷-招行 的转账 6,280.00 元也会受到影响。<span class="copy">复制这段话</span></div>
               <div class="ta">我知晓删除「测试账户」会改写 2025-01 至 2026-09 共 21 个账期,
-202501 账期 工资卡 的转账 111.00 元也会受到影响
-202502 账期 余额宝 的转账 112.00 元也会受到影响<span class="caret"></span></div>
-              <div class="acts"><span class="del off">删除(先备份)</span><span class="cancel">取消</span><span class="match warn">还差 2 行没对上</span></div>
+202501 账期 工资卡 的转账 111.00 元也会受到影响,
+202502 账期 余额宝 的转账 112.00 元也会受到影响,<span class="caret"></span></div>
+              <div class="acts"><span class="del off">删除(先备份)</span><span class="cancel">不备份,直接删除</span><span class="cancel">取消</span><span class="match warn">还差 2 行没对上</span></div>
             </div>
           </div>
         </div>
@@ -197,11 +197,11 @@
             <div class="body">
               <div class="confirm" style="margin-top:0;border-top:none;padding-top:0">
                 <div class="ta ok">我知晓删除「测试账户」会改写 2025-01 至 2026-09 共 21 个账期,
-202501 账期 工资卡 的转账 111.00 元也会受到影响
-202502 账期 余额宝 的转账 112.00 元也会受到影响
-202506 账期 招行理财 的转账 50,000.00 元也会受到影响
-202603 账期 房贷-招行 的转账 6,280.00 元也会受到影响</div>
-                <div class="acts"><span class="del">删除(先备份)</span><span class="cancel">取消</span><span class="match ok">✓ 一字不差</span></div>
+202501 账期 工资卡 的转账 111.00 元也会受到影响,
+202502 账期 余额宝 的转账 112.00 元也会受到影响,
+202506 账期 招行理财 的转账 50,000.00 元也会受到影响,
+202603 账期 房贷-招行 的转账 6,280.00 元也会受到影响。</div>
+                <div class="acts"><span class="del">删除(先备份)</span><span class="cancel">不备份,直接删除</span><span class="cancel">取消</span><span class="match ok">✓ 一字不差</span></div>
                 <span class="ln cmd" style="margin-top:12px">backup now --before-delete</span>
                 <span class="ln ok">✓ /data/backups/finance-manual-20261012-221503.sql.gz · 442 KB · 64 张表</span>
                 <span class="ln cmd">account delete "测试账户" --confirm</span>
@@ -235,7 +235,7 @@
           <span class="ln">    ¥2,480,000 → <span class="warn">¥2,426,756</span></span>
           <div class="confirm">
             <div class="phrase" style="font-size:11px">我知晓删除「测试账户」会改写 2025-01 至 2026-09 共 21 个账期,
-202501 账期 工资卡 的转账 111.00 元也会受到影响
+202501 账期 工资卡 的转账 111.00 元也会受到影响,
 …(共 5 行)</div>
             <div style="margin-top:8px;background:#d9a066;color:#1c1a17;text-align:center;padding:9px;font-family:'Noto Serif SC',serif">复制这段话</div>
             <div class="ta" style="min-height:60px"><span class="caret"></span></div>

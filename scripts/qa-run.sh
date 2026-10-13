@@ -11587,10 +11587,14 @@ QA133_DEL="$(awk '/public AccountTrash delete\(/{f=1} f{print} f&&/^    }$/{exit
 QA133_POST="$(awk '/@PostMapping\("\/accounts\/\{id\}\/delete"\)/{f=1} f{print} f&&/^    }$/{exit}' "$QA133_CTL")"
 QA133_L_BK="$(grep -n 'ensureFresh(' <<<"$QA133_POST" | head -1 | cut -d: -f1)"
 QA133_L_DEL="$(grep -n 'trashService.delete(' <<<"$QA133_POST" | head -1 | cut -d: -f1)"
+#   维护者 2026-10-13 加了「不备份,直接删除」:跳过备份只能是用户点了那个按钮(skipBackup=1),默认那条仍是先备份、没成不删
 { [ -n "$QA133_L_BK" ] && [ -n "$QA133_L_DEL" ] && [ "$QA133_L_BK" -lt "$QA133_L_DEL" ] \
-  && grep -q 'if (!backup.ok())' <<<"$QA133_POST"; } \
-  && log_ok "v133-BACKUP-FIRST(删除前先立即备份 · 10 分钟内成功过的手动备份复用 · 备份没成一行不删)" \
-  || log_bad "v133-BACKUP-FIRST 删除可以绕过备份" "see AccountDeleteController.delete · BackupNowService.ensureFresh"
+  && grep -q 'if (!backup.ok())' <<<"$QA133_POST" \
+  && grep -q 'if (!"1".equals(skipBackup))' <<<"$QA133_POST" \
+  && grep -q 'name="skipBackup" value="1"' "$RD/src/main/resources/templates/accounts/delete.html" \
+  && grep -q '未备份' "$QA133_SVC"; } \
+  && log_ok "v133-BACKUP-FIRST(默认先立即备份 · 10 分钟内成功过的手动备份复用 · 备份没成一行不删;「不备份,直接删除」要用户自己点,审计写「未备份」)" \
+  || log_bad "v133-BACKUP-FIRST 删除可以悄悄绕过备份(或「不备份」那条没留痕)" "see AccountDeleteController.delete · BackupNowService.ensureFresh · accounts/delete.html"
 # ⑤ 不走「原表打标记」:account 没有删除标记列,读路径一行不改
 QA133_ACOL="$(mysql -ufinance -pfinance finance -N -e "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='account' AND column_name IN ('deleted_at','is_deleted','deleted')" 2>/dev/null)"
 { [ "${QA133_ACOL:-x}" = 0 ] && ! grep -qiE 'ALTER TABLE account ADD.*delet' "$RD"/db/migration/V7[2-9]__*.sql; } \

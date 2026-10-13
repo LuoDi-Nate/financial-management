@@ -132,7 +132,7 @@ public class AccountTrashService {
         trashMapper.insertOwned(familyId, trash);
         auditLogService.record(familyId, memberId, AuditLogType.ACCOUNT_DELETE, "account", accountId,
                 clip("删除账户「" + name + "」→ 回收站 #" + trash.getId() + " · " + (plan.rangeLabel() == null ? "无历史" : "改写 " + plan.rangeLabel())
-                        + " · " + pa.size() + " 笔划转改记成本金进出 · 备份 " + backupFile, 255));
+                        + " · " + pa.size() + " 笔划转改记成本金进出 · " + (backupFile == null ? "未备份(用户选了不备份直接删除)" : "备份 " + backupFile), 255));
         events.publishEvent(new LensStaleEvent(familyId));
         return trash;
     }
