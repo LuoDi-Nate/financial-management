@@ -290,6 +290,61 @@ public class StockHoldingController {
         return "redirect:/accounts/" + accountId + "/holdings";
     }
 
+    /**
+     * v1.34 · issue #40 · 「调整顺序」页:一行一只,↑ ↓ 置顶 + 一键按市值 / 名称 / 添加先后。
+     * 市值取估值服务的 perHoldingLines(和账户余额同一个算式),只用来显示和「按市值从大到小」。
+     */
+    @GetMapping("/accounts/{accountId}/holdings/order")
+    public String orderForm(@AuthenticationPrincipal MemberPrincipal me,
+                            @PathVariable long accountId, Model model) {
+        Account account = requireAccount(me.getFamilyId(), accountId);
+        List<StockHolding> active = holdingService.findActiveByAccount(me.getFamilyId(), accountId);
+        if (active.size() < 2) return "redirect:/accounts/" + accountId + "/holdings";
+        Map<Long, BigDecimal> value = new HashMap<>();
+        for (var line : valuationService.perHoldingLines(account)) value.put(line.holding().getId(), line.valueAcctCcy());
+        model.addAttribute("me", me);
+        model.addAttribute("nav", navService.load(me));
+        model.addAttribute("account", account);
+        model.addAttribute("holdings", active);
+        model.addAttribute("values", value);
+        return "stock/holding-order";
+    }
+
+    @PostMapping("/accounts/{accountId}/holdings/order")
+    public String saveOrder(@AuthenticationPrincipal MemberPrincipal me,
+                            @PathVariable long accountId,
+                            @RequestParam(name = "ids", required = false) List<Long> ids,
+                            org.springframework.web.servlet.mvc.support.RedirectAttributes ra) {
+        try {
+            holdingService.saveOrder(me.getFamilyId(), accountId, ids);
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            ra.addFlashAttribute("orderError", e.getMessage());
+            return "redirect:/accounts/" + accountId + "/holdings/order";
+        }
+        ra.addFlashAttribute("flashOk", "已保存顺序 —— 填报页、截图导入也按这个顺序列");
+        return "redirect:/accounts/" + accountId + "/holdings";
+    }
+
+    /** v1.34 · issue #41 · 持仓卡片上「改名」(只改名字;截图导入下次按新名字认同一只) */
+    @PostMapping("/accounts/{accountId}/holdings/{hid}/rename")
+    public String rename(@AuthenticationPrincipal MemberPrincipal me,
+                         @PathVariable long accountId,
+                         @PathVariable long hid,
+                         @RequestParam(defaultValue = "") String name,
+                         org.springframework.web.servlet.mvc.support.RedirectAttributes ra) {
+        try {
+            String before = holdingService.require(me.getFamilyId(), hid).getDisplayName();
+            StockHolding h = holdingService.rename(me.getFamilyId(), accountId, hid, name);
+            lensQueryService.evict(me.getFamilyId());   // 资产透视的持仓级行用的是名字
+            if (!java.util.Objects.equals(before, h.getDisplayName())) {
+                ra.addFlashAttribute("flashOk", "已改名:「" + before + "」→「" + h.getDisplayName() + "」");
+            }
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            ra.addFlashAttribute("flashErr", "没改成:" + e.getMessage());
+        }
+        return "redirect:/accounts/" + accountId + "/holdings";
+    }
+
     /** v1.1 · 行内改个股行业标(资产透视维度 · 空串=清标回未分类) */
     @PostMapping("/accounts/{accountId}/holdings/{hid}/industry")
     public String updateIndustry(@AuthenticationPrincipal MemberPrincipal me,

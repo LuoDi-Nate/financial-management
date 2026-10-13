@@ -72,6 +72,52 @@ public class StockHoldingService {
         holdingMapper.updateIndustry(familyId, holdingId, industryTag);
     }
 
+    /** 持仓名称上限 = 列宽(V16 · VARCHAR(64)) */
+    public static final int NAME_MAX = 64;
+
+    /**
+     * v1.34 · issue #40 · 保存一个账户里持仓的顺序。
+     *
+     * <p>只收<b>这个账户全部在用持仓的完整排列</b>:少一只、多一只、重复、别的账户的、已归档的 —— 一律拒绝,
+     * 一行都不写(PRD §9 失败模式 3:顺序出现空洞)。写的是 1..n,之后新加的持仓 sort_order 为空、排在最后。</p>
+     */
+    @Transactional
+    public void saveOrder(long familyId, long accountId, List<Long> orderedIds) {
+        List<StockHolding> active = findActiveByAccount(familyId, accountId);
+        java.util.Set<Long> want = new java.util.HashSet<>();
+        for (StockHolding h : active) want.add(h.getId());
+        java.util.Set<Long> got = new java.util.HashSet<>(orderedIds == null ? List.of() : orderedIds);
+        if (orderedIds == null || orderedIds.size() != active.size() || got.size() != orderedIds.size() || !got.equals(want)) {
+            throw new IllegalArgumentException("顺序和账户里现在的持仓对不上(可能刚有人加了或归档了一只)—— 请重新打开「调整顺序」再排一次");
+        }
+        for (int i = 0; i < orderedIds.size(); i++) {
+            if (holdingMapper.updateSortOrder(familyId, accountId, orderedIds.get(i), i + 1) != 1) {
+                throw new IllegalStateException("保存顺序没成功,整次已撤回");
+            }
+        }
+    }
+
+    /**
+     * v1.34 · issue #41 · 改持仓名称。只改名字这一列(份额、估值、标签都不动)。
+     * 名字是截图导入「新旧比对」认同一只的依据之一 —— 改成平台 App 上的名字,下次导入就能对上。
+     */
+    @Transactional
+    public StockHolding rename(long familyId, long accountId, long holdingId, String name) {
+        StockHolding h = require(familyId, holdingId);
+        if (!java.util.Objects.equals(h.getAccountId(), accountId) || h.getArchivedAt() != null) {
+            throw new IllegalArgumentException("持仓不存在: " + holdingId);
+        }
+        String n = name == null ? "" : name.strip().replaceAll("\\s+", " ");
+        if (n.isEmpty()) throw new IllegalArgumentException("名称不能为空");
+        if (n.length() > NAME_MAX) throw new IllegalArgumentException("名称最多 " + NAME_MAX + " 个字");
+        if (n.equals(h.getDisplayName())) return h;
+        if (holdingMapper.updateDisplayName(familyId, accountId, holdingId, n) != 1) {
+            throw new IllegalStateException("改名没成功");
+        }
+        h.setDisplayName(n);
+        return h;
+    }
+
     @Transactional
     public StockHolding createAuto(long familyId, long accountId,
                                    String displayName, String ticker, Market market,

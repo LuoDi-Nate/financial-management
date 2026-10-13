@@ -129,6 +129,10 @@
       <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
       <button type="submit" class="btn-paper">⟳ 手动刷价</button>
     </form>
+    <!--/* v1.34 · issue #40 · 持仓少于 2 只时不出现(FR-1300) */-->
+    <a th:if="${#lists.size(holdings) >= 2}" th:href="@{|/accounts/${account.id}/holdings/order|}"
+       class="btn-paper no-underline inline-flex items-center gap-1.5" data-holding-order>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4v16"/><polyline points="3 8 7 4 11 8"/><path d="M17 20V4"/><polyline points="13 16 17 20 21 16"/></svg>调整顺序</a>
     <div class="ml-auto font-mono text-[10px] text-ink-subtle self-center"
          th:text="${priceSourceLabel}">数据源 · 新浪(主) + 腾讯(备)</div>
   </section>
@@ -185,6 +189,16 @@
           <span class="font-display text-xl font-medium" th:unless="${h.derivative}" th:text="${h.displayName}">持仓名</span>
           <!--/* v1.29 · 期权标题按「 · 」分段,每段不折行:手机上不会把「2027-04-16」从中间断开(实测截图发现) */-->
           <span class="font-display text-xl font-medium" th:if="${h.derivative}" th:attr="title=${h.ticker}"><th:block th:each="seg, st : ${#strings.arraySplit(h.displayName, '·')}"><span class="whitespace-nowrap" th:text="${#strings.trim(seg)}">AAPL</span><th:block th:unless="${st.last}"> · </th:block></th:block></span>
+          <!--/* v1.34 · issue #41 · 持仓名称可以直接改(只改名字;截图导入下次按新名字认同一只)*/-->
+          <details class="hold-rename" data-hold-rename>
+            <summary class="hold-rename-btn" title="改名称">改名</summary>
+            <form th:action="@{|/accounts/${account.id}/holdings/${h.id}/rename|}" method="post" class="hold-rename-form">
+              <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+              <input type="text" name="name" th:value="${h.displayName}" maxlength="64" required
+                     class="field-input text-sm" aria-label="持仓名称" data-hold-rename-input>
+              <button type="submit" class="btn-ink text-xs">保存</button>
+            </form>
+          </details>
           <span class="pill text-[9px]" th:if="${h.ticker != null and !h.derivative}" th:text="${h.ticker}">BABA</span>
           <span class="pill text-[9px]" th:if="${h.market != null}" th:text="${h.market}">US</span>
           <span class="pill text-[9px]" th:if="${h.valuationMode.name() == 'AUTO'}"
@@ -511,6 +525,25 @@
 
 </main>
 
+<style>
+  /* v1.34 · issue #41 · 卡片标题旁的「改名」:平时是一个小字链接;PC 上点开是标题下面浮出的一行(不挤动标题行),
+     手机上点开整行展开(浮层在窄屏上会出右边界)*/
+  .hold-rename { display: inline-block; position: relative; }
+  .hold-rename > summary { list-style: none; cursor: pointer; display: inline-block; }
+  .hold-rename > summary::-webkit-details-marker { display: none; }
+  .hold-rename-btn { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--ink-subtle);
+                     border-bottom: 1px dashed var(--rule); padding: 0 1px; }
+  .hold-rename-btn:hover, .hold-rename[open] > .hold-rename-btn { color: var(--brass-deep); border-color: var(--brass-deep); }
+  .hold-rename-form { display: flex; gap: 8px; align-items: center; position: absolute; top: calc(100% + 6px); left: 0; z-index: 20;
+                      background: var(--card); border: 1px solid var(--rule); padding: 10px 12px; box-shadow: 0 6px 18px rgba(26,23,20,.12); }
+  .hold-rename-form input { width: 22rem; }
+  .hold-rename-form button { white-space: nowrap; }
+  @media (max-width: 767.98px) {
+    .hold-rename[open] { flex-basis: 100%; }
+    .hold-rename-form { position: static; box-shadow: none; margin-top: 6px; padding: 8px; }
+    .hold-rename-form input { width: auto; min-width: 0; flex: 1; }
+  }
+</style>
 <footer th:replace="~{fragments/layout :: footer}"></footer>
 </body>
 </html>

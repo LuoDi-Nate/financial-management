@@ -92,6 +92,8 @@ public class StockHolding {
     private String navError;
     /** 份额是按哪天的净值从市值反推的;用户改过份额后清空 */
     private java.time.LocalDate sharesEstimatedOn;
+    /** v1.34 · 账户内的展示顺序(NULL = 没排过:按添加先后,排在排过的后面)· 只是展示,不进任何计算 */
+    private Integer sortOrder;
 
     /** 是不是券商同步来的期权 / 期货 / 债券这一类 */
     public boolean isDerivative() {

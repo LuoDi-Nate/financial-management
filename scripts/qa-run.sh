@@ -11621,6 +11621,34 @@ QA133_EC="$RD/src/main/java/com/family/finance/web/entry/EntryController.java"
 [ -f "$RD/scripts/e2e/flows/49-account-delete.cjs" ] \
   && log_ok "v133-E2E(flow 49:删除 → 对方改记 → 报表留痕 → 恢复 → 彻底清除 → 手机,页面 + 库两层)" || log_bad "v133-E2E 缺 flow 49" "scripts/e2e/flows/49-account-delete.cjs"
 
+
+# ── v1.34 · issue #40 持仓调整顺序 + issue #41 持仓改名(prd/v1.34.md · tech-design/v1.34.md)──
+section "v1.34 · 持仓调整顺序(#40)+ 持仓改名(#41)"
+QA134_MP="$RD/src/main/java/com/family/finance/repository/StockHoldingMapper.java"
+QA134_SVC="$RD/src/main/java/com/family/finance/service/stock/StockHoldingService.java"
+QA134_CTL="$RD/src/main/java/com/family/finance/web/stock/StockHoldingController.java"
+# ① 列账户持仓的两条查询共用一个排序规则(空排后、再按添加先后)—— 四处展示同一个顺序
+{ grep -q 'String ACCOUNT_ORDER = " (h.sort_order IS NULL), h.sort_order, h.id";' "$QA134_MP" \
+  && [ "$(grep -c 'ORDER BY" + ACCOUNT_ORDER)' "$QA134_MP")" -eq 1 ] \
+  && grep -q 'ORDER BY h.archived_at IS NULL DESC," + ACCOUNT_ORDER)' "$QA134_MP" \
+  && grep -qh 'ADD COLUMN sort_order INT NULL' "$RD"/db/migration/V73__*.sql; } \
+  && log_ok "v134-ORDER-ONE-KEY(按账户取持仓的两条查询共用 ACCOUNT_ORDER · 没排过 = 按添加先后 · 新加的排最后)" \
+  || log_bad "v134-ORDER-ONE-KEY 持仓顺序有了第二套规则(某一处会和别处不一样)" "see StockHoldingMapper.ACCOUNT_ORDER"
+# ② 保存只收完整排列(少 / 多 / 重复 / 别的账户 → 整次拒绝)
+QA134_SAVE="$(awk '/public void saveOrder\(/{f=1} f{print} f&&/^    }$/{exit}' "$QA134_SVC")"
+{ grep -q 'got.equals(want)' <<<"$QA134_SAVE" && grep -q 'orderedIds.size() != active.size()' <<<"$QA134_SAVE" \
+  && grep -q 'saveOrder_onlyAcceptsTheFullPermutation' "$RD/src/test/java/com/family/finance/service/stock/HoldingOrderRenameTest.java"; } \
+  && log_ok "v134-ORDER-FULL-PERMUTATION(保存顺序只收这个账户全部在用持仓的完整排列 · 单测钉住)" \
+  || log_bad "v134-ORDER-FULL-PERMUTATION 保存顺序可能出现空洞或排进别的账户的持仓" "see StockHoldingService.saveOrder"
+# ③ 改名只写名字这一列,改完清透视缓存
+{ grep -A3 'int updateDisplayName' "$QA134_MP" >/dev/null && grep -B4 'int updateDisplayName' "$QA134_MP" | grep -q 'SET h.display_name = #{name}"' \
+  && ! grep -B4 'int updateDisplayName' "$QA134_MP" | grep -q 'h.shares\|h.manual_value' \
+  && grep -q 'holdingService.rename(' "$QA134_CTL" \
+  && grep -A8 'holdingService.rename(' "$QA134_CTL" | grep -q 'lensQueryService.evict'; } \
+  && log_ok "v134-RENAME-NAME-ONLY(改名走只写 display_name 的专用语句 · 不覆盖份额 / 估值 · 改完清透视缓存)" \
+  || log_bad "v134-RENAME-NAME-ONLY 改名可能覆盖别的列,或透视里还是旧名字" "see StockHoldingMapper.updateDisplayName · StockHoldingController.rename"
+[ -f "$RD/scripts/e2e/flows/51-holding-order-rename.cjs" ] \
+  && log_ok "v134-E2E(flow 51:调整顺序 → 四处一致 → 新加的在最后 → 改名 → 手机)" || log_bad "v134-E2E 缺 flow 51" "scripts/e2e/flows/51-holding-order-rename.cjs"
 echo
 echo "═══════════════════════════════════════"
 echo " 总结: PASS=$PASS  FAIL=$FAIL  SKIP=$SKIP"

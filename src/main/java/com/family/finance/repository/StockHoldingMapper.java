@@ -33,7 +33,16 @@ public interface StockHoldingMapper {
             + " h.multiplier, h.quote_price AS quotePrice, h.notional,"
             // v1.30 · 净值行(场外基金 / 货币基金)· 见 NavMode
             + " h.nav_mode AS navMode, h.nav_date AS navDate, h.nav_checked_at AS navCheckedAt,"
-            + " h.nav_error AS navError, h.shares_estimated_on AS sharesEstimatedOn ";
+            + " h.nav_error AS navError, h.shares_estimated_on AS sharesEstimatedOn,"
+            // v1.34 · 账户内持仓顺序(只是展示)
+            + " h.sort_order AS sortOrder ";
+
+    /**
+     * v1.34 · issue #40 · 一个账户里持仓的展示顺序 —— <b>唯一的一份</b>。
+     * 排过的按 sort_order;没排过的(NULL,包括排完之后新加的)按添加先后排在后面。
+     * 持仓页 / 填报页股票收入 / 截图导入比对 / 资产打标都从下面两条取,顺序自然一致(护栏 v134-ORDER-ONE-KEY)。
+     */
+    String ACCOUNT_ORDER = " (h.sort_order IS NULL), h.sort_order, h.id";
 
     @Select("SELECT" + COLS + "FROM stock_holding h"
           + " JOIN account a ON a.id = h.account_id"
@@ -43,14 +52,14 @@ public interface StockHoldingMapper {
     @Select("SELECT" + COLS + "FROM stock_holding h"
           + " JOIN account a ON a.id = h.account_id"
           + " WHERE a.family_id = #{familyId} AND h.account_id = #{accountId}"
-          + " AND h.archived_at IS NULL ORDER BY h.id")
+          + " AND h.archived_at IS NULL ORDER BY" + ACCOUNT_ORDER)
     List<StockHolding> findActiveByAccount(@Param("familyId") long familyId,
                                            @Param("accountId") long accountId);
 
     @Select("SELECT" + COLS + "FROM stock_holding h"
           + " JOIN account a ON a.id = h.account_id"
           + " WHERE a.family_id = #{familyId} AND h.account_id = #{accountId}"
-          + " ORDER BY h.archived_at IS NULL DESC, h.id")
+          + " ORDER BY h.archived_at IS NULL DESC," + ACCOUNT_ORDER)
     List<StockHolding> findAllByAccount(@Param("familyId") long familyId,
                                         @Param("accountId") long accountId);
 
@@ -212,6 +221,20 @@ public interface StockHoldingMapper {
           + " SET h.nav_mode = NULL, h.nav_error = NULL, h.shares_estimated_on = NULL, h.manual_value_at = NOW()"
           + " WHERE a.family_id = #{familyId} AND h.id = #{id} AND h.nav_mode IS NOT NULL")
     int clearNavMode(@Param("familyId") long familyId, @Param("id") long id);
+
+    /** v1.34 · 保存一只持仓的顺序(只写这一列;family 经账户校验) */
+    @Update("UPDATE stock_holding h JOIN account a ON a.id = h.account_id"
+          + " SET h.sort_order = #{order}"
+          + " WHERE a.family_id = #{familyId} AND h.account_id = #{accountId} AND h.id = #{id} AND h.archived_at IS NULL")
+    int updateSortOrder(@Param("familyId") long familyId, @Param("accountId") long accountId,
+                        @Param("id") long id, @Param("order") int order);
+
+    /** v1.34 · issue #41 · 只改持仓名称(别的列一律不碰;family 经账户校验) */
+    @Update("UPDATE stock_holding h JOIN account a ON a.id = h.account_id"
+          + " SET h.display_name = #{name}"
+          + " WHERE a.family_id = #{familyId} AND h.account_id = #{accountId} AND h.id = #{id} AND h.archived_at IS NULL")
+    int updateDisplayName(@Param("familyId") long familyId, @Param("accountId") long accountId,
+                          @Param("id") long id, @Param("name") String name);
 
     /** v1.30 · 某家庭全部活的净值行(同步 / 结转用) */
     @Select("SELECT" + COLS + "FROM stock_holding h"
