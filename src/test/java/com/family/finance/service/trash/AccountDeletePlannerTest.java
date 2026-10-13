@@ -81,6 +81,9 @@ class AccountDeletePlannerTest {
         assertThat(plan.transfers().get(0).line()).contains("工资卡").contains("收到它转来 ¥111.00").contains("补录本金」+¥111.00");
         assertThat(plan.transfers().get(1).line()).contains("余额宝").contains("转给它 ¥112.00").contains("本金移出」−¥112.00");
         assertThat(plan.transfers().get(2).line()).contains("第一次出现").contains("开账基线");
+        // 面板上那一笔的符号由方向定(模板不许硬拼负号 · v1221-NO-HARDCODED-MINUS)
+        assertThat(plan.transfers().get(0).rewriteLabel()).isEqualTo("+¥111.00");
+        assertThat(plan.transfers().get(1).rewriteLabel()).isEqualTo("−¥112.00");
         assertThat(plan.phrase()).isEqualTo("""
                 我知晓删除「测试账户」会改写 2025-01 至 2025-06 共 3 个账期,
                 202501 账期 工资卡 的转账 111.00 元也会受到影响

@@ -11242,7 +11242,10 @@ body_of() { awk -v sig="$2" 'index($0, sig){f=1} f{print} f&&/^    }$/{exit}' "$
   || log_bad "v130-FUND-ONE-PATH 基金市值多了一条求和路径" "valuateInternal / perHoldingLines 不许认 navMode;页面市值从 perHoldingLines 取"
 
 # v130-SHARE-EVENT-NO-MONEY · 持仓数量变动只给人看:这张表只许 HoldingShareEventMapper 碰,fact / 报表 SQL 里不许出现
-QA130_SE=$(grep -rl 'holding_share_event' "$QA130_J" "$RD/src/main/resources/mapper" 2>/dev/null | grep -v 'HoldingShareEventMapper.java' | tr '\n' ' ')
+#   v1.33 · 删除账户的搬运清单 AccountTrashSpec 要点名这张表(整行原样搬进回收站、恢复时搬回)—— 只搬不算,
+#   所以放行,但它提到这张表的那一行不许出现 quantity / shares 这类数量列
+QA130_SE=$(grep -rl 'holding_share_event' "$QA130_J" "$RD/src/main/resources/mapper" 2>/dev/null | grep -v 'HoldingShareEventMapper.java' | grep -v '/service/trash/AccountTrashSpec.java' | tr '\n' ' ')
+grep -h 'holding_share_event' "$QA130_J/service/trash/AccountTrashSpec.java" 2>/dev/null | grep -qiE 'quantity|shares|amount' && QA130_SE="$QA130_SE AccountTrashSpec(提到了数量列)"
 [ -z "$QA130_SE" ] \
   && log_ok "v130-SHARE-EVENT-NO-MONEY(holding_share_event 只被 HoldingShareEventMapper 读写,不进任何金额汇总)" \
   || log_bad "v130-SHARE-EVENT-NO-MONEY 持仓数量变动被别处读了(钱的变化只在估值事件里)" "$QA130_SE"
@@ -11367,7 +11370,11 @@ done < <(grep -rn "type.name() == 'WEALTH'" "$RD/src/main/resources/templates" 2
 #   ② 账户第一期不认补录本金(第一期余额已整笔算开账基线 —— 认了就算两遍);
 #   ③ 持仓成本价不进任何账户级 / 家庭级指标(只给持仓行与透视持仓级「累计收益额」)。
 QA130_FVS="$QA130_J/factview/FactViewServiceImpl.java"
-QA130_PA_FILES="$(grep -rlw 'principal_adjustment' "$QA130_J" "$RD/src/main/resources/mapper" 2>/dev/null | sed "s|$RD/||" | sort | tr '\n' ' ')"
+#   v1.33 · 删除账户的三处要点名这张表:搬运清单(整行搬进回收站)、预演(数「补录本金 N 笔」)、改写的期(取 period_id)
+#   —— 都不碰金额,所以放行;它们提到这张表的那几行不许出现 amount(删除时写改记走 PrincipalAdjustmentMapper.insertSystem)
+QA130_PA_FILES="$(grep -rlw 'principal_adjustment' "$QA130_J" "$RD/src/main/resources/mapper" 2>/dev/null | sed "s|$RD/||" | grep -vE 'service/trash/(AccountTrashSpec|AccountDeletePlanner)\.java|repository/AccountTrashMapper\.java' | sort | tr '\n' ' ')"
+grep -hw 'principal_adjustment' "$QA130_J/service/trash/AccountTrashSpec.java" "$QA130_J/service/trash/AccountDeletePlanner.java" "$QA130_J/repository/AccountTrashMapper.java" 2>/dev/null \
+  | grep -qi 'amount' && QA130_PA_FILES="$QA130_PA_FILES(删除账户那几处读了金额)"
 { [ "$QA130_PA_FILES" = "src/main/java/com/family/finance/repository/PrincipalAdjustmentMapper.java src/main/resources/mapper/FactMapper.xml " ] \
   && grep -q 'principal_adj_orig' "$RD/src/main/resources/mapper/FactMapper.xml" \
   && grep -q 'WHERE family_id = #{f.familyId}' <(grep -A6 'FROM principal_adjustment' "$RD/src/main/resources/mapper/FactMapper.xml") \

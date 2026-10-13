@@ -60,6 +60,8 @@ public class AccountDeletePlanner {
         public String periodLabel() { return period.getPeriodStart().format(YM); }
         public String amountLabel() { return MoneyFormat.format2(counterpart.getCurrency(), amount); }
         public String directionLabel() { return counterpartReceives ? "收到它转来" : "转给它"; }
+        /** 改记成对方的本金进出那一笔:补录本金 +X / 本金移出 −X(划转金额恒为正,符号只由方向定)*/
+        public String rewriteLabel() { return (PA_OUT.equals(mode) ? "−" : "+") + amountLabel(); }
     }
 
     /** 删前 → 删后 一行 */

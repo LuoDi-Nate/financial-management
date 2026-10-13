@@ -64,8 +64,8 @@
         <span th:text="${t.counterpart.displayName}">工资卡</span>
         <span><span th:text="${t.directionLabel()}">收到它转来</span> <span class="amt" th:text="${t.amountLabel()}">¥111.00</span></span>
         <span th:switch="${t.mode}">
-          <th:block th:case="'PA_IN'">→ 改记成<span th:text="${t.counterpart.displayName}"></span>的「补录本金」<span class="ok" th:text="'+' + ${t.amountLabel()}"></span>,收益不变</th:block>
-          <th:block th:case="'PA_OUT'">→ 改记成<span th:text="${t.counterpart.displayName}"></span>的「本金移出」<span class="red" th:text="'−' + ${t.amountLabel()}"></span>,收益不变</th:block>
+          <th:block th:case="'PA_IN'">→ 改记成<span th:text="${t.counterpart.displayName}"></span>的「补录本金」<span class="ok" th:text="${t.rewriteLabel()}"></span>,收益不变</th:block>
+          <th:block th:case="'PA_OUT'">→ 改记成<span th:text="${t.counterpart.displayName}"></span>的「本金移出」<span class="red" th:text="${t.rewriteLabel()}"></span>,收益不变</th:block>
           <th:block th:case="*">→ <span th:text="${t.counterpart.displayName}"></span>这一期第一次出现:并进它的开账基线</th:block>
         </span>
       </div>

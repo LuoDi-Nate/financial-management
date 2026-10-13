@@ -1,7 +1,7 @@
 /**
  * flow · v1.33 · 删除账户(issue #39)—— prd/v1.33.md §10 验收 1 ~ 10
  *
- *   1  账户簿 ⋯ →「删除账户…」→ 命令行面板:改写的期、移走的行、逐笔划转(收到 / 转出 / 转去开户)、确认语,与库里一致
+ *   1  账户簿 ⋯ →「删除账户」→ 命令行面板:改写的期、移走的行、逐笔划转(收到 / 转出 / 转去开户)、确认语,与库里一致
  *   2  确认语没对上 → 按钮暗、提示还差几行;「复制这段话」→ 粘进框 → 按钮亮
  *   3  删除(先备份):备份目录写不了 → 不删、写原因、库里一行不少;能写 → 先备份再删
  *   4  删完:挂账户的表里都没有它、回收站有;对方那头的本金进出方向对;对方那一期的损益逐分不变;报表留痕
@@ -49,13 +49,13 @@ function pnl(acc, pid) {
   return Math.round((end - prev - inc + exp - (tin - tout) - pa) * 100) / 100;
 }
 
-/** 从账户簿把这个账户的 ⋯ 菜单点开,点「删除账户…」 */
+/** 从账户簿把这个账户的 ⋯ 菜单点开,点「删除账户」 */
 async function openDeletePanel(ui, accountId, label) {
   await ui.click('header a[href="/accounts"] >> nth=0', '顶栏点「账户」');
   await ui.page.waitForLoadState('networkidle').catch(() => {});
   const row = `tr:has(a[href="/accounts/${accountId}/delete"])`;
   await ui.click(`${row} details.row-more > summary`, `${label} 那一行点 ⋯`);
-  await ui.click(`${row} details.row-more[open] a[data-delete-account]`, '菜单里点「删除账户…」');
+  await ui.click(`${row} details.row-more[open] a[data-delete-account]`, '菜单里点「删除账户」');
   await ui.page.waitForLoadState('networkidle').catch(() => {});
   await ui.rendered('删除面板');
 }
@@ -104,7 +104,7 @@ module.exports = {
     report.info(`前置:测试账户 #${X}(8 月 / 9 月已关账 + 本期)· 新账户 #${N} · 删前 ${JSON.stringify(state.before)}`);
 
     // ── 1 · 面板 ──────────────────────────────────────────────────────────
-    report.section('1 · 账户簿 ⋯ →「删除账户…」→ 面板内容与库里一致');
+    report.section('1 · 账户簿 ⋯ →「删除账户」→ 面板内容与库里一致');
     await ui.goto('/dashboard');
     await openDeletePanel(ui, X, NAME);
     await ui.seesText(`account delete "${NAME}" --dry-run`, '第一行是命令 account delete "…" --dry-run');
@@ -228,7 +228,7 @@ module.exports = {
     state.trashId2 = db.num(`SELECT MAX(id) FROM account_trash WHERE account_name='${NAME}'`);
     await ui.goto('/admin/trash');
     const r2 = `tr[data-trash-row="${state.trashId2}"]`;
-    await ui.click(`${r2} [data-trash-purge-box] > summary`, '点「彻底清除…」');
+    await ui.click(`${r2} [data-trash-purge-box] > summary`, '点「彻底清除」');
     await ui.fill(`${r2} [data-trash-purge-input]`, '彻底清除', '只输一半');
     await ui.submit(`${r2} [data-trash-purge] button`, '点「彻底清除」');
     await ui.seesText('没有清除', '没对上:不清除、写明要输什么');

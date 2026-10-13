@@ -124,7 +124,7 @@ public interface AccountTrashMapper {
               UNION SELECT cf.period_id FROM cash_flow cf WHERE cf.account_id = #{accountId} AND cf.deleted_at IS NULL
               UNION SELECT t.period_id FROM transfer t WHERE (t.from_account_id = #{accountId} OR t.to_account_id = #{accountId})
                        AND t.deleted_at IS NULL AND t.is_draft = 0
-              UNION SELECT pa.period_id FROM principal_adjustment pa WHERE pa.account_id = #{accountId} AND pa.deleted_at IS NULL
+              UNION SELECT pa.period_id FROM principal_adjustment pa WHERE pa.family_id = #{familyId} AND pa.account_id = #{accountId} AND pa.deleted_at IS NULL
             ) x JOIN period p ON p.id = x.period_id AND p.family_id = #{familyId}
             """)
     List<Long> affectedPeriodIds(@Param("familyId") long familyId, @Param("accountId") long accountId);
