@@ -1208,7 +1208,9 @@ $CURL -b $COOKIE -c $COOKIE "$BASE/entry?period=35" -o /dev/null
 XSRF=$(awk '$6=="XSRF-TOKEN" {print $7}' $COOKIE)
 victim_cf=$(grep -oE 'hx-post="/entry/cash-flow/[0-9]+/delete"' "$TMP" | head -1 | grep -oE '[0-9]+')
 if [[ -n "$victim_cf" ]]; then
-  code=$($CURL -b $COOKIE -X POST -H "X-XSRF-TOKEN: $XSRF" -o /dev/null -w "%{http_code}" \
+  # 填报页的 ✕ 是 hx-post(带 HX-Request)—— 照它发。v1.33 起:HTMX 请求 200 + HX-Reswap: none(由这一行自己 GET 刷新);
+  # 不带 HX-Request 的整页请求(账户详情页的 ✕)302 回账户详情页,不再落到半截片段页(v133-ROW-SELF-REFRESH)
+  code=$($CURL -b $COOKIE -X POST -H "X-XSRF-TOKEN: $XSRF" -H "HX-Request: true" -o /dev/null -w "%{http_code}" \
         "$BASE/entry/cash-flow/$victim_cf/delete")
   [[ "$code" == "200" ]] && log_ok "v02-SOFT-DEL-5 POST 软删真实 cash_flow ($victim_cf) → 200" \
     || log_bad "v02-SOFT-DEL-5 软删失败" "cf=$victim_cf code=$code"
