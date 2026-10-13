@@ -128,6 +128,27 @@ public class BackupNowService {
         }
     }
 
+    /** 删除账户前:10 分钟内有一份成功、文件还在的手动备份就直接用它 */
+    static final Duration REUSE_WITHIN = Duration.ofMinutes(10);
+
+    /**
+     * v1.33 · 删除账户前的「先备份」(PRD v1.33 FR-1220 · tech-design 选型五)。
+     *
+     * <p>10 分钟内已经有一份<b>成功且文件还在</b>的手动备份 → 直接用(用户可能刚在备份页点过,
+     * 或连着删两个账户,再备一次会撞「1 分钟间隔」反而删不了);否则立即备份一次。
+     * 拒绝(正在备份 / 刚失败过不到 1 分钟)照样抛 {@link IllegalStateException},由调用方当失败处理。</p>
+     */
+    public Result ensureFresh(long familyId, long memberId) {
+        Optional<BackupLog> last = backupLogMapper.latestManual(familyId);
+        if (last.isPresent() && "SUCCESS".equals(last.get().getStatus()) && last.get().getStartedAt() != null
+                && last.get().getStartedAt().isAfter(LocalDateTime.now().minus(REUSE_WITHIN))
+                && last.get().getLocationLocal() != null && Files.isRegularFile(Path.of(last.get().getLocationLocal()))) {
+            BackupLog b = last.get();
+            return new Result(true, b.getLocationLocal(), b.getSizeBytes() == null ? 0 : b.getSizeBytes(), null, b.getId());
+        }
+        return runNow(familyId, memberId);
+    }
+
     private Result doBackup(long familyId, long memberId) {
         Path dir = dir();
         Path file = dir.resolve(filePrefix() + LocalDateTime.now().format(TS) + ".sql.gz");

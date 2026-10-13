@@ -50,6 +50,8 @@
         <span class="text-ink">
           <b th:text="${#temporals.format(sealed.period().periodStart,'yyyy-MM')} + ' 月度账册'">账册</b>
           <span th:if="${cp.closedAt() != null}" th:text="' · 关账于 ' + ${#temporals.format(cp.closedAt(),'yyyy-MM-dd')}"></span>
+          <!--/* v1.33 FR-1240 · 删除 / 恢复账户改写过这一期:封板数字不落库、按新数据重算,在这里留痕 */-->
+          <span th:each="tr : ${trashTraces}" class="text-rust" data-trash-trace th:text="' ' + ${tr}">· 2026-10-12 删除账户「测试账户」后重算</span>
         </span>
         <span th:if="${cp.complete()}" class="pill whitespace-nowrap"
               style="border-color:var(--forest);color:var(--forest);background:rgba(79,107,71,.10)"

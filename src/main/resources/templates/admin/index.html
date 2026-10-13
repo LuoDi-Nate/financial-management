@@ -375,6 +375,15 @@
         <p class="text-sm text-ink-soft mt-2 leading-relaxed">这一期的余额变动能不能被流水解释 · 只报不改</p>
       </div>
     </a>
+    <!--/* v1.33 FR-1230 · 删掉的账户在这里:恢复 / 彻底清除 */-->
+    <a th:href="@{/admin/trash}" class="group bg-card hover:bg-card-soft transition p-6 flex justify-between items-start">
+      <div>
+        <div class="eyebrow-ink mb-2">系统 · 回收站</div>
+        <h3 class="font-display text-xl">回收站</h3>
+        <p class="text-sm text-ink-soft mt-2 leading-relaxed">删掉的账户 · 原样恢复 / 彻底清除</p>
+      </div>
+      <span class="font-mono text-xs text-brass tracking-widest opacity-0 group-hover:opacity-100 transition">→</span>
+    </a>
   </section>
 
 </main>

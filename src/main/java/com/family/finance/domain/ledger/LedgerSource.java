@@ -52,6 +52,9 @@ public enum LedgerSource {
      */
     FIXED_FLOW("固定收支", "manual"),
 
+    /** v1.33 · 删除账户时,对方那头由划转改记成的本金进出(补录本金 / 本金移出) */
+    ACCOUNT_DELETE("删除账户改记", "system"),
+
     /** 来源当时没有记录 —— v1.18 之前的历史数据 */
     UNKNOWN("来源未记录", "unknown");
 

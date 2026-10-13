@@ -92,6 +92,8 @@ public class ReportsController {
     private final com.family.finance.service.MetricPrefsService metricPrefsService; // v0.11.4 账户表复用管理页指标配置
     private final com.family.finance.repository.PeriodAccountAttrMapper periodAccountAttrMapper; // v1.12 FR-350 锚期定格属性
     private final com.fasterxml.jackson.databind.ObjectMapper jacksonMapper = new com.fasterxml.jackson.databind.ObjectMapper();
+    /** v1.33 FR-1240 · 被删除 / 恢复账户改写过的已关账月份,封板抬头留一句痕 */
+    private final com.family.finance.repository.AccountTrashMapper accountTrashMapper;
 
     /**
      * v1.24 FR-633 · 一次性明细 —— 「剔除了 N 笔」点进来看的就是这几笔。
@@ -334,6 +336,15 @@ public class ReportsController {
         //   放在主切片之前算,是为了让「前两区与 range 无关」这件事在代码顺序上也看得出来。
         model.addAttribute("sealed",
                 sealedPeriodService.load(me.getFamilyId(), anchor, closedSnapshot, viewCurrency));
+        // v1.33 FR-1240 · 「· 日期 删除账户「X」后重算」—— 读回收站元数据,不存任何数字
+        java.util.List<String> trashTraces = new java.util.ArrayList<>();
+        for (var tr : accountTrashMapper.tracesForPeriod(me.getFamilyId(), anchor.getId())) {
+            trashTraces.add("· " + tr.deletedAt().toLocalDate() + " 删除账户「" + tr.accountName() + "」后重算");
+            if (tr.restoredAt() != null) {
+                trashTraces.add("· " + tr.restoredAt().toLocalDate() + " 恢复账户「" + tr.accountName() + "」后重算");
+            }
+        }
+        model.addAttribute("trashTraces", trashTraces);
         model.addAttribute("currencySymbol",
                 "USD".equals(viewCurrency) ? "$" : ("HKD".equals(viewCurrency) ? "HK$" : "¥"));
 
