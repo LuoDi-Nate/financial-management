@@ -218,6 +218,13 @@ module.exports = {
     await ui.click(`a[href="/accounts/${X}/edit"] >> nth=0`, '详情页点「编辑」');
     await ui.page.waitForLoadState('networkidle').catch(() => {});
     await ui.visible('[data-danger-zone]', '编辑页底部有「危险操作」');
+    // v1.34 · 维护者验收指出「按钮丑、没对齐」—— 并列的两行:按钮同宽同高、说明从同一列起、按钮右缘对齐
+    await ui.sameSize('[data-danger-zone] [data-dz-btn]', '危险操作:「归档」「删除」两个按钮同宽同高');
+    const dz = await ui.page.evaluate(() => ({
+      textX: [...document.querySelectorAll('[data-danger-zone] .danger-zone-text')].map(e => Math.round(e.getBoundingClientRect().left)),
+      btnR: [...document.querySelectorAll('[data-danger-zone] [data-dz-btn]')].map(e => Math.round(e.getBoundingClientRect().right)),
+    }));
+    await ui.assert(new Set(dz.textX).size === 1 && new Set(dz.btnR).size === 1, '危险操作:说明文字从同一列起、按钮右缘对齐', JSON.stringify(dz));
     await ui.click('[data-danger-zone] [data-delete-account]', '点「删除账户」');
     await ui.page.waitForLoadState('networkidle').catch(() => {});
     const ph2 = (await ui.page.textContent('[data-adel-phrase]')).trim();

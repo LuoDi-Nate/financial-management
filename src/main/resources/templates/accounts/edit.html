@@ -266,20 +266,29 @@
   </form>
 
   <!--/* v1.33 FR-1200 · 危险操作:归档与删除并列,写清两者的区别。删除先进确认面板(预演 + 打字确认),不在这里直接删 */-->
-  <section class="paper-card p-6 mt-8" data-danger-zone style="border-color:var(--rust);background:#fff8f4">
-    <h3 class="font-display text-lg" style="color:var(--rust)">危险操作</h3>
-    <div class="flex items-center gap-3 mt-3 flex-wrap" th:if="${account.archivedAt == null}">
+  <!--/* 危险操作区(v1.33 加 · v1.34 维护者验收指出「按钮丑、没对齐」重做):
+         共用件 .danger-zone(style.css)—— 每行「名称 + 说明 | 右边按钮」,按钮同宽同高、说明从同一列起,
+         不让按钮宽度决定文字从哪开始。手机上按钮整行。 */-->
+  <section class="paper-card mt-8 danger-zone" data-danger-zone>
+    <h3 class="danger-zone-title">危险操作</h3>
+    <div class="danger-zone-row" th:if="${account.archivedAt == null}" data-dz-row>
+      <div class="danger-zone-text">
+        <div class="danger-zone-name">归档此账户</div>
+        <div class="danger-zone-desc">不用了的账户:历史月份照常算它,从本期起不再计入。</div>
+      </div>
       <form th:action="@{/accounts/{id}/archive(id=${account.id})}" method="post"
             onsubmit="return confirm('归档这个账户?历史月份照常算它,从本期起不再计入。')">
         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
-        <button type="submit" class="btn-paper text-xs">归档此账户</button>
+        <button type="submit" class="danger-zone-btn" data-dz-btn>归档</button>
       </form>
-      <span class="text-xs text-ink-subtle">不用了的账户:历史照常算,从本期起不再计入</span>
     </div>
-    <div class="flex items-center gap-3 mt-3 flex-wrap">
-      <a th:href="@{/accounts/{id}/delete(id=${account.id})}" class="btn-paper text-xs no-underline" data-delete-account
-         style="color:var(--rust);border-color:var(--rust)">删除账户</a>
-      <span class="text-xs text-ink-subtle">建错了、测试用的才删:所有月份都当它从来没有过;不用了的账户请用「归档」</span>
+    <div class="danger-zone-row" data-dz-row>
+      <div class="danger-zone-text">
+        <div class="danger-zone-name">删除账户</div>
+        <div class="danger-zone-desc">建错了、测试用的才删:所有月份都当它从来没有过。删之前会逐项写清楚影响,删掉的在回收站里能恢复。</div>
+      </div>
+      <a th:href="@{/accounts/{id}/delete(id=${account.id})}" class="danger-zone-btn danger-zone-btn-red no-underline"
+         data-delete-account data-dz-btn>删除</a>
     </div>
   </section>
 </main>

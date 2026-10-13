@@ -2913,3 +2913,26 @@ body.adm-open #float-dock { display: none !important; }
   .adel .acts { flex-direction: column; align-items: stretch; }
   .adel .del, .adel .del-nobk, .adel .cancel { text-align: center; min-height: 40px; }
 }
+
+/* ── 危险操作区(账户编辑页 · v1.34 重做)──
+   每行「名称 + 说明 | 右边按钮」:grid 两列,说明永远从同一列起;按钮同宽同高(并列同类元素同尺寸)。
+   手机上按钮整行放在说明下面。 */
+.danger-zone { padding: 0; border-color: var(--rust); overflow: hidden; }
+.danger-zone-title { font-family: 'Fraunces', 'Noto Serif SC', serif; font-size: 17px; color: var(--rust);
+                     padding: 14px 20px; border-bottom: 1px solid rgba(156,74,42,.25); background: rgba(156,74,42,.04); }
+.danger-zone-row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 16px; padding: 14px 20px; }
+.danger-zone-row + .danger-zone-row { border-top: 1px solid var(--rule-soft); }
+.danger-zone-name { font-size: 14px; font-weight: 600; color: var(--ink); }
+.danger-zone-desc { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; line-height: 1.6; }
+.danger-zone-btn { display: inline-flex; align-items: center; justify-content: center; width: 7.5rem; height: 36px;
+                   font-size: 13px; letter-spacing: .08em; border: 1px solid var(--rust); color: var(--rust);
+                   background: var(--card); cursor: pointer; }
+.danger-zone-btn:hover { background: rgba(156,74,42,.06); }
+.danger-zone-btn-red { background: var(--rust); color: #fff; }
+.danger-zone-btn-red:hover { background: #8a3f22; }
+@media (max-width: 767.98px) {
+  .danger-zone-row { grid-template-columns: 1fr; gap: 10px; }
+  .danger-zone-row form, .danger-zone-btn { width: 100%; }
+  .danger-zone-btn { height: 42px; }
+}
+
