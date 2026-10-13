@@ -215,6 +215,8 @@ public class CsvExportService {
                 writer.write("  principal_adjustments.csv  补录本金(以前就有、某期才补录的钱 · 算本金不算收益)\n");
                 writer.write("  fixed_flows.csv            固定收支的设置(含停用的)\n");
                 writer.write("  fixed_flow_occurrences.csv 固定收支每期的结果(确认 / 这期没有 / 关联)· 钱在 cash_flows / transfers / snapshots 里\n");
+                // v1.33 PRD §8 · 回收站不进导出包(删掉的账户在各表里本来就没有了),写明
+                writer.write("\n删除到「回收站」的账户不在这份导出里;要导出它,先在 管理 → 回收站 里恢复。\n");
             });
         }
     }

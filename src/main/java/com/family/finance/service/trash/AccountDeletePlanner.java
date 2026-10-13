@@ -73,7 +73,7 @@ public class AccountDeletePlanner {
                              List<String> warnings, List<String> others, String phrase) {
         public List<Long> periodIds() { return periods.stream().map(Period::getId).toList(); }
 
-        /** 「余额 21 期 · 收入 2 笔 ¥3,000.00 · …」 */
+        /** 「余额 21 期 · 收入 2 笔 ¥(合计) · …」 */
         public String movedSummary() {
             return "余额 " + snapshotCount + " 期 · 收入 " + incomeCount + " 笔 " + incomeLabel
                     + " · 支出 " + expenseCount + " 笔 " + expenseLabel + " · 持仓 " + holdingCount + " 条"

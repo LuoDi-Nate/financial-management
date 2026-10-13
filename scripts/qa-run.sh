@@ -7032,7 +7032,9 @@ MINOR=$(printf '%s' "$APPV" | cut -d. -f1,2)
 #   是单测造的家庭,「净资产 100 万远大于阈值 5」是讲判据,而「同一时刻 checkup ¥5399878」
 #   是 prod 实测。机器分不出来,硬扫会得到一条天天红的护栏,然后被人关掉(这一版刚为
 #   「误报会让告警被关掉」付过代价)。要收得先由维护者逐条裁定哪些是真的。
-QA111_SYNTH='53,210|48,765|61,234|40,000|35,000|1,234,567\.89|123,456\.78|1,234,567|1,234,568|1,000,000|2,000,000|1,140,000|1,520,000|99,999,999|10,950,000|1,200,000|1,500,000|1,140,580|4,917,500|7,745,000|1,552,823|1,628,895|3,181,718|3,762,836|17,901,892|0,891,892,893,890|7,747,000|111,221.91|111,222.95|1,280\.00|12,845\.30|3,182\.50|1,046\.03|5,000\.00|1,250\.00|1,000,022\.53|12,001\.89|5,000\.02|12,000\.00|1,190,000|1,195,600|1,186,700|3,886\.44'
+QA111_SYNTH='53,210|48,765|61,234|40,000|35,000|1,234,567\.89|123,456\.78|1,234,567|1,234,568|1,000,000|2,000,000|1,140,000|1,520,000|99,999,999|10,950,000|1,200,000|1,500,000|1,140,580|4,917,500|7,745,000|1,552,823|1,628,895|3,181,718|3,762,836|17,901,892|0,891,892,893,890|7,747,000|111,221.91|111,222.95|1,280\.00|12,845\.30|3,182\.50|1,046\.03|5,000\.00|1,250\.00|1,000,022\.53|12,001\.89|5,000\.02|12,000\.00|1,190,000|1,195,600|1,186,700|3,886\.44|50,000\.00|2,480,000|2,426,756|101,102,106'
+#   v1.33 登记的最后四项:删除确认面板 preview / 模板占位里编的「删前 → 删后」净资产、单测里编的划转金额,
+#   以及单测里「改写过的账期 id」逗号串(不是金额,形状恰好像)。
 #   v1.32 登记的最后四项:prd/v1.32.md 与 preview 里编的房贷示例(上月 / 上上月欠款、按年利率拆的那一笔),
 #   单测 FixedFlowCalcTest 照抄同一组编的数核对利息 —— 不是任何环境里的真实余额。
 #   v1.30 登记的最后七项:前三项是 prd/v1.30.md「关键文案」表里编的示例(按市值反推份额、手动改份额那两行);
@@ -11539,6 +11541,63 @@ QA132_BK="$RD/src/main/java/com/family/finance/service/backup/BackupNowService.j
   || log_bad "v132-BACKUP-NOW 立即备份缺件(锁 / 间隔 / 校验 / 原话 / 目录白名单 / 部署方式)" "see BackupNowService · finance.service · admin/backup.html"
 [ -f "$RD/scripts/e2e/flows/48-fixed-flows.cjs" ] \
   && log_ok "v132-E2E(flow 48:页面 + 库两层,13 段)" || log_bad "v132-E2E 缺 flow 48" "scripts/e2e/flows/48-fixed-flows.cjs"
+
+# ── v1.33 · issue #39 删除账户(prd/v1.33.md · tech-design/v1.33.md)──
+section "v1.33 · 删除账户(进回收站可恢复 · 划转改记本金进出 · 先备份)"
+QA133_DIR="$RD/src/main/java/com/family/finance/service/trash"
+QA133_SPEC="$QA133_DIR/AccountTrashSpec.java"
+QA133_SVC="$QA133_DIR/AccountTrashService.java"
+QA133_CTL="$RD/src/main/java/com/family/finance/web/account/AccountDeleteController.java"
+# ① 库里每一个 *account_id* 列都在搬运清单里有去处(搬走,或写明为什么不搬)—— 现查 information_schema
+QA133_MISS=""
+while read -r tc; do
+  [ -z "$tc" ] && continue
+  t="${tc%%.*}"; c="${tc#*.}"
+  grep -qF "\"$tc\"" "$QA133_SPEC" && continue
+  grep -F "new Table(\"$t\"," "$QA133_SPEC" | grep -qE "t\.$c[ )]" && continue
+  QA133_MISS="$QA133_MISS $tc"
+done < <(mysql -ufinance -pfinance finance -N -e "SELECT CONCAT(table_name,'.',column_name) FROM information_schema.columns WHERE table_schema=DATABASE() AND column_name LIKE '%account_id%'" 2>/dev/null)
+QA133_NCOL="$(mysql -ufinance -pfinance finance -N -e "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND column_name LIKE '%account_id%'" 2>/dev/null)"
+{ [ -z "$QA133_MISS" ] && [ "${QA133_NCOL:-0}" -ge 25 ]; } \
+  && log_ok "v133-TRASH-COVERS-SCHEMA(库里 $QA133_NCOL 个挂账户的列都在 AccountTrashSpec 登记过 · 漏了就是「删了还在算」)" \
+  || log_bad "v133-TRASH-COVERS-SCHEMA 有挂账户的列没登记进搬运清单" "缺:${QA133_MISS:-(没查到库结构)}"
+# ② 面板与执行同一份计划:删除端点先重算计划、比确认语;执行器的改记只遍历 plan.transfers()
+QA133_DEL="$(awk '/public AccountTrash delete\(/{f=1} f{print} f&&/^    }$/{exit}' "$QA133_SVC")"
+{ grep -q 'planner.plan(me.getFamilyId(), id)' "$QA133_CTL" && grep -q 'AccountDeletePlanner.phraseMatches(plan.phrase(), phrase)' "$QA133_CTL" \
+  && grep -q 'plan.transfers()' <<<"$QA133_DEL" && ! grep -qE 'liveTransfers|planner\.' <<<"$QA133_DEL"; } \
+  && log_ok "v133-PLAN-ONE-SOURCE(确认面板与真删同一份计划 · 提交时按最新数据重算再逐字比确认语)" \
+  || log_bad "v133-PLAN-ONE-SOURCE 真删和面板各算各的(面板上写的和实际改的可能不一样)" "see AccountDeleteController · AccountTrashService.delete"
+# ③ 改记方向:对方收到 → 补录本金(+);对方转出 → 本金移出(−);对方第一期 → 不写(并进开账基线)· 单测钉住
+{ grep -q 'firstPeriod ? OPENING : counterpartReceives ? PA_IN : PA_OUT' "$QA133_DIR/AccountDeletePlanner.java" \
+  && grep -q 'AccountDeletePlanner.PA_IN.equals(ti.mode()) ? ti.amount() : ti.amount().negate()' "$QA133_SVC" \
+  && grep -q 'AccountDeletePlanner.OPENING.equals(ti.mode())) continue' "$QA133_SVC" \
+  && grep -q 'delete_rewritesEachTransferOnTheCounterpartWithTheRightSign' "$RD/src/test/java/com/family/finance/service/trash/AccountTrashServiceTest.java" \
+  && grep -q 'eachTransferGetsItsRewriteMode' "$RD/src/test/java/com/family/finance/service/trash/AccountDeletePlannerTest.java" \
+  && grep -qh 'CHECK (amount <> 0)' "$RD"/db/migration/V72__*.sql; } \
+  && log_ok "v133-REWRITE-DIRECTION(划转改记方向:收到 + / 转出 − / 第一期不写 · 对方收益一分不变)" \
+  || log_bad "v133-REWRITE-DIRECTION 划转改记的方向或符号变了(对方收益会被算错)" "see AccountDeletePlanner · AccountTrashService.delete · V72"
+# ④ 先备份:ensureFresh 在 delete( 之前,备份没成直接返回
+QA133_POST="$(awk '/@PostMapping\("\/accounts\/\{id\}\/delete"\)/{f=1} f{print} f&&/^    }$/{exit}' "$QA133_CTL")"
+QA133_L_BK="$(grep -n 'ensureFresh(' <<<"$QA133_POST" | head -1 | cut -d: -f1)"
+QA133_L_DEL="$(grep -n 'trashService.delete(' <<<"$QA133_POST" | head -1 | cut -d: -f1)"
+{ [ -n "$QA133_L_BK" ] && [ -n "$QA133_L_DEL" ] && [ "$QA133_L_BK" -lt "$QA133_L_DEL" ] \
+  && grep -q 'if (!backup.ok())' <<<"$QA133_POST"; } \
+  && log_ok "v133-BACKUP-FIRST(删除前先立即备份 · 10 分钟内成功过的手动备份复用 · 备份没成一行不删)" \
+  || log_bad "v133-BACKUP-FIRST 删除可以绕过备份" "see AccountDeleteController.delete · BackupNowService.ensureFresh"
+# ⑤ 不走「原表打标记」:account 没有删除标记列,读路径一行不改
+QA133_ACOL="$(mysql -ufinance -pfinance finance -N -e "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='account' AND column_name IN ('deleted_at','is_deleted','deleted')" 2>/dev/null)"
+{ [ "${QA133_ACOL:-x}" = 0 ] && ! grep -qiE 'ALTER TABLE account ADD.*delet' "$RD"/db/migration/V7[2-9]__*.sql; } \
+  && log_ok "v133-NO-SOFT-FLAG(删除 = 整块搬进回收站 · account 表没有删除标记列 · 已有查询不用加过滤)" \
+  || log_bad "v133-NO-SOFT-FLAG account 表长出了删除标记(每条查询都得记得过滤 —— 漏一处就静默算错)" "see V72 · tech-design v1.33 选型一"
+# ⑥ 回收站进隔离审计;改记行不能被普通「删除补录本金」删掉
+{ grep -qE '\baccount_trash\b' "$RD/scripts/family-isolation-audit.py" \
+  && grep -q "source_tag <> 'ACCOUNT_DELETE'" "$RD/src/main/java/com/family/finance/repository/PrincipalAdjustmentMapper.java" \
+  && [ "$(grep -l 'TRUNCATE TABLE account_trash;' "$RD/docker/clean-dev-data.sh" "$RD/deploy/deploy.sh" "$RD/deploy/_deploy-macos.sh" | wc -l)" -eq 3 ] \
+  && grep -q '回收站' "$RD/src/main/java/com/family/finance/service/export/CsvExportService.java"; } \
+  && log_ok "v133-TRASH-FAMILY(回收站表进隔离审计 · 三处清演示数据 · 导出包写明不含回收站 · 删除改记出来的本金进出不能单独删)" \
+  || log_bad "v133-TRASH-FAMILY 回收站漏了隔离审计 / 清演示数据 / 导出说明,或改记行可被单独删" "see family-isolation-audit.py · clean-dev-data.sh · CsvExportService · PrincipalAdjustmentMapper.softDelete"
+[ -f "$RD/scripts/e2e/flows/49-account-delete.cjs" ] \
+  && log_ok "v133-E2E(flow 49:删除 → 对方改记 → 报表留痕 → 恢复 → 彻底清除 → 手机,页面 + 库两层)" || log_bad "v133-E2E 缺 flow 49" "scripts/e2e/flows/49-account-delete.cjs"
 
 echo
 echo "═══════════════════════════════════════"
