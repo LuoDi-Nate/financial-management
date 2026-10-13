@@ -22,8 +22,24 @@ const state = {};
 
 const activeIds = () => db.col(`SELECT id FROM stock_holding WHERE account_id=${ACC} AND archived_at IS NULL ORDER BY id`).map(Number);
 const nameOf = (id) => db.one(`SELECT display_name FROM stock_holding WHERE id=${id}`);
+/**
+ * 拖之前等两件事(2026-10-13 全量 e2e 红过一次、单跑是绿的,查下来是这个):
+ *   · 全站的进场印章遮罩 #page-overlay(z-index 9998,DOMContentLoaded 后约 1 秒才淡出)还盖着时,
+ *     鼠标按下落在遮罩上,卡片纹丝不动。ui.click 有 Playwright 的「被遮挡就等」,裸 mouse.down 没有。
+ *     用户看得见印章、自然会等它散开,所以这是测试要等,不是页面要改。
+ *   · 拖拽件真的挂上了(sort-board.js 初始化完会给板子写 data-sort-saved)。
+ */
+async function boardReady(page) {
+  await page.waitForSelector('[data-sort-board][data-sort-saved]', { state: 'attached', timeout: 15000 });
+  await page.waitForSelector('#page-overlay', { state: 'hidden', timeout: 15000 }).catch(() => {});
+}
+
 /** 鼠标按住一张卡拖到另一张卡的位置(PC · SortableJS fallback 模式吃的是鼠标事件,和人手一样一点点挪) */
 async function dragCard(page, from, to) {
+  await boardReady(page);
+  await page.locator(to).scrollIntoViewIfNeeded();
+  await page.locator(from).scrollIntoViewIfNeeded();
+  await page.waitForTimeout(150);
   const a = await page.locator(from).boundingBox(), b = await page.locator(to).boundingBox();
   const x = a.x + 60, y0 = a.y + a.height / 2, y1 = b.y + (b.y < a.y ? 8 : b.height - 8);
   await page.mouse.move(x, y0);
@@ -35,6 +51,7 @@ async function dragCard(page, from, to) {
 }
 /** 手机:长按拿起再拖(CDP 触摸事件 —— Playwright 没有触摸拖动的 API) */
 async function touchDrag(m, from, to) {
+  await boardReady(m.page);
   const cdp = await m.page.context().newCDPSession(m.page);
   const a = await m.page.locator(from).boundingBox(), b = await m.page.locator(to).boundingBox();
   const x = a.x + a.width / 2, y0 = a.y + a.height / 2, y1 = b.y + (b.y < a.y ? 8 : b.height - 8);
@@ -46,6 +63,11 @@ async function touchDrag(m, from, to) {
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   await m.page.waitForTimeout(1200);
 }
+/** 提示条当前状态:{show, bad, text} —— 提示条的默认文字就是「已保存顺序」,只查文字等于没查 */
+const toastState = (page) => page.evaluate(() => {
+  const t = document.querySelector('[data-sort-toast]');
+  return { show: t.classList.contains('show'), bad: t.classList.contains('bad'), text: t.querySelector('[data-sort-toast-text]').textContent.trim() };
+});
 const rowIds = (page, sel) => page.evaluate((s) => [...document.querySelectorAll(s)].map(r => Number(r.getAttribute('data-sort-id'))), sel);
 
 /** 持仓页上卡片的顺序(按名字) */
@@ -97,7 +119,8 @@ module.exports = {
     await dragCard(ui.page, sortCard(c), sortCard(a));
     let shown = await rowIds(ui.page, '[data-sort-list] [data-sort-id]');
     await ui.assert(JSON.stringify(shown.slice(0, 3)) === JSON.stringify([c, a, b]), `按住「${state.names[c]}」拖到最前:其它卡片让开`, shown.join(','));
-    await ui.seesText('已保存顺序', '放下就保存:提示「已保存顺序」');
+    let ts = await toastState(ui.page);
+    await ui.assert(ts.show && !ts.bad && ts.text.startsWith('已保存顺序'), '放下就保存:提示条亮起「已保存顺序」+ 撤销', JSON.stringify(ts));
     await ui.assert(db.one(`SELECT sort_order FROM stock_holding WHERE id=${c}`) === '1' && db.one(`SELECT sort_order FROM stock_holding WHERE id=${b}`) === '3',
       '真值层:sort_order 跟着改了');
     await ui.click('[data-sort-undo]', '提示条上点「撤销」');
@@ -191,7 +214,8 @@ module.exports = {
     await dragCard(ui.page, `[data-sort-id="${x2}"]`, `[data-sort-id="${x0}"]`);
     const grpAfter = await ui.page.locator(g0).evaluate(g => [...g.querySelectorAll('[data-sort-id]')].map(e => Number(e.getAttribute('data-sort-id'))));
     await ui.assert(JSON.stringify(grpAfter.slice(0, 3)) === JSON.stringify([x2, x0, x1]), '组里第 3 个拖到最前', grpAfter.join(','));
-    await ui.seesText('已保存顺序', '放下就保存');
+    ts = await toastState(ui.page);
+    await ui.assert(ts.show && !ts.bad && ts.text.startsWith('已保存顺序'), '放下就保存:提示条亮起「已保存顺序」', JSON.stringify(ts));
     const d = (id) => Number(db.one(`SELECT display_order FROM account WHERE id=${id}`));
     await ui.assert(d(x2) < d(x0) && d(x0) < d(x1), '真值层:display_order 跟着改(x2 < x0 < x1)', `${d(x2)} / ${d(x0)} / ${d(x1)}`);
     const otherGroupMoved = await ui.page.evaluate(() => document.querySelectorAll('[data-ao-group]').length);
