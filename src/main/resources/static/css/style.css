@@ -2928,11 +2928,56 @@ body.adm-open #float-dock { display: none !important; }
                    font-size: 13px; letter-spacing: .08em; border: 1px solid var(--rust); color: var(--rust);
                    background: var(--card); cursor: pointer; }
 .danger-zone-btn:hover { background: rgba(156,74,42,.06); }
-.danger-zone-btn-red { background: var(--rust); color: #fff; }
-.danger-zone-btn-red:hover { background: #8a3f22; }
+.danger-zone-red { background: var(--rust); color: #fff; }
+.danger-zone-red:hover { background: #8a3f22; }
 @media (max-width: 767.98px) {
   .danger-zone-row { grid-template-columns: 1fr; gap: 10px; }
   .danger-zone-row form, .danger-zone-btn { width: 100%; }
   .danger-zone-btn { height: 42px; }
 }
 
+
+/* ── 拖拽排序板(v1.34 · 持仓顺序 / 账户顺序 · js/sort-board.js)──
+   一张卡一行:左边抓手 + 名字,右边数值;按住拖,卡片浮起跟着走,原位留虚线空位,其它卡片滑开让路。 */
+.sort-board { position: relative; }
+.sort-list { display: flex; flex-direction: column; gap: 8px; }
+.sort-card { display: grid; grid-template-columns: 22px 26px 1fr auto; align-items: center; gap: 10px;
+             background: var(--card); border: 1px solid var(--rule); padding: 12px 16px; cursor: grab;
+             user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+             transition: box-shadow .15s, border-color .15s, transform .15s; }
+.sort-card:hover { border-color: var(--ink-subtle); box-shadow: 0 2px 10px rgba(26,23,20,.06); }
+.sort-card:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+.sort-grip { color: var(--ink-subtle); display: inline-flex; }
+.sort-card:hover .sort-grip { color: var(--ink); }
+.sort-idx { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-subtle); text-align: right; }
+.sort-main { display: flex; flex-direction: column; min-width: 0; }
+.sort-name { font-family: 'Noto Serif SC', serif; font-size: 15px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sort-sub { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: var(--ink-subtle); margin-top: 2px; }
+.sort-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--ink-soft); white-space: nowrap; }
+/* 拖动时:原位置 = 虚线空位;跟手的那张 = 浮起 + 阴影 */
+.sort-ghost { background: rgba(196,148,62,.06) !important; border: 1px dashed var(--brass) !important; box-shadow: none !important; }
+.sort-ghost > * { visibility: hidden; }
+.sort-chosen { border-color: var(--brass); }
+.sort-drag { cursor: grabbing !important; box-shadow: 0 14px 34px rgba(26,23,20,.22) !important; transform: rotate(.6deg) scale(1.015);
+             background: var(--card) !important; opacity: .98 !important; }
+.sort-dropped { animation: sort-pulse .7s ease-out; }
+@keyframes sort-pulse { 0% { background: rgba(196,148,62,.22); } 100% { background: var(--card); } }
+.sort-board.dragging .sort-card:not(.sort-chosen):hover { box-shadow: none; }
+.sort-board.saving { opacity: .92; }
+.sort-group + .sort-group { margin-top: 22px; }
+.sort-group-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 13px; color: var(--ink-soft); }
+.sort-quick { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+/* 底部提示条:已保存 · 撤销 */
+.sort-toast { position: fixed; left: 50%; bottom: 28px; transform: translate(-50%, 20px); opacity: 0; pointer-events: none;
+              background: var(--ink); color: var(--paper); padding: 10px 14px 10px 16px; display: flex; align-items: center; gap: 14px;
+              font-size: 13px; box-shadow: 0 10px 28px rgba(26,23,20,.25); transition: opacity .2s, transform .2s; z-index: 60; }
+.sort-toast.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+.sort-toast.bad { background: var(--rust); }
+.sort-toast button { color: var(--brass); background: none; border: 0; font-size: 13px; cursor: pointer; padding: 2px 4px; text-decoration: underline; }
+@media (max-width: 767.98px) {
+  .sort-card { grid-template-columns: 18px 1fr auto; padding: 14px 12px; }
+  .sort-idx { display: none; }
+  .sort-name { font-size: 15px; }
+  .sort-val { font-size: 12px; }
+  .sort-toast { bottom: 18px; width: calc(100% - 32px); justify-content: space-between; }
+}

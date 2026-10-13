@@ -146,4 +146,10 @@ public interface AccountMapper {
                AND family_id = #{familyId}
             """)
     int restore(@Param("familyId") long familyId, @Param("id") long id);
+
+    /** v1.34 · 账户簿「调整顺序」:只写显示顺序这一列(按家庭过滤) */
+    @org.apache.ibatis.annotations.Update("UPDATE account SET display_order = #{order} WHERE family_id = #{familyId} AND id = #{id} AND archived_at IS NULL")
+    int updateDisplayOrder(@org.apache.ibatis.annotations.Param("familyId") long familyId,
+                           @org.apache.ibatis.annotations.Param("id") long id,
+                           @org.apache.ibatis.annotations.Param("order") int order);
 }

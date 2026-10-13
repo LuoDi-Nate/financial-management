@@ -2,14 +2,15 @@
  * flow · v1.34 · 持仓调整顺序(issue #40)+ 持仓改名(issue #41)
  *
  *   1  账户 → 富途证券-港美股 → 持仓管理:有「调整顺序」;顺序 = 添加先后(没排过)
- *   2  调整顺序:第 3 只「置顶」、第 2 只「↓」→ 提示「顺序改了」→ 保存 → 持仓页按新顺序 · 库里 sort_order = 1..n
+ *   2  调整顺序(拖拽):按住第 3 只拖到最前 → 放下就保存 → 撤销 → 再拖 → 持仓页按新顺序 · 库里 sort_order = 1..n
  *   3  填报页「股票收入」选这个账户:联动出来的持仓同一个顺序
  *   4  管理 → 资产打标:这个账户下的持仓同一个顺序
  *   5  再加一只手填持仓 → 排在最后,其余不动(库里新的那只 sort_order 为空)
  *   6  卡片上「改名」→ 页面、库、填报页股票收入都是新名字;其它列一个不动
- *   7  手机(390 · 触屏):调整顺序页不横向溢出,↑ ↓ 按钮够大
+ *   7  账户簿「调整顺序」:按成员分组、组内拖拽 → 库里 display_order · 账户簿按新顺序
+ *   8  手机(390 · 触屏):长按拿起拖动 · 不横向溢出
  *
- * cleanup:删掉新加的那只,三只原有持仓的名字与 sort_order 还原(sort_order 回到空 = 没排过)。
+ * cleanup:删掉新加的那只,三只原有持仓的名字与 sort_order 还原(sort_order 回到空 = 没排过);账户的 display_order 原样放回。
  */
 const db = require('../lib/db.cjs');
 const fx = require('../lib/fixture.cjs');
@@ -21,6 +22,32 @@ const state = {};
 
 const activeIds = () => db.col(`SELECT id FROM stock_holding WHERE account_id=${ACC} AND archived_at IS NULL ORDER BY id`).map(Number);
 const nameOf = (id) => db.one(`SELECT display_name FROM stock_holding WHERE id=${id}`);
+/** 鼠标按住一张卡拖到另一张卡的位置(PC · SortableJS fallback 模式吃的是鼠标事件,和人手一样一点点挪) */
+async function dragCard(page, from, to) {
+  const a = await page.locator(from).boundingBox(), b = await page.locator(to).boundingBox();
+  const x = a.x + 60, y0 = a.y + a.height / 2, y1 = b.y + (b.y < a.y ? 8 : b.height - 8);
+  await page.mouse.move(x, y0);
+  await page.mouse.down();
+  for (let i = 1; i <= 16; i++) { await page.mouse.move(x, y0 + (y1 - y0) * i / 16, { steps: 2 }); await page.waitForTimeout(25); }
+  await page.waitForTimeout(250);
+  await page.mouse.up();
+  await page.waitForTimeout(1200);   // 放下就保存(fetch)
+}
+/** 手机:长按拿起再拖(CDP 触摸事件 —— Playwright 没有触摸拖动的 API) */
+async function touchDrag(m, from, to) {
+  const cdp = await m.page.context().newCDPSession(m.page);
+  const a = await m.page.locator(from).boundingBox(), b = await m.page.locator(to).boundingBox();
+  const x = a.x + a.width / 2, y0 = a.y + a.height / 2, y1 = b.y + (b.y < a.y ? 8 : b.height - 8);
+  const tp = (y) => [{ x, y, radiusX: 4, radiusY: 4, force: 1, id: 1 }];
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: tp(y0) });
+  await m.page.waitForTimeout(350);   // 长按 0.18 秒才拿起
+  for (let i = 1; i <= 12; i++) { await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: tp(y0 + (y1 - y0) * i / 12) }); await m.page.waitForTimeout(30); }
+  await m.page.waitForTimeout(200);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await m.page.waitForTimeout(1200);
+}
+const rowIds = (page, sel) => page.evaluate((s) => [...document.querySelectorAll(s)].map(r => Number(r.getAttribute('data-sort-id'))), sel);
+
 /** 持仓页上卡片的顺序(按名字) */
 async function cardNames(ui) {
   return ui.page.evaluate(() => [...document.querySelectorAll('main article')]
@@ -42,6 +69,7 @@ module.exports = {
     state.bal = db.one(`SELECT end_balance FROM period_snapshot WHERE period_id=${state.pid} AND account_id=${ACC}`);
     state.maxSve = db.num(`SELECT COALESCE(MAX(id),0) FROM stock_valuation_event`);
     state.maxHse = db.num(`SELECT COALESCE(MAX(id),0) FROM holding_share_event`);
+    state.acctOrder = db.col(`SELECT CONCAT(id, ':', display_order) FROM account WHERE family_id=${fx.FAM}`);
     await ui.assert(state.ids.length >= 3, `前置:账户 #${ACC} 至少 3 只在用持仓`, state.ids.join(','));
     if (state.ids.length < 3) return;
     const [a, b, c] = state.ids;
@@ -58,22 +86,31 @@ module.exports = {
     const before = await cardNames(ui);
     await ui.assert(JSON.stringify(before.slice(0, 3)) === JSON.stringify([a, b, c].map(id => state.names[id])),
       '没排过:按添加先后', before.join(' / '));
-    await ui.visible('[data-holding-order]', '操作栏有「调整顺序」');
+    await ui.visible('[data-holding-order]', '持仓列表头上有「调整顺序」');
 
-    // ── 2 · 调整顺序 ─────────────────────────────────────────────────────
-    report.section('2 · 调整顺序:第 3 只置顶 · 第 2 只下移 → 保存');
+    // ── 2 · 调整顺序(拖拽)──────────────────────────────────────────────
+    report.section('2 · 调整顺序:把第 3 只拖到最前 → 放下就保存 · 撤销 · 再拖一次');
     await ui.click('[data-holding-order]', '点「调整顺序」');
     await ui.page.waitForLoadState('networkidle').catch(() => {});
     await ui.rendered('调整顺序页');
-    await ui.seesText('还没动过', '一开始提示「还没动过」');
-    await ui.click(`[data-ho-row][data-id="${c}"] [data-ho-top]`, `「${state.names[c]}」点「置顶」`);
-    await ui.click(`[data-ho-row][data-id="${a}"] [data-ho-down]`, `「${state.names[a]}」点「↓」`);
-    const shown = await ui.page.evaluate(() => [...document.querySelectorAll('[data-ho-row]')].map(r => Number(r.dataset.id)));
-    const want = [c, b, a, ...state.ids.slice(3)];
-    await ui.assert(JSON.stringify(shown) === JSON.stringify(want), '页面上的顺序:第 3 只在最前、原第 1 只到第 3', shown.join(','));
-    await ui.seesText('顺序改了', '提示「顺序改了 · 点「保存顺序」才生效」');
-    await ui.submit('[data-ho-save]', '点「保存顺序」');
-    await ui.seesText('已保存顺序', '回到持仓页:「已保存顺序 —— 填报页、截图导入也按这个顺序列」');
+    const sortCard = (id) => `[data-sort-list] [data-sort-id="${id}"]`;
+    await dragCard(ui.page, sortCard(c), sortCard(a));
+    let shown = await rowIds(ui.page, '[data-sort-list] [data-sort-id]');
+    await ui.assert(JSON.stringify(shown.slice(0, 3)) === JSON.stringify([c, a, b]), `按住「${state.names[c]}」拖到最前:其它卡片让开`, shown.join(','));
+    await ui.seesText('已保存顺序', '放下就保存:提示「已保存顺序」');
+    await ui.assert(db.one(`SELECT sort_order FROM stock_holding WHERE id=${c}`) === '1' && db.one(`SELECT sort_order FROM stock_holding WHERE id=${b}`) === '3',
+      '真值层:sort_order 跟着改了');
+    await ui.click('[data-sort-undo]', '提示条上点「撤销」');
+    await ui.page.waitForTimeout(1200);
+    shown = await rowIds(ui.page, '[data-sort-list] [data-sort-id]');
+    await ui.assert(JSON.stringify(shown.slice(0, 3)) === JSON.stringify([a, b, c]) && db.one(`SELECT sort_order FROM stock_holding WHERE id=${a}`) === '1',
+      '撤销:页面和库都回到上一步', shown.join(','));
+    await dragCard(ui.page, sortCard(c), sortCard(a));
+    await dragCard(ui.page, sortCard(a), sortCard(b));
+    shown = await rowIds(ui.page, '[data-sort-list] [data-sort-id]');
+    await ui.assert(JSON.stringify(shown.slice(0, 3)) === JSON.stringify([c, b, a]), '再拖两次:第 3 只最前、原第 1 只到第 3', shown.join(','));
+    await ui.click('[data-ho-done]', '点「完成」回到持仓页');
+    await ui.page.waitForLoadState('networkidle').catch(() => {});
     const after = await cardNames(ui);
     await ui.assert(JSON.stringify(after.slice(0, 3)) === JSON.stringify([c, b, a].map(id => state.names[id])), '持仓页按新顺序', after.join(' / '));
     const so = state.ids.map(id => `${id}:${db.one(`SELECT sort_order FROM stock_holding WHERE id=${id}`)}`);
@@ -141,15 +178,45 @@ module.exports = {
     await ui.seesText(RENAMED, '填报页股票收入里也是新名字');
 
     // ── 7 · 手机 ─────────────────────────────────────────────────────────
-    report.section('7 · 手机(390 · 触屏):调整顺序页不横向溢出,↑ ↓ 按钮够大');
+    report.section('7 · 账户簿「调整顺序」:按成员分组、组内拖拽 → 放下就保存 → 账户簿按新顺序');
+    await ui.click('header a[href="/accounts"] >> nth=0', '顶栏点「账户」');
+    await ui.page.waitForLoadState('networkidle').catch(() => {});
+    await ui.click('[data-account-order]', '账户簿点「调整顺序」');
+    await ui.page.waitForLoadState('networkidle').catch(() => {});
+    await ui.rendered('账户顺序页');
+    const g0 = '[data-ao-group] >> nth=0';
+    const grpIds = await ui.page.locator(g0).evaluate(g => [...g.querySelectorAll('[data-sort-id]')].map(e => Number(e.getAttribute('data-sort-id'))));
+    await ui.assert(grpIds.length >= 3, '第一个成员组至少 3 个账户', grpIds.join(','));
+    const [x0, x1, x2] = grpIds;
+    await dragCard(ui.page, `[data-sort-id="${x2}"]`, `[data-sort-id="${x0}"]`);
+    const grpAfter = await ui.page.locator(g0).evaluate(g => [...g.querySelectorAll('[data-sort-id]')].map(e => Number(e.getAttribute('data-sort-id'))));
+    await ui.assert(JSON.stringify(grpAfter.slice(0, 3)) === JSON.stringify([x2, x0, x1]), '组里第 3 个拖到最前', grpAfter.join(','));
+    await ui.seesText('已保存顺序', '放下就保存');
+    const d = (id) => Number(db.one(`SELECT display_order FROM account WHERE id=${id}`));
+    await ui.assert(d(x2) < d(x0) && d(x0) < d(x1), '真值层:display_order 跟着改(x2 < x0 < x1)', `${d(x2)} / ${d(x0)} / ${d(x1)}`);
+    const otherGroupMoved = await ui.page.evaluate(() => document.querySelectorAll('[data-ao-group]').length);
+    await ui.click('[data-ao-done]', '点「完成」回到账户簿');
+    await ui.page.waitForLoadState('networkidle').catch(() => {});
+    const book = await ui.page.evaluate((ids) => {
+      const pos = (id) => { const a = document.querySelector(`main table a[href="/accounts/${id}"]`); return a ? [...document.querySelectorAll('main table a[href^="/accounts/"]')].indexOf(a) : -1; };
+      return ids.map(pos);
+    }, [x2, x0, x1]);
+    await ui.assert(book[0] >= 0 && book[0] < book[1] && book[1] < book[2], '账户簿(PC 表格)按新顺序', `${book.join(' / ')} · 成员组 ${otherGroupMoved} 个`);
+
+    report.section('8 · 手机(390 · 触屏):长按拿起拖动 · 不横向溢出');
     await ui.phone(async (m) => {
       await m.goto(`/accounts/${ACC}/holdings`);
       await m.click('[data-holding-order]', '手机持仓页点「调整顺序」');
       await m.page.waitForLoadState('networkidle').catch(() => {});
       const over = await m.page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
       await m.assert(over <= 1, '调整顺序页没有横向溢出', `${over}px`);
-      const sz = await m.page.locator('[data-ho-up]').nth(1).evaluate(e => { const r = e.getBoundingClientRect(); return [r.width, r.height]; });
-      await m.assert(sz[0] >= 40 && sz[1] >= 40, '↑ 按钮 ≥ 40×40', sz.join('×'));
+      const h = await m.page.locator('[data-sort-list] [data-sort-id]').first().evaluate(e => e.getBoundingClientRect().height);
+      await m.assert(h >= 44, '每张卡 ≥ 44px 高(手指拿得住)', `${Math.round(h)}px`);
+      const ids0 = await rowIds(m.page, '[data-sort-list] [data-sort-id]');
+      await touchDrag(m, `[data-sort-list] [data-sort-id="${ids0[2]}"]`, `[data-sort-list] [data-sort-id="${ids0[0]}"]`);
+      const ids1 = await rowIds(m.page, '[data-sort-list] [data-sort-id]');
+      await m.assert(ids1[0] === ids0[2], '长按第 3 张拖到最前:顺序变了', `${ids0.join(',')} → ${ids1.join(',')}`);
+      await m.assert(Number(db.one(`SELECT sort_order FROM stock_holding WHERE id=${ids0[2]}`)) === 1, '真值层:手机拖完也保存了');
       await m.page.screenshot({ path: '/tmp/e2e-51-order-mobile.png', fullPage: false }).catch(() => {});
     });
     await ui.noConsoleErrors('这些页面控制台无报错');
@@ -170,6 +237,10 @@ module.exports = {
     }
     for (const [id, n] of Object.entries(state.names || {})) {
       db.raw(`UPDATE stock_holding SET display_name='${n.replace(/'/g, "''")}', sort_order=NULL WHERE id=${id} AND account_id=${ACC}`);
+    }
+    for (const kv of state.acctOrder || []) {
+      const [id, o] = kv.split(':');
+      db.raw(`UPDATE account SET display_order=${o} WHERE id=${id} AND family_id=${fx.FAM}`);
     }
     // 截图导入 / 估值刷新可能记了这只新持仓的流水 —— 只删本 flow 造的那只的
     const left = db.num(`SELECT COUNT(*) FROM stock_holding WHERE account_id=${ACC} AND display_name='${NEW_NAME}'`);

@@ -18,7 +18,7 @@
       <div class="eyebrow mb-2">账 · 户 · 全 · 览</div>
       <h1 class="font-display text-3xl sm:text-5xl font-medium tracking-tight">账户簿</h1>
       <p class="text-ink-soft text-sm mt-3 max-w-xl">
-        一家共 <span th:text="${#lists.size(rows)}">11</span> 个账户。此处可增改归档、调整主理人与显示顺序;实际填报在
+        一家共 <span th:text="${#lists.size(rows)}">11</span> 个账户。此处可增改归档、调整主理人;拖拽排顺序点「调整顺序」;实际填报在
         <a th:href="@{/entry}" class="brass-link">填报页</a>。
       </p>
     </div>
@@ -26,6 +26,9 @@
            「+ 添加账户(开向导)」超出视口 4px —— 整个页面因此横向能拖动,
            而拖出来的只有一片空白。加 flex-wrap:放不下就换行,不撑破页面。 */-->
     <div class="flex items-center gap-3 flex-wrap">
+      <!--/* v1.34 · 拖拽调整账户顺序(维护者:「账户也要支持可视化的排序」)—— 原来只能在编辑页填「显示顺序」数字 */-->
+      <a th:href="@{/accounts/order}" class="btn-paper no-underline whitespace-nowrap inline-flex items-center gap-1.5" data-account-order>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4v16"/><polyline points="3 8 7 4 11 8"/><path d="M17 20V4"/><polyline points="13 16 17 20 21 16"/></svg>调整顺序</a>
       <a th:href="@{/accounts/groups}" class="btn-paper no-underline whitespace-nowrap">账户分组</a>
       <a th:href="@{/lens/tags}" class="btn-paper no-underline whitespace-nowrap">资产打标</a>
       <a th:href="@{/accounts/new}" class="btn-ink no-underline whitespace-nowrap">+ 添加账户(开向导)</a>

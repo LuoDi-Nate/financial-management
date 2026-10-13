@@ -310,19 +310,21 @@ public class StockHoldingController {
         return "stock/holding-order";
     }
 
-    @PostMapping("/accounts/{accountId}/holdings/order")
-    public String saveOrder(@AuthenticationPrincipal MemberPrincipal me,
-                            @PathVariable long accountId,
-                            @RequestParam(name = "ids", required = false) List<Long> ids,
-                            org.springframework.web.servlet.mvc.support.RedirectAttributes ra) {
+    /**
+     * 拖拽排序每次放下就调一次(js/sort-board.js · fetch):ids 按页面顺序;只收完整排列,否则整次不写。
+     * 返回 JSON —— 页面在原地提示「已保存」或把卡片放回原样。
+     */
+    @PostMapping(value = "/accounts/{accountId}/holdings/order/save", produces = "application/json")
+    @org.springframework.web.bind.annotation.ResponseBody
+    public Map<String, Object> saveOrder(@AuthenticationPrincipal MemberPrincipal me,
+                                         @PathVariable long accountId,
+                                         @RequestParam(name = "ids", required = false) List<Long> ids) {
         try {
             holdingService.saveOrder(me.getFamilyId(), accountId, ids);
+            return Map.of("ok", true, "message", "已保存顺序 —— 填报页、截图导入也按这个顺序列");
         } catch (IllegalArgumentException | IllegalStateException e) {
-            ra.addFlashAttribute("orderError", e.getMessage());
-            return "redirect:/accounts/" + accountId + "/holdings/order";
+            return Map.of("ok", false, "message", e.getMessage());
         }
-        ra.addFlashAttribute("flashOk", "已保存顺序 —— 填报页、截图导入也按这个顺序列");
-        return "redirect:/accounts/" + accountId + "/holdings";
     }
 
     /** v1.34 · issue #41 · 持仓卡片上「改名」(只改名字;截图导入下次按新名字认同一只) */

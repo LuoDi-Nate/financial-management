@@ -11648,8 +11648,28 @@ QA134_SAVE="$(awk '/public void saveOrder\(/{f=1} f{print} f&&/^    }$/{exit}' "
   && grep -A8 'holdingService.rename(' "$QA134_CTL" | grep -q 'lensQueryService.evict'; } \
   && log_ok "v134-RENAME-NAME-ONLY(改名走只写 display_name 的专用语句 · 不覆盖份额 / 估值 · 改完清透视缓存)" \
   || log_bad "v134-RENAME-NAME-ONLY 改名可能覆盖别的列,或透视里还是旧名字" "see StockHoldingMapper.updateDisplayName · StockHoldingController.rename"
-[ -f "$RD/scripts/e2e/flows/51-holding-order-rename.cjs" ] \
-  && log_ok "v134-E2E(flow 51:调整顺序 → 四处一致 → 新加的在最后 → 改名 → 手机)" || log_bad "v134-E2E 缺 flow 51" "scripts/e2e/flows/51-holding-order-rename.cjs"
+# ④ 账户顺序同样只收完整排列(全部在用账户)· 写 10 / 20 / 30 留间隔给编辑页手填
+QA134_ASVC="$RD/src/main/java/com/family/finance/service/AccountService.java"
+QA134_ASAVE="$(awk '/public void saveOrder\(/{f=1} f{print} f&&/^    }$/{exit}' "$QA134_ASVC")"
+{ grep -q 'findActiveByFamily(familyId)' <<<"$QA134_ASAVE" && grep -q '!got.equals(want)' <<<"$QA134_ASAVE" \
+  && grep -q '(i + 1) \* 10' <<<"$QA134_ASAVE" \
+  && grep -q 'family_id = #{familyId} AND id = #{id} AND archived_at IS NULL' "$RD/src/main/java/com/family/finance/repository/AccountMapper.java" \
+  && grep -q 'onlyTheFullPermutationOfActiveAccounts' "$RD/src/test/java/com/family/finance/service/AccountOrderTest.java"; } \
+  && log_ok "v134-ACCOUNT-ORDER-FULL-PERMUTATION(账户顺序只收全部在用账户的完整排列 · 带 family_id · 单测钉住)" \
+  || log_bad "v134-ACCOUNT-ORDER-FULL-PERMUTATION 账户顺序可能出现空洞、排进别家的账户或归档账户" "see AccountService.saveOrder"
+# ⑤ 两个排序页共用一个拖拽件(维护者 2026-10-13:↑ ↓ 太丑 → 拖拽、其它卡片让路、手机长按)
+QA134_SB="$RD/src/main/resources/static/js/sort-board.js"
+{ head -c 80 "$RD/src/main/resources/static/vendor/Sortable.min.js" | grep -q 'Sortable 1.15.7 - MIT' \
+  && grep -q 'forceFallback: true' "$QA134_SB" && grep -q 'delayOnTouchOnly: true' "$QA134_SB" && grep -q 'animation: 220' "$QA134_SB" \
+  && grep -q 'data-sort-undo' "$QA134_SB" \
+  && ( for t in stock/holding-order accounts/order; do f="$RD/src/main/resources/templates/$t.html"; \
+       grep -q 'data-sort-board' "$f" && grep -q '/vendor/Sortable.min.js' "$f" && grep -q '/js/sort-board.js' "$f" || exit 1; done ) \
+  && ! grep -rqE 'data-ho-(up|down|top|save)' "$RD/src/main/resources/templates"; } \
+  && log_ok "v134-SORT-BOARD-SHARED(持仓 / 账户两个排序页共用 sort-board.js + SortableJS · 拖拽让路 · 手机长按 · 能撤销 · 旧 ↑ ↓ 按钮已清)" \
+  || log_bad "v134-SORT-BOARD-SHARED 排序页没走共用拖拽件(或旧 ↑ ↓ 按钮还在)" "see static/js/sort-board.js"
+[ -f "$RD/scripts/e2e/flows/51-holding-order-rename.cjs" ] && grep -q 'touchDrag' "$RD/scripts/e2e/flows/51-holding-order-rename.cjs" \
+  && grep -q 'data-account-order' "$RD/scripts/e2e/flows/51-holding-order-rename.cjs" \
+  && log_ok "v134-E2E(flow 51:鼠标拖拽 → 撤销 → 四处一致 → 新加的在最后 → 改名 → 账户顺序拖拽 → 手机长按拖)" || log_bad "v134-E2E 缺 flow 51(或没覆盖拖拽 / 账户顺序 / 手机)" "scripts/e2e/flows/51-holding-order-rename.cjs"
 echo
 echo "═══════════════════════════════════════"
 echo " 总结: PASS=$PASS  FAIL=$FAIL  SKIP=$SKIP"

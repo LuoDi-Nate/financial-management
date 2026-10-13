@@ -1,152 +1,68 @@
 <!DOCTYPE html>
 <html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
 <!--
-  v1.34 · issue #40 · 持仓「调整顺序」(PRD FR-1300 ~ 1303 · preview/v1.34 ②③)
+  v1.34 · issue #40 · 持仓「调整顺序」(PRD FR-1300 ~ 1303)
 
-  一行一只:名称 · 代码 / 类型 · 市值 · ↑ ↓ 置顶;顶上三个一键排法。手机上不做拖拽(长列表误操作),↑ ↓ 按钮够大。
-  顺序就是表单里 ids 的先后 —— 服务端只收「这个账户全部在用持仓的完整排列」(StockHoldingService.saveOrder)。
+  维护者验收后重做:拖拽排序(共用件 js/sort-board.js + SortableJS)。PC 按住卡片拖,其它卡片滑开让路;
+  手机长按拿起。每次放下就保存(提示条上能撤销);一键「按市值 / 名称 / 添加先后」同样立刻保存。
+  服务端只收「这个账户全部在用持仓的完整排列」(StockHoldingService.saveOrder)。
 -->
 <head th:replace="~{fragments/layout :: head('调整顺序 · ' + ${account.displayName})}"></head>
 <body class="min-h-screen relative">
 <div class="fixed top-0 left-0 right-0 h-1 bg-ink z-40"></div>
 <header th:replace="~{fragments/nav :: nav('accounts', ${me}, ${nav})}"></header>
 
-<main class="max-w-[860px] mx-auto px-4 sm:px-6 py-6 sm:py-10 relative z-10">
+<main class="max-w-[820px] mx-auto px-4 sm:px-6 py-6 sm:py-10 relative z-10">
   <div class="font-mono text-[10px] tracking-[0.18em] uppercase text-ink-subtle mb-4">
     <a th:href="@{|/accounts/${account.id}/holdings|}" class="hover:text-ink no-underline">持仓管理</a>
     <span class="mx-2 text-rule">/</span><span class="text-ink">调整顺序</span>
   </div>
 
-  <div class="mb-5">
-    <h1 class="font-display text-3xl font-medium tracking-tight" th:text="${account.displayName} + ' · 调整顺序'">某券商账户 · 调整顺序</h1>
-    <p class="text-sm text-ink-soft mt-2">排成和平台 App 一样的顺序,每月核对时从上往下挨个对。持仓页、填报页的股票收入、截图导入比对、资产打标都按这个顺序列;之后新加的排在最后。</p>
+  <div class="flex items-start justify-between gap-4 mb-5">
+    <div class="min-w-0 flex-1">
+      <h1 class="font-display text-3xl font-medium tracking-tight" th:text="${account.displayName} + ' · 持仓顺序'">某券商账户 · 持仓顺序</h1>
+      <p class="text-sm text-ink-soft mt-2">按住一只拖到想要的位置,松手就保存(手机上长按拿起)。持仓页、填报页的股票收入、截图导入比对、资产打标都按这个顺序;之后新加的排在最后。</p>
+    </div>
+    <a th:href="@{|/accounts/${account.id}/holdings|}" class="btn-ink text-xs no-underline whitespace-nowrap" data-ho-done>完成</a>
   </div>
 
-  <div th:if="${orderError}" class="paper-card p-3 mb-4 text-sm" data-order-error
-       style="border-left:4px solid var(--rust);color:var(--rust)" th:text="${orderError}">对不上</div>
-
-  <form th:action="@{|/accounts/${account.id}/holdings/order|}" method="post" class="paper-card ho" data-holding-order-form>
-    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
-    <div class="ho-head">
-      <span class="font-display text-lg">调整顺序</span>
-      <span class="ho-quick">
-        <button type="button" class="btn-paper text-xs" data-ho-sort="value">按市值从大到小</button>
-        <button type="button" class="btn-paper text-xs" data-ho-sort="name">按名称</button>
-        <button type="button" class="btn-paper text-xs" data-ho-sort="id">按添加先后</button>
-      </span>
+  <div class="sort-board" data-sort-board data-holding-order-board
+       th:attr="data-save-url=@{|/accounts/${account.id}/holdings/order/save|}">
+    <div class="sort-quick mb-3">
+      <span class="font-mono text-[10px] tracking-[0.14em] text-ink-subtle mr-1">一键排</span>
+      <button type="button" class="btn-paper text-xs" data-sort-by="value">按市值从大到小</button>
+      <button type="button" class="btn-paper text-xs" data-sort-by="name">按名称</button>
+      <button type="button" class="btn-paper text-xs" data-sort-by="id">按添加先后</button>
     </div>
-    <ol class="ho-list" data-ho-list>
-      <li th:each="h, st : ${holdings}" class="ho-row" data-ho-row
-          th:attr="data-id=${h.id}, data-name=${h.displayName}, data-value=${values.get(h.id) != null ? values.get(h.id) : 0}">
-        <input type="hidden" name="ids" th:value="${h.id}">
-        <span class="ho-idx font-mono" th:text="${st.count}">1</span>
-        <span class="ho-main">
-          <span class="ho-name" th:text="${h.displayName}">样例指数 ETF</span>
-          <span class="ho-sub font-mono"
+    <div class="sort-list" data-sort-list>
+      <div th:each="h : ${holdings}" class="sort-card" tabindex="0" data-ho-row
+           th:attr="data-sort-id=${h.id}, data-id=${h.id}, data-sort-name=${h.displayName}, data-sort-value=${values.get(h.id) != null ? values.get(h.id) : 0}">
+        <span class="sort-grip" aria-hidden="true">
+          <svg width="12" height="18" viewBox="0 0 12 18" fill="currentColor"><circle cx="3" cy="3" r="1.6"/><circle cx="9" cy="3" r="1.6"/><circle cx="3" cy="9" r="1.6"/><circle cx="9" cy="9" r="1.6"/><circle cx="3" cy="15" r="1.6"/><circle cx="9" cy="15" r="1.6"/></svg>
+        </span>
+        <span class="sort-idx" data-sort-index>1</span>
+        <span class="sort-main">
+          <span class="sort-name" th:text="${h.displayName}">样例指数 ETF</span>
+          <span class="sort-sub"
                 th:text="${h.valuationMode.name() == 'CASH'} ? ('账户内现金' + (${h.currency} != null ? ' · ' + ${h.currency} : ''))
                        : (${h.navRow} ? ${h.fundCode} + ' · 净值'
                        : (${h.ticker} != null ? ${h.ticker} + (${h.market} != null ? ' · ' + ${h.market} : '') : '手填市值'))">510300 · CN</span>
         </span>
-        <span class="ho-val font-mono" data-priv
+        <span class="sort-val" data-priv
               th:text="${account.currency} + ' ' + ${#numbers.formatInteger(values.get(h.id) != null ? values.get(h.id) : 0, 0, 'COMMA')}">CNY 96,500</span>
-        <span class="ho-btns">
-          <button type="button" class="ho-btn" data-ho-up aria-label="上移" title="上移">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg></button>
-          <button type="button" class="ho-btn" data-ho-down aria-label="下移" title="下移">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg></button>
-          <button type="button" class="ho-btn ho-top" data-ho-top>置顶</button>
-        </span>
-      </li>
-    </ol>
-    <div class="ho-foot">
-      <span class="ho-hint text-xs text-ink-subtle" data-ho-hint>还没动过</span>
-      <a th:href="@{|/accounts/${account.id}/holdings|}" class="btn-paper text-xs no-underline" data-ho-cancel>取消</a>
-      <button type="submit" class="btn-ink text-xs" data-ho-save>保存顺序</button>
+      </div>
     </div>
-  </form>
+    <p class="font-mono text-[10.5px] text-ink-subtle mt-3">键盘:选中一行按 Alt + ↑ / ↓ 也能移动。</p>
+  </div>
 </main>
 
-<style>
-  .ho { padding: 0; overflow: hidden; }
-  .ho-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
-             padding: 12px 16px; border-bottom: 1px solid var(--rule); background: var(--card-soft); }
-  .ho-quick { display: flex; gap: 6px; flex-wrap: wrap; }
-  .ho-list { list-style: none; margin: 0; padding: 0; }
-  .ho-row { display: grid; grid-template-columns: 28px 1fr auto auto; align-items: center; gap: 12px;
-            padding: 10px 16px; border-bottom: 1px solid var(--rule-soft); transition: background .3s; }
-  .ho-row.moved { background: rgba(196,148,62,.10); }
-  .ho-idx { font-size: 11px; color: var(--ink-subtle); }
-  .ho-main { display: flex; flex-direction: column; min-width: 0; }
-  .ho-name { font-family: 'Noto Serif SC', serif; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .ho-sub { font-size: 10.5px; color: var(--ink-subtle); margin-top: 2px; }
-  .ho-val { font-size: 13px; white-space: nowrap; }
-  .ho-btns { display: flex; gap: 6px; }
-  .ho-btn { min-width: 34px; height: 32px; border: 1px solid var(--rule); background: var(--card); display: inline-flex;
-            align-items: center; justify-content: center; font-size: 12px; cursor: pointer; padding: 0 8px; }
-  .ho-btn:hover { border-color: var(--ink); }
-  .ho-btn:disabled { opacity: .35; cursor: default; }
-  .ho-foot { display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding: 12px 16px; }
-  .ho-hint { margin-right: auto; }
-  @media (max-width: 767.98px) {
-    /* 手机:一行一只 —— 名称 + 市值占左边,↑ ↓ 两个大按钮在右边;序号与「置顶」收起(PRD FR-1303) */
-    .ho-row { grid-template-columns: 1fr auto; gap: 8px; padding: 10px 12px; }
-    .ho-idx, .ho-top { display: none; }
-    .ho-val { grid-column: 1; grid-row: 2; font-size: 12px; color: var(--ink-subtle); }
-    .ho-btns { grid-column: 2; grid-row: 1 / span 2; }
-    .ho-btn { min-width: 44px; height: 44px; }
-    .ho-foot { flex-wrap: wrap; }
-    .ho-hint { width: 100%; }
-    .ho-foot .btn-paper, .ho-foot .btn-ink { flex: 1; text-align: center; min-height: 40px; }
-  }
-</style>
-<script th:inline="none">
-  (function () {
-    var list = document.querySelector('[data-ho-list]');
-    if (!list) return;
-    var hint = document.querySelector('[data-ho-hint]');
-    var original = rows().map(function (r) { return r.dataset.id; }).join(',');
-    function rows() { return Array.prototype.slice.call(list.querySelectorAll('[data-ho-row]')); }
-    function refresh(moved) {
-      var rs = rows();
-      rs.forEach(function (r, i) {
-        r.querySelector('.ho-idx').textContent = i + 1;
-        r.querySelector('[data-ho-up]').disabled = i === 0;
-        r.querySelector('[data-ho-top]').disabled = i === 0;
-        r.querySelector('[data-ho-down]').disabled = i === rs.length - 1;
-      });
-      if (moved) {
-        moved.classList.add('moved');
-        setTimeout(function () { moved.classList.remove('moved'); }, 900);
-      }
-      var now = rs.map(function (r) { return r.dataset.id; }).join(',');
-      hint.textContent = now === original ? '还没动过' : '顺序改了 · 点「保存顺序」才生效';
-    }
-    list.addEventListener('click', function (e) {
-      var b = e.target.closest('button');
-      if (!b) return;
-      var row = b.closest('[data-ho-row]');
-      if (b.hasAttribute('data-ho-up') && row.previousElementSibling) list.insertBefore(row, row.previousElementSibling);
-      else if (b.hasAttribute('data-ho-down') && row.nextElementSibling) list.insertBefore(row.nextElementSibling, row);
-      else if (b.hasAttribute('data-ho-top')) list.insertBefore(row, list.firstElementChild);
-      else return;
-      refresh(row);
-    });
-    document.querySelectorAll('[data-ho-sort]').forEach(function (b) {
-      b.addEventListener('click', function () {
-        var key = b.getAttribute('data-ho-sort');
-        var rs = rows();
-        rs.sort(function (a, c) {
-          if (key === 'value') return Number(c.dataset.value) - Number(a.dataset.value) || Number(a.dataset.id) - Number(c.dataset.id);
-          if (key === 'name') return a.dataset.name.localeCompare(c.dataset.name, 'zh-CN') || Number(a.dataset.id) - Number(c.dataset.id);
-          return Number(a.dataset.id) - Number(c.dataset.id);
-        });
-        rs.forEach(function (r) { list.appendChild(r); });
-        refresh(null);
-      });
-    });
-    refresh(null);
-  })();
-</script>
+<div class="sort-toast" data-sort-toast role="status" aria-live="polite">
+  <span data-sort-toast-text>已保存顺序</span>
+  <button type="button" data-sort-undo hidden>撤销</button>
+</div>
+
+<script th:src="@{/vendor/Sortable.min.js(v=${buildVersion})}"></script>
+<script th:src="@{/js/sort-board.js(v=${buildVersion})}"></script>
 <footer th:replace="~{fragments/layout :: footer}"></footer>
 </body>
 </html>
