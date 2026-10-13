@@ -1,18 +1,27 @@
 package com.family.finance.service.trash;
 
 import com.family.finance.domain.account.Account;
+import com.family.finance.domain.account.AccountClass;
+import com.family.finance.domain.account.AccountLiquidity;
 import com.family.finance.domain.account.AccountType;
 import com.family.finance.domain.family.Family;
 import com.family.finance.domain.period.Period;
 import com.family.finance.domain.period.PeriodStatus;
+import com.family.finance.domain.period.PeriodType;
+import com.family.finance.factview.AccountPeriodFact;
+import com.family.finance.factview.FactFilter;
+import com.family.finance.factview.FactSlice;
 import com.family.finance.factview.FactViewService;
+import com.family.finance.factview.PeriodFlow;
 import com.family.finance.repository.AccountMapper;
 import com.family.finance.repository.AccountTrashMapper;
 import com.family.finance.repository.FamilyMapper;
 import com.family.finance.repository.PeriodMapper;
 import com.family.finance.repository.PrincipalAdjustmentMapper;
 import com.family.finance.repository.SnapshotTodoMapper;
+import com.family.finance.service.MoneyFormat;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -26,6 +35,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /** v1.33 · 预演:逐笔划转的改记方式、确认语、比对规则(PRD FR-1211 / 1212) */
@@ -125,6 +135,49 @@ class AccountDeletePlannerTest {
         var plan = new AccountDeletePlanner(accounts, trash, periods, mock(PrincipalAdjustmentMapper.class),
                 mock(SnapshotTodoMapper.class), mock(FamilyMapper.class), mock(FactViewService.class)).plan(FAM, X);
         assertThat(plan.phrase()).isEqualTo("我知晓删除「银行卡」会改写 2025-01 至 2025-02 共 2 个账期。");
+    }
+
+    @Test
+    void preview_readsThePeriodThroughTheSameLensAsThePages() {
+        // 2026-10-13 真实用例:面板上 09 的「删前」按本月汇率折算,比报表 09 多出几百;钱赚按账户损益求和,和页面「钱赚」差一截。
+        // 现在:窗口截到那一期(汇率镜头 = 那一期),钱赚取家庭级 periodFlows —— 与仪表盘 / 报表同一个数。金额全是编的。
+        AccountMapper accounts = mock(AccountMapper.class);
+        AccountTrashMapper trash = mock(AccountTrashMapper.class);
+        PeriodMapper periods = mock(PeriodMapper.class);
+        FamilyMapper families = mock(FamilyMapper.class);
+        FactViewService facts = mock(FactViewService.class);
+        acc(accounts, X, "银行卡");
+        Period feb = period(periods, 102, "2025-02-01", PeriodStatus.CLOSED);
+        when(trash.affectedPeriodIds(FAM, X)).thenReturn(List.of(102L));
+        when(trash.flowTotals(eq(FAM), eq(X), anyString())).thenReturn(Map.of("n", 0L, "total", BigDecimal.ZERO));
+        when(trash.liveTransfers(FAM, X)).thenReturn(List.of());
+        when(periods.findLatestClosedAsOf(anyLong(), any())).thenReturn(Optional.of(feb));
+        when(periods.findBalancePeriod(anyLong())).thenReturn(Optional.empty());
+        when(families.findById(FAM)).thenReturn(Optional.of(Family.builder().id(FAM).baseCurrency("CNY").periodType(PeriodType.MONTHLY).build()));
+        FactFilter f = new FactFilter(FAM, PeriodType.MONTHLY, LocalDate.of(2024, 3, 1), LocalDate.of(2025, 2, 1), false, null, "CNY");
+        FactSlice slice = new FactSlice(f, List.of(fact(X, 102, "800", "5"), fact(77L, 102, "10000", "300")), List.of(102L), 102L);
+        when(facts.load(any())).thenReturn(slice);
+        when(facts.periodFlows(slice)).thenReturn(List.of(new PeriodFlow(102L, LocalDate.of(2025, 2, 1), "2025-02",
+                null, null, null, new BigDecimal("-1234"), null, null)));
+
+        var plan = new AccountDeletePlanner(accounts, trash, periods, mock(PrincipalAdjustmentMapper.class),
+                mock(SnapshotTodoMapper.class), families, facts).plan(FAM, X);
+
+        ArgumentCaptor<FactFilter> used = ArgumentCaptor.forClass(FactFilter.class);
+        verify(facts).load(used.capture());
+        assertThat(used.getValue().rangeEnd()).as("窗口截到那一期 → 汇率镜头取那一期").isEqualTo(LocalDate.of(2025, 2, 1));
+        var pv = plan.previews().get(0);
+        assertThat(pv.netWorthBefore()).isEqualTo("¥10,800");
+        assertThat(pv.netWorthAfter()).isEqualTo("¥10,000");
+        assertThat(pv.pnlBefore()).as("钱赚 = 页面上那个家庭级的数").isEqualTo(MoneyFormat.formatDelta("CNY", new BigDecimal("-1234")));
+        assertThat(pv.pnlAfter()).isEqualTo(MoneyFormat.formatDelta("CNY", new BigDecimal("-1239")));
+    }
+
+    private static AccountPeriodFact fact(long account, long period, String end, String pnl) {
+        BigDecimal e = new BigDecimal(end), z = BigDecimal.ZERO;
+        return new AccountPeriodFact(account, "x", AccountType.CASH, AccountClass.ASSET, AccountLiquidity.LIQUID, "CNY", null, 0,
+                period, LocalDate.of(2025, 2, 1), LocalDate.of(2025, 2, 28), e, e, e, e, z, z, z, z, z, z, z, z,
+                new BigDecimal(pnl), new BigDecimal(pnl), BigDecimal.ONE, z, z);
     }
 
     private static void acc(AccountMapper m, long id, String name) {

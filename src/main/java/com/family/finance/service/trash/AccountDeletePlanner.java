@@ -6,8 +6,11 @@ import com.family.finance.domain.period.PeriodStatus;
 import com.family.finance.domain.snapshot.SnapshotTodo;
 import com.family.finance.domain.snapshot.TodoStatus;
 import com.family.finance.factview.AccountPeriodFact;
+import com.family.finance.domain.family.Family;
+import com.family.finance.factview.FactFilter;
 import com.family.finance.factview.FactSlice;
 import com.family.finance.factview.FactViewService;
+import com.family.finance.factview.PeriodFlow;
 import com.family.finance.repository.AccountMapper;
 import com.family.finance.repository.AccountTrashMapper;
 import com.family.finance.repository.FamilyMapper;
@@ -139,17 +142,22 @@ public class AccountDeletePlanner {
         }
 
         // ── 删前 → 删后(事实层:减掉它自己的那一份;对方的数按改记一分不变)──
+        //   「删前」必须和仪表盘 / 报表上那一期的数逐字相同:窗口截到那一期(汇率镜头取窗口末期,
+        //   FactMapper v10-CCY-LENS),钱赚取家庭级同一个函数(periodFlows)。
+        //   2026-10-13 真实用例抓到:原来统一用「截到本月」的切片,上个月的净资产按本月汇率折算,
+        //   面板上 09 的「删前」比报表 09 多出几百;钱赚按账户损益求和,和页面「钱赚」差一截(成员级收支不挂账户)。
         List<Preview> previews = new ArrayList<>();
-        String base = familyMapper.findById(familyId).map(f -> f.getBaseCurrency()).orElse("CNY");
-        try {
-            FactSlice slice = factViewService.loadDefault(familyId);
-            Map<Long, List<AccountPeriodFact>> byPeriod = slice.byPeriod();
-            periodMapper.findLatestClosedAsOf(familyId, LocalDate.now()).ifPresent(p ->
-                    preview(previews, byPeriod.get(p.getId()), accountId, base, p.getPeriodStart().format(YM) + "(最近已关账)", true));
-            periodMapper.findBalancePeriod(familyId).ifPresent(p ->
-                    preview(previews, byPeriod.get(p.getId()), accountId, base, p.getPeriodStart().format(YM) + "(本期)", false));
-        } catch (RuntimeException e) {
-            // 预演数字只是参考;算不出来不挡删除面板
+        Family fam = familyMapper.findById(familyId).orElse(null);
+        String base = fam == null || fam.getBaseCurrency() == null ? "CNY" : fam.getBaseCurrency();
+        if (fam != null) {
+            try {
+                periodMapper.findLatestClosedAsOf(familyId, LocalDate.now()).ifPresent(p ->
+                        preview(previews, fam, p, accountId, base, p.getPeriodStart().format(YM) + "(最近已关账)", true));
+                periodMapper.findBalancePeriod(familyId).ifPresent(p ->
+                        preview(previews, fam, p, accountId, base, p.getPeriodStart().format(YM) + "(本期)", false));
+            } catch (RuntimeException e) {
+                // 预演数字只是参考;算不出来不挡删除面板
+            }
         }
 
         // ── 其它会变的 ──
@@ -200,21 +208,27 @@ public class AccountDeletePlanner {
         return normalizePhrase(expected).equals(normalizePhrase(typed));
     }
 
-    private void preview(List<Preview> out, List<AccountPeriodFact> rows, long accountId, String base, String label, boolean withPnl) {
+    private void preview(List<Preview> out, Family fam, Period period, long accountId, String base, String label, boolean withPnl) {
+        LocalDate anchor = period.getPeriodStart();
+        FactSlice slice = factViewService.load(new FactFilter(fam.getId(), fam.getPeriodType(),
+                anchor.minusMonths(11), anchor, false, null, base));
+        List<AccountPeriodFact> rows = slice.byPeriod().get(period.getId());
         if (rows == null || rows.isEmpty()) return;
-        BigDecimal nw = BigDecimal.ZERO, pnl = BigDecimal.ZERO, mineNw = BigDecimal.ZERO, minePnl = BigDecimal.ZERO;
+        BigDecimal nw = BigDecimal.ZERO, mineNw = BigDecimal.ZERO, minePnl = BigDecimal.ZERO;
         for (AccountPeriodFact f : rows) {
             BigDecimal b = f.endBalanceBase() == null ? BigDecimal.ZERO : f.endBalanceBase();
-            BigDecimal p = f.periodPnlBase() == null ? BigDecimal.ZERO : f.periodPnlBase();
             nw = nw.add(b);
-            pnl = pnl.add(p);
             if (Objects.equals(f.accountId(), accountId)) {
                 mineNw = mineNw.add(b);
-                minePnl = minePnl.add(p);
+                minePnl = minePnl.add(f.periodPnlBase() == null ? BigDecimal.ZERO : f.periodPnlBase());
             }
         }
+        BigDecimal pnl = !withPnl ? null : factViewService.periodFlows(slice).stream()
+                .filter(f -> Objects.equals(f.periodId(), period.getId()))
+                .map(PeriodFlow::pnl).filter(Objects::nonNull).findFirst().orElse(null);
         out.add(new Preview(label, MoneyFormat.format(base, nw), MoneyFormat.format(base, nw.subtract(mineNw)),
-                withPnl ? MoneyFormat.formatDelta(base, pnl) : null, withPnl ? MoneyFormat.formatDelta(base, pnl.subtract(minePnl)) : null));
+                pnl == null ? null : MoneyFormat.formatDelta(base, pnl),
+                pnl == null ? null : MoneyFormat.formatDelta(base, pnl.subtract(minePnl))));
     }
 
     private int count(String table, long familyId, long accountId) {

@@ -11607,6 +11607,15 @@ QA133_ACOL="$(mysql -ufinance -pfinance finance -N -e "SELECT COUNT(*) FROM info
   && grep -q '回收站' "$RD/src/main/java/com/family/finance/service/export/CsvExportService.java"; } \
   && log_ok "v133-TRASH-FAMILY(回收站表进隔离审计 · 三处清演示数据 · 导出包写明不含回收站 · 删除改记出来的本金进出不能单独删)" \
   || log_bad "v133-TRASH-FAMILY 回收站漏了隔离审计 / 清演示数据 / 导出说明,或改记行可被单独删" "see family-isolation-audit.py · clean-dev-data.sh · CsvExportService · PrincipalAdjustmentMapper.softDelete"
+# ⑦ 真实用例顺带抓到的两处老问题(2026-10-13):填报行「自己刷新」不许再先换后刷(swapError);账户详情页 ✕ 整页删除回详情页
+QA133_EC="$RD/src/main/java/com/family/finance/web/entry/EntryController.java"
+{ [ "$(grep -c 'selfRefresh(response, ' "$QA133_EC")" -ge 5 ] \
+  && grep -A3 'private static void selfRefresh' "$QA133_EC" | grep -q '"HX-Reswap", "none"' \
+  && [ "$(grep -cE '"HX-Trigger", "refresh-row-" \+ (accountId|row\.account\(\)\.getId\(\))' "$QA133_EC")" -eq 1 ] \
+  && [ "$(grep -c 'if (hxRequest == null) return backToAccountPage(' "$QA133_EC")" -eq 2 ] \
+  && [ -f "$RD/scripts/e2e/flows/50-account-delete-real-case.cjs" ]; } \
+  && log_ok "v133-ROW-SELF-REFRESH(填报行自己刷新:POST 不换、GET 换 · 控制台不再 swapError · 账户详情页 ✕ 回详情页 · 真实用例 flow 50)" \
+  || log_bad "v133-ROW-SELF-REFRESH 填报行又会先换后刷(控制台 swapError),或详情页删流水落到半截页面" "see EntryController.selfRefresh · backToAccountPage"
 [ -f "$RD/scripts/e2e/flows/49-account-delete.cjs" ] \
   && log_ok "v133-E2E(flow 49:删除 → 对方改记 → 报表留痕 → 恢复 → 彻底清除 → 手机,页面 + 库两层)" || log_bad "v133-E2E 缺 flow 49" "scripts/e2e/flows/49-account-delete.cjs"
 
