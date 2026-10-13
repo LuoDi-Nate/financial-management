@@ -3215,10 +3215,11 @@ RM_BBX="$(grep -oE '[0-9]+ 黑盒回归' "$RD/README.md" | head -1 | grep -oE '[
 { ! grep -q '<your-org>' "$RD/README.md" \
   && [ -n "$RM_TST" ] && [ "$RM_TST" -ge 289 ] \
   && [ -n "$RM_BBX" ] && [ "$RM_BBX" -ge 412 ] \
-  && ! grep -q '244 单元' "$RD/README.md"; } \
+  && ! grep -qE '(^|[^0-9])244 单元' "$RD/README.md"; } \
   && log_ok "v07-CLEAN-2 README 无 <your-org> 占位符 + 测试数自洽($RM_TST 单元 / $RM_BBX 黑盒 · 只增不减)" \
   || log_bad "v07-CLEAN-2 README 仍有占位符或测试数不一致" "README 需写明「N 单元 / N 黑盒回归」且不小于历史基线(289/412)"
 
+#   v1.34 · 「不许出现 244 单元」守的是某个老版本的陈旧数字;单测涨到 1244 时被子串误伤 —— 改成整数匹配
 section "v0.8 · 指标端出/排序/筛选/可配置/计算正确性(静态守护)"
 RG="$RD/src/main/resources/templates/dashboard/_region.html"
 FVI="$RD/src/main/java/com/family/finance/factview/FactViewServiceImpl.java"
