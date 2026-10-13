@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<!--
+  v1.33 · 删除账户的确认面板(PRD FR-1210 ~ 1214 · preview/v1.33 ②③)
+
+  样式与「看 AI 收到了什么」的终端面板同款(深色、等宽、$ 命令行);内容全部来自 AccountDeletePlanner.plan()
+  —— 系统先预演出来的,不是写死的模板。删除时服务端重算同一份计划、逐字比确认语。
+  这里的金额刻意不加 data-priv(要照着输,也要看清删的是什么 · FR-1213)。
+  手机上就是全屏的这一块(FR-1214)。
+-->
+<head th:replace="~{fragments/layout :: head('删除账户 · 家庭账房')}"></head>
+<body class="min-h-screen relative adel-page">
+<div class="fixed top-0 left-0 right-0 h-1 bg-ink z-40"></div>
+<header th:replace="~{fragments/nav :: nav('accounts', ${me}, ${nav})}"></header>
+<main class="max-w-[1040px] mx-auto px-3 sm:px-6 py-5 sm:py-8 relative z-10">
+
+  <div class="adel" data-account-delete th:attr="data-account-id=${plan.account.id}">
+    <div class="adel-bar">
+      <span class="adel-dot r"></span><span class="adel-dot"></span><span class="adel-dot"></span>
+      <span class="adel-title" th:text="'account-delete · ' + ${plan.account.displayName} + ' · 不能撤销(可在回收站恢复)'">account-delete</span>
+      <a th:href="@{/accounts}" class="adel-x" data-adel-cancel-top>esc</a>
+    </div>
+    <div class="adel-body">
+      <span class="ln cmd" th:text="'account delete &quot;' + ${plan.account.displayName} + '&quot; --dry-run'">account delete "测试账户" --dry-run</span>
+      <span class="ln cmt"># 下面是系统按你家现在的数据预演出来的结果 · 这里的金额没有隐藏</span>
+
+      <div th:if="${deleteError}" class="adel-err" data-delete-error th:text="${deleteError}">备份失败</div>
+      <div th:if="${!backupDirWritable}" class="adel-err" data-backup-dir-warn>
+        应用对备份目录 <span th:text="${backupDir}">/var/backup/finance</span> 没有写权限 ——「删除(先备份)」会被挡下(不会删任何东西)。
+        在服务器上运行一次 sudo chown finance:finance <span th:text="${backupDir}">/var/backup/finance</span> 即可;不需要备份的话,用下面的「不备份,直接删除」。
+      </div>
+
+      <!-- ① 和归档的区别 -->
+      <div class="hd">
+        <span class="tag">区别</span>删除 ≠ 归档
+        <form th:action="@{/accounts/{id}/archive(id=${plan.account.id})}" method="post" class="inline" data-adel-archive
+              th:if="${plan.account.archivedAt == null}"
+              onsubmit="return confirm('改成归档?历史月份照常算它,从本期起不再计入。')">
+          <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+          <button type="submit" class="adel-arch">我其实要归档</button>
+        </form>
+      </div>
+      <span class="ln cmt">#   归档:历史月份照常算它,从本期起不再计入</span>
+      <span class="ln warn">#   删除:所有月份都当它从来没有过 —— 已关账的报表数字也会变</span>
+
+      <!-- ② 改写的账期 -->
+      <div class="hd"><span class="tag red">改写</span>会改写的账期</div>
+      <span class="ln" th:if="${plan.rangeLabel != null}" data-adel-range>    <span th:text="${plan.rangeLabel}">2025-01 至 2026-09 共 21 个账期</span>(其中已关账 <b class="red" th:text="${plan.closedCount}">20</b> 期)</span>
+      <details th:if="${!#lists.isEmpty(plan.periods)}" class="adel-more">
+        <summary>▸ 展开看每一期</summary>
+        <span class="ln" th:each="p : ${plan.periods}"
+              th:text="'    ' + ${#temporals.format(p.periodStart, 'yyyy-MM')} + (${p.status.name() == 'CLOSED'} ? '  已关账' : '  开着')">2025-01 已关账</span>
+      </details>
+      <span class="ln cmt" th:if="${plan.rangeLabel == null}">    它没有任何历史数据,删掉不会改写任何一期</span>
+
+      <!-- ③ 一起移走的 -->
+      <div class="hd"><span class="tag">移走</span>会一起移进回收站</div>
+      <span class="ln" data-adel-moved th:text="'    ' + ${plan.movedSummary()}">余额 21 期 · 收入 2 笔 …</span>
+
+      <!-- ④ 牵连的划转(逐笔)-->
+      <div class="hd"><span class="tag red">牵连</span>牵连的其它账户 · 逐笔(对方收益一分不变)</div>
+      <div th:each="t : ${plan.transfers}" class="tr" data-adel-transfer th:attr="data-transfer-id=${t.transferId}, data-mode=${t.mode}">
+        <span th:text="${t.periodLabel()}">2025-01</span>
+        <span th:text="${t.counterpart.displayName}">工资卡</span>
+        <span><span th:text="${t.directionLabel()}">收到它转来</span> <span class="amt" th:text="${t.amountLabel()}">¥111.00</span></span>
+        <span th:switch="${t.mode}">
+          <th:block th:case="'PA_IN'">→ 改记成<span th:text="${t.counterpart.displayName}"></span>的「补录本金」<span class="ok" th:text="${t.rewriteLabel()}"></span>,收益不变</th:block>
+          <th:block th:case="'PA_OUT'">→ 改记成<span th:text="${t.counterpart.displayName}"></span>的「本金移出」<span class="red" th:text="${t.rewriteLabel()}"></span>,收益不变</th:block>
+          <th:block th:case="*">→ <span th:text="${t.counterpart.displayName}"></span>这一期第一次出现:并进它的开账基线</th:block>
+        </span>
+      </div>
+      <span class="ln cmt" th:if="${#lists.isEmpty(plan.transfers)}">    它和别的账户之间没有划转</span>
+      <span class="ln cmt" th:unless="${#lists.isEmpty(plan.transfers)}"
+            th:text="'#   共 ' + ${#lists.size(plan.transfers)} + ' 笔 · ' + ${plan.counterpartCount} + ' 个账户 · 它们的余额、收益率、本期损益、归因贡献都不变;家庭层面这几笔算外部资本进出'">#   共 4 笔</span>
+
+      <!-- ⑤ 删前 → 删后 -->
+      <th:block th:if="${!#lists.isEmpty(plan.previews)}">
+        <div class="hd"><span class="tag">预演</span>删前 → 删后</div>
+        <span class="ln" th:each="pv : ${plan.previews}" data-adel-preview>    <span th:text="${pv.label}">2026-09(最近已关账)</span>  净资产 <span th:text="${pv.netWorthBefore}">¥2,480,000</span> → <span class="warn" th:text="${pv.netWorthAfter}">¥2,426,756</span><th:block th:if="${pv.pnlBefore != null}">  钱赚 <span th:text="${pv.pnlBefore}">+¥12,300</span> → <span class="warn" th:text="${pv.pnlAfter}">+¥12,176</span></th:block></span>
+      </th:block>
+
+      <!-- ⑥ 其它会变的 -->
+      <th:block th:if="${!#lists.isEmpty(plan.warnings) or !#lists.isEmpty(plan.others)}">
+        <div class="hd"><span class="tag">其它</span>还会变的</div>
+        <span class="ln warn" th:each="w : ${plan.warnings}" th:text="'    · ' + ${w}">· 它是本期最后一个没填的账户</span>
+        <span class="ln" th:each="o : ${plan.others}" th:text="'    · ' + ${o}">· 目标解绑</span>
+      </th:block>
+      <span class="ln ok"># 「删除(先备份)」先做一次立即备份,成功才删;「不备份,直接删除」跳过备份 —— 两种删掉的都在回收站里,能恢复</span>
+
+      <!-- 确认区 -->
+      <form th:action="@{/accounts/{id}/delete(id=${plan.account.id})}" method="post" class="confirm" data-adel-form>
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+        <span class="ln">请把下面这段话原样输进框里(一字不差):</span>
+        <div class="phrase-wrap">
+          <pre class="phrase" data-adel-phrase th:text="${plan.phrase}">我知晓删除「测试账户」会改写 …</pre>
+          <button type="button" class="copy" data-adel-copy>复制这段话</button>
+        </div>
+        <textarea name="phrase" class="ta" rows="4" data-adel-input spellcheck="false" autocomplete="off"
+                  placeholder="在这里粘贴或输入上面那段话"></textarea>
+        <div class="acts">
+          <button type="submit" class="del" data-adel-submit disabled>删除(先备份)</button>
+          <button type="submit" name="skipBackup" value="1" class="del-nobk" data-adel-submit-nobackup disabled>不备份,直接删除</button>
+          <a th:href="@{/accounts}" class="cancel no-underline" data-adel-cancel>取消</a>
+          <span class="match warn" data-adel-match>还没输入</span>
+        </div>
+      </form>
+    </div>
+  </div>
+</main>
+<script th:inline="none">
+  (function () {
+    var form = document.querySelector('[data-adel-form]');
+    if (!form) return;
+    var expected = form.querySelector('[data-adel-phrase]').textContent;
+    var input = form.querySelector('[data-adel-input]');
+    var btn = form.querySelector('[data-adel-submit]');
+    var btnNoBk = form.querySelector('[data-adel-submit-nobackup]');
+    var match = form.querySelector('[data-adel-match]');
+    // 与服务端 AccountDeletePlanner.normalizePhrase 同一个规则:统一换行、去掉每行行尾空白和空行
+    function norm(s) {
+      return s.replace(/\r\n?/g, '\n').split('\n').map(function (l) { return l.replace(/\s+$/, ''); })
+              .filter(function (l) { return l.length > 0; });
+    }
+    var want = norm(expected);
+    function check() {
+      var got = norm(input.value);
+      var bad = 0;
+      for (var i = 0; i < want.length; i++) if (got[i] !== want[i]) bad++;
+      if (got.length > want.length) bad += got.length - want.length;
+      var ok = bad === 0 && got.length === want.length;
+      btn.disabled = !ok;
+      btnNoBk.disabled = !ok;
+      input.classList.toggle('ok', ok);
+      match.className = 'match ' + (ok ? 'ok' : 'warn');
+      match.textContent = ok ? '✓ 一字不差' : (input.value.trim() === '' ? '还没输入' : '还差 ' + bad + ' 行没对上');
+    }
+    input.addEventListener('input', check);
+    form.querySelector('[data-adel-copy]').addEventListener('click', function () {
+      var b = this;
+      function done() { b.textContent = '已复制 · 粘贴到下面的框里'; setTimeout(function () { b.textContent = '复制这段话'; }, 2500); }
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(expected).then(done, fallback);
+      } else { fallback(); }
+      function fallback() {
+        var t = document.createElement('textarea');
+        t.value = expected; t.setAttribute('readonly', ''); t.style.position = 'fixed'; t.style.opacity = '0';
+        document.body.appendChild(t); t.select();
+        try { document.execCommand('copy'); done(); } catch (e) { b.textContent = '复制不了 · 请手动选中上面那段'; }
+        document.body.removeChild(t);
+      }
+    });
+    // 点的是哪个按钮就改哪个的字;按钮在提交之后再禁用(先禁用的话 skipBackup 就带不上了)
+    form.addEventListener('submit', function (e) {
+      var by = e.submitter;
+      if (by) by.textContent = by === btnNoBk ? '正在删除…' : '正在备份、删除…';
+      setTimeout(function () { btn.disabled = true; btnNoBk.disabled = true; }, 0);
+    });
+    check();
+  })();
+</script>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

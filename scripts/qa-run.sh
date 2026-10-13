@@ -495,9 +495,11 @@ $CURL -b $COOKIE "$BASE/export.zip" -o /tmp/finance-qa.zip -w ""
 file /tmp/finance-qa.zip 2>&1 | grep -q "Zip" && log_ok "FR16-1 /export.zip 是 ZIP" || log_bad "FR16-1 不是 ZIP" "$(file /tmp/qa.zip)"
 
 cnt=$(python3 -c "import zipfile; z=zipfile.ZipFile('/tmp/finance-qa.zip'); print(len(z.infolist()))" 2>/dev/null)
-# v1.30 · 多一张 principal_adjustments.csv(补录本金 —— 少了它,导出的数据重算出来的收益对不上)→ 9 张 CSV + README
-[[ "$cnt" == "10" ]] && unzip -l /tmp/finance-qa.zip 2>/dev/null | grep -q 'principal_adjustments.csv' \
-  && log_ok "FR16-2 ZIP 含 10 个文件(9 张 CSV + README · 含补录本金)" || log_bad "FR16-2 文件数 $cnt" "expected 10(含 principal_adjustments.csv)"
+# v1.30 · 多一张 principal_adjustments.csv(补录本金 —— 少了它,导出的数据重算出来的收益对不上)
+# v1.32 · 再多两张:fixed_flows.csv / fixed_flow_occurrences.csv(固定收支是家庭数据,PRD v1.32 §8)→ 11 张 CSV + README
+[[ "$cnt" == "12" ]] && unzip -l /tmp/finance-qa.zip 2>/dev/null | grep -q 'principal_adjustments.csv' \
+  && unzip -l /tmp/finance-qa.zip 2>/dev/null | grep -q 'fixed_flow_occurrences.csv' \
+  && log_ok "FR16-2 ZIP 含 12 个文件(11 张 CSV + README · 含补录本金 · 固定收支)" || log_bad "FR16-2 文件数 $cnt" "expected 12(含 principal_adjustments.csv / fixed_flows.csv / fixed_flow_occurrences.csv)"
 
 bom=$(python3 -c "import zipfile; z=zipfile.ZipFile('/tmp/finance-qa.zip'); print(z.read('families.csv')[:3].hex())" 2>/dev/null)
 [[ "$bom" == "efbbbf" ]] && log_ok "FR16-3 UTF-8 BOM 头" || log_bad "FR16-3 BOM" "got $bom"
@@ -1206,7 +1208,9 @@ $CURL -b $COOKIE -c $COOKIE "$BASE/entry?period=35" -o /dev/null
 XSRF=$(awk '$6=="XSRF-TOKEN" {print $7}' $COOKIE)
 victim_cf=$(grep -oE 'hx-post="/entry/cash-flow/[0-9]+/delete"' "$TMP" | head -1 | grep -oE '[0-9]+')
 if [[ -n "$victim_cf" ]]; then
-  code=$($CURL -b $COOKIE -X POST -H "X-XSRF-TOKEN: $XSRF" -o /dev/null -w "%{http_code}" \
+  # 填报页的 ✕ 是 hx-post(带 HX-Request)—— 照它发。v1.33 起:HTMX 请求 200 + HX-Reswap: none(由这一行自己 GET 刷新);
+  # 不带 HX-Request 的整页请求(账户详情页的 ✕)302 回账户详情页,不再落到半截片段页(v133-ROW-SELF-REFRESH)
+  code=$($CURL -b $COOKIE -X POST -H "X-XSRF-TOKEN: $XSRF" -H "HX-Request: true" -o /dev/null -w "%{http_code}" \
         "$BASE/entry/cash-flow/$victim_cf/delete")
   [[ "$code" == "200" ]] && log_ok "v02-SOFT-DEL-5 POST 软删真实 cash_flow ($victim_cf) → 200" \
     || log_bad "v02-SOFT-DEL-5 软删失败" "cf=$victim_cf code=$code"
@@ -3138,18 +3142,23 @@ WIZ17="$RD/src/main/resources/templates/accounts/_template-wizard.html"
   && log_ok "v17-WIZARD 模板卡点击回填表单(data-tpl-* + tpl-card 点击 handler + 隐藏 templateId + type 去 searchable 便于赋值),非死展示" \
   || log_bad "v17-WIZARD 模板卡未驱动表单" "see _template-wizard.html data-tpl-*/tpl-selected/tplId/click handler"
 
-# v17-LOAN-PROMPT 贷款趋势预测从「开账静默外推」改为「填报行内显式接受/保持上月」+ 兼容闸(committed==prev)
+# v17-LOAN-PROMPT 贷款趋势预测从「开账静默外推」改为「填报页显式接受/保持上月」+ 兼容闸(committed==prev)
+#   v1.32 起提示条从贷款行(_row.html)挪进了「本月收支」下面的固定收支那一行(_fixed-flows.html · FR-1117 / 1120):
+#   意图不变(人点了才写、两个按钮还是那两个方法),守的位置跟着换 —— 见 AGENTS 第 8 节「两条护栏可能编码互相矛盾的意图」
 POJ="$RD/src/main/java/com/family/finance/service/PeriodOpener.java"
 ESJ="$RD/src/main/java/com/family/finance/service/EntryService.java"
-ROW17="$RD/src/main/resources/templates/entry/_row.html"
+FF17="$RD/src/main/resources/templates/entry/_fixed-flows.html"
+FFC17="$RD/src/main/java/com/family/finance/web/fixedflow/FixedFlowEntryController.java"
 { ! grep -q 'applyLoanPrefill' "$POJ" \
   && grep -q 'predictLoanBalance' "$POJ" \
   && grep -q 'static boolean loanPromptVisible' "$ESJ" \
   && grep -q 'acceptLoanPrediction' "$ESJ" \
   && grep -q 'accept-loan-prediction' "$RD/src/main/java/com/family/finance/web/entry/EntryController.java" \
-  && grep -qF 'showLoanPrompt' "$ROW17" && grep -q '按上两月趋势' "$ROW17"; } \
-  && log_ok "v17-LOAN-PROMPT 贷款不再静默外推(删 applyLoanPrefill)· PeriodOpener 延续 prev · 填报行提示条(接受/保持上月)· acceptLoanPrediction 复刻旧逻辑 · loanPromptVisible 兼容闸(committed==prev 屏蔽老账期)" \
-  || log_bad "v17-LOAN-PROMPT 贷款显式接受缺件" "see PeriodOpener(删applyLoanPrefill/留predictLoanBalance)/EntryService.loanPromptVisible+acceptLoanPrediction/EntryController/_row.html"
+  && grep -q 'isShowLoanPrompt()' "$RD/src/main/java/com/family/finance/service/fixedflow/FixedFlowSummaryService.java" \
+  && grep -q 'entryService.acceptLoanPrediction(' "$FFC17" && grep -q 'entryService.submitBalance(' "$FFC17" \
+  && grep -q '按上两月差值,本月预计还到' "$FF17" && grep -q 'data-ff-accept' "$FF17" && grep -q 'data-ff-keep' "$FF17"; } \
+  && log_ok "v17-LOAN-PROMPT 贷款不再静默外推(删 applyLoanPrefill)· 显式「接受 / 保持上月」(v1.32 起在固定收支那一行,调的仍是 acceptLoanPrediction / submitBalance)· loanPromptVisible 兼容闸" \
+  || log_bad "v17-LOAN-PROMPT 贷款显式接受缺件" "see PeriodOpener/EntryService.loanPromptVisible+acceptLoanPrediction/FixedFlowEntryController/_fixed-flows.html"
 
 # v11-LENS-1 资产透视底座:V45 三列+lens_board · 枚举 · 注册表(≥8维5度量)· 唯一网关 · 纯函数引擎
 V45L="$RD/db/migration/V45__asset_lens.sql"
@@ -7025,7 +7034,11 @@ MINOR=$(printf '%s' "$APPV" | cut -d. -f1,2)
 #   是单测造的家庭,「净资产 100 万远大于阈值 5」是讲判据,而「同一时刻 checkup ¥5399878」
 #   是 prod 实测。机器分不出来,硬扫会得到一条天天红的护栏,然后被人关掉(这一版刚为
 #   「误报会让告警被关掉」付过代价)。要收得先由维护者逐条裁定哪些是真的。
-QA111_SYNTH='53,210|48,765|61,234|40,000|35,000|1,234,567\.89|123,456\.78|1,234,567|1,234,568|1,000,000|2,000,000|1,140,000|1,520,000|99,999,999|10,950,000|1,200,000|1,500,000|1,140,580|4,917,500|7,745,000|1,552,823|1,628,895|3,181,718|3,762,836|17,901,892|0,891,892,893,890|7,747,000|111,221.91|111,222.95|1,280\.00|12,845\.30|3,182\.50|1,046\.03|5,000\.00|1,250\.00|1,000,022\.53|12,001\.89|5,000\.02|12,000\.00'
+QA111_SYNTH='53,210|48,765|61,234|40,000|35,000|1,234,567\.89|123,456\.78|1,234,567|1,234,568|1,000,000|2,000,000|1,140,000|1,520,000|99,999,999|10,950,000|1,200,000|1,500,000|1,140,580|4,917,500|7,745,000|1,552,823|1,628,895|3,181,718|3,762,836|17,901,892|0,891,892,893,890|7,747,000|111,221.91|111,222.95|1,280\.00|12,845\.30|3,182\.50|1,046\.03|5,000\.00|1,250\.00|1,000,022\.53|12,001\.89|5,000\.02|12,000\.00|1,190,000|1,195,600|1,186,700|3,886\.44|50,000\.00|2,480,000|2,426,756|101,102,106'
+#   v1.33 登记的最后四项:删除确认面板 preview / 模板占位里编的「删前 → 删后」净资产、单测里编的划转金额,
+#   以及单测里「改写过的账期 id」逗号串(不是金额,形状恰好像)。
+#   v1.32 登记的最后四项:prd/v1.32.md 与 preview 里编的房贷示例(上月 / 上上月欠款、按年利率拆的那一笔),
+#   单测 FixedFlowCalcTest 照抄同一组编的数核对利息 —— 不是任何环境里的真实余额。
 #   v1.30 登记的最后七项:前三项是 prd/v1.30.md「关键文案」表里编的示例(按市值反推份额、手动改份额那两行);
 #   后四项是货基逐日结转单测的复利结果,以及持仓页 / 确认框模板里的占位示例。
 # 【基线 · 待裁定】把扫描面扩到源码/模板时一次性捞出来的存量(v1.19)。
@@ -10554,8 +10567,10 @@ QA124_JUDGE=$(grep -rn "ONE_OFF" "$RD/src/main/java" --include="*.java" \
 
 # v1240-ONEOFF-NOT-BALANCE · one_off 是纯分析期标记,不许进任何余额链路。
 #   affects_balance 有过「一个标记要同时退出三条链」的教训,这个标记刻意只有一条链。
+#   v1.32 · FixedFlowConfirmService 进白名单:「记一笔时顺手设成固定」把表单上两个勾原样转交 EntryService.recordExpense
+#   (和 EntryController 同一种转交,自己不碰余额)
 { ! grep -rn "one_off\|oneOff" "$RD/src/main/java" --include="*.java" \
-      | grep -vE "/test/|ExpenseNature|NormalExpense|ExpenseAttribution|ExpenseSectionView|CashFlow\.java|CashFlowMapper|ExpenseFlowMapper|EntryService|BillCommitService|ExpenseImportController|EntryController|ReviewInsightService" \
+      | grep -vE "/test/|ExpenseNature|NormalExpense|ExpenseAttribution|ExpenseSectionView|CashFlow\.java|CashFlowMapper|ExpenseFlowMapper|EntryService|BillCommitService|ExpenseImportController|EntryController|ReviewInsightService|FixedFlowConfirmService" \
       | grep -qiE "balance|snapshot|nav|networth|xirr" ; } \
   && log_ok "v1240-ONEOFF-NOT-BALANCE(one_off 不出现在余额/快照/净值路径上)" \
   || log_bad "v1240-ONEOFF-NOT-BALANCE 一次性标记渗进了余额链路" "它只该影响常态月均;碰了余额就是静默改钱"
@@ -11229,7 +11244,10 @@ body_of() { awk -v sig="$2" 'index($0, sig){f=1} f{print} f&&/^    }$/{exit}' "$
   || log_bad "v130-FUND-ONE-PATH 基金市值多了一条求和路径" "valuateInternal / perHoldingLines 不许认 navMode;页面市值从 perHoldingLines 取"
 
 # v130-SHARE-EVENT-NO-MONEY · 持仓数量变动只给人看:这张表只许 HoldingShareEventMapper 碰,fact / 报表 SQL 里不许出现
-QA130_SE=$(grep -rl 'holding_share_event' "$QA130_J" "$RD/src/main/resources/mapper" 2>/dev/null | grep -v 'HoldingShareEventMapper.java' | tr '\n' ' ')
+#   v1.33 · 删除账户的搬运清单 AccountTrashSpec 要点名这张表(整行原样搬进回收站、恢复时搬回)—— 只搬不算,
+#   所以放行,但它提到这张表的那一行不许出现 quantity / shares 这类数量列
+QA130_SE=$(grep -rl 'holding_share_event' "$QA130_J" "$RD/src/main/resources/mapper" 2>/dev/null | grep -v 'HoldingShareEventMapper.java' | grep -v '/service/trash/AccountTrashSpec.java' | tr '\n' ' ')
+grep -h 'holding_share_event' "$QA130_J/service/trash/AccountTrashSpec.java" 2>/dev/null | grep -qiE 'quantity|shares|amount' && QA130_SE="$QA130_SE AccountTrashSpec(提到了数量列)"
 [ -z "$QA130_SE" ] \
   && log_ok "v130-SHARE-EVENT-NO-MONEY(holding_share_event 只被 HoldingShareEventMapper 读写,不进任何金额汇总)" \
   || log_bad "v130-SHARE-EVENT-NO-MONEY 持仓数量变动被别处读了(钱的变化只在估值事件里)" "$QA130_SE"
@@ -11354,7 +11372,11 @@ done < <(grep -rn "type.name() == 'WEALTH'" "$RD/src/main/resources/templates" 2
 #   ② 账户第一期不认补录本金(第一期余额已整笔算开账基线 —— 认了就算两遍);
 #   ③ 持仓成本价不进任何账户级 / 家庭级指标(只给持仓行与透视持仓级「累计收益额」)。
 QA130_FVS="$QA130_J/factview/FactViewServiceImpl.java"
-QA130_PA_FILES="$(grep -rlw 'principal_adjustment' "$QA130_J" "$RD/src/main/resources/mapper" 2>/dev/null | sed "s|$RD/||" | sort | tr '\n' ' ')"
+#   v1.33 · 删除账户的三处要点名这张表:搬运清单(整行搬进回收站)、预演(数「补录本金 N 笔」)、改写的期(取 period_id)
+#   —— 都不碰金额,所以放行;它们提到这张表的那几行不许出现 amount(删除时写改记走 PrincipalAdjustmentMapper.insertSystem)
+QA130_PA_FILES="$(grep -rlw 'principal_adjustment' "$QA130_J" "$RD/src/main/resources/mapper" 2>/dev/null | sed "s|$RD/||" | grep -vE 'service/trash/(AccountTrashSpec|AccountDeletePlanner)\.java|repository/AccountTrashMapper\.java' | sort | tr '\n' ' ')"
+grep -hw 'principal_adjustment' "$QA130_J/service/trash/AccountTrashSpec.java" "$QA130_J/service/trash/AccountDeletePlanner.java" "$QA130_J/repository/AccountTrashMapper.java" 2>/dev/null \
+  | grep -qi 'amount' && QA130_PA_FILES="$QA130_PA_FILES(删除账户那几处读了金额)"
 { [ "$QA130_PA_FILES" = "src/main/java/com/family/finance/repository/PrincipalAdjustmentMapper.java src/main/resources/mapper/FactMapper.xml " ] \
   && grep -q 'principal_adj_orig' "$RD/src/main/resources/mapper/FactMapper.xml" \
   && grep -q 'WHERE family_id = #{f.familyId}' <(grep -A6 'FROM principal_adjustment' "$RD/src/main/resources/mapper/FactMapper.xml") \
@@ -11467,6 +11489,137 @@ QA1311_DUMP="$(awk '/^dump_once\(\) \{/{f=1} f{print} f&&/^}$/{exit}' "$QA1311_B
   && grep -q 'data-backup-mode="docker"' "$QA1311_PAGE" && grep -q 'data-backup-mode="none"' "$QA1311_PAGE"; } \
   && log_ok "v1311-BACKUP-DOCKER-LOGS(Docker 备份容器每个周期写一行 backup_log · DAILY · 成功失败都记 · 备份页文案按部署方式写)" \
   || log_bad "v1311-BACKUP-DOCKER-LOGS Docker 下备份页又会是「0 次备份」,或文案又写死成 systemd 的" "see docker/backup.sh log_row · admin/backup.html · V70"
+
+# ── v1.32 · issue #38 固定收支 + issue #29 立即备份(prd/v1.32.md · tech-design/v1.32.md)──
+section "v1.32 · 固定收支(设一次 · 到日子一键确认 · 贷款试算并入)+ 立即备份"
+QA132_SVC="$RD/src/main/java/com/family/finance/service/fixedflow"
+QA132_CONF="$QA132_SVC/FixedFlowConfirmService.java"
+# ① 一条写入路径:固定收支只经 EntryService 写流水 / 划转 / 快照,自己不插行(选型二)
+{ ! for f in "$QA132_SVC"/*.java; do java_code_only "$f"; done | grep -qE 'cashFlowMapper\.insert|transferMapper\.insert|snapshotMapper\.upsert' \
+  && grep -q 'entryService.recordExpense(' "$QA132_CONF" && grep -q 'entryService.recordIncome(' "$QA132_CONF" \
+  && grep -q 'entryService.addTransfer(' "$QA132_CONF" && grep -q 'entryService.setLoanBalanceBySystem(' "$QA132_CONF" \
+  && grep -q 'LedgerSource.FIXED_FLOW' "$QA132_CONF" \
+  && grep -q 'public static final class WriteReceipt' "$RD/src/main/java/com/family/finance/service/EntryService.java"; } \
+  && log_ok "v132-ONE-WRITE-PATH(确认只调 EntryService 既有方法 · 写入回执带来源 FIXED_FLOW 与 id · 服务自己不插流水)" \
+  || log_bad "v132-ONE-WRITE-PATH 固定收支长出了第二条写入路径" "see FixedFlowConfirmService · EntryService.WriteReceipt"
+# ② 按差值与「接受」同一个函数;那段外推算式全仓只在 PeriodOpener 里
+QA132_EXTRAP="$(grep -rlF 'prev.add(prev.subtract(' "$RD/src/main/java" | grep -v 'PeriodOpener.java' || true)"
+{ grep -q 'public static BigDecimal predictLoanBalance' "$RD/src/main/java/com/family/finance/service/PeriodOpener.java" \
+  && grep -q 'PeriodOpener.predictLoanBalance' "$QA132_SVC/FixedFlowCalc.java" \
+  && grep -q 'PeriodOpener.predictLoanBalance' "$RD/src/main/java/com/family/finance/service/EntryService.java" \
+  && [ -z "$QA132_EXTRAP" ]; } \
+  && log_ok "v132-LOAN-SAME-FUNCTION(还款 · 按上两月差值 与 贷款「接受」同一个 predictLoanBalance · 外推算式只此一份)" \
+  || log_bad "v132-LOAN-SAME-FUNCTION 贷款按差值另写了一份算法" "多出来的:$QA132_EXTRAP"
+# ③ 信用卡账单 / 交保费只记划转(支出翻倍那个坑)
+QA132_TR="$(awk '/if \(f.writesTransfer\(\)\) \{/{f=1} f{print} f&&/\} else \{/{exit}' "$QA132_CONF")"
+{ grep -q 'entryService.addTransfer(' <<<"$QA132_TR" && ! grep -q 'recordExpense' <<<"$QA132_TR" \
+  && grep -q 'creditCardBill_isOnlyATransfer_neverAnExpense' "$RD/src/test/java/com/family/finance/service/fixedflow/FixedFlowConfirmServiceTest.java"; } \
+  && log_ok "v132-CARD-IS-TRANSFER(信用卡账单 / 交保费只记一笔划转、不记支出 · 单测钉住)" \
+  || log_bad "v132-CARD-IS-TRANSFER 信用卡还款又会记成支出(刷卡时已经算过一次)" "see FixedFlowConfirmService writesTransfer 分支"
+# ④ 系统从不自己记:固定收支服务里没有定时任务,确认端点都是 POST
+{ ! for f in "$QA132_SVC"/*.java; do java_code_only "$f"; done | grep -q '@Scheduled' \
+  && ! grep -q '@GetMapping' "$RD/src/main/java/com/family/finance/web/fixedflow/FixedFlowEntryController.java"; } \
+  && log_ok "v132-NO-SILENT-WRITE(没有定时入账 · 确认 / 撤销都是人点的 POST)" \
+  || log_bad "v132-NO-SILENT-WRITE 固定收支出现了不经人确认的写入" "see service/fixedflow · FixedFlowEntryController"
+# ⑤ 贷款提示条挪进摘要:_row.html 不再有接受表单,只剩一行指路
+QA132_ROW="$RD/src/main/resources/templates/entry/_row.html"
+{ ! grep -q 'accept-loan-prediction' "$QA132_ROW" && grep -q 'data-ff-loan-hint' "$QA132_ROW" \
+  && grep -q "entry/_fixed-flows :: bar(" "$RD/src/main/resources/templates/entry/index.html" \
+  && grep -q 'data-ff-entry' "$RD/src/main/resources/templates/entry/index.html"; } \
+  && log_ok "v132-LOAN-PROMPT-MOVED(贷款行变短:提示条挪进「本月收支」下面那一行 · 标题行有「固定收支」入口)" \
+  || log_bad "v132-LOAN-PROMPT-MOVED 贷款提示又回到行内,或填报页没有固定收支入口" "see entry/_row.html · entry/index.html"
+# ⑥ 新表进隔离审计 / 导出 / 清演示数据
+{ grep -q 'fixed_flow fixed_flow_occurrence' "$RD/scripts/family-isolation-audit.py" \
+  && grep -q '"fixed_flows.csv"' "$RD/src/main/java/com/family/finance/service/export/CsvExportService.java" \
+  && grep -q '"fixed_flow_occurrences.csv"' "$RD/src/main/java/com/family/finance/service/export/CsvExportService.java" \
+  && [ "$(grep -l 'TRUNCATE TABLE fixed_flow;' "$RD/docker/clean-dev-data.sh" "$RD/deploy/deploy.sh" "$RD/deploy/_deploy-macos.sh" | wc -l)" -eq 3 ] \
+  && [ "$(grep -l 'TRUNCATE TABLE fixed_flow_occurrence;' "$RD/docker/clean-dev-data.sh" "$RD/deploy/deploy.sh" "$RD/deploy/_deploy-macos.sh" | wc -l)" -eq 3 ]; } \
+  && log_ok "v132-FAMILY-TABLES(两张新表进隔离审计 · 导出 CSV 包 · 三处清演示数据)" \
+  || log_bad "v132-FAMILY-TABLES 固定收支的表漏了隔离审计 / 导出 / 清演示数据" "see family-isolation-audit.py · CsvExportService · clean-dev-data.sh"
+# ⑦ 立即备份:锁 + 间隔 + 超时 + 校验 + 原话 + 文件名落进自动备份的滚动删除前缀 + systemd 可写白名单 + 部署方式由控制器给
+QA132_BK="$RD/src/main/java/com/family/finance/service/backup/BackupNowService.java"
+{ grep -q 'lock.tryLock()' "$QA132_BK" && grep -q 'MIN_GAP = Duration.ofSeconds(60)' "$QA132_BK" \
+  && grep -q 'destroyForcibly' "$QA132_BK" && grep -q 'CREATE TABLE' "$QA132_BK" && grep -q 'MYSQL_PWD' "$QA132_BK" \
+  && grep -q '"dump-manual-"' "$QA132_BK" && grep -q '"finance-manual-"' "$QA132_BK" \
+  && grep -q "name 'dump-\*.sql.gz'" "$RD/deploy/backup.sh" && grep -q "name 'finance-\*.sql.gz'" "$RD/docker/backup.sh" \
+  && grep -q 'ReadWritePaths=.*-/var/backup/finance' "$RD/deploy/finance.service" \
+  && grep -q 'backupMode' "$RD/src/main/java/com/family/finance/web/admin/AdminController.java" \
+  && grep -q 'data-backup-now' "$RD/src/main/resources/templates/admin/backup.html" \
+  && ! grep -q "logs\[0\].kind == 'DAILY'" "$RD/src/main/resources/templates/admin/backup.html"; } \
+  && log_ok "v132-BACKUP-NOW(立即备份:同一时间一个 · 1 分钟间隔 · 10 分钟超时 · 能解压且有建表才算 · 失败记原话 · 跟自动备份同一个目录同一套滚动删除)" \
+  || log_bad "v132-BACKUP-NOW 立即备份缺件(锁 / 间隔 / 校验 / 原话 / 目录白名单 / 部署方式)" "see BackupNowService · finance.service · admin/backup.html"
+[ -f "$RD/scripts/e2e/flows/48-fixed-flows.cjs" ] \
+  && log_ok "v132-E2E(flow 48:页面 + 库两层,13 段)" || log_bad "v132-E2E 缺 flow 48" "scripts/e2e/flows/48-fixed-flows.cjs"
+
+# ── v1.33 · issue #39 删除账户(prd/v1.33.md · tech-design/v1.33.md)──
+section "v1.33 · 删除账户(进回收站可恢复 · 划转改记本金进出 · 先备份)"
+QA133_DIR="$RD/src/main/java/com/family/finance/service/trash"
+QA133_SPEC="$QA133_DIR/AccountTrashSpec.java"
+QA133_SVC="$QA133_DIR/AccountTrashService.java"
+QA133_CTL="$RD/src/main/java/com/family/finance/web/account/AccountDeleteController.java"
+# ① 库里每一个 *account_id* 列都在搬运清单里有去处(搬走,或写明为什么不搬)—— 现查 information_schema
+QA133_MISS=""
+while read -r tc; do
+  [ -z "$tc" ] && continue
+  t="${tc%%.*}"; c="${tc#*.}"
+  grep -qF "\"$tc\"" "$QA133_SPEC" && continue
+  grep -F "new Table(\"$t\"," "$QA133_SPEC" | grep -qE "t\.$c[ )]" && continue
+  QA133_MISS="$QA133_MISS $tc"
+done < <(mysql -ufinance -pfinance finance -N -e "SELECT CONCAT(table_name,'.',column_name) FROM information_schema.columns WHERE table_schema=DATABASE() AND column_name LIKE '%account_id%'" 2>/dev/null)
+QA133_NCOL="$(mysql -ufinance -pfinance finance -N -e "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND column_name LIKE '%account_id%'" 2>/dev/null)"
+{ [ -z "$QA133_MISS" ] && [ "${QA133_NCOL:-0}" -ge 25 ]; } \
+  && log_ok "v133-TRASH-COVERS-SCHEMA(库里 $QA133_NCOL 个挂账户的列都在 AccountTrashSpec 登记过 · 漏了就是「删了还在算」)" \
+  || log_bad "v133-TRASH-COVERS-SCHEMA 有挂账户的列没登记进搬运清单" "缺:${QA133_MISS:-(没查到库结构)}"
+# ② 面板与执行同一份计划:删除端点先重算计划、比确认语;执行器的改记只遍历 plan.transfers()
+QA133_DEL="$(awk '/public AccountTrash delete\(/{f=1} f{print} f&&/^    }$/{exit}' "$QA133_SVC")"
+{ grep -q 'planner.plan(me.getFamilyId(), id)' "$QA133_CTL" && grep -q 'AccountDeletePlanner.phraseMatches(plan.phrase(), phrase)' "$QA133_CTL" \
+  && grep -q 'plan.transfers()' <<<"$QA133_DEL" && ! grep -qE 'liveTransfers|planner\.' <<<"$QA133_DEL"; } \
+  && log_ok "v133-PLAN-ONE-SOURCE(确认面板与真删同一份计划 · 提交时按最新数据重算再逐字比确认语)" \
+  || log_bad "v133-PLAN-ONE-SOURCE 真删和面板各算各的(面板上写的和实际改的可能不一样)" "see AccountDeleteController · AccountTrashService.delete"
+# ③ 改记方向:对方收到 → 补录本金(+);对方转出 → 本金移出(−);对方第一期 → 不写(并进开账基线)· 单测钉住
+{ grep -q 'firstPeriod ? OPENING : counterpartReceives ? PA_IN : PA_OUT' "$QA133_DIR/AccountDeletePlanner.java" \
+  && grep -q 'AccountDeletePlanner.PA_IN.equals(ti.mode()) ? ti.amount() : ti.amount().negate()' "$QA133_SVC" \
+  && grep -q 'AccountDeletePlanner.OPENING.equals(ti.mode())) continue' "$QA133_SVC" \
+  && grep -q 'delete_rewritesEachTransferOnTheCounterpartWithTheRightSign' "$RD/src/test/java/com/family/finance/service/trash/AccountTrashServiceTest.java" \
+  && grep -q 'eachTransferGetsItsRewriteMode' "$RD/src/test/java/com/family/finance/service/trash/AccountDeletePlannerTest.java" \
+  && grep -qh 'CHECK (amount <> 0)' "$RD"/db/migration/V72__*.sql; } \
+  && log_ok "v133-REWRITE-DIRECTION(划转改记方向:收到 + / 转出 − / 第一期不写 · 对方收益一分不变)" \
+  || log_bad "v133-REWRITE-DIRECTION 划转改记的方向或符号变了(对方收益会被算错)" "see AccountDeletePlanner · AccountTrashService.delete · V72"
+# ④ 先备份:ensureFresh 在 delete( 之前,备份没成直接返回
+QA133_POST="$(awk '/@PostMapping\("\/accounts\/\{id\}\/delete"\)/{f=1} f{print} f&&/^    }$/{exit}' "$QA133_CTL")"
+QA133_L_BK="$(grep -n 'ensureFresh(' <<<"$QA133_POST" | head -1 | cut -d: -f1)"
+QA133_L_DEL="$(grep -n 'trashService.delete(' <<<"$QA133_POST" | head -1 | cut -d: -f1)"
+#   维护者 2026-10-13 加了「不备份,直接删除」:跳过备份只能是用户点了那个按钮(skipBackup=1),默认那条仍是先备份、没成不删
+{ [ -n "$QA133_L_BK" ] && [ -n "$QA133_L_DEL" ] && [ "$QA133_L_BK" -lt "$QA133_L_DEL" ] \
+  && grep -q 'if (!backup.ok())' <<<"$QA133_POST" \
+  && grep -q 'if (!"1".equals(skipBackup))' <<<"$QA133_POST" \
+  && grep -q 'name="skipBackup" value="1"' "$RD/src/main/resources/templates/accounts/delete.html" \
+  && grep -q '未备份' "$QA133_SVC"; } \
+  && log_ok "v133-BACKUP-FIRST(默认先立即备份 · 10 分钟内成功过的手动备份复用 · 备份没成一行不删;「不备份,直接删除」要用户自己点,审计写「未备份」)" \
+  || log_bad "v133-BACKUP-FIRST 删除可以悄悄绕过备份(或「不备份」那条没留痕)" "see AccountDeleteController.delete · BackupNowService.ensureFresh · accounts/delete.html"
+# ⑤ 不走「原表打标记」:account 没有删除标记列,读路径一行不改
+QA133_ACOL="$(mysql -ufinance -pfinance finance -N -e "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='account' AND column_name IN ('deleted_at','is_deleted','deleted')" 2>/dev/null)"
+{ [ "${QA133_ACOL:-x}" = 0 ] && ! grep -qiE 'ALTER TABLE account ADD.*delet' "$RD"/db/migration/V7[2-9]__*.sql; } \
+  && log_ok "v133-NO-SOFT-FLAG(删除 = 整块搬进回收站 · account 表没有删除标记列 · 已有查询不用加过滤)" \
+  || log_bad "v133-NO-SOFT-FLAG account 表长出了删除标记(每条查询都得记得过滤 —— 漏一处就静默算错)" "see V72 · tech-design v1.33 选型一"
+# ⑥ 回收站进隔离审计;改记行不能被普通「删除补录本金」删掉
+{ grep -qE '\baccount_trash\b' "$RD/scripts/family-isolation-audit.py" \
+  && grep -q "source_tag <> 'ACCOUNT_DELETE'" "$RD/src/main/java/com/family/finance/repository/PrincipalAdjustmentMapper.java" \
+  && [ "$(grep -l 'TRUNCATE TABLE account_trash;' "$RD/docker/clean-dev-data.sh" "$RD/deploy/deploy.sh" "$RD/deploy/_deploy-macos.sh" | wc -l)" -eq 3 ] \
+  && grep -q '回收站' "$RD/src/main/java/com/family/finance/service/export/CsvExportService.java"; } \
+  && log_ok "v133-TRASH-FAMILY(回收站表进隔离审计 · 三处清演示数据 · 导出包写明不含回收站 · 删除改记出来的本金进出不能单独删)" \
+  || log_bad "v133-TRASH-FAMILY 回收站漏了隔离审计 / 清演示数据 / 导出说明,或改记行可被单独删" "see family-isolation-audit.py · clean-dev-data.sh · CsvExportService · PrincipalAdjustmentMapper.softDelete"
+# ⑦ 真实用例顺带抓到的两处老问题(2026-10-13):填报行「自己刷新」不许再先换后刷(swapError);账户详情页 ✕ 整页删除回详情页
+QA133_EC="$RD/src/main/java/com/family/finance/web/entry/EntryController.java"
+{ [ "$(grep -c 'selfRefresh(response, ' "$QA133_EC")" -ge 5 ] \
+  && grep -A3 'private static void selfRefresh' "$QA133_EC" | grep -q '"HX-Reswap", "none"' \
+  && [ "$(grep -cE '"HX-Trigger", "refresh-row-" \+ (accountId|row\.account\(\)\.getId\(\))' "$QA133_EC")" -eq 1 ] \
+  && [ "$(grep -c 'if (hxRequest == null) return backToAccountPage(' "$QA133_EC")" -eq 2 ] \
+  && [ -f "$RD/scripts/e2e/flows/50-account-delete-real-case.cjs" ]; } \
+  && log_ok "v133-ROW-SELF-REFRESH(填报行自己刷新:POST 不换、GET 换 · 控制台不再 swapError · 账户详情页 ✕ 回详情页 · 真实用例 flow 50)" \
+  || log_bad "v133-ROW-SELF-REFRESH 填报行又会先换后刷(控制台 swapError),或详情页删流水落到半截页面" "see EntryController.selfRefresh · backToAccountPage"
+[ -f "$RD/scripts/e2e/flows/49-account-delete.cjs" ] \
+  && log_ok "v133-E2E(flow 49:删除 → 对方改记 → 报表留痕 → 恢复 → 彻底清除 → 手机,页面 + 库两层)" || log_bad "v133-E2E 缺 flow 49" "scripts/e2e/flows/49-account-delete.cjs"
 
 echo
 echo "═══════════════════════════════════════"

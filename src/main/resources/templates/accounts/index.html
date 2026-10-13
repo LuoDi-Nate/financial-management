@@ -7,6 +7,12 @@
 <header th:replace="~{fragments/nav :: nav('accounts', ${me}, ${nav})}"></header>
 
 <main class="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10 py-5 sm:py-10 relative z-10">
+  <!--/* v1.32 FR-1134 · 归档时用到它的固定收支一起停了,说一句 */-->
+  <div th:if="${deletedNote}" data-deleted-note class="border-l-2 border-brass-deep bg-brass-soft/40 px-4 py-2.5 text-[13px] mb-5">
+    <span th:text="${deletedNote}">已删除</span> · <a th:href="@{/admin/trash}" class="brass-link">去回收站</a>
+  </div>
+  <div th:if="${archiveNote}" data-archive-note class="border-l-2 border-brass-deep bg-brass-soft/40 px-4 py-2.5 text-[13px] mb-5"
+       th:text="${archiveNote}">已归档</div>
   <section class="mb-8 flex items-end justify-between flex-wrap gap-6">
     <div>
       <div class="eyebrow mb-2">账 · 户 · 全 · 览</div>
@@ -227,6 +233,9 @@
                 <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
                 <button class="row-more-item">恢复此账户</button>
               </form>
+              <!--/* v1.33 FR-1200 · 删除:先进确认面板(预演 + 打字确认),在用的和已归档的都能删 */-->
+              <a th:href="@{/accounts/{id}/delete(id=${row.account.id})}" class="no-underline row-more-danger" data-delete-account
+                 style="font-weight:600">删除账户</a>
             </div>
           </details>
         </td>
@@ -376,6 +385,14 @@
             <span>恢复</span>
           </button>
         </form>
+        <!--/* v1.33 FR-1200 · 手机行内也给删除入口(低频的维护动作,和归档并列) */-->
+        <a th:href="@{/accounts/{id}/delete(id=${row.account.id})}" data-delete-account
+           class="btn-ghost text-[10px] inline-flex items-center gap-1 no-underline" title="删除" style="color:var(--rust)">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+          </svg>
+          <span>删除</span>
+        </a>
       </div>
     </div>
     </th:block>

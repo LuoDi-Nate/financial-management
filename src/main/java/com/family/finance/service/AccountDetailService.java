@@ -261,15 +261,20 @@ public class AccountDetailService {
         for (com.family.finance.domain.ledger.PrincipalAdjustment pa : principals) {
             Period p = periodById.get(pa.getPeriodId());
             if (p == null) continue;
+            // v1.33 · 删除账户时由划转改记的那几笔(source_tag=ACCOUNT_DELETE):负数是「本金移出」;
+            //   用户不能单独删(删了会把这个账户那一期的收益带歪),恢复被删账户时由系统拿掉
+            boolean rewritten = "ACCOUNT_DELETE".equals(pa.getSourceTag());
+            boolean out = pa.getAmount() != null && pa.getAmount().signum() < 0;
             byMonth.computeIfAbsent(p.getPeriodStart(), k -> new ArrayList<>()).add(new AccountDetail.Entry(
                     AccountDetail.Kind.PRINCIPAL,
                     pa.getCreatedAt(),
                     pa.getAmount(),
-                    "+" + MoneyFormat.format(account.getCurrency(), pa.getAmount()),
-                    "补录本金" + (pa.getHoldingName() == null ? "" : " · " + pa.getHoldingName()),
+                    (out ? "" : "+") + MoneyFormat.format(account.getCurrency(), pa.getAmount()),
+                    (out ? "本金移出" : "补录本金") + (rewritten ? " · 删除账户时由划转改记"
+                            : (pa.getHoldingName() == null ? "" : " · " + pa.getHoldingName())),
                     pa.getNote(),
                     pa.getId(),
-                    p.getStatus() == PeriodStatus.OPEN,
+                    p.getStatus() == PeriodStatus.OPEN && !rewritten,
                     com.family.finance.domain.ledger.LedgerSource.parse(pa.getSourceTag())
             ));
         }

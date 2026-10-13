@@ -83,6 +83,30 @@
     </div>
   </section>
 
+  <!--/* v1.32 FR-1133 / FR-1105 · 贷款 / 保险账户:每期还款 / 交保费一行,没有就给一键设(进表单预填,确认后保存) */-->
+  <section th:if="${(detail.account.type.name() == 'LOAN' or detail.account.type.name() == 'INSURANCE') and detail.account.archivedAt == null}"
+           class="paper-card px-6 py-4 mb-6" data-fixed-lines>
+    <div class="flex items-center gap-x-3 gap-y-2 flex-wrap">
+      <span class="eyebrow-ink">固 · 定 · 收 · 支</span>
+      <th:block th:each="l : ${fixedLines}">
+        <span class="text-sm" data-priv th:text="${l.text}" data-fixed-line>每期还款 · 自动 · 按上两月差值 · 从 工资卡 · 每月 20 号</span>
+        <a th:href="@{/admin/fixed-flows/{id}/edit(id=${l.flow.id}, back=${'/accounts/' + detail.account.id})}" class="brass-link text-xs">改</a>
+      </th:block>
+      <th:block th:if="${#lists.isEmpty(fixedLines)}">
+        <a th:if="${detail.account.type.name() == 'LOAN'}" data-fixed-make
+           th:href="@{/admin/fixed-flows/new(loan=${detail.account.id}, back=${'/accounts/' + detail.account.id})}"
+           class="btn-paper text-xs no-underline">设固定还款</a>
+        <a th:if="${detail.account.type.name() == 'INSURANCE'}" data-fixed-make
+           th:href="@{/admin/fixed-flows/new(policy=${detail.account.id}, back=${'/accounts/' + detail.account.id})}"
+           class="btn-paper text-xs no-underline">设成固定交保费</a>
+        <span class="text-xs text-ink-subtle" th:if="${detail.account.type.name() == 'LOAN'}">
+          每月还款设一次,到日子在填报页一键确认 —— 付款账户记「还贷」、贷款余额跟着减</span>
+        <span class="text-xs text-ink-subtle" th:if="${detail.account.type.name() == 'INSURANCE'}">
+          按保单登记的每期保费、缴费月份自动生成,缴满那期自动停;交保费记成划转,不算支出</span>
+      </th:block>
+    </div>
+  </section>
+
   <!-- v0.17 · 保险保单(仅 INSURANCE)-->
   <section class="paper-card p-6 mb-6" th:if="${detail.account.type.name() == 'INSURANCE'}">
     <div class="flex items-baseline justify-between gap-3 flex-wrap mb-3">

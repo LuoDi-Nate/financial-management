@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>v1.33 Preview · 删除账户</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..700&family=JetBrains+Mono:wght@300;400;500&family=Noto+Serif+SC:wght@300;400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/style.css">
+<style>
+  body{background:var(--paper-deep);margin:0}
+  .wrap{max-width:1340px;margin:0 auto;padding:28px 20px 80px;position:relative;z-index:2}
+  .mono{font-family:'JetBrains Mono',monospace;font-feature-settings:"tnum" 1}
+  .serif{font-family:'Fraunces','Noto Serif SC',serif}
+  h1{font-family:'Fraunces','Noto Serif SC',serif;font-weight:500;margin:0}
+  .note{font-size:12.5px;color:var(--ink-soft);line-height:1.8}
+  .zone{margin-top:46px}
+  .zone-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+  .zone-no{font-family:'JetBrains Mono',monospace;font-size:18px;color:var(--paper);background:var(--brass-deep);line-height:1;padding:5px 10px}
+  .zone-t{font-family:'Fraunces','Noto Serif SC',serif;font-size:21px}
+  .zone-fr{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink-subtle);letter-spacing:.06em}
+  .zone-line{height:2px;background:var(--brass-deep);opacity:.35;margin:10px 0 16px}
+  .row{display:flex;gap:26px;flex-wrap:wrap;align-items:flex-start}
+  .col{display:flex;flex-direction:column;gap:8px}
+  .cap{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.12em;color:var(--forest)}
+  .side-note{max-width:330px;font-size:12.5px;line-height:1.85;color:var(--ink-soft)}
+  .side-note b{color:var(--ink)} .side-note li{margin-bottom:6px}
+  .k{font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.14em;color:var(--ink-subtle)}
+  .card{border:1px solid var(--rule);background:var(--card);padding:16px 18px}
+  .btn-paper{background:transparent;color:var(--ink);border:1px solid var(--ink);padding:6px 12px;font-size:12px;white-space:nowrap;display:inline-flex}
+  .btn-danger{background:transparent;color:var(--rust);border:1px solid var(--rust);padding:6px 12px;font-size:12px;white-space:nowrap;display:inline-flex}
+  .sub{font-size:11.5px;color:var(--ink-subtle);line-height:1.6}
+
+  /* —— 终端面板(与「看 AI 收到了什么」同款 .peek)—— */
+  .modal-bg{background:rgba(26,23,20,.55);padding:26px;width:940px;border-radius:4px}
+  .term{background:#1c1a17;border:1px solid #2a2622;border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:12.5px;color:#cfc8ba;box-shadow:0 20px 50px -20px rgba(0,0,0,.6)}
+  .term .bar{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid #2a2622;color:#a39b8c;font-size:11.5px}
+  .term .dot{width:10px;height:10px;border-radius:50%;background:#3a352f;display:inline-block}
+  .term .dot.r{background:#c0563f}
+  .term .x{margin-left:auto;border:1px solid #3a352f;padding:0 7px;border-radius:3px}
+  .term .body{padding:14px 16px 10px}
+  .ln{display:block;white-space:pre-wrap;line-height:1.75}
+  .cmd{color:#e9e3d6}.cmd::before{content:'$ ';color:#8fae86}
+  .cmt{color:#7d766a}
+  .warn{color:#d9a066}
+  .red{color:#e07a5f}
+  .ok{color:#8fae86}
+  .hd{color:#e9e3d6;margin-top:10px;border-top:1px dashed #3a352f;padding-top:8px}
+  .hd .tag{color:#1c1a17;background:#d9a066;padding:0 5px;font-size:10.5px;margin-right:6px}
+  .hd .tag.red{background:#e07a5f}
+  .hd .tag.g{background:#8fae86}
+  .tr{display:grid;grid-template-columns:70px 90px 170px 1fr;gap:8px;padding:2px 0 2px 1em}
+  .tr .amt{color:#e9e3d6}
+  .arch{display:inline-block;border:1px solid #8fae86;color:#8fae86;padding:1px 9px;margin-left:12px;font-size:11.5px}
+  .confirm{margin-top:12px;border-top:1px solid #3a352f;padding-top:12px}
+  .phrase{background:#26231f;border:1px dashed #d9a066;padding:10px 12px;color:#f0e6d2;white-space:pre-wrap;line-height:1.8;position:relative}
+  .copy{position:absolute;right:8px;top:8px;background:#d9a066;color:#1c1a17;padding:3px 10px;font-size:11.5px;font-family:'Noto Serif SC',serif}
+  .ta{margin-top:10px;background:#141210;border:1px solid #3a352f;min-height:118px;padding:10px 12px;color:#e9e3d6;white-space:pre-wrap;line-height:1.8}
+  .ta.ok{border-color:#8fae86}
+  .caret{display:inline-block;width:.6em;height:1.05em;background:#8fae86;vertical-align:-2px}
+  .acts{display:flex;gap:10px;align-items:center;margin-top:12px}
+  .del{background:#9c4a2a;color:#fff;border:1px solid #c0563f;padding:8px 16px;font-family:'Noto Serif SC',serif;font-size:13px}
+  .del.off{background:#3a2a24;color:#8a6f62;border-color:#4a3a33}
+  .cancel{color:#a39b8c;border:1px solid #3a352f;padding:8px 14px;font-family:'Noto Serif SC',serif;font-size:13px}
+  .match{font-size:11.5px}
+
+  /* 手机 */
+  .phone{width:390px;height:844px;border:12px solid #111;border-radius:46px;background:#1c1a17;position:relative;overflow:hidden;box-shadow:0 18px 40px -18px rgba(0,0,0,.45)}
+  .phone::before{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:120px;height:26px;background:#111;border-radius:0 0 16px 16px;z-index:50}
+  .phone .term{border:none;border-radius:0;box-shadow:none;height:100%;font-size:11.5px}
+  .phone .tr{grid-template-columns:62px 1fr;gap:2px 6px}
+  .phone .tr .w{grid-column:1/-1;padding-left:62px;color:#7d766a}
+
+  .tbl{border-collapse:collapse;width:100%;font-size:13px}
+  .tbl th{font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.14em;color:var(--ink-subtle);text-align:left;padding:7px 8px;border-bottom:1px solid var(--ink);font-weight:400}
+  .tbl td{padding:10px 8px;border-bottom:1px solid var(--rule-soft);white-space:nowrap}
+  .pill{font-family:'JetBrains Mono',monospace;font-size:9.5px;padding:2px 7px;border:1px solid var(--rule);white-space:nowrap}
+  .danger-zone{border:1px solid var(--rust);background:#fff8f4;padding:14px 16px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="eyebrow">v1.33 · preview · 删除账户(issue #39)· 金额均为样例</div>
+  <h1 style="font-size:34px;margin-top:6px">删除账户:删前写清每一期、每一笔,一字不差确认;删后进回收站,能恢复</h1>
+  <p class="note" style="max-width:980px;margin-top:8px">
+    按维护者 2026-10-12 的裁定:<b>软删</b>(整块挪进回收站、能整块放回)· 已关账月份<b>跟着改</b> · 和别的账户之间的划转改记成<b>本金进出</b>、对方收益一分不变,并且在弹窗里逐笔写明 · 删前先做一次立即备份。
+    弹窗用「看 AI 收到了什么」的命令行样式。
+  </p>
+
+  <!-- ① 入口 -->
+  <section class="zone">
+    <div class="zone-head"><span class="zone-no">1</span><span class="zone-t">入口:编辑页的「危险操作」区 · 账户簿 ⋯ 菜单</span><span class="zone-fr">FR-1200 · 1201</span></div>
+    <div class="zone-line"></div>
+    <div class="row">
+      <div class="col">
+        <div class="card" style="width:520px">
+          <div class="k">编 辑 账 户 · 页 面 最 下 面</div>
+          <div class="danger-zone" style="margin-top:10px">
+            <div class="serif" style="font-size:16px;color:var(--rust)">危险操作</div>
+            <div style="display:flex;gap:10px;margin-top:10px;align-items:center;flex-wrap:wrap">
+              <span class="btn-paper">归档此账户</span><span class="sub">不用了的账户:历史照常算,从本期起不再计入</span>
+            </div>
+            <div style="display:flex;gap:10px;margin-top:8px;align-items:center;flex-wrap:wrap">
+              <span class="btn-danger">删除账户</span><span class="sub">建错了、测试用的才删:所有月份都当它从来没有过</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col">
+        <div class="card" style="width:300px">
+          <div class="k">账 户 簿 · 卡 片 ⋯ 菜 单</div>
+          <div style="margin-top:10px;border:1px solid var(--rule);font-size:13px">
+            <div style="padding:9px 12px;border-bottom:1px solid var(--rule-soft)">账户间划转</div>
+            <div style="padding:9px 12px;border-bottom:1px solid var(--rule-soft)">导出本账户 CSV</div>
+            <div style="padding:9px 12px;border-bottom:1px solid var(--rule-soft);color:var(--rust)">归档此账户</div>
+            <div style="padding:9px 12px;color:var(--rust);font-weight:600">删除账户</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ② 终端面板 -->
+  <section class="zone">
+    <div class="zone-head"><span class="zone-no">2</span><span class="zone-t">删除面板(命令行形态 · 先预演、再打字确认)</span><span class="zone-fr">FR-1210 ~ 1213</span></div>
+    <div class="zone-line"></div>
+    <div class="row">
+      <div class="modal-bg">
+        <div class="term">
+          <div class="bar"><span class="dot r"></span><span class="dot"></span><span class="dot"></span><span style="margin-left:6px">account-delete · 测试账户 · 不能撤销(可在回收站恢复)</span><span class="x">esc</span></div>
+          <div class="body">
+            <span class="ln cmd">account delete "测试账户" --dry-run</span>
+            <span class="ln cmt"># 下面是系统按你家现在的数据预演出来的结果 · 这里的金额没有隐藏</span>
+
+            <div class="hd"><span class="tag">区别</span>删除 ≠ 归档 <span class="arch">我其实要归档</span></div>
+            <span class="ln cmt">#   归档:历史月份照常算它,从本期起不再计入</span>
+            <span class="ln warn">#   删除:所有月份都当它从来没有过 —— 已关账的报表数字也会变</span>
+
+            <div class="hd"><span class="tag red">改写</span>会改写的账期</div>
+            <span class="ln">    2025-01 至 2026-09 共 <span class="red">21</span> 期(其中已关账 <span class="red">20</span> 期)  <span class="cmt">▸ 展开看每一期</span></span>
+
+            <div class="hd"><span class="tag">移走</span>会一起移进回收站</div>
+            <span class="ln">    余额 21 期 · 收入 2 笔 ¥3,000.00 · 支出 9 笔 ¥1,840.50 · 持仓 1 条 · 补录本金 0 笔 · 固定收支 0 条</span>
+
+            <div class="hd"><span class="tag red">牵连</span>牵连的其它账户 · 逐笔(对方收益一分不变)</div>
+            <div class="tr"><span>2025-01</span><span>工资卡</span><span>收到它转来 <span class="amt">¥111.00</span></span><span>→ 改记成工资卡的「补录本金」<span class="ok">+¥111.00</span></span></div>
+            <div class="tr"><span>2025-02</span><span>余额宝</span><span>转给它 <span class="amt">¥112.00</span></span><span>→ 改记成余额宝的「本金移出」<span class="red">−¥112.00</span></span></div>
+            <div class="tr"><span>2025-06</span><span>招行理财</span><span>收到它转来 <span class="amt">¥50,000.00</span></span><span>→ 招行理财这一期第一次出现:并进它的开账基线</span></div>
+            <div class="tr"><span>2026-03</span><span>房贷-招行</span><span>收到它转来 <span class="amt">¥6,280.00</span></span><span>→ 改记成房贷-招行的「补录本金」<span class="ok">+¥6,280.00</span></span></div>
+            <span class="ln cmt">#   共 4 笔 · 4 个账户 · 它们的余额、收益率、本期损益、归因贡献都不变;家庭层面这几笔算外部资本进出</span>
+
+            <div class="hd"><span class="tag">预演</span>删前 → 删后</div>
+            <span class="ln">    2026-09(最近已关账) 净资产  ¥2,480,000 → <span class="warn">¥2,426,756</span>    钱赚  +¥12,300 → <span class="warn">+¥12,176</span></span>
+            <span class="ln">    2026-10(本期)       净资产  ¥2,495,600 → <span class="warn">¥2,442,356</span></span>
+
+            <div class="hd"><span class="tag">其它</span>还会变的</div>
+            <span class="ln warn">    · 它是本期最后一个没填的账户:删掉后本期就算全部填完,到点会自动关账</span>
+            <span class="ln">    · 再平衡计划「2026-09」里涉及它的 1 条会移走(进度 2/3 → 2/2)</span>
+            <span class="ln">    · 目标「应急金」解绑它(目标还绑着 2 个账户)</span>
+            <span class="ln">    · AI 月度复盘(20 个已关账月的存稿)和 AI 调仓建议会重新生成</span>
+            <span class="ln ok"># 「删除(先备份)」先做一次立即备份,成功才删;「不备份,直接删除」跳过备份 —— 两种删掉的都在回收站里,能恢复</span>
+
+            <div class="confirm">
+              <span class="ln">请把下面这段话原样输进框里(一字不差):</span>
+              <div class="phrase">我知晓删除「测试账户」会改写 2025-01 至 2026-09 共 21 个账期,
+202501 账期 工资卡 的转账 111.00 元也会受到影响,
+202502 账期 余额宝 的转账 112.00 元也会受到影响,
+202506 账期 招行理财 的转账 50,000.00 元也会受到影响,
+202603 账期 房贷-招行 的转账 6,280.00 元也会受到影响。<span class="copy">复制这段话</span></div>
+              <div class="ta">我知晓删除「测试账户」会改写 2025-01 至 2026-09 共 21 个账期,
+202501 账期 工资卡 的转账 111.00 元也会受到影响,
+202502 账期 余额宝 的转账 112.00 元也会受到影响,<span class="caret"></span></div>
+              <div class="acts"><span class="del off">删除(先备份)</span><span class="cancel">不备份,直接删除</span><span class="cancel">取消</span><span class="match warn">还差 2 行没对上</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="side-note">
+        <ul>
+          <li>样式就是「看 AI 收到了什么」那块终端:深色、等宽、<b>$ 命令行</b>;内容是系统<b>先预演</b>算出来的。</li>
+          <li><b>牵连 · 逐笔</b>:每一笔和它之间的划转一行 —— 哪一期、哪个账户、多少钱、方向、会改记成什么(D3 B:对方收益一分不变)。</li>
+          <li><b>确认语</b>明细到每一笔:首行 + 每笔一行;「复制这段话」一键复制,粘进来就行。</li>
+          <li>没对上时按钮是暗的,并提示还差几行;全部对上才亮。</li>
+          <li>「我其实要归档」直接跳归档确认。</li>
+          <li>这里的金额<b>不受隐私模式糊化</b>(要照着输)。</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="row" style="margin-top:20px">
+      <div class="col">
+        <div class="modal-bg" style="width:auto;padding:18px">
+          <div class="term" style="width:880px">
+            <div class="bar"><span class="dot r"></span><span class="dot"></span><span class="dot"></span><span style="margin-left:6px">account-delete · 测试账户</span></div>
+            <div class="body">
+              <div class="confirm" style="margin-top:0;border-top:none;padding-top:0">
+                <div class="ta ok">我知晓删除「测试账户」会改写 2025-01 至 2026-09 共 21 个账期,
+202501 账期 工资卡 的转账 111.00 元也会受到影响,
+202502 账期 余额宝 的转账 112.00 元也会受到影响,
+202506 账期 招行理财 的转账 50,000.00 元也会受到影响,
+202603 账期 房贷-招行 的转账 6,280.00 元也会受到影响。</div>
+                <div class="acts"><span class="del">删除(先备份)</span><span class="cancel">不备份,直接删除</span><span class="cancel">取消</span><span class="match ok">✓ 一字不差</span></div>
+                <span class="ln cmd" style="margin-top:12px">backup now --before-delete</span>
+                <span class="ln ok">✓ /data/backups/finance-manual-20261012-221503.sql.gz · 442 KB · 64 张表</span>
+                <span class="ln cmd">account delete "测试账户" --confirm</span>
+                <span class="ln ok">✓ 已移进回收站 · 4 笔划转已改记成本金进出 · 报表 20 个已关账月份将按新数据重算</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="cap">对上之后:先备份 → 再删除,过程照命令行一行行打出来</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ③ 手机 -->
+  <section class="zone">
+    <div class="zone-head"><span class="zone-no">3</span><span class="zone-t">手机:同一块面板,全屏</span><span class="zone-fr">FR-1214</span></div>
+    <div class="zone-line"></div>
+    <div class="row">
+      <div class="phone"><div class="term">
+        <div class="bar" style="padding-top:34px"><span class="dot r"></span><span class="dot"></span><span class="dot"></span><span style="margin-left:6px">删除 · 测试账户</span><span class="x">esc</span></div>
+        <div class="body">
+          <span class="ln cmd">account delete "测试账户"</span>
+          <div class="hd"><span class="tag red">改写</span>2025-01 至 2026-09 · 21 期</div>
+          <span class="ln cmt">    其中已关账 20 期 ▸</span>
+          <div class="hd"><span class="tag red">牵连</span>4 笔划转 · 对方收益不变</div>
+          <div class="tr"><span>2025-01</span><span>工资卡 收到 <span class="amt">¥111.00</span></span><span class="w">→ 记成「补录本金」</span></div>
+          <div class="tr"><span>2025-02</span><span>余额宝 转出 <span class="amt">¥112.00</span></span><span class="w">→ 记成「本金移出」</span></div>
+          <div class="tr"><span>2025-06</span><span>招行理财 收到 <span class="amt">¥50,000.00</span></span><span class="w">→ 并进开账基线</span></div>
+          <div class="tr"><span>2026-03</span><span>房贷-招行 收到 <span class="amt">¥6,280.00</span></span><span class="w">→ 记成「补录本金」</span></div>
+          <div class="hd"><span class="tag">预演</span>2026-09 净资产</div>
+          <span class="ln">    ¥2,480,000 → <span class="warn">¥2,426,756</span></span>
+          <div class="confirm">
+            <div class="phrase" style="font-size:11px">我知晓删除「测试账户」会改写 2025-01 至 2026-09 共 21 个账期,
+202501 账期 工资卡 的转账 111.00 元也会受到影响,
+…(共 5 行)</div>
+            <div style="margin-top:8px;background:#d9a066;color:#1c1a17;text-align:center;padding:9px;font-family:'Noto Serif SC',serif">复制这段话</div>
+            <div class="ta" style="min-height:60px"><span class="caret"></span></div>
+            <div style="margin-top:8px;background:#3a2a24;color:#8a6f62;text-align:center;padding:9px;font-family:'Noto Serif SC',serif;border:1px solid #4a3a33">删除(先备份)</div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+  </section>
+
+  <!-- ④ 回收站 -->
+  <section class="zone">
+    <div class="zone-head"><span class="zone-no">4</span><span class="zone-t">管理 → 系统 →「回收站」· 恢复 / 彻底清除</span><span class="zone-fr">FR-1230 ~ 1234</span></div>
+    <div class="zone-line"></div>
+    <div class="row">
+      <div class="col">
+        <div class="card" style="width:900px">
+          <div class="k">系 · 统 · 回 · 收 · 站</div>
+          <div class="serif" style="font-size:26px">删掉的账户都在这里</div>
+          <div class="sub" style="font-size:13px">恢复 = 原样放回(数据、被改记的划转、目标绑定、计划条目都还原);彻底清除之后只能从备份恢复。</div>
+          <table class="tbl" style="margin-top:12px">
+            <tr><th>账户</th><th>类型</th><th>删除</th><th>改写过的账期</th><th>牵连划转</th><th></th></tr>
+            <tr><td class="serif" style="font-size:15px">测试账户</td><td><span class="pill">现金</span></td><td>迪娃 · 2026-10-12 22:15</td><td class="mono">2025-01 至 2026-09 · 21 期</td><td class="mono">4 笔 / 4 个账户</td><td><span class="btn-paper">恢复</span> <span class="btn-danger">彻底清除</span></td></tr>
+            <tr><td class="serif" style="font-size:15px">e2e · 转入开户</td><td><span class="pill">现金</span></td><td>王二狗 · 2026-10-09 20:50</td><td class="mono">2026-10 · 1 期</td><td class="mono">1 笔 / 1 个账户</td><td><span class="btn-paper">恢复</span> <span class="btn-danger">彻底清除</span></td></tr>
+          </table>
+        </div>
+        <div class="card" style="width:900px;margin-top:10px;border-left:4px solid var(--brass-deep)">
+          <div class="serif" style="font-size:16px">恢复「测试账户」</div>
+          <div class="sub" style="font-size:12.5px;margin-top:6px">会放回:余额 21 期 · 流水 11 笔 · 持仓 1 条 · 4 笔划转(从本金进出还原成划转)· 目标「应急金」重新绑定 · 再平衡计划条目 1 条</div>
+          <div class="sub" style="font-size:12.5px;margin-top:4px;color:var(--rust)">放不回的(列出来,不静默跳过):目标「旅行基金」已经删了,这条绑定没法恢复</div>
+          <div style="margin-top:10px;display:flex;gap:10px"><span class="btn-paper" style="background:var(--ink);color:var(--paper)">恢复</span><span class="btn-paper">取消</span></div>
+        </div>
+      </div>
+      <div class="side-note">
+        <ul>
+          <li><b>一直保留</b>,直到手动「彻底清除」。</li>
+          <li>恢复是<b>轻量确认</b>:列出会放回什么、放不回什么,不要求打字。</li>
+          <li>彻底清除要再打一次字:<span class="mono">彻底清除「测试账户」</span>(同样有复制按钮)。</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ⑤ 报表留痕 -->
+  <section class="zone">
+    <div class="zone-head"><span class="zone-no">5</span><span class="zone-t">报表留痕:被改写过的已关账月份</span><span class="zone-fr">FR-1240</span></div>
+    <div class="zone-line"></div>
+    <div class="card" style="width:760px;border-left:4px solid var(--brass-deep)">
+      <div class="mono" style="font-size:13px"><b>2026-09 月度账册</b> · 关账于 2026-10-09 <span style="color:var(--rust)">· 2026-10-12 删除账户「测试账户」后重算</span></div>
+      <div class="sub" style="margin-top:6px">「口径 v2」不变;数字按删除后的数据重算。恢复过的写「… 恢复账户「测试账户」后重算」。来源是审计日志,不另存数字。</div>
+    </div>
+  </section>
+
+</div>
+</body>
+</html>

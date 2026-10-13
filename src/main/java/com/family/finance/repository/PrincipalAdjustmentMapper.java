@@ -71,7 +71,7 @@ public interface PrincipalAdjustmentMapper {
               JOIN period p ON p.id = pa.period_id AND p.family_id = pa.family_id
                SET pa.deleted_at = NOW()
              WHERE pa.id = #{id} AND pa.family_id = #{familyId} AND pa.account_id = #{accountId}
-               AND pa.deleted_at IS NULL AND p.status = 'OPEN'
+               AND pa.deleted_at IS NULL AND p.status = 'OPEN' AND pa.source_tag <> 'ACCOUNT_DELETE'
             """)
     int softDelete(@Param("familyId") long familyId, @Param("accountId") long accountId, @Param("id") long id);
 
@@ -90,4 +90,25 @@ public interface PrincipalAdjustmentMapper {
             """)
     BigDecimal findPreviousEndBalance(@Param("familyId") long familyId, @Param("accountId") long accountId,
                                       @Param("periodStart") LocalDate periodStart);
+
+    /**
+     * v1.33 · 删除账户时由系统写的本金进出(对方收到 → 正;对方转出 → 负 = 本金移出)。
+     * 与 {@link #insert} 不同:<b>允许写进已关账的期</b>(划转发生在哪期就改记在哪期),来源固定 ACCOUNT_DELETE。
+     */
+    @Insert("""
+            INSERT INTO principal_adjustment (family_id, account_id, period_id, amount, note, source_tag, member_id)
+            SELECT #{familyId}, a.id, p.id, #{e.amount}, #{e.note}, 'ACCOUNT_DELETE', #{e.memberId}
+              FROM account a
+              JOIN period p ON p.id = #{e.periodId} AND p.family_id = #{familyId}
+             WHERE a.id = #{e.accountId} AND a.family_id = #{familyId}
+            """)
+    @Options(useGeneratedKeys = true, keyProperty = "e.id")
+    int insertSystem(@Param("familyId") long familyId, @Param("e") PrincipalAdjustment e);
+
+    /** v1.33 · 恢复被删账户时,拿掉当初改记写的那几笔(只认 ACCOUNT_DELETE 来源) */
+    @org.apache.ibatis.annotations.Delete("""
+            DELETE FROM principal_adjustment
+             WHERE id = #{id} AND family_id = #{familyId} AND source_tag = 'ACCOUNT_DELETE'
+            """)
+    int deleteSystem(@Param("familyId") long familyId, @Param("id") long id);
 }

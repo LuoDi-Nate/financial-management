@@ -7,21 +7,42 @@
 <main class="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10 py-5 sm:py-10 relative z-10 grid grid-cols-12 gap-8">
   <aside th:replace="~{admin/_sidebar :: sidebar('backup')}"></aside>
   <section class="col-span-12 md:col-span-9">
-    <div class="mb-8 flex items-end justify-between">
+    <div class="mb-8 flex items-end justify-between flex-wrap gap-4">
       <div>
         <div class="eyebrow mb-2">备 · 份 · 与 · 恢 · 复</div>
         <h1 class="font-display text-4xl font-medium">数据安守</h1>
         <!--/* v1.31.1 · issue #29 续:原来写死 systemd 的「每周日 03:00 · /var/backup/finance/」——
                Docker 用户看到的是另一回事(备份容器每天一次、存在数据卷里),而且这页在 Docker 下永远「0 次」。
-               现在两种部署都往 backup_log 写,文案按最近一条记录是哪种来写;一条都没有就两种都说清。*/-->
-        <p class="text-ink-soft text-sm mt-2" th:if="${!#lists.isEmpty(logs) and logs[0].kind == 'DAILY'}" data-backup-mode="docker">
+               v1.32 · 部署方式改由控制器给(backupMode):原来按「最近一条记录是哪种」猜,
+               有了「立即备份」之后最近一条可能是「手动」,Docker 用户就会看到 systemd 的文案。*/-->
+        <p class="text-ink-soft text-sm mt-2" th:if="${backupMode == 'docker'}" data-backup-mode="docker">
           Docker 部署:备份容器每天自动做一次 mysqldump,失败 5 分钟后重试;能解压、里面有建表语句才算成功。默认保留 56 天。</p>
-        <p class="text-ink-soft text-sm mt-2" th:if="${!#lists.isEmpty(logs) and logs[0].kind != 'DAILY'}" data-backup-mode="systemd">
+        <p class="text-ink-soft text-sm mt-2" th:if="${backupMode != 'docker'}" data-backup-mode="systemd">
           每周日凌晨 03:00 通过 mysqldump 自动备份。保留 8 周。</p>
-        <p class="text-ink-soft text-sm mt-2" th:if="${#lists.isEmpty(logs)}" data-backup-mode="none">
-          还没有备份记录。systemd 部署每周日凌晨 03:00 自动备份;Docker 部署由备份容器每天备份一次 —— 两种都会记在这里。</p>
+        <p class="text-ink-subtle text-xs mt-1" th:if="${#lists.isEmpty(logs)}" data-backup-mode="none">
+          还没有备份记录 —— 自动备份和下面的「立即备份」都会记在这里。</p>
       </div>
-      <a th:href="@{/export.zip}" class="btn-ink text-xs"><svg class="inline-block align-[-2px] mr-1" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>导出 CSV 包</a>
+      <div class="flex items-start gap-3 flex-wrap">
+        <!--/* v1.32 FR-1170 ~ 1173 · issue #29 用户建议。同步跑完才回来,按下去就变「正在备份…」防连点;
+               服务端另有一把锁 + 1 分钟间隔,不靠前端。 */-->
+        <form th:action="@{/admin/backup/now}" method="post" class="text-right" data-backup-now
+              onsubmit="var b=this.querySelector('button');b.disabled=true;b.textContent='正在备份…';">
+          <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+          <button type="submit" class="btn-ink text-xs inline-flex items-center gap-1.5">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>立即备份</button>
+          <div class="font-mono text-[10px] text-ink-subtle mt-1">改大东西之前先备一份</div>
+        </form>
+        <a th:href="@{/export.zip}" class="btn-paper text-xs no-underline"><svg class="inline-block align-[-2px] mr-1" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>导出 CSV 包</a>
+      </div>
+    </div>
+
+    <div th:if="${backupNote}" data-backup-note class="border-l-2 border-forest px-4 py-2.5 text-[13px] mb-5" style="background:rgba(79,107,71,.07)" th:text="${backupNote}">已备份</div>
+    <div th:if="${backupError}" data-backup-error class="border-l-2 border-rust bg-rust/[0.05] px-4 py-2.5 text-[13px] mb-5" th:text="${backupError}">备份失败</div>
+    <!--/* 目录写不了:提前说,别等点了才失败。systemd 由 deploy.sh 建目录(属主 finance)并放进可写白名单;
+           手建过目录的机器(例如维护者的 beta)要改一次属主 */-->
+    <div th:if="${!backupDirWritable}" data-backup-dir-warn class="border-l-2 border-brass-deep bg-brass-soft/40 px-4 py-2.5 text-[12.5px] leading-relaxed mb-5">
+      应用对备份目录 <code class="font-mono" th:text="${backupDir}">/var/backup/finance</code> 没有写权限,「立即备份」会失败(自动备份不受影响)。
+      <span th:if="${backupMode != 'docker'}">在服务器上运行一次 <code class="font-mono">sudo chown finance:finance <span th:text="${backupDir}">/var/backup/finance</span></code> 即可。</span>
     </div>
 
     <!-- 状态 -->
@@ -32,7 +53,7 @@
              th:text="${#lists.isEmpty(logs) ? '—' : #temporals.format(logs[0].startedAt,'M月d日 HH:mm')}">5 月 4 日 03:00</div>
         <div class="font-mono text-xs num-pos mt-1"
              th:if="${!#lists.isEmpty(logs) and logs[0].status == 'SUCCESS'}"
-             th:text="|✓ 成功 · ${logs[0].sizeBytes != null ? (logs[0].sizeBytes / 1024 / 1024) + ' MB' : ''}|">✓ 成功</div>
+             th:text="|✓ 成功 · ${logs[0].sizeBytes == null ? '' : (logs[0].sizeBytes >= 1048576 ? (logs[0].sizeBytes / 1024 / 1024) + ' MB' : (logs[0].sizeBytes / 1024) + ' KB')}|">✓ 成功</div>
         <!--/* v1.31.1 · 最近一次是失败的,这里原来什么都不写 —— 只剩一个日期,看着像成功了 */-->
         <div class="font-mono text-xs text-rust mt-1"
              th:if="${!#lists.isEmpty(logs) and logs[0].status == 'FAILED'}">✗ 失败 · 原因见下表「错误」</div>
@@ -44,13 +65,13 @@
       </div>
       <div class="kpi-card">
         <span class="kpi-eyebrow">存储位置</span>
-        <th:block th:if="${!#lists.isEmpty(logs) and logs[0].kind == 'DAILY'}">
+        <th:block th:if="${backupMode == 'docker'}">
           <div class="font-display text-2xl mt-1">Docker 数据卷</div>
-          <div class="font-mono text-xs text-ink-soft mt-1">backups 卷 · 容器内 /data/backups/</div>
+          <div class="font-mono text-xs text-ink-soft mt-1">backups 卷 · 容器内 <span th:text="${backupDir}">/data/backups</span>/</div>
         </th:block>
-        <th:block th:unless="${!#lists.isEmpty(logs) and logs[0].kind == 'DAILY'}">
+        <th:block th:unless="${backupMode == 'docker'}">
           <div class="font-display text-2xl mt-1">本地磁盘</div>
-          <div class="font-mono text-xs text-ink-soft mt-1">/var/backup/finance/</div>
+          <div class="font-mono text-xs text-ink-soft mt-1"><span th:text="${backupDir}">/var/backup/finance</span>/</div>
         </th:block>
       </div>
     </div>

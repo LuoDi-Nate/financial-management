@@ -2772,3 +2772,144 @@ body.adm-open #float-dock { display: none !important; }
   /* 卡片化以后不需要横向滚动;外层若写了 overflow-x-auto,手机上让它别出滚动条 */
   .m-cards-wrap { overflow-x: visible !important; }
 }
+
+/* ═══ v1.32 · 固定收支那一行(entry/_fixed-flows.html · prd/v1.32.md FR-1110 ~ 1118)═══════════════
+   默认收起只占一行;展开后每笔三行:名称 · 种类 · 金额 / 账户与算式 / 按钮。
+   手机上按钮整行、点得中(v1.31 卡片排法);PC 上按钮靠右。 */
+.ff { margin: 0 0 4px; }
+.ff-box { border: 1px solid var(--rule); border-left: 4px solid var(--brass-deep); background: var(--card); }
+.ff-sum { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 16px; cursor: pointer;
+  background: rgba(176,134,66,.08); font-size: calc(13.5px * var(--fs-scale,1)); list-style: none; }
+.ff-sum::-webkit-details-marker { display: none; }
+.ff-sum-ok { background: rgba(79,107,71,.07); }
+.ff-sum-empty { cursor: default; border: 1px dashed var(--rule); background: transparent; }
+.ff-chev { display: inline-flex; color: var(--brass-deep); transition: transform .15s; }
+.ff-box[open] > .ff-sum .ff-chev { transform: rotate(90deg); }
+.ff-box[open] > .ff-sum { border-bottom: 1px solid var(--rule-soft); }
+.ff-nm { font-family: 'Fraunces','Noto Serif SC',serif; font-size: calc(15px * var(--fs-scale,1)); }
+.ff-cnt { color: var(--rust); font-family: 'JetBrains Mono', monospace; font-size: calc(12px * var(--fs-scale,1)); white-space: nowrap; }
+.ff-total { font-family: 'JetBrains Mono', monospace; white-space: nowrap; }
+.ff-ok { color: var(--forest); }
+.ff-sub { color: var(--ink-subtle); font-size: calc(12px * var(--fs-scale,1)); }
+.ff-spacer { flex: 1 1 auto; }
+.ff-toggle { color: var(--ink-soft); font-size: calc(12px * var(--fs-scale,1)); white-space: nowrap; }
+.ff-box:not([open]) .ff-when-open, .ff-box[open] .ff-when-closed { display: none; }
+.ff-link, .ff-add { color: var(--brass-deep); font-size: calc(12px * var(--fs-scale,1)); text-decoration: underline; text-underline-offset: 3px; white-space: nowrap; }
+.ff-add { text-decoration: none; font-weight: 500; }
+.ff-all-btn { white-space: nowrap; }
+.ff-flash { padding: 8px 14px; font-size: calc(13px * var(--fs-scale,1)); margin-bottom: 8px; border-left: 2px solid; }
+.ff-flash-ok { border-color: var(--forest); background: rgba(79,107,71,.07); }
+.ff-flash-err { border-color: var(--rust); background: rgba(159,74,58,.06); }
+.ff-row { padding: 10px 16px; border-bottom: 1px solid var(--rule-soft); }
+.ff-row-sug { background: rgba(176,134,66,.06); }
+.ff-row-later { opacity: .75; }
+.ff-row-done { background: rgba(79,107,71,.04); }
+.ff-l1 { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.ff-l2 { margin-top: 4px; font-size: calc(12px * var(--fs-scale,1)); color: var(--ink-subtle); line-height: 1.6; }
+.ff-l3 { display: flex; gap: 8px; align-items: center; justify-content: flex-end; margin-top: 8px; flex-wrap: wrap; }
+.ff-l3 form { display: inline; margin: 0; }
+.ff-av { display: inline-flex; width: 20px; height: 20px; border-radius: 50%; color: var(--paper); font-size: 11px;
+  align-items: center; justify-content: center; flex-shrink: 0; font-family: 'Fraunces','Noto Serif SC',serif; }
+.ff-name { font-family: 'Fraunces','Noto Serif SC',serif; font-size: calc(15px * var(--fs-scale,1)); min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ff-tag { display: inline-block; white-space: nowrap; font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: .06em;
+  padding: 1px 7px; border: 1px solid var(--rule); color: var(--ink-soft); background: var(--paper-soft); flex-shrink: 0; }
+.ff-tag-in { background: var(--forest-soft); color: var(--forest); border-color: var(--forest); }
+.ff-tag-out { background: var(--rust-soft); color: var(--rust); border-color: var(--rust); }
+.ff-tag-loan { background: rgba(60,74,90,.12); color: #3c4a5a; border-color: #3c4a5a; }
+.ff-tag-ins { background: var(--brass-soft); color: var(--brass-deep); border-color: var(--brass); }
+.ff-tag-sug { background: transparent; color: var(--brass-deep); border-style: dashed; border-color: var(--brass-deep); }
+.ff-amt { margin-left: auto; font-family: 'JetBrains Mono', monospace; font-size: calc(14px * var(--fs-scale,1)); white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 4px; }
+.ff-amt-in { width: 7.5rem; border: 1px solid var(--brass-deep); background: #fffdf7; font-family: 'JetBrains Mono', monospace;
+  font-size: calc(14px * var(--fs-scale,1)); padding: 3px 8px; text-align: right; }
+.ff-calc { font-family: 'JetBrains Mono', monospace; font-size: 9.5px; color: var(--brass-deep); border: 1px solid var(--brass-deep);
+  padding: 0 4px; cursor: help; }
+.ff-formula { margin-top: 3px; font-family: 'JetBrains Mono', monospace; font-size: calc(10.5px * var(--fs-scale,1)); color: var(--brass-deep); }
+.ff-problem { margin-top: 4px; font-size: calc(12px * var(--fs-scale,1)); color: var(--rust); }
+.ff-diff { color: var(--rust); }
+.ff-remember { display: inline-flex; gap: 6px; align-items: center; margin-top: 6px; font-size: calc(12px * var(--fs-scale,1)); color: var(--brass-deep); }
+.ff-remember[hidden] { display: none; }
+.ff-hint { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 8px; padding: 6px 10px;
+  font-size: calc(12px * var(--fs-scale,1)); color: var(--brass-deep); background: rgba(176,134,66,.08); }
+.ff-fold > summary { padding: 9px 16px; font-size: calc(12.5px * var(--fs-scale,1)); color: var(--ink-soft); cursor: pointer;
+  border-bottom: 1px solid var(--rule-soft); }
+.ff-fold[open] > summary { color: var(--ink); }
+@media (max-width: 767.98px) {
+  .ff-sum { padding: 10px 12px; gap: 8px; }
+  .ff-all-btn { order: 10; flex: 1 1 100%; min-height: 38px; justify-content: center; }
+  .ff-row { padding: 11px 12px; }
+  .ff-l3 { justify-content: stretch; }
+  .ff-l3 > button, .ff-l3 > form, .ff-l3 > .btn-ink, .ff-l3 > .btn-paper { flex: 1 1 0; }
+  .ff-l3 button { width: 100%; min-height: 36px; justify-content: center; }
+  .ff-amt-in { width: 6.5rem; }
+}
+@media (max-width: 767.98px) {
+  /* 手机上摘要那一行要放得下「固定收支 · N 笔待确认 · 共 ¥X · 管理」:展开 / 收起两个字让给左边的箭头 */
+  .ff-toggle { display: none; }
+}
+@media (min-width: 768px) {
+  /* PC 上按钮挪到第一行右边:一笔两行(名称 · 种类 · 金额 | 按钮 / 账户 · 算式),不是三行 */
+  .ff-form, .ff-row-sug, .ff-row-done { display: grid; grid-template-columns: minmax(0,1fr) auto; column-gap: 18px; align-items: center; }
+  .ff-form > *, .ff-row-sug > *, .ff-row-done > * { grid-column: 1; }
+  .ff-form > .ff-l3, .ff-row-sug > .ff-l3, .ff-row-done > .ff-l3 { grid-column: 2; grid-row: 1; margin-top: 0; }
+  .ff-row-done > .ff-l3 { display: flex; }
+}
+/* 管理页「固定收支」:改 / 停用 两个动作在手机卡片里也排成一行 */
+.ff-acts { display: inline-flex; align-items: center; gap: 14px; }
+@media (max-width: 767.98px) {
+  table.m-cards > tbody > tr > td.m-act .ff-acts form { display: inline; width: auto; }
+}
+
+/* ═══ v1.33 · 删除账户的确认面板(accounts/delete.html · 与 .peek 同一套终端配色)═══════════════ */
+/* 面板页本身沿用纸色背景(深色只在面板里)—— 整页压暗会让顶栏看不清 */
+.adel { background: #1c1a17; border: 1px solid #2a2622; border-radius: 6px; font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: calc(12.5px * var(--fs-scale,1)); color: #cfc8ba; box-shadow: 0 20px 50px -20px rgba(0,0,0,.6); }
+.adel-bar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid #2a2622; color: #a39b8c; font-size: 11.5px; }
+.adel-dot { width: 10px; height: 10px; border-radius: 50%; background: #3a352f; display: inline-block; flex-shrink: 0; }
+.adel-dot.r { background: #c0563f; }
+.adel-title { margin-left: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.adel-x { margin-left: auto; border: 1px solid #3a352f; padding: 0 7px; border-radius: 3px; color: #a39b8c; text-decoration: none; }
+.adel-x:hover { color: #fff; border-color: var(--brass-deep); }
+.adel-body { padding: 14px 16px 16px; }
+.adel .ln { display: block; white-space: pre-wrap; word-break: break-word; line-height: 1.75; }
+.adel .ln.cmd { color: #e9e3d6; }
+.adel .ln.cmd::before { content: '$ '; color: #8fae86; }
+.adel .cmt { color: #7d766a; }
+.adel .warn { color: #d9a066; }
+.adel .red { color: #e07a5f; }
+.adel .ok { color: #8fae86; }
+.adel .hd { color: #e9e3d6; margin-top: 12px; border-top: 1px dashed #3a352f; padding-top: 8px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.adel .hd .tag { color: #1c1a17; background: #d9a066; padding: 0 5px; font-size: 10.5px; }
+.adel .hd .tag.red { background: #e07a5f; color: #1c1a17; }
+.adel-arch { border: 1px solid #8fae86; color: #8fae86; padding: 1px 9px; margin-left: 10px; font-size: 11.5px; background: transparent; cursor: pointer; font-family: inherit; }
+.adel-arch:hover { background: rgba(143,174,134,.12); }
+.adel-err { margin: 10px 0 4px; border-left: 3px solid #e07a5f; background: rgba(224,122,95,.10); color: #f0c7b8; padding: 8px 12px; line-height: 1.7; }
+.adel-more summary { color: #7d766a; cursor: pointer; padding-left: 4ch; }
+.adel .tr { display: grid; grid-template-columns: 70px 110px 200px 1fr; gap: 8px; padding: 3px 0 3px 1em; line-height: 1.6; }
+.adel .tr .amt { color: #e9e3d6; }
+.adel .confirm { margin-top: 14px; border-top: 1px solid #3a352f; padding-top: 12px; }
+.adel .phrase-wrap { position: relative; margin-top: 6px; }
+.adel .phrase { background: #26231f; border: 1px dashed #d9a066; padding: 10px 12px; padding-right: 120px; color: #f0e6d2; white-space: pre-wrap;
+  word-break: break-word; line-height: 1.8; margin: 0; font-family: inherit; font-size: inherit; }
+.adel .copy { position: absolute; right: 8px; top: 8px; background: #d9a066; color: #1c1a17; padding: 4px 10px; font-size: 12px;
+  font-family: 'Noto Serif SC', serif; border: none; cursor: pointer; }
+.adel .ta { display: block; width: 100%; margin-top: 10px; background: #141210; border: 1px solid #3a352f; min-height: 118px; padding: 10px 12px;
+  color: #e9e3d6; line-height: 1.8; font-family: inherit; font-size: inherit; resize: vertical; }
+.adel .ta.ok { border-color: #8fae86; }
+.adel .acts { display: flex; gap: 10px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
+.adel .del { background: #9c4a2a; color: #fff; border: 1px solid #c0563f; padding: 8px 16px; font-family: 'Noto Serif SC', serif; font-size: 13px; cursor: pointer; }
+.adel .del:disabled { background: #3a2a24; color: #8a6f62; border-color: #4a3a33; cursor: not-allowed; }
+.adel .del-nobk { background: transparent; color: #e08a6d; border: 1px solid #9c4a2a; padding: 8px 14px; font-family: 'Noto Serif SC', serif; font-size: 13px; cursor: pointer; }
+.adel .del-nobk:disabled { color: #6f5a50; border-color: #4a3a33; cursor: not-allowed; }
+.adel .cancel { color: #a39b8c; border: 1px solid #3a352f; padding: 8px 14px; font-family: 'Noto Serif SC', serif; font-size: 13px; }
+.adel .match { font-size: 11.5px; }
+@media (max-width: 767.98px) {
+  .adel { border-radius: 0; margin: 0 -12px; font-size: calc(11.5px * var(--fs-scale,1)); }
+  .adel .tr { grid-template-columns: 62px 1fr; gap: 2px 6px; }
+  .adel .tr > span:nth-child(3), .adel .tr > span:nth-child(4) { grid-column: 1 / -1; padding-left: 62px; }
+  .adel .phrase { padding-right: 12px; }
+  .adel .copy { position: static; display: block; width: 100%; margin-top: 8px; padding: 9px; font-size: 13px; }
+  .adel .acts { flex-direction: column; align-items: stretch; }
+  .adel .del, .adel .del-nobk, .adel .cancel { text-align: center; min-height: 40px; }
+}
