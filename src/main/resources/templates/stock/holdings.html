@@ -129,10 +129,6 @@
       <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
       <button type="submit" class="btn-paper">⟳ 手动刷价</button>
     </form>
-    <!--/* v1.34 · issue #40 · 持仓少于 2 只时不出现(FR-1300) */-->
-    <a th:if="${#lists.size(holdings) >= 2}" th:href="@{|/accounts/${account.id}/holdings/order|}"
-       class="btn-paper no-underline inline-flex items-center gap-1.5" data-holding-order>
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4v16"/><polyline points="3 8 7 4 11 8"/><path d="M17 20V4"/><polyline points="13 16 17 20 21 16"/></svg>调整顺序</a>
     <div class="ml-auto font-mono text-[10px] text-ink-subtle self-center"
          th:text="${priceSourceLabel}">数据源 · 新浪(主) + 腾讯(备)</div>
   </section>
@@ -177,6 +173,15 @@
     <p class="text-xs text-ink-subtle">
       未添加持仓时,此账户的余额仍可在填报页手填。
     </p>
+  </div>
+
+  <!--/* v1.34 · issue #40 · 「调整顺序」放在持仓列表的头上(维护者验收:放在操作栏一排「添加」按钮里找不到)。
+         持仓少于 2 只时不出现(FR-1300)。 */-->
+  <div th:if="${#lists.size(holdings) >= 2}" class="flex items-center justify-between gap-3 mb-3 holding-list-head">
+    <span class="font-mono text-[11px] tracking-[0.12em] text-ink-soft min-w-0"><span th:text="'持仓 · ' + ${#lists.size(holdings)} + ' 只'">持仓 · 6 只</span><span class="hidden sm:inline"> · 按你排的顺序(没排过 = 按添加先后)</span></span>
+    <a th:href="@{|/accounts/${account.id}/holdings/order|}"
+       class="btn-ink text-xs no-underline inline-flex items-center gap-1.5 whitespace-nowrap shrink-0" data-holding-order>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4v16"/><polyline points="3 8 7 4 11 8"/><path d="M17 20V4"/><polyline points="13 16 17 20 21 16"/></svg>调整顺序</a>
   </div>
 
   <article th:each="h : ${holdings}" class="paper-card mb-4 overflow-hidden"
