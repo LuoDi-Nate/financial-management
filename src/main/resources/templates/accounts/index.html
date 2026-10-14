@@ -25,13 +25,15 @@
     <!--/* v1.22.1 · 三个按钮都 whitespace-nowrap 且不换行,在 390px 下第三个
            「+ 添加账户(开向导)」超出视口 4px —— 整个页面因此横向能拖动,
            而拖出来的只有一片空白。加 flex-wrap:放不下就换行,不撑破页面。 */-->
-    <div class="flex items-center gap-3 flex-wrap">
+    <!--/* v1.34 · 手机上四个按钮一行四等分、同宽同高(维护者:「四个按钮怎么还换行了,变小一点,一行排」)·
+           「(开向导)」手机上不显示(文字仍在,e2e 按它找按钮)· PC 不变 —— 见 style.css .acct-actions */-->
+    <div class="acct-actions flex items-center gap-3 flex-wrap" data-acct-actions>
       <!--/* v1.34 · 拖拽调整账户顺序(维护者:「账户也要支持可视化的排序」)—— 原来只能在编辑页填「显示顺序」数字 */-->
       <a th:href="@{/accounts/order}" class="btn-paper no-underline whitespace-nowrap inline-flex items-center gap-1.5" data-account-order>
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4v16"/><polyline points="3 8 7 4 11 8"/><path d="M17 20V4"/><polyline points="13 16 17 20 21 16"/></svg>调整顺序</a>
       <a th:href="@{/accounts/groups}" class="btn-paper no-underline whitespace-nowrap">账户分组</a>
       <a th:href="@{/lens/tags}" class="btn-paper no-underline whitespace-nowrap">资产打标</a>
-      <a th:href="@{/accounts/new}" class="btn-ink no-underline whitespace-nowrap">+ 添加账户(开向导)</a>
+      <a th:href="@{/accounts/new}" class="btn-ink no-underline whitespace-nowrap">+ 添加账户<span class="acct-actions-long">(开向导)</span></a>
     </div>
   </section>
 

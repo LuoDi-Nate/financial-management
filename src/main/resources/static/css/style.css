@@ -2992,3 +2992,12 @@ body.adm-open #float-dock { display: none !important; }
   .sort-quick-label { grid-column: 1 / -1; }
   .sort-quick-btn { height: 42px; padding: 0 4px; letter-spacing: 0; }
 }
+
+/* ── 账户簿页头四个按钮(v1.34)──
+   手机上一行四等分、同宽同高(并列同类元素同尺寸);字号收小、字距归零、「(开向导)」不显示。PC 照旧。 */
+@media (max-width: 767.98px) {
+  .acct-actions[data-acct-actions] { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; width: 100%; }   /* 带属性提高权重:元素上的 Tailwind .flex 是运行时注入、排在 style.css 后面 */
+  .acct-actions > a { justify-content: center; height: 38px; padding: 0 2px; font-size: calc(11.5px * var(--fs-scale,1)); letter-spacing: 0; gap: 3px; }
+  .acct-actions > a svg { width: 11px; height: 11px; flex: none; }
+  .acct-actions-long { display: none; }
+}

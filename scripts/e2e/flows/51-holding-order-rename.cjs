@@ -238,6 +238,12 @@ module.exports = {
 
     report.section('8 · 手机(390 · 触屏):长按拿起拖动 · 不横向溢出');
     await ui.phone(async (m) => {
+      // 账户簿页头四个按钮:手机上一行排下、同宽同高、字不截(维护者:「四个按钮怎么还换行了,变小一点,一行排」)
+      await m.goto('/accounts');
+      await m.page.waitForSelector('#page-overlay', { state: 'hidden', timeout: 15000 }).catch(() => {});
+      await m.sameSize('[data-acct-actions] > a', '手机账户簿:调整顺序 / 账户分组 / 资产打标 / 添加账户 四个按钮同宽同高');
+      const ab = await m.page.locator('[data-acct-actions] > a').evaluateAll(els => els.map(e => [Math.round(e.getBoundingClientRect().top), e.scrollWidth <= e.clientWidth + 1, e.innerText.trim()]));
+      await m.assert(ab.length === 4 && new Set(ab.map(q => q[0])).size === 1 && ab.every(q => q[1]), '手机账户簿:四个按钮在同一行、文字没被截', JSON.stringify(ab));
       await m.goto(`/accounts/${ACC}/holdings`);
       await m.click('[data-holding-order]', '手机持仓页点「调整顺序」');
       await m.page.waitForLoadState('networkidle').catch(() => {});
