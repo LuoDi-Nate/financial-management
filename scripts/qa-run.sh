@@ -11664,9 +11664,12 @@ QA134_SB="$RD/src/main/resources/static/js/sort-board.js"
   && grep -q 'data-sort-undo' "$QA134_SB" \
   && ( for t in stock/holding-order accounts/order; do f="$RD/src/main/resources/templates/$t.html"; \
        grep -q 'data-sort-board' "$f" && grep -q '/vendor/Sortable.min.js' "$f" && grep -q '/js/sort-board.js' "$f" || exit 1; done ) \
-  && ! grep -rqE 'data-ho-(up|down|top|save)' "$RD/src/main/resources/templates"; } \
-  && log_ok "v134-SORT-BOARD-SHARED(持仓 / 账户两个排序页共用 sort-board.js + SortableJS · 拖拽让路 · 手机长按 · 能撤销 · 旧 ↑ ↓ 按钮已清)" \
-  || log_bad "v134-SORT-BOARD-SHARED 排序页没走共用拖拽件(或旧 ↑ ↓ 按钮还在)" "see static/js/sort-board.js"
+  && ! grep -rqE 'data-ho-(up|down|top|save)' "$RD/src/main/resources/templates" \
+  && ! grep -A2 '^\.sort-drag {' "$RD/src/main/resources/static/css/style.css" | grep -qE '(^|[ ;{])transform:' \
+  && grep -A2 '^\.sort-drag {' "$RD/src/main/resources/static/css/style.css" | grep -q 'transition: none !important' \
+  && ! grep -A3 '^\.sort-card {' "$RD/src/main/resources/static/css/style.css" | grep 'transition:' | grep -q 'transform'; } \
+  && log_ok "v134-SORT-BOARD-SHARED(持仓 / 账户两个排序页共用 sort-board.js + SortableJS · 拖拽让路 · 手机长按 · 能撤销 · 旧 ↑ ↓ 按钮已清 · 跟手的卡不带 transform / 过渡)" \
+  || log_bad "v134-SORT-BOARD-SHARED 排序页没走共用拖拽件(或旧 ↑ ↓ 按钮还在 / 跟手的卡又带了 transform 过渡 —— 卡片会只跟鼠标走三分之一)" "see static/js/sort-board.js · style.css .sort-drag"
 [ -f "$RD/scripts/e2e/flows/51-holding-order-rename.cjs" ] && grep -q 'touchDrag' "$RD/scripts/e2e/flows/51-holding-order-rename.cjs" \
   && grep -q 'data-account-order' "$RD/scripts/e2e/flows/51-holding-order-rename.cjs" \
   && log_ok "v134-E2E(flow 51:鼠标拖拽 → 撤销 → 四处一致 → 新加的在最后 → 改名 → 账户顺序拖拽 → 手机长按拖)" || log_bad "v134-E2E 缺 flow 51(或没覆盖拖拽 / 账户顺序 / 手机)" "scripts/e2e/flows/51-holding-order-rename.cjs"

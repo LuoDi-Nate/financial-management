@@ -2944,7 +2944,7 @@ body.adm-open #float-dock { display: none !important; }
 .sort-card { display: grid; grid-template-columns: 22px 26px 1fr auto; align-items: center; gap: 10px;
              background: var(--card); border: 1px solid var(--rule); padding: 12px 16px; cursor: grab;
              user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
-             transition: box-shadow .15s, border-color .15s, transform .15s; }
+             transition: box-shadow .15s, border-color .15s; }
 .sort-card:hover { border-color: var(--ink-subtle); box-shadow: 0 2px 10px rgba(26,23,20,.06); }
 .sort-card:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
 .sort-grip { color: var(--ink-subtle); display: inline-flex; }
@@ -2954,12 +2954,15 @@ body.adm-open #float-dock { display: none !important; }
 .sort-name { font-family: 'Noto Serif SC', serif; font-size: 15px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sort-sub { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: var(--ink-subtle); margin-top: 2px; }
 .sort-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--ink-soft); white-space: nowrap; }
-/* 拖动时:原位置 = 虚线空位;跟手的那张 = 浮起 + 阴影 */
+/* 拖动时:原位置 = 虚线空位;跟手的那张 = 浮起 + 阴影。
+   跟手的那张**不许有 transform 过渡、也不许自带 transform**:SortableJS 每次移动先读它当前的 transform 矩阵再加上位移,
+   有过渡时读到的是动画走到一半的值,差额一路累积 —— 鼠标移 246px 卡只跟 99px(维护者验收:「鼠标移动的像素很少,拖不到别的卡上」)。
+   旋转 / 放大同理会被并进矩阵,一并不用,浮起感只靠阴影。e2e flow 51 量「卡片跟手」。 */
 .sort-ghost { background: rgba(196,148,62,.06) !important; border: 1px dashed var(--brass) !important; box-shadow: none !important; }
 .sort-ghost > * { visibility: hidden; }
 .sort-chosen { border-color: var(--brass); }
-.sort-drag { cursor: grabbing !important; box-shadow: 0 14px 34px rgba(26,23,20,.22) !important; transform: rotate(.6deg) scale(1.015);
-             background: var(--card) !important; opacity: .98 !important; }
+.sort-drag { cursor: grabbing !important; box-shadow: 0 14px 34px rgba(26,23,20,.22) !important; transition: none !important;
+             background: var(--card) !important; opacity: .98 !important; border-color: var(--brass) !important; }
 .sort-dropped { animation: sort-pulse .7s ease-out; }
 @keyframes sort-pulse { 0% { background: rgba(196,148,62,.22); } 100% { background: var(--card); } }
 .sort-board.dragging .sort-card:not(.sort-chosen):hover { box-shadow: none; }

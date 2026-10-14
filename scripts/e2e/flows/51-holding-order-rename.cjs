@@ -46,8 +46,11 @@ async function dragCard(page, from, to) {
   await page.mouse.down();
   for (let i = 1; i <= 16; i++) { await page.mouse.move(x, y0 + (y1 - y0) * i / 16, { steps: 2 }); await page.waitForTimeout(25); }
   await page.waitForTimeout(250);
+  // 松手前量一下「跟手」:浮起的那张卡应该和鼠标走一样远(v1.34 验收抓到过只走三分之一 —— 见 style.css .sort-drag 注释)
+  const cardY = await page.evaluate(() => { const g = document.querySelector('.sort-drag:not(.sort-ghost)'); if (!g) return null; const r = g.getBoundingClientRect(); return r.top + r.height / 2; });
   await page.mouse.up();
   await page.waitForTimeout(1200);   // 放下就保存(fetch)
+  return { mouseDy: Math.round(y1 - y0), cardDy: cardY == null ? null : Math.round(cardY - (a.y + a.height / 2)) };
 }
 /** 手机:长按拿起再拖(CDP 触摸事件 —— Playwright 没有触摸拖动的 API) */
 async function touchDrag(m, from, to) {
@@ -117,7 +120,9 @@ module.exports = {
     await ui.rendered('调整顺序页');
     await ui.sameSize('[data-sort-board] [data-sort-by]', '一键排法三个按钮同宽同高');
     const sortCard = (id) => `[data-sort-list] [data-sort-id="${id}"]`;
-    await dragCard(ui.page, sortCard(c), sortCard(a));
+    const follow = await dragCard(ui.page, sortCard(c), sortCard(a));
+    await ui.assert(follow.cardDy != null && Math.abs(follow.cardDy - follow.mouseDy) <= 4,
+      '拖动时浮起的卡片跟手(和鼠标走一样远)', `鼠标 ${follow.mouseDy}px · 卡片 ${follow.cardDy}px`);
     let shown = await rowIds(ui.page, '[data-sort-list] [data-sort-id]');
     await ui.assert(JSON.stringify(shown.slice(0, 3)) === JSON.stringify([c, a, b]), `按住「${state.names[c]}」拖到最前:其它卡片让开`, shown.join(','));
     let ts = await toastState(ui.page);
@@ -213,7 +218,9 @@ module.exports = {
     const grpIds = await ui.page.locator(g0).evaluate(g => [...g.querySelectorAll('[data-sort-id]')].map(e => Number(e.getAttribute('data-sort-id'))));
     await ui.assert(grpIds.length >= 3, '第一个成员组至少 3 个账户', grpIds.join(','));
     const [x0, x1, x2] = grpIds;
-    await dragCard(ui.page, `[data-sort-id="${x2}"]`, `[data-sort-id="${x0}"]`);
+    const follow2 = await dragCard(ui.page, `[data-sort-id="${x2}"]`, `[data-sort-id="${x0}"]`);
+    await ui.assert(follow2.cardDy != null && Math.abs(follow2.cardDy - follow2.mouseDy) <= 4,
+      '账户卡片拖动时也跟手', `鼠标 ${follow2.mouseDy}px · 卡片 ${follow2.cardDy}px`);
     const grpAfter = await ui.page.locator(g0).evaluate(g => [...g.querySelectorAll('[data-sort-id]')].map(e => Number(e.getAttribute('data-sort-id'))));
     await ui.assert(JSON.stringify(grpAfter.slice(0, 3)) === JSON.stringify([x2, x0, x1]), '组里第 3 个拖到最前', grpAfter.join(','));
     ts = await toastState(ui.page);
