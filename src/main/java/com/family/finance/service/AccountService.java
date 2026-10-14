@@ -49,6 +49,26 @@ public class AccountService {
         return accountMapper.findActiveByFamily(familyId);
     }
 
+    /**
+     * v1.34 · 账户簿「调整顺序」(拖拽):只收<b>全部在用账户的完整排列</b>,写显示顺序 10, 20, 30…
+     * (留间隔:编辑页「显示顺序」手填一个数也能插进两个之间)。少 / 多 / 重复 / 别家的 —— 整次拒绝,一行不写。
+     * 账户按成员分组显示,组内顺序就是这里的顺序;成员组的先后看组里第一个账户,所以拖完组的先后不变。
+     */
+    @org.springframework.transaction.annotation.Transactional
+    public void saveOrder(long familyId, List<Long> orderedIds) {
+        List<Account> active = accountMapper.findActiveByFamily(familyId);
+        java.util.Set<Long> want = active.stream().map(Account::getId).collect(Collectors.toSet());
+        java.util.Set<Long> got = new java.util.HashSet<>(orderedIds == null ? List.of() : orderedIds);
+        if (orderedIds == null || orderedIds.size() != active.size() || got.size() != orderedIds.size() || !got.equals(want)) {
+            throw new IllegalArgumentException("顺序和现在的账户对不上(可能刚有人加了或归档了一个)—— 请刷新页面再排一次");
+        }
+        for (int i = 0; i < orderedIds.size(); i++) {
+            if (accountMapper.updateDisplayOrder(familyId, orderedIds.get(i), (i + 1) * 10) != 1) {
+                throw new IllegalStateException("保存顺序没成功,整次已撤回");
+            }
+        }
+    }
+
     public List<AccountRow> listRows(long familyId, boolean includeArchived) {
         List<Account> accounts = includeArchived
                 ? accountMapper.findAllByFamily(familyId)

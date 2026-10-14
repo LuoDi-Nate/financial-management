@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<!--
+  v1.34 · issue #40 · 持仓「调整顺序」(PRD FR-1300 ~ 1303)
+
+  维护者验收后重做:拖拽排序(共用件 js/sort-board.js + SortableJS)。PC 按住卡片拖,其它卡片滑开让路;
+  手机长按拿起。每次放下就保存(提示条上能撤销);一键「按市值 / 名称 / 添加先后」同样立刻保存。
+  服务端只收「这个账户全部在用持仓的完整排列」(StockHoldingService.saveOrder)。
+-->
+<head th:replace="~{fragments/layout :: head('调整顺序 · ' + ${account.displayName})}"></head>
+<body class="min-h-screen relative">
+<div class="fixed top-0 left-0 right-0 h-1 bg-ink z-40"></div>
+<header th:replace="~{fragments/nav :: nav('accounts', ${me}, ${nav})}"></header>
+
+<main class="max-w-[820px] mx-auto px-4 sm:px-6 py-6 sm:py-10 relative z-10">
+  <div class="font-mono text-[10px] tracking-[0.18em] uppercase text-ink-subtle mb-4">
+    <a th:href="@{|/accounts/${account.id}/holdings|}" class="hover:text-ink no-underline">持仓管理</a>
+    <span class="mx-2 text-rule">/</span><span class="text-ink">调整顺序</span>
+  </div>
+
+  <!-- 标题行只放「标题 + 完成」,说明整行放下面:手机上说明不被「完成」挤窄,长账户名也不会把标题折成「…持仓顺 / 序」 -->
+  <div class="flex items-start justify-between gap-4">
+    <div class="min-w-0 flex-1">
+      <h1 class="font-display text-3xl font-medium tracking-tight">持仓顺序</h1>
+      <div class="sort-head-sub" th:text="${account.displayName} + ' · ' + ${#lists.size(holdings)} + ' 只持仓'">某券商账户 · 3 只持仓</div>
+    </div>
+    <a th:href="@{|/accounts/${account.id}/holdings|}" class="btn-ink text-xs no-underline whitespace-nowrap" data-ho-done>完成</a>
+  </div>
+  <p class="text-sm text-ink-soft mt-3 mb-5">按住一只拖到想要的位置,松手就保存(手机上长按拿起)。持仓页、填报页的股票收入、截图导入比对、资产打标都按这个顺序;之后新加的排在最后。</p>
+
+  <div class="sort-board" data-sort-board data-holding-order-board
+       th:attr="data-save-url=@{|/accounts/${account.id}/holdings/order/save|}">
+    <div class="sort-quick mb-3">
+      <span class="sort-quick-label">一键排</span>
+      <button type="button" class="btn-paper sort-quick-btn" data-sort-by="value">按市值从大到小</button>
+      <button type="button" class="btn-paper sort-quick-btn" data-sort-by="name">按名称</button>
+      <button type="button" class="btn-paper sort-quick-btn" data-sort-by="id">按添加先后</button>
+    </div>
+    <div class="sort-list" data-sort-list>
+      <div th:each="h : ${holdings}" class="sort-card" tabindex="0" data-ho-row
+           th:attr="data-sort-id=${h.id}, data-id=${h.id}, data-sort-name=${h.displayName}, data-sort-value=${values.get(h.id) != null ? values.get(h.id) : 0}">
+        <span class="sort-grip" aria-hidden="true">
+          <svg width="12" height="18" viewBox="0 0 12 18" fill="currentColor"><circle cx="3" cy="3" r="1.6"/><circle cx="9" cy="3" r="1.6"/><circle cx="3" cy="9" r="1.6"/><circle cx="9" cy="9" r="1.6"/><circle cx="3" cy="15" r="1.6"/><circle cx="9" cy="15" r="1.6"/></svg>
+        </span>
+        <span class="sort-idx" data-sort-index>1</span>
+        <span class="sort-main">
+          <span class="sort-name" th:text="${h.displayName}">样例指数 ETF</span>
+          <span class="sort-sub"
+                th:text="${h.valuationMode.name() == 'CASH'} ? ('账户内现金' + (${h.currency} != null ? ' · ' + ${h.currency} : ''))
+                       : (${h.navRow} ? ${h.fundCode} + ' · 净值'
+                       : (${h.ticker} != null ? ${h.ticker} + (${h.market} != null ? ' · ' + ${h.market} : '') : '手填市值'))">510300 · CN</span>
+        </span>
+        <span class="sort-val" data-priv
+              th:text="${account.currency} + ' ' + ${#numbers.formatInteger(values.get(h.id) != null ? values.get(h.id) : 0, 0, 'COMMA')}">CNY 96,500</span>
+      </div>
+    </div>
+    <p class="font-mono text-[10.5px] text-ink-subtle mt-3">键盘:选中一行按 Alt + ↑ / ↓ 也能移动。</p>
+  </div>
+</main>
+
+<div class="sort-toast" data-sort-toast role="status" aria-live="polite">
+  <span data-sort-toast-text>已保存顺序</span>
+  <button type="button" data-sort-undo hidden>撤销</button>
+</div>
+
+<script th:src="@{/vendor/Sortable.min.js(v=${buildVersion})}"></script>
+<script th:src="@{/js/sort-board.js(v=${buildVersion})}"></script>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

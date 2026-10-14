@@ -2913,3 +2913,91 @@ body.adm-open #float-dock { display: none !important; }
   .adel .acts { flex-direction: column; align-items: stretch; }
   .adel .del, .adel .del-nobk, .adel .cancel { text-align: center; min-height: 40px; }
 }
+
+/* ── 危险操作区(账户编辑页 · v1.34 重做)──
+   每行「名称 + 说明 | 右边按钮」:grid 两列,说明永远从同一列起;按钮同宽同高(并列同类元素同尺寸)。
+   手机上按钮整行放在说明下面。 */
+.danger-zone { padding: 0; border-color: var(--rust); overflow: hidden; }
+.danger-zone-title { font-family: 'Fraunces', 'Noto Serif SC', serif; font-size: 17px; color: var(--rust);
+                     padding: 14px 20px; border-bottom: 1px solid rgba(156,74,42,.25); background: rgba(156,74,42,.04); }
+.danger-zone-row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 16px; padding: 14px 20px; }
+.danger-zone-row + .danger-zone-row { border-top: 1px solid var(--rule-soft); }
+.danger-zone-name { font-size: 14px; font-weight: 600; color: var(--ink); }
+.danger-zone-desc { font-size: 12.5px; color: var(--ink-soft); margin-top: 3px; line-height: 1.6; }
+.danger-zone-btn { display: inline-flex; align-items: center; justify-content: center; width: 7.5rem; height: 36px;
+                   font-size: 13px; letter-spacing: .08em; border: 1px solid var(--rust); color: var(--rust);
+                   background: var(--card); cursor: pointer; }
+.danger-zone-btn:hover { background: rgba(156,74,42,.06); }
+.danger-zone-red { background: var(--rust); color: #fff; }
+.danger-zone-red:hover { background: #8a3f22; }
+@media (max-width: 767.98px) {
+  .danger-zone-row { grid-template-columns: 1fr; gap: 10px; }
+  .danger-zone-row form, .danger-zone-btn { width: 100%; }
+  .danger-zone-btn { height: 42px; }
+}
+
+
+/* ── 拖拽排序板(v1.34 · 持仓顺序 / 账户顺序 · js/sort-board.js)──
+   一张卡一行:左边抓手 + 名字,右边数值;按住拖,卡片浮起跟着走,原位留虚线空位,其它卡片滑开让路。 */
+.sort-board { position: relative; }
+.sort-list { display: flex; flex-direction: column; gap: 8px; }
+.sort-card { display: grid; grid-template-columns: 22px 26px 1fr auto; align-items: center; gap: 10px;
+             background: var(--card); border: 1px solid var(--rule); padding: 12px 16px; cursor: grab;
+             user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+             transition: box-shadow .15s, border-color .15s; }
+.sort-card:hover { border-color: var(--ink-subtle); box-shadow: 0 2px 10px rgba(26,23,20,.06); }
+.sort-card:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+.sort-grip { color: var(--ink-subtle); display: inline-flex; }
+.sort-card:hover .sort-grip { color: var(--ink); }
+.sort-idx { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--ink-subtle); text-align: right; }
+.sort-main { display: flex; flex-direction: column; min-width: 0; }
+.sort-name { font-family: 'Noto Serif SC', serif; font-size: 15px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sort-sub { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: var(--ink-subtle); margin-top: 2px; }
+.sort-val { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--ink-soft); white-space: nowrap; }
+/* 拖动时:原位置 = 虚线空位;跟手的那张 = 浮起 + 阴影。
+   跟手的那张**不许有 transform 过渡、也不许自带 transform**:SortableJS 每次移动先读它当前的 transform 矩阵再加上位移,
+   有过渡时读到的是动画走到一半的值,差额一路累积 —— 鼠标移 246px 卡只跟 99px(维护者验收:「鼠标移动的像素很少,拖不到别的卡上」)。
+   旋转 / 放大同理会被并进矩阵,一并不用,浮起感只靠阴影。e2e flow 51 量「卡片跟手」。 */
+.sort-ghost { background: rgba(196,148,62,.06) !important; border: 1px dashed var(--brass) !important; box-shadow: none !important; }
+.sort-ghost > * { visibility: hidden; }
+.sort-chosen { border-color: var(--brass); }
+.sort-drag { cursor: grabbing !important; box-shadow: 0 14px 34px rgba(26,23,20,.22) !important; transition: none !important;
+             background: var(--card) !important; opacity: .98 !important; border-color: var(--brass) !important; }
+.sort-dropped { animation: sort-pulse .7s ease-out; }
+@keyframes sort-pulse { 0% { background: rgba(196,148,62,.22); } 100% { background: var(--card); } }
+.sort-board.dragging .sort-card:not(.sort-chosen):hover { box-shadow: none; }
+.sort-board.saving { opacity: .92; }
+.sort-group + .sort-group { margin-top: 22px; }
+.sort-group-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 13px; color: var(--ink-soft); }
+.sort-head-sub { font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .06em; color: var(--ink-subtle); margin-top: 6px;
+                 overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 一键排法:三个按钮同宽同高(并列同类元素同尺寸 · visual-spec「操作行 / 按钮组」)*/
+.sort-quick { display: grid; grid-template-columns: auto repeat(3, 9.5rem); gap: 8px; align-items: center; justify-content: start; }
+.sort-quick-label { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: .14em; color: var(--ink-subtle); margin-right: 4px; }
+.sort-quick-btn { justify-content: center; height: 38px; padding: 0 8px; letter-spacing: .06em; white-space: nowrap; }
+/* 底部提示条:已保存 · 撤销 */
+.sort-toast { position: fixed; left: 50%; bottom: 28px; transform: translate(-50%, 20px); opacity: 0; pointer-events: none;
+              background: var(--ink); color: var(--paper); padding: 10px 14px 10px 16px; display: flex; align-items: center; gap: 14px;
+              font-size: 13px; box-shadow: 0 10px 28px rgba(26,23,20,.25); transition: opacity .2s, transform .2s; z-index: 60; }
+.sort-toast.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+.sort-toast.bad { background: var(--rust); }
+.sort-toast button { color: var(--brass); background: none; border: 0; font-size: 13px; cursor: pointer; padding: 2px 4px; text-decoration: underline; }
+@media (max-width: 767.98px) {
+  .sort-card { grid-template-columns: 18px 1fr auto; padding: 14px 12px; }
+  .sort-idx { display: none; }
+  .sort-name { font-size: 15px; }
+  .sort-val { font-size: 12px; }
+  .sort-toast { bottom: 18px; width: calc(100% - 32px); justify-content: space-between; }
+  .sort-quick { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .sort-quick-label { grid-column: 1 / -1; }
+  .sort-quick-btn { height: 42px; padding: 0 4px; letter-spacing: 0; }
+}
+
+/* ── 账户簿页头四个按钮(v1.34)──
+   手机上一行四等分、同宽同高(并列同类元素同尺寸);字号收小、字距归零、「(开向导)」不显示。PC 照旧。 */
+@media (max-width: 767.98px) {
+  .acct-actions[data-acct-actions] { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; width: 100%; }   /* 带属性提高权重:元素上的 Tailwind .flex 是运行时注入、排在 style.css 后面 */
+  .acct-actions > a { justify-content: center; height: 38px; padding: 0 2px; font-size: calc(11.5px * var(--fs-scale,1)); letter-spacing: 0; gap: 3px; }
+  .acct-actions > a svg { width: 11px; height: 11px; flex: none; }
+  .acct-actions-long { display: none; }
+}

@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>v1.34 Preview · 持仓调整顺序</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..700&family=JetBrains+Mono:wght@300;400;500&family=Noto+Serif+SC:wght@300;400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/style.css">
+<style>
+  body{background:var(--paper-deep);margin:0}
+  .wrap{max-width:1300px;margin:0 auto;padding:28px 20px 80px;position:relative;z-index:2}
+  .mono{font-family:'JetBrains Mono',monospace;font-feature-settings:"tnum" 1}
+  .serif{font-family:'Fraunces','Noto Serif SC',serif}
+  h1,h2,h3{font-family:'Fraunces','Noto Serif SC',serif;font-weight:500;margin:0}
+  .note{font-size:12.5px;color:var(--ink-soft);line-height:1.8}
+  .zone{margin-top:44px}
+  .zone-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+  .zone-no{font-family:'JetBrains Mono',monospace;font-size:18px;color:var(--paper);background:var(--brass-deep);line-height:1;padding:5px 10px}
+  .zone-t{font-family:'Fraunces','Noto Serif SC',serif;font-size:21px}
+  .zone-fr{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink-subtle);letter-spacing:.06em}
+  .zone-line{height:2px;background:var(--brass-deep);opacity:.35;margin:10px 0 16px}
+  .row{display:flex;gap:26px;flex-wrap:wrap;align-items:flex-start}
+  .cap{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.12em;color:var(--forest);margin-top:8px}
+  .side{max-width:330px;font-size:12.5px;line-height:1.85;color:var(--ink-soft)}
+  .side b{color:var(--ink)}
+  .btn-ink{background:var(--ink);color:var(--paper);border:1px solid var(--ink);padding:6px 12px;font-size:12px;white-space:nowrap;display:inline-flex;align-items:center;gap:5px}
+  .btn-paper{background:transparent;color:var(--ink);border:1px solid var(--ink);padding:5px 11px;font-size:12px;white-space:nowrap;display:inline-flex;align-items:center}
+  .btn-ghost{background:transparent;color:var(--ink-soft);border:1px solid var(--rule);padding:5px 10px;font-size:12px;white-space:nowrap}
+  .page{width:860px;border:1px solid var(--rule);background:var(--paper);padding:18px 20px}
+  .hcard{border:1px solid var(--rule);background:var(--card);padding:12px 16px;margin-top:10px;display:flex;align-items:center;gap:14px}
+  .hcard .nm{font-family:'Fraunces','Noto Serif SC',serif;font-size:16px;flex:1}
+  .tag{font-family:'JetBrains Mono',monospace;font-size:10px;padding:1px 7px;border:1px solid var(--rule);color:var(--ink-soft)}
+  .amt{font-family:'JetBrains Mono',monospace;font-size:15px}
+  .ord{border:1px solid var(--ink);background:var(--card)}
+  .ord-h{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--rule);flex-wrap:wrap;background:rgba(176,134,66,.07)}
+  .ord-r{display:grid;grid-template-columns:28px 1fr 120px auto;align-items:center;gap:12px;padding:9px 14px;border-bottom:1px solid var(--rule-soft)}
+  .ord-r .no{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink-subtle)}
+  .ord-r .nm{font-family:'Fraunces','Noto Serif SC',serif;font-size:15px}
+  .ord-r .sub{font-size:11px;color:var(--ink-subtle);font-family:'JetBrains Mono',monospace}
+  .mv{display:flex;gap:6px}
+  .mv span{border:1px solid var(--rule);padding:3px 9px;font-size:13px;background:var(--paper)}
+  .moved{background:rgba(176,134,66,.10)}
+  .ord-f{display:flex;gap:10px;justify-content:flex-end;padding:12px 14px}
+  .phone{width:390px;height:844px;border:12px solid #111;border-radius:46px;background:var(--paper);position:relative;overflow:hidden;box-shadow:0 18px 40px -18px rgba(0,0,0,.45)}
+  .phone::before{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:120px;height:26px;background:#111;border-radius:0 0 16px 16px;z-index:5}
+  .screen{position:absolute;inset:0;padding:40px 12px 0;overflow:hidden}
+  .m-r{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;padding:10px 12px;border-bottom:1px solid var(--rule-soft)}
+  .m-r .mv span{min-width:40px;min-height:36px;display:inline-flex;align-items:center;justify-content:center;font-size:15px}
+  .flash{border-left:2px solid var(--forest);background:rgba(79,107,71,.07);padding:7px 12px;font-size:12.5px;margin-bottom:10px}
+  ul.where{font-size:13px;line-height:2}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">v1.34 · preview · 持仓调整顺序(issue #40)· 名称与金额均为样例</div>
+  <h1 style="font-size:32px;margin-top:6px">账户里的持仓,按平台 App 的顺序排</h1>
+  <p class="note" style="max-width:900px;margin-top:8px">今天持仓一律按添加先后排。每月对着平台 App 核对时,两边顺序不一样就得来回找。本版:持仓管理页「调整顺序」→ 上下移 / 置顶 / 一键按市值 → 保存;同一个顺序用在所有列出这个账户持仓的地方。</p>
+
+  <section class="zone">
+    <div class="zone-head"><span class="zone-no">1</span><span class="zone-t">持仓管理页:多一个「调整顺序」</span><span class="zone-fr">FR-1300</span></div>
+    <div class="zone-line"></div>
+    <div class="row">
+      <div>
+        <div class="page">
+          <div style="display:flex;align-items:baseline;gap:12px"><span class="serif" style="font-size:22px">某券商账户 · 持仓</span><span style="flex:1"></span><span class="btn-paper">调整顺序</span><span class="btn-ink">+ 添加持仓</span></div>
+          <div class="hcard"><span class="nm">样例科技</span><span class="tag">AUTO · US</span><span class="amt">¥48,200</span></div>
+          <div class="hcard"><span class="nm">样例指数 ETF</span><span class="tag">AUTO · CN</span><span class="amt">¥96,500</span></div>
+          <div class="hcard"><span class="nm">样例混合基金</span><span class="tag">净值</span><span class="amt">¥31,800</span></div>
+          <div class="hcard"><span class="nm">券商现金</span><span class="tag">CASH</span><span class="amt">¥5,120</span></div>
+        </div>
+        <div class="cap">今天:按添加先后(和平台对不上)· 持仓少于 2 只时不出现这个按钮</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="zone">
+    <div class="zone-head"><span class="zone-no">2</span><span class="zone-t">排序状态(PC):一行一只 · ↑ ↓ 置顶 · 一键排法</span><span class="zone-fr">FR-1301 · 1302</span></div>
+    <div class="zone-line"></div>
+    <div class="row">
+      <div>
+        <div class="ord" style="width:860px">
+          <div class="ord-h"><span class="serif" style="font-size:16px">调整顺序</span><span style="flex:1"></span><span class="btn-ghost">按市值从大到小</span><span class="btn-ghost">按名称</span><span class="btn-ghost">按添加先后</span></div>
+          <div class="ord-r moved"><span class="no">1</span><span><span class="nm">样例指数 ETF</span><br><span class="sub">510300 · CN</span></span><span class="amt">¥96,500</span><span class="mv"><span>↑</span><span>↓</span><span>置顶</span></span></div>
+          <div class="ord-r"><span class="no">2</span><span><span class="nm">样例科技</span><br><span class="sub">SAMPLE · US</span></span><span class="amt">¥48,200</span><span class="mv"><span>↑</span><span>↓</span><span>置顶</span></span></div>
+          <div class="ord-r"><span class="no">3</span><span><span class="nm">样例混合基金</span><br><span class="sub">000000 · 净值</span></span><span class="amt">¥31,800</span><span class="mv"><span>↑</span><span>↓</span><span>置顶</span></span></div>
+          <div class="ord-r"><span class="no">4</span><span><span class="nm">券商现金</span><br><span class="sub">CASH</span></span><span class="amt">¥5,120</span><span class="mv"><span>↑</span><span>↓</span><span>置顶</span></span></div>
+          <div class="ord-f"><span class="btn-ghost">取消</span><span class="btn-ink">保存顺序</span></div>
+        </div>
+        <div class="cap">刚移动过的那行浅底提示 · 保存后回到正常页面并提示「已保存顺序」</div>
+      </div>
+      <div class="side"><ul>
+        <li><b>不做「每次自动按市值排」</b>:市值天天变、顺序跟着跳,和对着平台一行行看反而对不上。要按市值就点一次再保存。</li>
+        <li><b>不做拖拽</b>:手机上长列表拖拽容易误操作。</li>
+        <li>保存只接受这个账户全部在用持仓的完整顺序 —— 少一只、多一只都不收。</li>
+      </ul></div>
+    </div>
+  </section>
+
+  <section class="zone">
+    <div class="zone-head"><span class="zone-no">3</span><span class="zone-t">手机:同样一行一只,按钮够大</span><span class="zone-fr">FR-1303</span></div>
+    <div class="zone-line"></div>
+    <div class="row">
+      <div class="phone"><div class="screen">
+        <div class="serif" style="font-size:19px;margin-bottom:8px">调整顺序</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px"><span class="btn-ghost">按市值从大到小</span><span class="btn-ghost">按名称</span><span class="btn-ghost">按添加先后</span></div>
+        <div style="border:1px solid var(--ink);background:var(--card)">
+          <div class="m-r moved"><span><span class="serif" style="font-size:15px">样例指数 ETF</span><br><span class="mono" style="font-size:11px;color:var(--ink-subtle)">¥96,500</span></span><span class="mv"><span>↑</span><span>↓</span></span></div>
+          <div class="m-r"><span><span class="serif" style="font-size:15px">样例科技</span><br><span class="mono" style="font-size:11px;color:var(--ink-subtle)">¥48,200</span></span><span class="mv"><span>↑</span><span>↓</span></span></div>
+          <div class="m-r"><span><span class="serif" style="font-size:15px">样例混合基金</span><br><span class="mono" style="font-size:11px;color:var(--ink-subtle)">¥31,800</span></span><span class="mv"><span>↑</span><span>↓</span></span></div>
+          <div class="m-r"><span><span class="serif" style="font-size:15px">券商现金</span><br><span class="mono" style="font-size:11px;color:var(--ink-subtle)">¥5,120</span></span><span class="mv"><span>↑</span><span>↓</span></span></div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:12px"><span class="btn-ghost" style="flex:1;justify-content:center;display:inline-flex;min-height:38px;align-items:center">取消</span><span class="btn-ink" style="flex:1;justify-content:center;min-height:38px">保存顺序</span></div>
+      </div></div>
+      <div class="phone"><div class="screen">
+        <div class="flash">已保存顺序 —— 填报页、截图导入也按这个顺序列</div>
+        <div class="serif" style="font-size:19px;margin-bottom:8px">某券商账户 · 持仓</div>
+        <div class="hcard" style="margin-top:6px"><span class="nm">样例指数 ETF</span><span class="amt">¥96,500</span></div>
+        <div class="hcard"><span class="nm">样例科技</span><span class="amt">¥48,200</span></div>
+        <div class="hcard"><span class="nm">样例混合基金</span><span class="amt">¥31,800</span></div>
+        <div class="hcard"><span class="nm">券商现金</span><span class="amt">¥5,120</span></div>
+      </div></div>
+    </div>
+  </section>
+
+  <section class="zone">
+    <div class="zone-head"><span class="zone-no">4</span><span class="zone-t">同一个顺序在哪儿生效</span><span class="zone-fr">FR-1310 ~ 1313</span></div>
+    <div class="zone-line"></div>
+    <ul class="where">
+      <li>持仓管理页(账户 → 持仓管理)</li>
+      <li>填报页「股票收入」选账户后联动出的持仓</li>
+      <li>截图导入比对页的「旧持仓」一侧</li>
+      <li>资产打标页按账户分的持仓</li>
+      <li style="color:var(--ink-subtle)">已归档的持仓不参与排序;之后新加的(手动 / 截图导入 / 券商同步)排在最后;从没调过的账户和今天完全一样</li>
+    </ul>
+  </section>
+</div>
+</body>
+</html>

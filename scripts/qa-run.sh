@@ -3215,10 +3215,11 @@ RM_BBX="$(grep -oE '[0-9]+ 黑盒回归' "$RD/README.md" | head -1 | grep -oE '[
 { ! grep -q '<your-org>' "$RD/README.md" \
   && [ -n "$RM_TST" ] && [ "$RM_TST" -ge 289 ] \
   && [ -n "$RM_BBX" ] && [ "$RM_BBX" -ge 412 ] \
-  && ! grep -q '244 单元' "$RD/README.md"; } \
+  && ! grep -qE '(^|[^0-9])244 单元' "$RD/README.md"; } \
   && log_ok "v07-CLEAN-2 README 无 <your-org> 占位符 + 测试数自洽($RM_TST 单元 / $RM_BBX 黑盒 · 只增不减)" \
   || log_bad "v07-CLEAN-2 README 仍有占位符或测试数不一致" "README 需写明「N 单元 / N 黑盒回归」且不小于历史基线(289/412)"
 
+#   v1.34 · 「不许出现 244 单元」守的是某个老版本的陈旧数字;单测涨到 1244 时被子串误伤 —— 改成整数匹配
 section "v0.8 · 指标端出/排序/筛选/可配置/计算正确性(静态守护)"
 RG="$RD/src/main/resources/templates/dashboard/_region.html"
 FVI="$RD/src/main/java/com/family/finance/factview/FactViewServiceImpl.java"
@@ -11621,6 +11622,57 @@ QA133_EC="$RD/src/main/java/com/family/finance/web/entry/EntryController.java"
 [ -f "$RD/scripts/e2e/flows/49-account-delete.cjs" ] \
   && log_ok "v133-E2E(flow 49:删除 → 对方改记 → 报表留痕 → 恢复 → 彻底清除 → 手机,页面 + 库两层)" || log_bad "v133-E2E 缺 flow 49" "scripts/e2e/flows/49-account-delete.cjs"
 
+
+# ── v1.34 · issue #40 持仓调整顺序 + issue #41 持仓改名(prd/v1.34.md · tech-design/v1.34.md)──
+section "v1.34 · 持仓调整顺序(#40)+ 持仓改名(#41)"
+QA134_MP="$RD/src/main/java/com/family/finance/repository/StockHoldingMapper.java"
+QA134_SVC="$RD/src/main/java/com/family/finance/service/stock/StockHoldingService.java"
+QA134_CTL="$RD/src/main/java/com/family/finance/web/stock/StockHoldingController.java"
+# ① 列账户持仓的两条查询共用一个排序规则(空排后、再按添加先后)—— 四处展示同一个顺序
+{ grep -q 'String ACCOUNT_ORDER = " (h.sort_order IS NULL), h.sort_order, h.id";' "$QA134_MP" \
+  && [ "$(grep -c 'ORDER BY" + ACCOUNT_ORDER)' "$QA134_MP")" -eq 1 ] \
+  && grep -q 'ORDER BY h.archived_at IS NULL DESC," + ACCOUNT_ORDER)' "$QA134_MP" \
+  && grep -qh 'ADD COLUMN sort_order INT NULL' "$RD"/db/migration/V73__*.sql; } \
+  && log_ok "v134-ORDER-ONE-KEY(按账户取持仓的两条查询共用 ACCOUNT_ORDER · 没排过 = 按添加先后 · 新加的排最后)" \
+  || log_bad "v134-ORDER-ONE-KEY 持仓顺序有了第二套规则(某一处会和别处不一样)" "see StockHoldingMapper.ACCOUNT_ORDER"
+# ② 保存只收完整排列(少 / 多 / 重复 / 别的账户 → 整次拒绝)
+QA134_SAVE="$(awk '/public void saveOrder\(/{f=1} f{print} f&&/^    }$/{exit}' "$QA134_SVC")"
+{ grep -q 'got.equals(want)' <<<"$QA134_SAVE" && grep -q 'orderedIds.size() != active.size()' <<<"$QA134_SAVE" \
+  && grep -q 'saveOrder_onlyAcceptsTheFullPermutation' "$RD/src/test/java/com/family/finance/service/stock/HoldingOrderRenameTest.java"; } \
+  && log_ok "v134-ORDER-FULL-PERMUTATION(保存顺序只收这个账户全部在用持仓的完整排列 · 单测钉住)" \
+  || log_bad "v134-ORDER-FULL-PERMUTATION 保存顺序可能出现空洞或排进别的账户的持仓" "see StockHoldingService.saveOrder"
+# ③ 改名只写名字这一列,改完清透视缓存
+{ grep -A3 'int updateDisplayName' "$QA134_MP" >/dev/null && grep -B4 'int updateDisplayName' "$QA134_MP" | grep -q 'SET h.display_name = #{name}"' \
+  && ! grep -B4 'int updateDisplayName' "$QA134_MP" | grep -q 'h.shares\|h.manual_value' \
+  && grep -q 'holdingService.rename(' "$QA134_CTL" \
+  && grep -A8 'holdingService.rename(' "$QA134_CTL" | grep -q 'lensQueryService.evict'; } \
+  && log_ok "v134-RENAME-NAME-ONLY(改名走只写 display_name 的专用语句 · 不覆盖份额 / 估值 · 改完清透视缓存)" \
+  || log_bad "v134-RENAME-NAME-ONLY 改名可能覆盖别的列,或透视里还是旧名字" "see StockHoldingMapper.updateDisplayName · StockHoldingController.rename"
+# ④ 账户顺序同样只收完整排列(全部在用账户)· 写 10 / 20 / 30 留间隔给编辑页手填
+QA134_ASVC="$RD/src/main/java/com/family/finance/service/AccountService.java"
+QA134_ASAVE="$(awk '/public void saveOrder\(/{f=1} f{print} f&&/^    }$/{exit}' "$QA134_ASVC")"
+{ grep -q 'findActiveByFamily(familyId)' <<<"$QA134_ASAVE" && grep -q '!got.equals(want)' <<<"$QA134_ASAVE" \
+  && grep -q '(i + 1) \* 10' <<<"$QA134_ASAVE" \
+  && grep -q 'family_id = #{familyId} AND id = #{id} AND archived_at IS NULL' "$RD/src/main/java/com/family/finance/repository/AccountMapper.java" \
+  && grep -q 'onlyTheFullPermutationOfActiveAccounts' "$RD/src/test/java/com/family/finance/service/AccountOrderTest.java"; } \
+  && log_ok "v134-ACCOUNT-ORDER-FULL-PERMUTATION(账户顺序只收全部在用账户的完整排列 · 带 family_id · 单测钉住)" \
+  || log_bad "v134-ACCOUNT-ORDER-FULL-PERMUTATION 账户顺序可能出现空洞、排进别家的账户或归档账户" "see AccountService.saveOrder"
+# ⑤ 两个排序页共用一个拖拽件(维护者 2026-10-13:↑ ↓ 太丑 → 拖拽、其它卡片让路、手机长按)
+QA134_SB="$RD/src/main/resources/static/js/sort-board.js"
+{ head -c 80 "$RD/src/main/resources/static/vendor/Sortable.min.js" | grep -q 'Sortable 1.15.7 - MIT' \
+  && grep -q 'forceFallback: true' "$QA134_SB" && grep -q 'delayOnTouchOnly: true' "$QA134_SB" && grep -q 'animation: 220' "$QA134_SB" \
+  && grep -q 'data-sort-undo' "$QA134_SB" \
+  && ( for t in stock/holding-order accounts/order; do f="$RD/src/main/resources/templates/$t.html"; \
+       grep -q 'data-sort-board' "$f" && grep -q '/vendor/Sortable.min.js' "$f" && grep -q '/js/sort-board.js' "$f" || exit 1; done ) \
+  && ! grep -rqE 'data-ho-(up|down|top|save)' "$RD/src/main/resources/templates" \
+  && ! grep -A2 '^\.sort-drag {' "$RD/src/main/resources/static/css/style.css" | grep -qE '(^|[ ;{])transform:' \
+  && grep -A2 '^\.sort-drag {' "$RD/src/main/resources/static/css/style.css" | grep -q 'transition: none !important' \
+  && ! grep -A3 '^\.sort-card {' "$RD/src/main/resources/static/css/style.css" | grep 'transition:' | grep -q 'transform'; } \
+  && log_ok "v134-SORT-BOARD-SHARED(持仓 / 账户两个排序页共用 sort-board.js + SortableJS · 拖拽让路 · 手机长按 · 能撤销 · 旧 ↑ ↓ 按钮已清 · 跟手的卡不带 transform / 过渡)" \
+  || log_bad "v134-SORT-BOARD-SHARED 排序页没走共用拖拽件(或旧 ↑ ↓ 按钮还在 / 跟手的卡又带了 transform 过渡 —— 卡片会只跟鼠标走三分之一)" "see static/js/sort-board.js · style.css .sort-drag"
+[ -f "$RD/scripts/e2e/flows/51-holding-order-rename.cjs" ] && grep -q 'touchDrag' "$RD/scripts/e2e/flows/51-holding-order-rename.cjs" \
+  && grep -q 'data-account-order' "$RD/scripts/e2e/flows/51-holding-order-rename.cjs" \
+  && log_ok "v134-E2E(flow 51:鼠标拖拽 → 撤销 → 四处一致 → 新加的在最后 → 改名 → 账户顺序拖拽 → 手机长按拖)" || log_bad "v134-E2E 缺 flow 51(或没覆盖拖拽 / 账户顺序 / 手机)" "scripts/e2e/flows/51-holding-order-rename.cjs"
 echo
 echo "═══════════════════════════════════════"
 echo " 总结: PASS=$PASS  FAIL=$FAIL  SKIP=$SKIP"

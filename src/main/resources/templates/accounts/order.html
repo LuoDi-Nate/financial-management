@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<!--
+  v1.34 · 账户簿「调整顺序」(维护者 2026-10-13:「账户也要用类似的逻辑,支持可视化的排序」)
+
+  和持仓顺序同一个共用件(js/sort-board.js):按住拖、其它卡片让路、松手就保存、能撤销。
+  账户按成员分组显示,组内拖;不能拖到别的成员组(那是改主理人,不是排序)。
+  保存写 account.display_order(10, 20, 30…),账户簿、填报页、仪表盘本来就按它排。
+-->
+<head th:replace="~{fragments/layout :: head('调整账户顺序 · 家庭账房')}"></head>
+<body class="min-h-screen relative">
+<div class="fixed top-0 left-0 right-0 h-1 bg-ink z-40"></div>
+<header th:replace="~{fragments/nav :: nav('accounts', ${me}, ${nav})}"></header>
+
+<main class="max-w-[820px] mx-auto px-4 sm:px-6 py-6 sm:py-10 relative z-10">
+  <div class="font-mono text-[10px] tracking-[0.18em] uppercase text-ink-subtle mb-4">
+    <a th:href="@{/accounts}" class="hover:text-ink no-underline">账户簿</a>
+    <span class="mx-2 text-rule">/</span><span class="text-ink">调整顺序</span>
+  </div>
+
+  <!-- 标题行只放「标题 + 完成」,说明整行放下面(手机上不被「完成」挤窄)—— 和持仓顺序页同一个版式 -->
+  <div class="flex items-start justify-between gap-4">
+    <div class="min-w-0 flex-1">
+      <h1 class="font-display text-3xl font-medium tracking-tight">账户顺序</h1>
+      <div class="sort-head-sub" th:text="${total} + ' 个在用账户 · 按成员分组'">21 个在用账户 · 按成员分组</div>
+    </div>
+    <a th:href="@{/accounts}" class="btn-ink text-xs no-underline whitespace-nowrap" data-ao-done>完成</a>
+  </div>
+  <p class="text-sm text-ink-soft mt-3 mb-5">按住一个账户拖到想要的位置,松手就保存(手机上长按拿起)。账户簿、填报页、仪表盘都按这个顺序;只能在同一个成员的组里排。</p>
+
+  <div class="sort-board" data-sort-board data-account-order-board th:attr="data-save-url=@{/accounts/order/save}">
+    <div class="sort-quick mb-4">
+      <span class="sort-quick-label">每组一键排</span>
+      <button type="button" class="btn-paper sort-quick-btn" data-sort-by="type">按类型</button>
+      <button type="button" class="btn-paper sort-quick-btn" data-sort-by="name">按名称</button>
+      <button type="button" class="btn-paper sort-quick-btn" data-sort-by="id">按添加先后</button>
+    </div>
+    <section th:each="group : ${ownerGroups}" class="sort-group" data-ao-group>
+      <div class="sort-group-head">
+        <span th:classappend="'avatar-' + ${ownerColorMap.get(group.key) % 5}"
+              class="inline-flex w-5 h-5 rounded-full text-paper items-center justify-center text-[10px] font-display"
+              th:text="${#strings.substring(group.key, 0, 1)}">迪</span>
+        <span class="font-mono text-[11px]" th:text="${group.key} + ' · ' + ${#lists.size(group.value)} + ' 个账户'">迪娃 · 6 个账户</span>
+      </div>
+      <div class="sort-list" data-sort-list>
+        <div th:each="row : ${group.value}" class="sort-card" tabindex="0" data-ao-row
+             th:attr="data-sort-id=${row.account.id}, data-sort-name=${row.account.displayName}, data-sort-type=${row.account.type.ordinal()}">
+          <span class="sort-grip" aria-hidden="true">
+            <svg width="12" height="18" viewBox="0 0 12 18" fill="currentColor"><circle cx="3" cy="3" r="1.6"/><circle cx="9" cy="3" r="1.6"/><circle cx="3" cy="9" r="1.6"/><circle cx="9" cy="9" r="1.6"/><circle cx="3" cy="15" r="1.6"/><circle cx="9" cy="15" r="1.6"/></svg>
+          </span>
+          <span class="sort-idx" data-sort-index>1</span>
+          <span class="sort-main">
+            <span class="sort-name" th:text="${row.account.displayName}">招行储蓄卡-工资</span>
+            <span class="sort-sub" th:text="${row.account.type.label} + ' · ' + ${row.account.currency}">现金 · CNY</span>
+          </span>
+          <span class="sort-val" data-priv th:text="${row.balanceLabel}">¥12,000</span>
+        </div>
+      </div>
+    </section>
+    <p class="font-mono text-[10.5px] text-ink-subtle mt-4">键盘:选中一行按 Alt + ↑ / ↓ 也能移动。已归档的账户不在这里(账户簿勾「显示已归档」能看到)。</p>
+  </div>
+</main>
+
+<div class="sort-toast" data-sort-toast role="status" aria-live="polite">
+  <span data-sort-toast-text>已保存顺序</span>
+  <button type="button" data-sort-undo hidden>撤销</button>
+</div>
+
+<script th:src="@{/vendor/Sortable.min.js(v=${buildVersion})}"></script>
+<script th:src="@{/js/sort-board.js(v=${buildVersion})}"></script>
+<footer th:replace="~{fragments/layout :: footer}"></footer>
+</body>
+</html>

@@ -81,6 +81,35 @@ public class AccountController {
         return "accounts/index";
     }
 
+    /** v1.34 · 账户簿「调整顺序」:按成员分组,组内拖拽(js/sort-board.js);每次放下就保存 */
+    @GetMapping("/order")
+    public String orderPage(@AuthenticationPrincipal MemberPrincipal me, Model model) {
+        model.addAttribute("me", me);
+        model.addAttribute("nav", navService.load(me));
+        var rows = accountService.listRows(me.getFamilyId(), false);
+        var ownerGroups = rows.stream().collect(java.util.stream.Collectors.groupingBy(
+                r -> r.ownerName() == null ? "共同" : r.ownerName(), java.util.LinkedHashMap::new, java.util.stream.Collectors.toList()));
+        model.addAttribute("ownerGroups", ownerGroups);
+        var ownerColorMap = new java.util.LinkedHashMap<String, Integer>();
+        int colorIdx = 0;
+        for (String key : ownerGroups.keySet()) ownerColorMap.put(key, colorIdx++);
+        model.addAttribute("ownerColorMap", ownerColorMap);
+        model.addAttribute("total", rows.size());
+        return "accounts/order";
+    }
+
+    @PostMapping(value = "/order/save", produces = "application/json")
+    @org.springframework.web.bind.annotation.ResponseBody
+    public java.util.Map<String, Object> saveOrder(@AuthenticationPrincipal MemberPrincipal me,
+                                                   @RequestParam(name = "ids", required = false) java.util.List<Long> ids) {
+        try {
+            accountService.saveOrder(me.getFamilyId(), ids);
+            return java.util.Map.of("ok", true, "message", "已保存顺序 —— 账户簿、填报页、仪表盘都按这个顺序列");
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            return java.util.Map.of("ok", false, "message", e.getMessage());
+        }
+    }
+
     @GetMapping("/new")
     public String newWizard(@AuthenticationPrincipal MemberPrincipal me, Model model) {
         addModel(me, model, false, true);
