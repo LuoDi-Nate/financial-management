@@ -60,3 +60,7 @@ application-secrets.yml
 
 # 本地运维具体值(IP/SSH/凭据/部署路径)· 不入公开库
 AGENTS.local.md
+
+# e2e 断言失败时自动截的现场图(scripts/e2e/lib/browser.cjs 会自己建目录)—— 只给本机排查看,不进仓库
+# (v1.33 / v1.34 两次被 git add -A 误提交;v1.34 发版前从跟踪里整体移出)
+scripts/e2e/shots/
