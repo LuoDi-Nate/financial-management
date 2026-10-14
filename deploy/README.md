@@ -7,6 +7,7 @@
 - 一台公网 Linux 服务器:Ubuntu 22+ / Debian 12+ / RHEL 9+ / Alibaba Cloud Linux 都行
 - 你能 SSH 进去 + 有 sudo
 - 一个公网 80 端口(可选 443),能从公网拉 apt 包
+- 内存:应用 + MySQL 常驻约 1G;**在服务器上编译时还要再空出约 1G**(`deploy.sh` 编译前会检查,不够就停下说明,见下面「迭代」第 1 步)。小内存机器可以在别处编好 jar 用 `--jar` 传上来
 
 **或** macOS 本机(本地开发 / 个人自用 · 见下面 [macOS 部署](#macos-本地部署))。
 
@@ -54,13 +55,26 @@ sudo bash deploy/deploy.sh              # 一键迭代
 
 `deploy.sh` 检测到已上线,进入「迭代模式」,做:
 
-1. `mysqldump | gzip` 备份 → `/var/backup/finance/pre-deploy-{ts}.sql.gz`(+ `gunzip -t` 完整性校验)
-2. 列出待 apply 的增量 `V*.sql`,**交互确认才执行**(`schema_history` 表防重)
-3. `mvn package` 编译新 jar
+1. **先编译**新 jar(v1.34.1 起放在迁移前面 —— 编不出来,库和线上都没动),带内存保护:
+   - 编译前看可用内存,**不到 1000MB 就停下**并说明(在本机编译可能把整台机器拖到卡死:磁盘读打满、SSH 都连不上)
+   - 编译限堆 `MAVEN_OPTS=-Xmx768m`(你自己设了 `MAVEN_OPTS` 就用你的)
+   - 编译期间有看门狗:可用内存连续两次低于 300MB 就停掉编译(这时还没换 jar,线上继续跑旧版)
+2. `mysqldump | gzip` 备份 → `/var/backup/finance/pre-deploy-{ts}.sql.gz`(+ `gunzip -t` 完整性校验)
+3. 列出待 apply 的增量 `V*.sql`,**交互确认才执行**(`schema_history` 表防重)
 4. 旧 jar 备份到 `app.jar.prev` + 新 jar 切入
 5. `systemctl restart finance`
 6. `/health` 30s 轮询 + `/login` 烟测
-7. **任意步骤失败 → 自动 `app.jar.prev → app.jar` + restart + 健康复检**(DB 备份保留不动,因 schema 多数 backward-compat,老 jar 兼容新表)
+7. **换 jar 之后失败 → 自动 `app.jar.prev → app.jar` + restart + 健康复检**(DB 备份保留不动,因 schema 多数 backward-compat,老 jar 兼容新表)
+
+每一步都打开始时间和上一步用时;全程输出另存到 `/var/log/finance-deploy-<时间>.log`(卡住时能看出卡在哪一步)。
+
+**小内存服务器 / 不想在服务器上编译**:在别的机器(同一个版本)`mvn -DskipTests package`,把 `target/app.jar` 传上来:
+
+```bash
+sudo bash deploy/deploy.sh --jar /tmp/app.jar     # 核对 jar 里的版本号 == 仓库检出的版本,对不上不换
+```
+
+可调:`FINANCE_BUILD_MIN_AVAIL_MB`(编译前要求的可用内存,默认 1000)· `FINANCE_BUILD_KILL_AVAIL_MB`(看门狗阈值,默认 300)· 确认要硬编:`FINANCE_BUILD_FORCE=1 sudo -E bash deploy/deploy.sh`。
 
 ---
 
@@ -68,6 +82,8 @@ sudo bash deploy/deploy.sh              # 一键迭代
 
 ```bash
 sudo bash deploy/rollback.sh
+sudo bash deploy/rollback.sh --expect-current 1.34.1    # 推荐:线上跑的不是这一版就拒绝(新 jar 根本没换上去时,回滚会换成更老的版本)
+bash deploy/rollback.sh --expect-current 1.34.1 --check-only   # 只看能不能回滚,什么都不动
 ```
 
 把 `app.jar.prev` 还原到 `app.jar` + restart + 健康检查。**不动 DB**(若 DB 也要还原见脚本输出的 `gunzip ... | mysql` 提示)。
@@ -113,6 +129,8 @@ certbot 自动改 `finance.conf` 加 `listen 443 ssl` + 配 cron 续签。`deplo
 | 症状 | 解 |
 |---|---|
 | Linux:`deploy.sh` 步 7 mysql 失败 | `sudo mysql` 看能不能进(Ubuntu 默认 socket 鉴权) |
+| Linux:`deploy.sh` 步 9「可用内存不够,没有编译」 | 同机别的常驻进程占了内存。先停掉它们再跑;或在别处编好 jar 用 `--jar` 传上来。**别硬编** —— 内存不够时编译会把整机拖到卡死(SSH 都连不上,只能控制台重启) |
+| Linux:部署中整机卡死(SSH / 网页都超时,CPU 不高,云监控报磁盘读打满) | 内存耗尽、系统反复从盘读回程序代码。控制台重启后线上会是旧版(编译在换 jar 之前)。另查 `sysctl vm.swappiness`:为 0 时内核宁可抖动也不用 swap,建议改 10 |
 | Linux:`deploy.sh` 步 14 服务 30s 不起 | 看 `journalctl -u finance --no-pager -n 100`(脚本自动打了 30 行);DB 密码错 / 端口被占最常见 |
 | macOS:`deploy.sh` 步 6 ERROR 1045 Access denied for root | root 设了密码 · 重跑输入密码;真忘了:`brew services stop mysql && mysqld_safe --skip-grant-tables &` 重置 |
 | macOS:登入后看到 demo 数据 | 你 sentinel 已写但 TRUNCATE 没跑 · 删 `~/finance/.prod-cleaned` + 重跑 `deploy/deploy.sh` |
@@ -131,7 +149,8 @@ deploy/
 ├── _deploy-macos.sh                ← deploy.sh 的 macOS 内部实现($HOME/finance · brew · 无 sudo · 别直接调)
 ├── docker-up.sh                    ← Docker 唯一入口(全平台 · 自检+生成密钥+起+验健康)
 ├── finance.macos.plist.template    ← macOS launchd 自启模板(可选)
-├── rollback.sh                     ← 紧急回滚(Linux)
+├── _build-guard.sh                 ← deploy.sh 的编译内存保护(编前查内存 · 限堆 · 看门狗 · 核对 --jar)· 测试 scripts/test-deploy-guards.sh
+├── rollback.sh                     ← 紧急回滚(Linux · --expect-current 核对线上版本)
 ├── nginx-setup.sh                  ← nginx 单独配置(deploy.sh 内部会调,macOS 不用)
 ├── finance.service                 ← systemd unit 模板(Linux)
 ├── finance.env.example             ← /etc/finance.env 配置示例(参考用)

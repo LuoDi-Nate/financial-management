@@ -5,16 +5,20 @@
 # 一个脚本管两个场景:首装 + 迭代发版。
 #
 # 用法(在 prod 服务器,仓库目录内):
-#   sudo bash deploy/deploy.sh
+#   sudo bash deploy/deploy.sh                      本机编译(带内存保护,见 deploy/_build-guard.sh)
+#   sudo bash deploy/deploy.sh --jar /path/app.jar  用别处编好的 jar(版本号要和仓库检出一致),本机不编译
+#   可选 --log <文件>:全程输出另存一份(默认 /var/log/finance-deploy-<时间>.log)
 #
 # 干啥:
 #   首装 — apt 装 JDK21 / Maven / MySQL / nginx 等所有依赖
 #         建系统用户 / 目录 / DB / /etc/finance.env / systemd / sudoers
 #         编译 jar / 跑迁移 / 装 nginx / 启服务
-#   迭代 — mysqldump 备份 / 备份旧 jar / 应用新 V*.sql / 切新 jar / restart / 健康检查 / 失败自动回滚
+#   迭代 — 先编译(或核对预编译 jar)/ mysqldump 备份 / 应用新 V*.sql / 切新 jar / restart / 健康检查 / 失败自动回滚
 #
 # 完全幂等:任何步骤都先检测当前状态,只在变了的时候动作。
-# 失败安全:any step crash 都不留半完成态;12 步切 jar 之后失败 → auto rollback jar。
+# 失败安全:any step crash 都不留半完成态;编译放在迁移前面(v1.34.1)—— 编不出来就什么都没动;
+#           12 步切 jar 之后失败 → auto rollback jar。
+# 每一步带开始时间和上一步耗时,全程输出另存日志文件(v1.34.1 · 卡住时能看出卡在哪一步)。
 # =========================================================
 set -euo pipefail
 
@@ -25,9 +29,22 @@ if [[ "$(uname)" == "Darwin" ]]; then
   exec bash "$(dirname -- "${BASH_SOURCE[0]}")/_deploy-macos.sh" "$@"
 fi
 
+# ---------- 参数(v1.34.1)----------
+PREBUILT_JAR=""; DEPLOY_LOG=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --jar) PREBUILT_JAR="${2:?--jar 后面要跟 jar 路径}"; shift 2 ;;
+    --log) DEPLOY_LOG="${2:?--log 后面要跟文件路径}"; shift 2 ;;
+    *) echo "未知参数:$1(支持 --jar <app.jar> · --log <文件>)" >&2; exit 2 ;;
+  esac
+done
+
 # ---------- 颜色 + 辅助 ----------
 G=$'\033[32m'; R=$'\033[31m'; Y=$'\033[33m'; B=$'\033[1;36m'; X=$'\033[0m'
-say()  { echo; echo "${B}═══ $* ═══${X}"; }
+# 每一步打开始时间 + 上一步耗时(v1.34.1:卡住时一眼看出卡在哪一步、卡了多久)
+_STEP_T=""
+say()  { local now; now=$(date +%s); [[ -n "$_STEP_T" ]] && echo "  (上一步用时 $((now - _STEP_T))s)"; _STEP_T=$now
+         echo; echo "${B}═══ $(date '+%H:%M:%S') · $* ═══${X}"; }
 ok()   { echo "${G}✓${X} $*"; }
 warn() { echo "${Y}⚠${X} $*"; }
 err()  { echo "${R}✗${X} $*" >&2; }
@@ -37,6 +54,8 @@ ask_pw() { local q="$1"; local ans; read -s -p "$q: " ans; echo >&2; echo "$ans"
 
 REPO_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_DIR"
+# shellcheck source=deploy/_build-guard.sh
+. "$REPO_DIR/deploy/_build-guard.sh"
 
 # 用 MYSQL_PWD env var 而不是 -p 参数,避免每条 mysql 调用都打 password warning
 mysql_run()      { MYSQL_PWD="$DB_PASS" mysql -h127.0.0.1 -u"$DB_USER" "$DB_NAME" "$@"; }
@@ -44,8 +63,13 @@ mysqldump_run()  { MYSQL_PWD="$DB_PASS" mysqldump --no-tablespaces --single-tran
                     -h"${DB_HOST:-127.0.0.1}" -P"${DB_PORT:-3306}" -u"$DB_USER" "$DB_NAME" "$@"; }
 
 # ---------- 0. 预飞 ----------
-say "0/15 预飞"
 [[ $EUID -eq 0 ]] || die "必须 sudo 跑(需要装包 / 改 systemd / 写 sudoers)"
+# 全程输出另存一份(终端照常看得到)
+[[ -n "$DEPLOY_LOG" ]] || DEPLOY_LOG="/var/log/finance-deploy-$(date +%Y%m%d-%H%M%S).log"
+mkdir -p "$(dirname "$DEPLOY_LOG")"
+exec > >(tee -a "$DEPLOY_LOG") 2>&1
+say "0/15 预飞"
+ok "本次日志 → $DEPLOY_LOG"
 [[ -d src/main/java && -d db/migration ]] || die "$(pwd) 不像本仓库根目录"
 [[ -f deploy/finance.service && -f pom.xml ]] || die "deploy/finance.service 或 pom.xml 缺失"
 
@@ -53,6 +77,10 @@ if   [[ -f /etc/debian_version ]]; then OS=debian
 elif [[ -f /etc/redhat-release ]]; then OS=rhel
 else die "未识别的 OS(仅支持 Debian/Ubuntu / RHEL/CentOS/Alibaba)"; fi
 ok "OS = $OS · 仓库 = $REPO_DIR"
+if [[ -n "$PREBUILT_JAR" ]]; then
+  PREBUILT_JAR="$(readlink -f "$PREBUILT_JAR")"
+  check_prebuilt_jar "$PREBUILT_JAR" "$(repo_app_version "$REPO_DIR")" || die "预编译 jar 核对不过 · 什么都没动"
+fi
 
 NEEDS_DAEMON_RELOAD=0
 NEEDS_FINANCE_RESTART=0
@@ -174,10 +202,56 @@ fi
 SERVER_PORT=$(grep '^SERVER_PORT=' /etc/finance.env | cut -d= -f2- | tr -d '"' || echo 20000)
 
 # ============================================================
-# B. 数据库迁移
+# B. 编译(v1.34.1 起放在迁移前面:编不出来 = 库也没动,线上原样)
 # ============================================================
 
-say "9/15 数据库迁移(schema_history 幂等)"
+say "9/15 编译(或核对预编译 jar)"
+if [[ -n "$PREBUILT_JAR" ]]; then
+  mkdir -p "$REPO_DIR/target"
+  [[ "$PREBUILT_JAR" == "$(readlink -f "$REPO_DIR/target/app.jar" 2>/dev/null)" ]] \
+    || install -m 644 "$PREBUILT_JAR" "$REPO_DIR/target/app.jar"
+  chown finance:finance "$REPO_DIR/target/app.jar" 2>/dev/null || true
+  ok "用预编译 jar(本机不编译)· $(du -h "$REPO_DIR/target/app.jar" | cut -f1)"
+else
+# 以脚本调用者身份(通常 sudo 后是 root)跑 mvn — 不要切到 finance 用户,
+# 因为 REPO_DIR 可能在 /root/... 或 /home/<other>/... finance 用户读不到。
+
+# 国内 maven central 直连极慢(首次 200MB 拉 20 分钟+)→ 装阿里云 mirror,10x 加速
+# settings.xml 内容在 deploy/maven-settings.xml,这里只 cp + 装到目标 home/.m2/
+HOME_DIR="${SUDO_USER:+/home/$SUDO_USER}"
+[[ -z "${SUDO_USER:-}" ]] && HOME_DIR="$HOME"
+[[ ! -d "$HOME_DIR" ]] && HOME_DIR="$HOME"
+M2_SETTINGS="$HOME_DIR/.m2/settings.xml"
+MAVEN_SRC="$REPO_DIR/deploy/maven-settings.xml"
+if [[ ! -f "$MAVEN_SRC" ]]; then
+  warn "deploy/maven-settings.xml 缺失,跳过 mirror 配置(走 maven central,国内慢)"
+elif [[ ! -f "$M2_SETTINGS" ]] || ! grep -q 'aliyun' "$M2_SETTINGS"; then
+  mkdir -p "$(dirname "$M2_SETTINGS")"
+  cp "$MAVEN_SRC" "$M2_SETTINGS"
+  [[ -n "${SUDO_USER:-}" ]] && chown -R "$SUDO_USER:$SUDO_USER" "$(dirname "$M2_SETTINGS")" 2>/dev/null || true
+  ok "$M2_SETTINGS ← deploy/maven-settings.xml(阿里云 mirror)"
+else
+  ok "$M2_SETTINGS 已含 aliyun mirror,跳过"
+fi
+
+# v1.34.1 · 内存保护(见 deploy/_build-guard.sh 头注释):编译前看可用内存 · 限编译堆 · 编译期间看门狗
+build_precheck || die "可用内存不够,没有编译 —— 什么都没动,线上还是原来的版本"
+export MAVEN_OPTS="${MAVEN_OPTS:--Xmx768m}"
+echo "  MAVEN_OPTS=$MAVEN_OPTS(首次构建国内下载 ~200MB 依赖,5-15 分钟;后续几十秒)"
+MVN_RC=0
+run_build_guarded "$(mktemp)" bash -c "cd '$REPO_DIR' && exec mvn -B -DskipTests package" || MVN_RC=$?
+[[ $MVN_RC -eq 137 ]] && die "编译被看门狗停掉(内存快耗尽)—— 没有迁移、没有换 jar,线上还是原来的版本"
+[[ $MVN_RC -eq 0 ]] || die "mvn package 失败(exit=$MVN_RC)—— 没有迁移、没有换 jar"
+[[ -f "$REPO_DIR/target/app.jar" ]] || die "target/app.jar 缺失"
+chown finance:finance "$REPO_DIR/target/app.jar" 2>/dev/null || true
+ok "jar $(du -h "$REPO_DIR/target/app.jar" | cut -f1)"
+fi
+
+# ============================================================
+# B2. 数据库迁移
+# ============================================================
+
+say "10/15 数据库迁移(schema_history 幂等)"
 install -m 755 -o finance -g finance db/apply.sh /opt/finance/db/apply.sh
 # v0.4.19 fix · 周备份脚本必须装到 /opt/finance/deploy/(finance-backup.service 的 ExecStart 路径)
 install -m 755 -o finance -g finance deploy/backup.sh /opt/finance/deploy/backup.sh
@@ -219,7 +293,7 @@ set -a; . /etc/finance.env; set +a
 MYSQL_PWD="$DB_PASS" bash /opt/finance/db/apply.sh
 ok "迁移完毕"
 
-# 9b. 修复 seed 用户 PLACEHOLDER 密码(仅首装会有)
+# 10b. 修复 seed 用户 PLACEHOLDER 密码(仅首装会有)
 PLACEHOLDER_COUNT=$(mysql_run -sN -e "SELECT COUNT(*) FROM member WHERE password_hash LIKE 'PLACEHOLDER%'" 2>/dev/null || echo 0)
 if [[ "${PLACEHOLDER_COUNT:-0}" -gt 0 ]]; then
   warn "$PLACEHOLDER_COUNT 个种子用户密码为 PLACEHOLDER(prod DevSeedRunner 不跑)"
@@ -230,14 +304,14 @@ if [[ "${PLACEHOLDER_COUNT:-0}" -gt 0 ]]; then
   ok "种子用户密码 → bcrypt(临时)"
 fi
 
-# 9.5 v0.4.18 · 配置种子迁移(把 env 值一次性灌进 family_runtime_config · 只跑一次幂等)
+# 10.5 v0.4.18 · 配置种子迁移(把 env 值一次性灌进 family_runtime_config · 只跑一次幂等)
 # 详 prd/v0.4.md §22.8
-say "9.5/15 配置种子迁移(v0.4.18+)"
+say "10.5/15 配置种子迁移(v0.4.18+)"
 MIGRATED_FLAG=/var/finance/.config-migrated-v0.4.18
 if [[ -f "$MIGRATED_FLAG" ]]; then
   ok "已迁移过 · 跳过(再次升级幂等 · 不覆盖用户管理页改过的值)"
 else
-  # 检测 family_runtime_config 表是否存在(V26 必须先应用 · 上面 step 9 应已应用)
+  # 检测 family_runtime_config 表是否存在(V26 必须先应用 · 上面 step 10 应已应用)
   if mysql_run -N -e "SELECT 1 FROM information_schema.tables WHERE table_schema = '$DB_NAME' AND table_name = 'family_runtime_config' LIMIT 1;" 2>/dev/null | grep -q 1; then
     # 注意:这里不用 source · 因为 deploy.sh 顶部已读过 finance.env 的 DB_* 等
     # 单家庭模式 · family_id=1(与 backup.sh 一致 · 见 prd §22.3 类 A)
@@ -255,12 +329,12 @@ SQLEOF
     touch "$MIGRATED_FLAG"
     ok "env 配置已 seed 到 family_runtime_config · 后续以 DB 为准(私密 key 不打印)"
   else
-    warn "family_runtime_config 表不存在 · 跳过(V26 可能未应用 · 见 step 9)"
+    warn "family_runtime_config 表不存在 · 跳过(V26 可能未应用 · 见 step 10)"
   fi
 fi
 
-# 10. 清 dev 演示数据(首装才会触发;sentinel + 真实数据双保险)
-say "10/15 清 dev 演示数据"
+# 11. 清 dev 演示数据(首装才会触发;sentinel + 真实数据双保险)
+say "11/15 清 dev 演示数据"
 SENTINEL=/opt/finance/.prod-cleaned
 if [[ -f "$SENTINEL" ]]; then
   ok "已清过($SENTINEL 存在)"
@@ -306,42 +380,8 @@ SQL
 fi
 
 # ============================================================
-# C. 编译 + 切 jar + 重启
+# C. 切 jar + 重启
 # ============================================================
-
-say "11/15 mvn package"
-# 以脚本调用者身份(通常 sudo 后是 root)跑 mvn — 不要切到 finance 用户,
-# 因为 REPO_DIR 可能在 /root/... 或 /home/<other>/... finance 用户读不到。
-
-# 国内 maven central 直连极慢(首次 200MB 拉 20 分钟+)→ 装阿里云 mirror,10x 加速
-# settings.xml 内容在 deploy/maven-settings.xml,这里只 cp + 装到目标 home/.m2/
-HOME_DIR="${SUDO_USER:+/home/$SUDO_USER}"
-[[ -z "${SUDO_USER:-}" ]] && HOME_DIR="$HOME"
-[[ ! -d "$HOME_DIR" ]] && HOME_DIR="$HOME"
-M2_SETTINGS="$HOME_DIR/.m2/settings.xml"
-MAVEN_SRC="$REPO_DIR/deploy/maven-settings.xml"
-if [[ ! -f "$MAVEN_SRC" ]]; then
-  warn "deploy/maven-settings.xml 缺失,跳过 mirror 配置(走 maven central,国内慢)"
-elif [[ ! -f "$M2_SETTINGS" ]] || ! grep -q 'aliyun' "$M2_SETTINGS"; then
-  mkdir -p "$(dirname "$M2_SETTINGS")"
-  cp "$MAVEN_SRC" "$M2_SETTINGS"
-  [[ -n "${SUDO_USER:-}" ]] && chown -R "$SUDO_USER:$SUDO_USER" "$(dirname "$M2_SETTINGS")" 2>/dev/null || true
-  ok "$M2_SETTINGS ← deploy/maven-settings.xml(阿里云 mirror)"
-else
-  ok "$M2_SETTINGS 已含 aliyun mirror,跳过"
-fi
-
-# 不加 -q 让用户看见 [INFO] 阶段进度,过滤掉下载行 spam(每个依赖 N 行 Downloading)
-echo "  (首次构建国内下载 ~200MB 依赖,5-15 分钟;后续秒级)"
-set +e
-(cd "$REPO_DIR" && mvn -B -DskipTests package 2>&1 \
-  | grep -vE '^\[INFO\] (Downloading|Downloaded from|Progress )')
-MVN_RC=${PIPESTATUS[0]}
-set -e
-[[ $MVN_RC -eq 0 ]] || die "mvn package 失败(exit=$MVN_RC)"
-[[ -f "$REPO_DIR/target/app.jar" ]] || die "target/app.jar 缺失"
-chown finance:finance "$REPO_DIR/target/app.jar" 2>/dev/null || true
-ok "jar $(du -h "$REPO_DIR/target/app.jar" | cut -f1)"
 
 say "12/15 部署 jar(无变化则 skip)"
 if [[ -f /opt/finance/app.jar ]] && cmp -s "$REPO_DIR/target/app.jar" /opt/finance/app.jar; then
