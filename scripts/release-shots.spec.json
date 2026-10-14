@@ -1,97 +1,75 @@
 {
-  "_comment": "v1.33.0 · 固定收支(#38)+ 立即备份(#29)+ 删除账户(#39)。分两轮拍:A 轮(删之前)= 填报页固定收支一行(展开)· 管理页固定收支清单 · 「示例·旧储蓄卡」的删除面板(PC + 手机上半 / 确认区)· 备份页「立即备份」;中间用浏览器把「示例·旧储蓄卡」删进回收站;B 轮 = 回收站(PC + 手机)· 报表封板抬头的「删除账户…后重算」。固定收支与示例账户的历史是截图前临时造的(金额是编的),截完整库还原。",
+  "_comment": "v1.34.0 · 持仓拖拽排序(#40)+ 账户拖拽排序 + 持仓改名(#41)+ 危险操作区重做。拖到一半的两张用 drag(按住拖过去拍,拍完原路拖回再松手 —— 不保存、不改库)。持仓用 beta 演示账户 #4 富途证券-港美股(3 只);金额在隐私模式下打码。",
   "pc": [
     {
-      "path": "/entry",
-      "name": "fixed-flows-bar",
-      "wait": 1500,
-      "waitFor": "[data-fixed-flows]",
-      "eval": "[].forEach.call(document.querySelectorAll('[data-agent-fab], #agent-fab, #ask-float'), function(e){ e.style.display='none'; }); var b=document.querySelector('[data-ff-box]'); if(b) b.open=true; var el=document.querySelector('[data-fixed-flows]'); window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - 120);",
-      "selector": "[data-fixed-flows]",
-      "round": "A"
-    },
-    {
-      "path": "/admin/fixed-flows",
-      "name": "fixed-flows-admin",
+      "path": "/accounts/4/holdings/order",
+      "name": "holding-order-drag",
       "wait": 1200,
-      "waitFor": "[data-ff-table]",
-      "eval": "[].forEach.call(document.querySelectorAll('[data-agent-fab], #agent-fab, #ask-float'), function(e){ e.style.display='none'; }); window.scrollTo(0,0);",
-      "selector": "main section",
-      "round": "A"
+      "waitFor": "[data-sort-board][data-sort-saved]",
+      "eval": "[].forEach.call(document.querySelectorAll('[data-agent-fab], #agent-fab, #ask-float, .ask-fab'), function(e){ e.style.display='none'; }); window.scrollTo(0,0);",
+      "drag": {
+        "from": "[data-sort-list] [data-sort-id]:nth-child(3)",
+        "to": "[data-sort-list] [data-sort-id]:nth-child(1)"
+      },
+      "selector": "main"
     },
     {
-      "path": "/accounts/177/delete",
-      "name": "delete-panel",
-      "wait": 1500,
-      "waitFor": "[data-account-delete]",
-      "eval": "[].forEach.call(document.querySelectorAll('[data-agent-fab], #agent-fab, #ask-float'), function(e){ e.style.display='none'; }); var h=document.querySelector('header'); if(h){ h.style.position='static'; } window.scrollTo(0,0);",
-      "selector": "[data-account-delete]",
-      "round": "A"
-    },
-    {
-      "path": "/admin/trash",
-      "name": "trash",
+      "path": "/accounts/order",
+      "name": "account-order-drag",
       "wait": 1200,
-      "waitFor": "[data-trash-table]",
-      "eval": "[].forEach.call(document.querySelectorAll('[data-agent-fab], #agent-fab, #ask-float'), function(e){ e.style.display='none'; }); var d=document.querySelector('[data-trash-restore-box]'); if(d) d.open=true; window.scrollTo(0,0);",
-      "selector": "main section",
-      "round": "B"
+      "waitFor": "[data-sort-board][data-sort-saved]",
+      "eval": "[].forEach.call(document.querySelectorAll('[data-agent-fab], #agent-fab, #ask-float, .ask-fab'), function(e){ e.style.display='none'; }); [].forEach.call(document.querySelectorAll('[data-ao-group]'), function(g, i){ if (i > 0) g.style.display='none'; }); var p=document.querySelector('main p.font-mono'); if(p) p.style.display='none'; window.scrollTo(0,0);",
+      "drag": {
+        "from": "section[data-ao-group] [data-sort-id]:nth-child(4)",
+        "to": "section[data-ao-group] [data-sort-id]:nth-child(2)"
+      },
+      "selector": "main"
     },
     {
-      "path": "/reports",
-      "name": "report-trace",
-      "wait": 2000,
-      "waitFor": "select[data-base]",
-      "eval": "[].forEach.call(document.querySelectorAll('[data-agent-fab], #agent-fab, #ask-float'), function(e){ e.style.display='none'; }); var t=document.querySelector('[data-trash-trace]'); var c=t.closest('.paper-card'); c.setAttribute('data-shot','1'); window.scrollTo(0, c.getBoundingClientRect().top + window.scrollY - 140);",
-      "selector": "[data-shot]",
-      "round": "B"
-    },
-    {
-      "path": "/admin/backup",
-      "name": "backup-now",
+      "path": "/accounts/4/holdings",
+      "name": "holdings-head-rename",
       "wait": 1200,
-      "waitFor": "[data-backup-now]",
-      "eval": "[].forEach.call(document.querySelectorAll('[data-agent-fab], #agent-fab, #ask-float'), function(e){ e.style.display='none'; }); var f=document.querySelector('[data-backup-now]'); var c=f.parentElement.parentElement; c.setAttribute('data-shot','1'); window.scrollTo(0,0);",
-      "selector": "[data-shot]",
-      "round": "A"
+      "waitFor": ".holding-list-head",
+      "eval": "[].forEach.call(document.querySelectorAll('[data-agent-fab], #agent-fab, #ask-float, .ask-fab'), function(e){ e.style.display='none'; }); var m=document.querySelector('main'); m.style.maxWidth='860px'; m.style.marginLeft='auto'; m.style.marginRight='auto'; var d=document.querySelector('[data-hold-rename]'); if(d) d.open=true; var h=document.querySelector('.holding-list-head'); window.scrollTo(0, h.getBoundingClientRect().top + window.scrollY - 140);",
+      "clipUnion": [
+        ".holding-list-head",
+        "main article",
+        "[data-hold-rename-input]"
+      ]
+    },
+    {
+      "path": "/accounts/4/edit",
+      "name": "danger-zone",
+      "wait": 1000,
+      "waitFor": "[data-danger-zone]",
+      "eval": "[].forEach.call(document.querySelectorAll('[data-agent-fab], #agent-fab, #ask-float, .ask-fab'), function(e){ e.style.display='none'; });",
+      "selector": "[data-danger-zone]"
     }
   ],
   "mobile": [
     {
-      "path": "/entry",
-      "name": "fixed-flows-row",
+      "path": "/accounts/4/holdings/order",
+      "name": "holding-order",
       "wait": 1500,
-      "waitFor": "[data-fixed-flows]",
-      "eval": "var b=document.querySelector('[data-ff-box]'); if(b) b.open=true; var el=document.querySelector('[data-fixed-flows]'); window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY - 80);",
-      "full": false,
-      "round": "A"
+      "waitFor": "[data-sort-board][data-sort-saved]",
+      "eval": "window.scrollTo(0,0); [].forEach.call(document.querySelectorAll('body *'), function(e){ var cs=getComputedStyle(e); if(cs.position==='fixed'){ var r=e.getBoundingClientRect(); if(r.top>window.innerHeight-260) e.style.display='none'; } });",
+      "full": false
     },
     {
-      "path": "/accounts/177/delete",
-      "name": "delete-panel-top",
+      "path": "/accounts/order",
+      "name": "account-order",
       "wait": 1500,
-      "waitFor": "[data-account-delete]",
-      "eval": "window.scrollTo(0,0);",
-      "full": false,
-      "round": "A"
+      "waitFor": "[data-sort-board][data-sort-saved]",
+      "eval": "window.scrollTo(0,0); [].forEach.call(document.querySelectorAll('body *'), function(e){ var cs=getComputedStyle(e); if(cs.position==='fixed'){ var r=e.getBoundingClientRect(); if(r.top>window.innerHeight-260) e.style.display='none'; } });",
+      "full": false
     },
     {
-      "path": "/accounts/177/delete",
-      "name": "delete-panel-confirm",
+      "path": "/accounts",
+      "name": "accounts-head",
       "wait": 1500,
-      "waitFor": "[data-adel-form]",
-      "eval": "var f=document.querySelector('[data-adel-form]'); window.scrollTo(0, f.getBoundingClientRect().top + window.scrollY - 40); [].forEach.call(document.querySelectorAll('body *'), function(e){ var cs=getComputedStyle(e); if(cs.position==='fixed'){ var r=e.getBoundingClientRect(); if(r.top>window.innerHeight-260) e.style.display='none'; } });",
-      "full": false,
-      "round": "A"
-    },
-    {
-      "path": "/admin/trash",
-      "name": "trash-cards",
-      "wait": 1200,
-      "waitFor": "[data-trash-table]",
-      "eval": "var t=document.querySelector('[data-trash-table]'); window.scrollTo(0, t.getBoundingClientRect().top + window.scrollY - 70);",
-      "full": false,
-      "round": "B"
+      "waitFor": "[data-acct-actions]",
+      "eval": "window.scrollTo(0,0); [].forEach.call(document.querySelectorAll('body *'), function(e){ var cs=getComputedStyle(e); if(cs.position==='fixed'){ var r=e.getBoundingClientRect(); if(r.top>window.innerHeight-260) e.style.display='none'; } });",
+      "full": false
     }
   ]
 }

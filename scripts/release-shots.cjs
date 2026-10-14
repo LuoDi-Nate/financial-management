@@ -10,6 +10,8 @@
  * - PC 1440x900 + 移动 390x844 双视口;JPEG quality=82(压缩且保清晰)
  * - spec 默认 scripts/release-shots.spec.json —— 每次发版按本次核心能力改清单
  * - spec 条目可选 eval:"<js>" —— 截图前在页面里跑一段(展开折叠块 / 截短长列表)
+ * - spec 条目可选 drag:{from, to} —— 拍「拖到一半」:按住 from 拖向 to,拍完原路拖回再松手(放回原位 = 不保存、不改库)
+ * - spec 条目可选 clipUnion:[selA, selB, …] —— 截这几个元素合起来的那块(页面上没有现成的包裹元素时用)
  * - chromium 路径按本机 playwright 缓存(见 memory reference_headless_screenshot)
  */
 const path = require('path');
@@ -73,12 +75,35 @@ const { chromium } = require(PW);
         if (s.eval) { await p.evaluate(s.eval); await p.waitForTimeout(300); }
         await p.waitForTimeout(s.wait || 1200);   // 图表/字体/轮询首帧
         const f = path.join(outDir, `${prefix}_${s.name}.jpg`);
-        if (s.selector) {
+        let back = null;
+        if (s.drag) {
+          // v1.34 · 进场印章遮罩(#page-overlay)散开之前按下去会落在遮罩上,拖不起来
+          await p.waitForSelector('#page-overlay', { state: 'hidden', timeout: 15000 }).catch(() => {});
+          const a = await p.locator(s.drag.from).first().boundingBox(), b = await p.locator(s.drag.to).first().boundingBox();
+          const x = a.x + Math.min(60, a.width / 4), y0 = a.y + a.height / 2, y1 = b.y + Math.min(24, b.height / 3);
+          await p.mouse.move(x, y0); await p.mouse.down();
+          for (let i = 1; i <= 16; i++) { await p.mouse.move(x + i, y0 + (y1 - y0) * i / 16, { steps: 2 }); await p.waitForTimeout(25); }
+          await p.waitForTimeout(500);
+          back = async () => {
+            for (let i = 15; i >= 0; i--) { await p.mouse.move(x, y0 + (y1 - y0) * i / 16, { steps: 2 }); await p.waitForTimeout(25); }
+            await p.waitForTimeout(300); await p.mouse.up(); await p.waitForTimeout(800);
+          };
+        }
+        if (s.clipUnion) {
+          const box = await p.evaluate((sels) => {
+            const rs = sels.map(q => document.querySelector(q)).filter(Boolean).map(e => e.getBoundingClientRect());
+            const l = Math.min(...rs.map(r => r.left)), t = Math.min(...rs.map(r => r.top));
+            const r = Math.max(...rs.map(r => r.right)), b = Math.max(...rs.map(r => r.bottom));
+            return { x: l - 12, y: t + window.scrollY - 12, width: r - l + 24, height: b - t + 24 };
+          }, s.clipUnion);
+          await p.screenshot({ path: f, type: 'jpeg', quality: 82, fullPage: true, clip: box });
+        } else if (s.selector) {
           // 聚焦局部:只截该元素(裁掉导航/留白/无关区域)
           await p.locator(s.selector).first().screenshot({ path: f, type: 'jpeg', quality: 82 });
         } else {
           await p.screenshot({ path: f, type: 'jpeg', quality: 82, fullPage: s.full !== false });
         }
+        if (back) await back();
         console.log('shot', f, Math.round(fs.statSync(f).size / 1024) + 'KB');
       } catch (e) { console.error('FAIL', s.path, e.message); }
     }
