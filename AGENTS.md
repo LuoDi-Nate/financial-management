@@ -200,7 +200,7 @@ worktree 的工作目录里没有 `.githooks/`(那是 master 上的文件),hook 
 | `src/main/resources/templates/landing.html` | 落地页**工程数字带** | `data-stat` version/tests/migrations/blackbox 必须与现状一致(release preflight 硬门) |
 | `.claude/skills/release-prod/` | 发布 prod skill | 见第 10 节 |
 | `.claude/skills/auto-issue-killer/` | GitHub issue 预处理 skill | `bash .claude/skills/auto-issue-killer/issue.sh scan`;先 👀 → 打 label → 以「作者的 agent 助手」双语回复;bug 开 `issue/<n>-<slug>` 分支修到 beta 为止,需求先写 PRD+preview,**发布/合并/关 issue 一律等作者批准** |
-| `deploy/deploy.sh` `rollback.sh` | prod 部署/回滚 | 幂等 + 失败自动回滚;`rollback.sh` 读 `app.jar.prev` 的版本,回到 vX.Y 之前先执行 `db/rollback/vX.Y.sql`(v1.30 起:基金账户改回理财) |
+| `deploy/deploy.sh` `rollback.sh` | prod 部署/回滚 | 幂等 + 失败自动回滚;`rollback.sh` 读 `app.jar.prev` 的版本,回到 vX.Y 之前先执行 `db/rollback/vX.Y.sql`(v1.30 起:基金账户改回理财)· **v1.34.1**:`deploy.sh --jar <jar>` 用别处编好的 jar(核对版本)· 本机编译在迁移**之前**、带内存保护(`deploy/_build-guard.sh`:编前查可用内存 · 限堆 · 看门狗)· 每步打时间、全程日志 `/var/log/finance-deploy-*.log` · `rollback.sh --expect-current <版本>` 线上不是这一版就拒绝 · 测试 `scripts/test-deploy-guards.sh` |
 | `src/main/java/.../service/fund/` | v1.30 场外基金 / 货币基金 | `FundCatalog`(搜索 / 分类)· `FundNavService`(同步 + 货基结转,行锁)· `MmfAccrual`(逐日结转纯函数)· `FundHoldingService`(用户动作 + 现金联动)· 数据在 `penetration/EastMoneyFundClient` |
 | `AGENTS.md`(本文) | 项目操作手册 | 每次迭代必过 |
 | memory `~/.claude/projects/-home-finance-financial-management/memory/` | Claude 跨会话记忆 | 一事一文件 + `MEMORY.md` 索引;详细规则见各 `feedback_*` |
@@ -380,8 +380,8 @@ bash .claude/skills/release-prod/release.sh verify
 1. **阶段 0 预检**:`release.sh preflight [版本]` — git 干净 / tag 不重 / 列 commit+diff / 扫迁移 / **README 联动 + 主页数字带 + 部署脚本 硬门** / `mvn test`。
 2. **阶段 0.5 硬 gate**:把预检输出给用户,**停下**。用户回**严格等于 `release vX.Y.Z`**(版本一致)才继续;回别的/不回 = 中止,不打 tag、不碰 prod。
 3. **阶段 1** `tag-push`:annotated tag + push origin(gitlab)+ github。
-4. **阶段 2** `deploy`:ssh prod checkout tag + `deploy.sh`(mysqldump 备份 + 迁移 + 切 jar + 健康检查 + 失败自动回滚)。
+4. **阶段 2** `deploy`:ssh prod checkout tag → **beta 从同一个 tag 编 jar → scp → sha256 对上** → prod **后台**跑 `deploy.sh --jar`(核对 jar 版本 + mysqldump 备份 + 迁移 + 切 jar + 健康检查 + 失败自动回滚),本地轮询日志。**v1.34.1 起不在 prod 上编译**(2026-10-14 v1.34.0 在 prod 本机编译把 3.5G 内存顶满、整机卡死 100 分钟)。失败时**先看线上版本**:还是旧版 = jar 没换上去,别回滚。
 5. **阶段 3** `verify`:loopback + 域名 `/health`+`/login` 200。
-6. **阶段 4** 成功 `notify ok` / 失败 `rollback` + `notify rollback`。
+6. **阶段 4** 成功 `notify ok` / 失败 `rollback vX.Y.Z`(带版本:线上不是这一版就拒绝)+ `notify rollback`。
 
 版本号约定:精化/bugfix 走 patch(vX.Y.Z);prod 落后时可跳版本发(tag 含全部增量)。

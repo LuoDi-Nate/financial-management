@@ -2775,10 +2775,10 @@ QA_SB_N=$(grep -o "href:'" "$SB" | wc -l)
 
 # v04-CFG-9 · deploy.sh 加 step 9.5 配置种子 + 幂等 flag
 DEP=deploy/deploy.sh
-{ grep -q "9.5/15 配置种子迁移" "$DEP" \
+{ grep -q "10.5/15 配置种子迁移" "$DEP" \
   && grep -q "config-migrated-v0.4.18" "$DEP" \
   && grep -q "family_runtime_config" "$DEP"; } \
-  && log_ok "v04-CFG-9 deploy.sh 加 step 9.5 种子 + 幂等 flag" \
+  && log_ok "v04-CFG-9 deploy.sh 配置种子步(v1.34.1 起编号 10.5)+ 幂等 flag" \
   || log_bad "v04-CFG-9 deploy.sh 9.5 步缺" "see deploy.sh"
 
 # v04-CFG-10 · PrivacyIsolationTest 扩 PromptBuilder LLM key 防泄露
@@ -11673,6 +11673,65 @@ QA134_SB="$RD/src/main/resources/static/js/sort-board.js"
 [ -f "$RD/scripts/e2e/flows/51-holding-order-rename.cjs" ] && grep -q 'touchDrag' "$RD/scripts/e2e/flows/51-holding-order-rename.cjs" \
   && grep -q 'data-account-order' "$RD/scripts/e2e/flows/51-holding-order-rename.cjs" \
   && log_ok "v134-E2E(flow 51:鼠标拖拽 → 撤销 → 四处一致 → 新加的在最后 → 改名 → 账户顺序拖拽 → 手机长按拖)" || log_bad "v134-E2E 缺 flow 51(或没覆盖拖拽 / 账户顺序 / 手机)" "scripts/e2e/flows/51-holding-order-rename.cjs"
+# ════════════════════════════════════════════════════════════════════
+# v1.34.1 · 部署防卡死(2026-10-14 v1.34.0 首次上 prod:deploy.sh 在 prod 本机编译,把 3.5G 内存顶满,
+#   swappiness=0 → 反复从盘读回程序代码页 → 磁盘读打满、整机卡死 100 分钟)
+# ════════════════════════════════════════════════════════════════════
+section "v1.34.1 · 部署防卡死"
+QA1341_D="$RD/deploy/deploy.sh"; QA1341_G="$RD/deploy/_build-guard.sh"; QA1341_RB="$RD/deploy/rollback.sh"
+# ① 编译(或核对预编译 jar)在迁移之前:编不出来 = 库没动、线上原样;迁移之后不再有 mvn
+QA1341_LB=$(grep -n 'say "9/15 编译' "$QA1341_D" | head -1 | cut -d: -f1)
+QA1341_LM=$(grep -n 'say "10/15 数据库迁移' "$QA1341_D" | head -1 | cut -d: -f1)
+QA1341_LMVN=$(grep -nF 'exec mvn -B -DskipTests package' "$QA1341_D" | head -1 | cut -d: -f1)
+{ [[ -n "$QA1341_LB" && -n "$QA1341_LM" && -n "$QA1341_LMVN" ]] && (( QA1341_LB < QA1341_LMVN && QA1341_LMVN < QA1341_LM )) \
+  && [ "$(grep -cF 'mvn -B' "$QA1341_D")" -eq 1 ]; } \
+  && log_ok "v1341-BUILD-BEFORE-MIGRATE(编译 / 核对 jar 在迁移之前 · 编不出来什么都没动)" \
+  || log_bad "v1341-BUILD-BEFORE-MIGRATE 编译又跑到迁移后面了(编译失败时库已改、程序还是旧的)" "see deploy.sh 9/15 · 10/15"
+# ② 本机编译三层保护:编前查可用内存 · 限堆 · 看门狗(整组停、连续两次才停)
+{ grep -q '^\. "$REPO_DIR/deploy/_build-guard.sh"' "$QA1341_D" \
+  && grep -qF 'build_precheck || die' "$QA1341_D" \
+  && grep -qF 'export MAVEN_OPTS="${MAVEN_OPTS:--Xmx768m}"' "$QA1341_D" \
+  && grep -qF 'run_build_guarded "$(mktemp)" bash -c' "$QA1341_D" \
+  && grep -qF 'MVN_RC -eq 137' "$QA1341_D" \
+  && grep -qF 'kill -TERM -- "-$pid"' "$QA1341_G" && grep -qF 'if (( low >= 2 )); then' "$QA1341_G" \
+  && grep -qF 'setsid "$@"' "$QA1341_G"; } \
+  && log_ok "v1341-BUILD-MEM-GUARD(编前查可用内存 · MAVEN_OPTS 默认限堆 · 看门狗整组停 · 连续两次低才停)" \
+  || log_bad "v1341-BUILD-MEM-GUARD 本机编译的内存保护缺了一层" "see deploy/_build-guard.sh"
+# ③ --jar:别处编好的 jar,先核对版本 == 检出版本(在任何改动之前)
+{ grep -q -- '--jar) PREBUILT_JAR=' "$QA1341_D" \
+  && grep -qF 'check_prebuilt_jar "$PREBUILT_JAR" "$(repo_app_version "$REPO_DIR")" || die' "$QA1341_D" \
+  && (( $(grep -nF 'check_prebuilt_jar "$PREBUILT_JAR"' "$QA1341_D" | cut -d: -f1) < QA1341_LB )); } \
+  && log_ok "v1341-PREBUILT-JAR(deploy.sh --jar · 预飞就核对 jar 版本,对不上什么都不动)" \
+  || log_bad "v1341-PREBUILT-JAR --jar 缺了或核对太晚" "see deploy.sh 预飞"
+# ④ 回滚先核对线上版本:不是本次发布的版本 → 退出 3,在任何 SQL / cp 之前
+QA1341_LX=$(grep -n 'exit 3' "$QA1341_RB" | head -1 | cut -d: -f1)
+QA1341_LS=$(grep -nF 'for f in "$REPO_DIR"/db/rollback/v*.sql' "$QA1341_RB" | head -1 | cut -d: -f1)
+QA1341_LC=$(grep -n '^cp /opt/finance/app.jar.prev /opt/finance/app.jar' "$QA1341_RB" | head -1 | cut -d: -f1)
+{ grep -q -- '--expect-current)' "$QA1341_RB" && [[ -n "$QA1341_LX" && -n "$QA1341_LS" && -n "$QA1341_LC" ]] \
+  && (( QA1341_LX < QA1341_LS && QA1341_LX < QA1341_LC )); } \
+  && log_ok "v1341-ROLLBACK-VERSION-AWARE(rollback.sh --expect-current:线上不是这一版就拒绝,在任何 SQL / 换 jar 之前)" \
+  || log_bad "v1341-ROLLBACK-VERSION-AWARE 回滚不核对线上版本(新 jar 没换上去时会换成更老的版本)" "see deploy/rollback.sh"
+# ⑤ 每步带时间 + 全程日志
+{ grep -qF 'say()  { local now; now=$(date +%s)' "$QA1341_D" && grep -qF 'exec > >(tee -a "$DEPLOY_LOG") 2>&1' "$QA1341_D"; } \
+  && log_ok "v1341-DEPLOY-LOG(每步打开始时间 + 上一步用时 · 全程输出另存 /var/log/finance-deploy-*.log)" \
+  || log_bad "v1341-DEPLOY-LOG 部署输出又没时间 / 没日志了(卡住时看不出卡在哪)" "see deploy.sh say / exec tee"
+# ⑥ 闸门行为测试(假 meminfo / 假 jar · 几秒 · 含反证过的看门狗用例)
+if bash "$RD/scripts/test-deploy-guards.sh" > /tmp/finance-qa-deploy-guards.txt 2>&1; then
+  log_ok "v1341-DEPLOY-GUARD-TESTS($(tail -1 /tmp/finance-qa-deploy-guards.txt))"
+else
+  log_bad "v1341-DEPLOY-GUARD-TESTS 部署闸测试没过" "$(grep FAIL /tmp/finance-qa-deploy-guards.txt | head -3 | tr '\n' ' ')"
+fi
+# ⑦ 发布脚本不在 prod 上编译(release.sh 在 .claude/ 下、不进仓库;issue / 版本 worktree 里看不到 → SKIP 不算红)
+QA1341_REL="$RD/.claude/skills/release-prod/release.sh"
+if [[ -f "$QA1341_REL" ]]; then
+  { grep -qF 'JAR_ARG="--jar $REMOTE_JAR"' "$QA1341_REL" && grep -qF 'setsid nohup bash -c "sudo bash deploy/deploy.sh $JAR_ARG' "$QA1341_REL" \
+    && grep -qF 'ServerAliveInterval=15' "$QA1341_REL" && grep -qF 'rollback.sh --expect-current' "$QA1341_REL"; } \
+    && log_ok "v1341-RELEASE-NO-PROD-BUILD(beta 编 jar → sha256 → prod 后台 deploy.sh --jar · SSH 心跳 · 回滚带版本)" \
+    || log_bad "v1341-RELEASE-NO-PROD-BUILD 发布脚本又在 prod 上编译 / 前台跑 / 回滚不带版本" "see .claude/skills/release-prod/release.sh"
+else
+  log_skip "v1341-RELEASE-NO-PROD-BUILD" "release.sh 在 .claude/ 下,本工作区看不到(主工作区跑会检查)"
+fi
+
 echo
 echo "═══════════════════════════════════════"
 echo " 总结: PASS=$PASS  FAIL=$FAIL  SKIP=$SKIP"

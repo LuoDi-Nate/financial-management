@@ -4,6 +4,8 @@
 #
 # 用法:
 #   sudo bash deploy/rollback.sh
+#   sudo bash deploy/rollback.sh --expect-current 1.34.1   (发布流程用:线上跑的不是这一版就拒绝回滚)
+#   bash deploy/rollback.sh --expect-current 1.34.1 --check-only   只看「现在能不能回滚」,什么都不动(不需要 sudo)
 #
 # 干啥:
 #   1. 把 /opt/finance/app.jar.prev 还原到 /opt/finance/app.jar
@@ -20,12 +22,24 @@ ok()  { echo "${G}✓${X} $*"; }
 err() { echo "${R}✗${X} $*" >&2; }
 die() { err "$1"; exit 1; }
 
-[[ $EUID -eq 0 ]] || die "必须 sudo 跑"
-[[ -f /opt/finance/app.jar ]] || die "/opt/finance/app.jar 不存在,服务可能从未上线"
-[[ -f /opt/finance/app.jar.prev ]] || die "/opt/finance/app.jar.prev 不存在,没有上一版可回滚"
+EXPECT_CURRENT=""; CHECK_ONLY=0
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --expect-current) EXPECT_CURRENT="${2:?--expect-current 后面要跟版本号}"; EXPECT_CURRENT="${EXPECT_CURRENT#v}"; shift 2 ;;
+    --check-only) CHECK_ONLY=1; shift ;;
+    *) die "未知参数:$1(支持 --expect-current <版本> · --check-only)" ;;
+  esac
+done
+# jar 目录:默认 /opt/finance;FINANCE_APP_DIR 只给 --check-only 的测试用(scripts/test-deploy-guards.sh)
+APP_DIR="/opt/finance"
+[[ "$CHECK_ONLY" == "1" && -n "${FINANCE_APP_DIR:-}" ]] && APP_DIR="$FINANCE_APP_DIR"
+
+[[ "$CHECK_ONLY" == "1" || $EUID -eq 0 ]] || die "必须 sudo 跑"
+[[ -f $APP_DIR/app.jar ]] || die "$APP_DIR/app.jar 不存在,服务可能从未上线"
+[[ -f $APP_DIR/app.jar.prev ]] || die "$APP_DIR/app.jar.prev 不存在,没有上一版可回滚"
 
 # 检查 prev 和当前不一样,否则白回滚
-if cmp -s /opt/finance/app.jar /opt/finance/app.jar.prev; then
+if cmp -s $APP_DIR/app.jar $APP_DIR/app.jar.prev; then
   echo "${Y}⚠${X} app.jar 与 app.jar.prev 内容相同,回滚无意义"
   exit 0
 fi
@@ -40,7 +54,21 @@ jar_yml() {   # 机器上不一定装了 unzip,装不了就退而用 python3 读
   unzip -p "$1" BOOT-INF/classes/application.yml 2>/dev/null \
     || python3 -c 'import sys,zipfile;sys.stdout.write(zipfile.ZipFile(sys.argv[1]).read("BOOT-INF/classes/application.yml").decode())' "$1" 2>/dev/null
 }
-PREV_VER=$(jar_yml /opt/finance/app.jar.prev | grep -oE 'APP_VERSION:[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1 | cut -d: -f2 || true)
+PREV_VER=$(jar_yml $APP_DIR/app.jar.prev | grep -oE 'APP_VERSION:[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1 | cut -d: -f2 || true)
+CUR_VER=$(jar_yml $APP_DIR/app.jar | grep -oE 'APP_VERSION:[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1 | cut -d: -f2 || true)
+echo "当前 jar = v${CUR_VER:-?} · 上一版 jar(app.jar.prev)= v${PREV_VER:-?}"
+# v1.34.1 · 发布失败时的回滚要先确认「新 jar 真的换上去了」。
+#   2026-10-14 v1.34.0 首次部署卡在编译、jar 根本没换 —— 那时线上还是 1.33.0,app.jar.prev 是更老的版本;
+#   照「部署失败就回滚」跑下去,会把线上从 1.33.0 换成更老的版本。
+if [[ -n "$EXPECT_CURRENT" && "$CUR_VER" != "$EXPECT_CURRENT" ]]; then
+  err "线上跑的是 v${CUR_VER:-?},不是本次发布的 v$EXPECT_CURRENT —— 新 jar 没换上去,不需要回滚"
+  err "若照样回滚,会换成更老的 v${PREV_VER:-?}。已拒绝,什么都没动。"
+  exit 3
+fi
+if [[ "$CHECK_ONLY" == "1" ]]; then
+  ok "可以回滚:v${CUR_VER:-?} → v${PREV_VER:-?}(--check-only,什么都没动)"
+  exit 0
+fi
 ver_lt() { [[ "$1" != "$2" && "$(printf '%s\n%s\n' "$1" "$2" | sort -V | head -1)" == "$1" ]]; }
 if [[ -n "$PREV_VER" ]]; then
   echo "═══ 回滚前置 SQL(上一版 jar = v$PREV_VER)═══"
