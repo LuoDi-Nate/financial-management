@@ -93,6 +93,9 @@ async function snapReports(ui) {
   return ui.page.evaluate(() => document.body.innerText.replace(/\s+/g, ' '));
 }
 
+/** v1.34.2 · cleanup 要用:A 列那个账户与它跑之前每一期的余额 */
+const state = {};
+
 module.exports = {
   name: '21-dual-period-metrics',
   title: 'v1.23 · 双活跃窗口下的指标联动矩阵(PRD §4.3)',
@@ -141,6 +144,11 @@ module.exports = {
                           WHERE period_id=${cur} AND source_tag='CARRIED_FORWARD' LIMIT 1`)
              || db.one(`SELECT id FROM account WHERE family_id=${fx.FAM}
                          AND archived_at IS NULL AND type='CASH' LIMIT 1`);
+    // v1.34.2 · 记下这个账户每一期的余额,cleanup 原样放回 —— purgeFlows 只是在库里把流水标删,
+    //   不冲回余额,每跑一次 beta 上就留下一笔(补录期 −888.88、进行期延续值跟着 −888.88)。
+    //   有了补记 B(之后各期一起挪)之后,这个残留会摊到之后每一期,必须还原。
+    state.acct = acct;
+    state.acctSnaps = db.col(`SELECT CONCAT(period_id, ':', end_balance, ':', source_tag) FROM period_snapshot WHERE account_id=${acct}`);
     await ui.goto(`/entry?period=${prev}`);
     const form = 'form[action="/entry/expense"]';
     if (await ui.page.locator(form).count() === 0) {
@@ -336,6 +344,13 @@ module.exports = {
   async cleanup(ui, report) {
     ui.flow = this.name;
     fx.purgeFlows(NOTE);
+    if (state.acct && state.acctSnaps) {
+      for (const kv of state.acctSnaps) {
+        const [pid, b, tag] = kv.split(':');
+        db.raw(`UPDATE period_snapshot SET end_balance=${b}, source_tag='${tag}' WHERE account_id=${state.acct} AND period_id=${pid}`);
+      }
+      report.info(`还原:A 列那个账户 ${state.acctSnaps.length} 期的余额放回跑之前`);
+    }
     ui.page.on('dialog', d => d.accept().catch(() => {}));
     for (const pid of db.col(`SELECT id FROM period WHERE family_id=${fx.FAM}
                                AND status='OPEN' AND period_end < CURDATE()`)) {

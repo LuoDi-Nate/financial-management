@@ -180,6 +180,9 @@ public interface SnapshotMapper {
 
     // ── v1.34.2 · 往「之后已有人确认过余额」的账期里补记(维护者 2026-10-15 拍板:每次问,默认 A)──────────
     //   「确认过」= 不是系统代填的延续值(CARRIED_FORWARD)。系统代填的照旧走传导,不算断点。
+    //   「之后」只算**已经开始的期**(period_start <= 今天):还没开始的期不可能有「当时看到的余额」——
+    //   那只能是预建 / 测试数据(beta 的账期排到 2039,未来期都填过)。算进来的话每个账户都「之后确认过」,
+    //   双活跃窗口里补录期 → 进行期的传导(v1.23 FR-623)就被弹框截走了(全量 e2e flow 20 / 23 实测)。
 
     /** 这个账户在 {@code after} 之后的期里,有没有有人确认过的余额 */
     @Select("""
@@ -189,6 +192,7 @@ public interface SnapshotMapper {
              WHERE p.family_id = #{familyId}
                AND s.account_id = #{accountId}
                AND p.period_start > #{after}
+               AND p.period_start <= CURRENT_DATE()
                AND s.source_tag <> 'CARRIED_FORWARD'
             """)
     int countConfirmedAfter(@Param("familyId") long familyId,
@@ -211,6 +215,7 @@ public interface SnapshotMapper {
                             WHERE p.family_id = #{familyId}
                               AND s.account_id = cur.account_id
                               AND p.period_start > pc.period_start
+                              AND p.period_start <= CURRENT_DATE()
                               AND s.source_tag <> 'CARRIED_FORWARD')
             """)
     List<Long> accountsAskingBackfill(@Param("familyId") long familyId, @Param("periodId") long periodId);

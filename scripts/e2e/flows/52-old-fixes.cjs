@@ -82,7 +82,7 @@ async function quickExpense(ui, amt, choice) {
   await ui.click(`${form} button`, '点「− 支出」');
   const dlg = 'dialog[data-backfill-dialog][open]';
   await ui.page.waitForSelector(dlg, { timeout: 5000 }).catch(() => {});
-  await ui.assert(await ui.page.locator(dlg).count() === 1, '弹框问「这笔当时算进余额里了吗」');
+  await ui.visible(dlg, '弹框问「这笔当时算进余额里了吗」');
   return dlg;
 }
 
@@ -108,6 +108,7 @@ module.exports = {
     fs.closeSync(fd);
     state.dumped = true;
     report.info(`整库快照 → ${DUMP}(cleanup 用它还原)`);
+    state.cfMax = db.num(`SELECT COALESCE(MAX(id),0) FROM cash_flow`);
 
     const cur = Number(fx.currentPeriod());
     state.prev = db.num(`SELECT p.id FROM period p JOIN period c ON c.id=${cur}
@@ -116,8 +117,10 @@ module.exports = {
     const label = state.prevStart.slice(0, 7);
     await ui.assert(db.one(`SELECT status FROM period WHERE id=${state.prev}`) === 'CLOSED', `前置:上个月 ${label} 已关账`);
     await ui.assert(['MANUAL', 'UNKNOWN', 'IMPORT', 'AUTO_VALUATION'].includes(db.one(`SELECT source_tag FROM period_snapshot WHERE account_id=${A} AND period_id=${state.prev}`))
-        && laterBals(A, state.prevStart).length > 0,
-      `前置:工商银行-备用金 ${label} 的余额是确认过的,之后也有确认过的余额`);
+        && db.num(`SELECT COUNT(*) FROM period_snapshot s JOIN period p ON p.id=s.period_id WHERE p.family_id=${fx.FAM}
+             AND s.account_id=${A} AND p.period_start > '${state.prevStart}' AND p.period_start <= CURDATE()
+             AND s.source_tag <> 'CARRIED_FORWARD'`) > 0,
+      `前置:工商银行-备用金 ${label} 的余额是确认过的,之后(已经开始的期里)也有确认过的余额`);
 
     // ── 1 · 默认 A ─────────────────────────────────────────────────────
     report.section(`1 · 重开 ${label} → 填报页「− 支出」100 → 弹框默认「余额不动」→ 记上`);
@@ -210,6 +213,7 @@ module.exports = {
       AND (archived_at IS NULL OR archived_at > '${anchorEnd}')
       AND NOT (DATE(created_at) > '${anchorEnd}' AND NOT EXISTS (SELECT 1 FROM period_snapshot s WHERE s.period_id=${anchorId} AND s.account_id=a.id))`);
     await ui.assert(head && Number(head[2]) === expected, `「应填」= ${expected}(在册且不是那个月之后才建的)`, head ? head[0] : '');
+    await ui.seesText(`/ ${expected}`, `页面上封板抬头写的是「… / ${expected}」`);
     await ui.assert(bornAfter.every(n => !head[0].includes(n)),
       `那个月之后才建的 ${bornAfter.length} 个账户不在「缺」里`, bornAfter.join('、') || '(这次没有)');
 
@@ -243,7 +247,7 @@ module.exports = {
     }
     await relogin(ui);
     await ui.assert(db.num(`SELECT COUNT(*) FROM period WHERE family_id=${fx.FAM} AND status='OPEN'`) === 1
-        && db.num(`SELECT COUNT(*) FROM cash_flow WHERE backfill_mode IS NOT NULL`) === 0,
-      '还原:整库回到开跑前(只有本期 OPEN · 没有补记标记的流水)· 应用已重启并重新登录');
+        && db.num(`SELECT COUNT(*) FROM cash_flow WHERE id > ${state.cfMax || 0}`) === 0,
+      '还原:整库回到开跑前(只有本期 OPEN · 这条记的流水都不在了)· 应用已重启并重新登录');
   },
 };

@@ -243,6 +243,7 @@ worktree 的工作目录里没有 `.githooks/`(那是 master 上的文件),hook 
 | L23 · 手机上的表格与设置页(v1.31) | 新增 / 改**会在手机上显示的表格**;新增设置页 | 表格:同一份 `<table>` 加 `m-cards` + 单元格角色类(`m-title` 这一行是谁 / `m-badge` 状态标签 / 普通格带 `data-label` / `m-act` 操作整行 / `m-full` 长文本),**不另写一份手机 DOM**;操作格不许 `m-hide`;有意横滑的宽表(交叉透视、本期 vs 上期)除外。设置页:侧栏清单(`admin/_sidebar.html`)加一项、页面 include 侧栏。手机验收用 `ui.phone(fn)`(390×844 触屏;只改视口宽度看不到右下浮钮) | `v131-ADMIN-NAV` · `v131-MOBILE-CARDS` · e2e flow 47 |
 | L25 · 挂账户的表(v1.33 删除账户) | 新建一张带账户 id 的表(任何名字含 `account_id` 的列),或给已有表加这样一列 | 在 `AccountTrashSpec` 里登记:要么进 `TABLES`(删除时搬进回收站,条件带家庭过滤、按子 → 父排好位置),要么在 `COLUMNS` 里写明为什么不搬(比如「别人的引用,置空并记下」)。不登记 = 删了账户、这张表里它的行还在,**还在算,不报错**。别处引用被删账户的(像默认还款来源、待填行的预填划转)要在删除时置空并记进 `rewrites`、恢复时还原 | `v133-TRASH-COVERS-SCHEMA`(现查 `information_schema`)· `AccountTrashSpecTest` · e2e flow 49 |
 | L26 · 列一个账户的持仓(v1.34 持仓顺序) | 新写一条「按账户列持仓」给页面用的查询 / 新的页面要列某账户的持仓 | 走 `StockHoldingService.findActiveByAccount` / `findAllByAccount`,或在 SQL 里用 `StockHoldingMapper.ACCOUNT_ORDER` 排序;**不许另写 `ORDER BY h.id`** —— 那一处顺序会和持仓页不一样,用户以为没存上。新加持仓的写入入口不用管顺序(空排最后) | `v134-ORDER-ONE-KEY` · e2e flow 51 |
+| L27 · 往历史期补记(v1.34.2) | 新加一个「把金额加到某一期余额上」的写入口 / 改「什么时候问 A / B」 | 新入口一律走 `EntryService.creditAccountBalance`(判据和 A / B 只在那里),新表单加 `data-backfill-check`;改判据要同时改 `EntryService.backfillAsks` 和 `SnapshotMapper.accountsAskingBackfill`(页面弹框用);新记录要写 `backfill_mode`、删除要 `BackfillContext.override` | `v1342-BACKFILL-ONE-SINK` · `v1342-BACKFILL-JUDGE-ALIGNED` · `v1342-BACKFILL-UI` · e2e flow 52 |
 
 **新链怎么加**:出现"改 A 漏了 B"事故 → 加一行(触发/必须同步/守护)+ `qa-run.sh` 加静态 grep 把它网住,下次它自己 fail。
 

@@ -343,10 +343,25 @@ module.exports = {
     state.f8 = flowId(`${TAG}补录房租`);
     await toEntry(ui);
     await ui.click(`.entry-perpill[href*="period=${state.sep}"]`, '点上面的补录期 pill');
-    await confirmItem(ui, state.f8, '补录期摘要里点「确认」');
+    /* v1.34.2 · 工商银行-备用金 补录期(9 月)和进行期(10 月)的余额都确认过 → 确认前弹框问「当时算进余额了吗」
+     *   (维护者 2026-10-15 拍板:每次问,默认 A)。照默认 A「只补记,余额不动」点「记上」。 */
+    const sepBal0 = db.one(`SELECT end_balance FROM period_snapshot WHERE period_id=${state.sep} AND account_id=${CASH}`);
+    await openSummary(ui);
+    await ui.click(`[data-ff-item][data-ff-flow="${state.f8}"] [data-ff-confirm]`, '补录期摘要里点「确认」');
+    const dlg8 = 'dialog[data-backfill-dialog][open]';
+    const asked8 = await ui.page.waitForSelector(dlg8, { timeout: 4000 }).then(() => true).catch(() => false);
+    await ui.assert(asked8, '弹框问「这笔当时算进余额里了吗」(这个账户 9 月、10 月的余额都确认过)');
+    if (asked8) {
+      await ui.assert(await ui.page.locator(`${dlg8} [data-bf-keep]`).isChecked(), '默认选中「只补记这笔,余额不动」');
+      await Promise.all([ui.page.waitForNavigation({ waitUntil: 'networkidle' }).catch(() => {}),
+                         ui.click(`${dlg8} [data-bf-ok]`, '点「记上」')]);
+    }
     const o8 = String(occ(state.f8, state.sep) || '').split('|');
     const c8 = String(cf(o8[3] || 0) || '').split('|');
     await ui.assert(o8[1] === 'CONFIRMED' && Number(c8[0]) === state.sep, '真值层:确认记录与流水都在补录期', `${o8.join('|')} · ${c8.join('|')}`);
+    await ui.assert(db.one(`SELECT backfill_mode FROM cash_flow WHERE id=${Number(o8[3] || 0)}`) === 'KEEP'
+        && db.one(`SELECT end_balance FROM period_snapshot WHERE period_id=${state.sep} AND account_id=${CASH}`) === sepBal0,
+      '真值层:记的是「余额不动」(KEEP)· 补录期余额一分没动', `${sepBal0} → ${db.one(`SELECT end_balance FROM period_snapshot WHERE period_id=${state.sep} AND account_id=${CASH}`)}`);
     await ui.assert(!occ(state.f8, state.cur), '真值层:进行期没有多出这一笔');
     db.raw(`UPDATE period SET status='${state.sepStatus}' WHERE id=${state.sep}`);
 
