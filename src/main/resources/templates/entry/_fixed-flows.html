@@ -108,7 +108,7 @@
               <input th:if="${it.editable and s.open}" type="number" step="0.01" min="0.01" name="amount" class="ff-amt-in"
                      th:value="${it.amount}" th:attr="data-orig=${it.amount}" data-ff-amount aria-label="金额">
               <span th:unless="${it.editable and s.open}" data-priv th:text="${it.amountLabel}">¥300</span>
-              <span th:if="${it.calc}" class="ff-calc" th:title="${it.formula != null ? it.formula : it.problem}">算</span>
+              <span th:if="${it.calc}" class="ff-calc" title="自动算的金额 · 怎么算的见下面一行">算</span>
             </span>
           </div>
           <div class="ff-l2">
@@ -118,7 +118,9 @@
             <span th:if="${it.state == 'LIST'}" class="ff-sub">· 支出按「每人一个总数」填 —— 算进你填的总数就行,这里不单独记</span>
           </div>
           <div th:if="${it.calc and it.formula != null}" class="ff-formula" data-priv th:text="${it.formula}">按上月 … 与上上月 … 的差值</div>
-          <div th:if="${it.problem != null}" class="ff-problem" th:text="${it.problem}">算不出来</div>
+          <!--/* v1.34.2 · 原因里常带金额(「月供 ¥… 还不够这个月的利息 ¥…」「上月末欠款 ¥…」)→ 和算式一样挂 data-priv;
+           「算」角标的悬停提示原来直接放算式 / 原因,隐私模式糊不掉悬停框 → 改成不带金额的固定说明 */-->
+          <div th:if="${it.problem != null}" class="ff-problem" data-priv th:text="${it.problem}">算不出来</div>
           <label th:if="${it.rememberable and it.editable and s.open}" class="ff-remember" hidden data-ff-remember>
             <input type="checkbox" name="remember" value="true"> 以后都按 <span data-ff-remember-amt></span>?
           </label>
