@@ -27,6 +27,8 @@ public class Transfer {
     private boolean draft;
     /** v1.18 · 这一笔是谁写进来的({@link com.family.finance.domain.ledger.LedgerSource});历史数据为 UNKNOWN = 当时没记 */
     private String sourceTag;
+    /** v1.34.2 · 历史期补记方式:NULL 普通 / KEEP 余额不动 / SHIFT 之后各期一起挪(删时按同一种方式撤回) */
+    private String backfillMode;
 
     /**
      * 转入账户实际收到的钱(<b>转入账户的币种</b>)。

@@ -32,6 +32,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
     private final CacheHeaderInterceptor cacheHeaderInterceptor;
     private final MustChangePasswordInterceptor mustChangePasswordInterceptor;
     private final com.family.finance.observability.SqlProfileWebInterceptor sqlProfileWebInterceptor;
+    private final BackfillChoiceInterceptor backfillChoiceInterceptor;
 
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry r) {
@@ -71,6 +72,9 @@ public class WebMvcConfig implements WebMvcConfigurer {
         // 真正的业务处理之前 start(),但排在前面的两个 interceptor 也会发 SQL(改密码检查),
         // 那些不是被诊断的对象,不该进清单。
         registry.addInterceptor(sqlProfileWebInterceptor)
+                .excludePathPatterns("/vendor/**", "/css/**", "/img/**", "/uploads/**", "/favicon.ico");
+        // v1.34.2 · 补记到历史期的 A / B 选择(只在填报相关的写请求上有意义,放全站也只是读一个参数)
+        registry.addInterceptor(backfillChoiceInterceptor)
                 .excludePathPatterns("/vendor/**", "/css/**", "/img/**", "/uploads/**", "/favicon.ico");
     }
 }

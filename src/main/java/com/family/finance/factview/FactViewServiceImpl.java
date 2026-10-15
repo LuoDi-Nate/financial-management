@@ -1132,17 +1132,26 @@ public class FactViewServiceImpl implements FactViewService {
      * 不挂在任何账户上,账本分不出是哪种。加回去,后一种情况会把工资既算「人赚」又当开账基线
      * 剔除一次。转入没有这个歧义:钱一定来自家里另一个已记账的账户。</p>
      *
-     * <p>有转入时,资产类不为负:转进来的钱这一期亏了 / 花了,留在钱赚里,不算「负的存量」;
+     * <p>扣出转入 / 收支之后,资产类不为负:转进来的钱这一期亏了 / 花了,留在钱赚里,不算「负的存量」;
      * 负债照常为负(新纳入一笔贷款、这一期还了一部分,带进来的是还款前的欠款)。
-     * 首期没有转入的账户与原来逐字相同;收入 / 支出这一版不动(口径变更只做维护者点名的这一处)。</p>
+     * 首期没有转入的账户与原来逐字相同。</p>
+     *
+     * <p><b>v1.34.2 · 首期挂在这个账户上的收入 / 支出也扣出来</b>(维护者 2026-10-15 拍板)。
+     * 这些流水(affects_balance=1)已经在期末余额里,又各自记进了「人赚」—— 留在开账基线里,
+     * 「钱赚」就少算(收入)或虚高(支出)同样的数;账户表「累计净投入」把首期收入算两遍。
+     * 例:从 A 转进 1,000、记 200 工资、期末 1,200 → 开账基线 0(原来 200);
+     * 期初本有 500、这期从它花了 100、期末 400 → 开账基线 500(原来 400)。
+     * 没挂账户的收支(按人填总数)照旧分不出、不动。首期既无转入也无挂账户收支的账户与原来逐字相同。</p>
      */
     /** v1.30.1 · 公开给报表封板「本期归因」的「资本纳入」用 —— 与家庭开账基线同一个函数,不许各算各的 */
     public static BigDecimal openingOf(AccountPeriodFact row) {
         if (row == null || row.endBalanceBase() == null) return null;
         BigDecimal in = row.transferInBase() == null ? BigDecimal.ZERO : row.transferInBase();
-        // 首期没有转入 → 与原来逐字相同(口径只动维护者点名的这一处;零差异基线守着)
-        if (in.signum() == 0) return row.endBalanceBase();
-        BigDecimal v = row.endBalanceBase().subtract(in);
+        BigDecimal netFlow = (row.incomeBase() == null ? BigDecimal.ZERO : row.incomeBase())
+                .subtract(row.expenseBase() == null ? BigDecimal.ZERO : row.expenseBase());
+        // 首期既没有转入、也没有挂在账户上的收支 → 与原来逐字相同(零差异基线守着)
+        if (in.signum() == 0 && netFlow.signum() == 0) return row.endBalanceBase();
+        BigDecimal v = row.endBalanceBase().subtract(in).subtract(netFlow);
         boolean liability = row.accountType() != null && row.accountType().isLiability();
         if (!liability && v.signum() < 0) v = BigDecimal.ZERO;
         return v;

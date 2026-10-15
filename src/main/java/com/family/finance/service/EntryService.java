@@ -1,5 +1,6 @@
 package com.family.finance.service;
 
+import com.family.finance.service.backfill.BackfillContext;
 import com.family.finance.calc.ReconciliationCalculator;
 import com.family.finance.domain.account.Account;
 import com.family.finance.domain.account.AccountType;
@@ -649,6 +650,7 @@ public class EntryService {
                 .orElseThrow(() -> new IllegalArgumentException("现金流不存在: " + cashFlowId));
         Period period = requireOpenPeriod(familyId, cf.getPeriodId());
         Account account = requireAccount(familyId, cf.getAccountId());
+        BackfillContext.override(BackfillContext.parse(cf.getBackfillMode()));   // v1.34.2 · B 记的删时挪回去
         if (cf.getRefHoldingId() != null) {
             // v0.12 · 股票「+股数」收入:冲回持仓股数(持仓已归档/删则跳过)+ 冲回余额;不碰现金行
             BigDecimal shares = cf.getRefShares() == null ? BigDecimal.ZERO : cf.getRefShares();
@@ -666,6 +668,7 @@ public class EntryService {
             creditAccountBalance(familyId, period, account, memberId, delta,
                     "✕ 撤销 " + cf.getKind() + " " + money(cf.getAmount()));
         }
+        BackfillContext.resetApplied();
         cashFlowMapper.softDelete(familyId, cashFlowId);
         auditLogService.record(familyId, memberId, AuditLogType.CASH_FLOW_WRITE, "cash_flow", cashFlowId,
                 "软删现金流 " + cf.getKind() + " " + money(cf.getAmount()));
@@ -683,10 +686,12 @@ public class EntryService {
         // 反向:from +amount,to -amount(v1.18.1 · 与 addTransfer 同一条路由,否则撤销会把现金行留在原地)
         // 跨币种:收款方当初进账的是 to_amount,冲回也必须按同一个数,否则现金行会残留差额。
         BigDecimal backToAmount = t.receivedAmount();
+        BackfillContext.override(BackfillContext.parse(t.getBackfillMode()));   // v1.34.2 · B 记的删时挪回去
         creditAccountBalance(familyId, period, from, memberId, t.getAmount(),
                 "✕ 撤销划出到 " + to.getDisplayName() + " " + money(t.getAmount()));
         creditAccountBalance(familyId, period, to, memberId, backToAmount.negate(),
                 "✕ 撤销来自 " + from.getDisplayName() + " " + money(backToAmount));
+        BackfillContext.resetApplied();
         transferMapper.softDelete(familyId, transferId);
         auditLogService.record(familyId, memberId, AuditLogType.TRANSFER_CREATE, "transfer", transferId,
                 "软删转账 " + from.getDisplayName() + " → " + to.getDisplayName() + " " + money(t.getAmount()));
@@ -764,6 +769,34 @@ public class EntryService {
      */
     private void applyDeltaToBalance(Period period, Account account, long memberId,
                                       BigDecimal delta, String reason) {
+        applyDeltaToBalance(period, account, memberId, delta, reason, true);
+    }
+
+    /**
+     * v1.34.2 · 这一笔要不要按 A / B 处理:这一期这个账户的余额<b>是有人确认过的</b>,并且之后的期里也有确认过的余额。
+     *
+     * <p>两个条件缺一不可。这一期的余额要是还没填 / 是系统代填的延续值,它就不是「当时看到的数」,
+     * 照旧把这笔加上去才对(之后确认过的余额是真实观察,本来就包含它,不会出现断点);
+     * 之后没有确认过的余额,照旧传导就够。只有「两头都是真实观察」时,才需要问这笔当时算进去了没有。</p>
+     */
+    private boolean backfillAsks(long familyId, Period period, long accountId) {
+        return snapshotMapper.findByPeriodAndAccount(familyId, period.getId(), accountId)
+                .filter(s -> !com.family.finance.domain.ledger.LedgerSource.CARRIED_FORWARD.name().equals(s.getSourceTag()))
+                .isPresent()
+                && snapshotMapper.countConfirmedAfter(familyId, accountId, period.getPeriodStart()) > 0;
+    }
+
+    /** v1.34.2 · 填报页用:这一期里补记时要问 A / B 的账户(判据与 {@link #backfillAsks} 相同 —— SQL 版在 SnapshotMapper) */
+    public java.util.Set<Long> accountsAskingBackfill(long familyId, Period period) {
+        if (period == null || period.getStatus() == com.family.finance.domain.period.PeriodStatus.CLOSED) {
+            return java.util.Set.of();
+        }
+        return new java.util.HashSet<>(snapshotMapper.accountsAskingBackfill(familyId, period.getId()));
+    }
+
+    /** v1.34.2 · {@code propagate=false}:B 模式自己把之后各期一起挪,不再叠一次「传导到下一个系统代填的期」 */
+    private void applyDeltaToBalance(Period period, Account account, long memberId,
+                                      BigDecimal delta, String reason, boolean propagate) {
         Optional<PeriodSnapshot> currentOpt = snapshotMapper.findByPeriodAndAccount(period.getFamilyId(), period.getId(), account.getId());
         BigDecimal base;
         if (currentOpt.isPresent()) {
@@ -786,7 +819,7 @@ public class EntryService {
         auditLogService.record(period.getFamilyId(), memberId, AuditLogType.SNAPSHOT_WRITE,
                 "account", account.getId(),
                 reason + ":余额 " + base + " → " + newBalance);
-        propagateCarriedForward(period, account.getId(), newBalance, memberId);
+        if (propagate) propagateCarriedForward(period, account.getId(), newBalance, memberId);
     }
 
     /**
@@ -858,6 +891,30 @@ public class EntryService {
      */
     private void creditAccountBalance(long familyId, Period period, Account account, long memberId,
                                       BigDecimal delta, String reason) {
+        /* v1.34.2 · 这个账户在之后的期里已经有人确认过余额(不是系统代填)→ 按用户选的 A / B(维护者 2026-10-15)。
+         *   原来照常改这一期、只传导到下一个系统代填的期:后面确认过的期是断点,
+         *   于是下一期凭空多出一笔等额收益 / 亏损(v1.33 真实用例:A 的 09 +1,000)。
+         *   A(默认)= 只补记,余额不动 —— 当时填的余额已经包含了它;
+         *   B = 这一期和之后每一期(含已关账)一起挪同样的数,之后各期的逐期损益不变。
+         *   之后没有确认过的余额 → 照旧(下面三行原样)。 */
+        if (delta != null && delta.signum() != 0 && backfillAsks(familyId, period, account.getId())) {
+            BackfillContext.Mode mode = BackfillContext.resolve();
+            BackfillContext.markApplied(mode);
+            if (mode == BackfillContext.Mode.KEEP) {
+                auditLogService.record(familyId, memberId, AuditLogType.SYSTEM, "account", account.getId(),
+                        reason + " · 补记到 " + period.getPeriodStart() + " 起的这一期:之后已有确认过的余额,余额不动");
+                return;
+            }
+            if (stockHoldingService.valuationManaged(account)) {
+                stockHoldingService.adjustAccountCash(familyId, account.getId(), account.getCurrency(), delta);
+            }
+            applyDeltaToBalance(period, account, memberId, delta, reason, false);
+            int shifted = snapshotMapper.shiftAfter(familyId, account.getId(), period.getPeriodStart(), delta,
+                    "随 " + period.getPeriodStart().toString().substring(0, 7) + " 补记一起挪 " + money(delta));
+            auditLogService.record(familyId, memberId, AuditLogType.SNAPSHOT_WRITE, "account", account.getId(),
+                    reason + " · 补记到历史期:这一期和之后 " + shifted + " 期的余额一起挪 " + money(delta));
+            return;
+        }
         if (stockHoldingService.valuationManaged(account)) {
             stockHoldingService.adjustAccountCash(familyId, account.getId(), account.getCurrency(), delta);
         }
@@ -1194,7 +1251,9 @@ public class EntryService {
                  * 不进「钱花在哪」,给它们打一次性标记没有任何读它的地方。
                  * 与 expenseCategoryId 同一条规则:脏数据挡在写入口,不留给读口径去 if。 */
                 .oneOff(CONSUMPTION.equals(line.categoryCode()) && oneOff)
+                .backfillMode(BackfillContext.appliedName())   // v1.34.2 · 删这一笔时按同一种方式撤回
                 .build();
+        BackfillContext.resetApplied();
         cashFlowMapper.insertOwned(period.getFamilyId(), row);
         if (receipt != null) receipt.cashFlowIds.add(row.getId());
     }
@@ -1234,7 +1293,9 @@ public class EntryService {
                 .draft(false)
                 .sourceTag(receipt != null ? receipt.sourceTag()
                         : com.family.finance.domain.ledger.LedgerSource.MANUAL.name())   // v1.18 · v1.32 回执
+                .backfillMode(BackfillContext.appliedName())   // v1.34.2 · 删这一笔时按同一种方式撤回
                 .build();
+        BackfillContext.resetApplied();
         transferMapper.insertOwned(period.getFamilyId(), transfer);
         if (receipt != null) receipt.transferIds.add(transfer.getId());
         return transfer;

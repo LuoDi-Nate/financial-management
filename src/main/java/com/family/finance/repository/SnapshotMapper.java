@@ -177,4 +177,60 @@ public interface SnapshotMapper {
                     + " / 账户 " + snapshot.getAccountId() + " 不属于家庭 " + familyId);
         }
     }
+
+    // ── v1.34.2 · 往「之后已有人确认过余额」的账期里补记(维护者 2026-10-15 拍板:每次问,默认 A)──────────
+    //   「确认过」= 不是系统代填的延续值(CARRIED_FORWARD)。系统代填的照旧走传导,不算断点。
+
+    /** 这个账户在 {@code after} 之后的期里,有没有有人确认过的余额 */
+    @Select("""
+            SELECT COUNT(*)
+              FROM period_snapshot s
+              JOIN period p ON p.id = s.period_id
+             WHERE p.family_id = #{familyId}
+               AND s.account_id = #{accountId}
+               AND p.period_start > #{after}
+               AND s.source_tag <> 'CARRIED_FORWARD'
+            """)
+    int countConfirmedAfter(@Param("familyId") long familyId,
+                            @Param("accountId") long accountId,
+                            @Param("after") LocalDate after);
+
+    /**
+     * 填报页用:补记时要问 A / B 的账户 = 这一期的余额确认过、之后的期里也有确认过的余额
+     * (与 {@code EntryService.backfillAsks} 同一个判据,改一处要改两处 · 护栏 v1342-BACKFILL-JUDGE-ALIGNED)
+     */
+    @Select("""
+            SELECT DISTINCT cur.account_id
+              FROM period_snapshot cur
+              JOIN period pc ON pc.id = cur.period_id
+             WHERE pc.family_id = #{familyId}
+               AND pc.id = #{periodId}
+               AND cur.source_tag <> 'CARRIED_FORWARD'
+               AND EXISTS (SELECT 1 FROM period_snapshot s
+                             JOIN period p ON p.id = s.period_id
+                            WHERE p.family_id = #{familyId}
+                              AND s.account_id = cur.account_id
+                              AND p.period_start > pc.period_start
+                              AND s.source_tag <> 'CARRIED_FORWARD')
+            """)
+    List<Long> accountsAskingBackfill(@Param("familyId") long familyId, @Param("periodId") long periodId);
+
+    /**
+     * B · 「当时的余额还没算上它」:把 {@code after} 之后<b>每一期</b>(含已关账)这个账户的余额挪 {@code delta}。
+     * 之后各期的逐期损益因此不变 —— 对方账户不再凭空出现一笔等额收益 / 亏损。来源标记不动。
+     */
+    @org.apache.ibatis.annotations.Update("""
+            UPDATE period_snapshot s
+              JOIN period p ON p.id = s.period_id
+               SET s.end_balance = s.end_balance + #{delta},
+                   s.note = LEFT(CONCAT(#{note}, IFNULL(CONCAT(' · ', s.note), '')), 255)
+             WHERE p.family_id = #{familyId}
+               AND s.account_id = #{accountId}
+               AND p.period_start > #{after}
+            """)
+    int shiftAfter(@Param("familyId") long familyId,
+                   @Param("accountId") long accountId,
+                   @Param("after") LocalDate after,
+                   @Param("delta") BigDecimal delta,
+                   @Param("note") String note);
 }

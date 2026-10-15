@@ -6,7 +6,8 @@
 <div class="fixed top-0 left-0 right-0 h-1 bg-ink z-40"></div>
 <header th:replace="~{fragments/nav :: nav('entry', ${me}, ${nav})}"></header>
 
-<main class="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10 py-5 sm:py-10 relative z-10">
+<main class="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10 py-5 sm:py-10 relative z-10"
+      th:attr="data-backfill-ids=${backfillIds},data-backfill-period=${#temporals.format(period.periodStart,'yyyy-MM')}">
 
   <!-- v1.6.32 · 新手引导卡(localStorage 一年 · 见 fragments/_manual-hint) -->
   <th:block th:insert="~{fragments/_manual-hint :: card}"></th:block>
@@ -158,7 +159,7 @@
 
         <!-- 现金收入(类型切换 tab 与表单同一行 · 2026-07-18 UED:tab 不再独占一行、字号与控件一致) -->
         <div id="income-cash-block">
-          <form th:action="@{/entry/income}" method="post" class="flex flex-wrap items-end gap-2 mb-1">
+          <form th:action="@{/entry/income}" method="post" class="flex flex-wrap items-end gap-2 mb-1" data-backfill-check>
             <span class="flex gap-1 self-end" role="tablist">
               <button type="button" class="tab-cash pill text-xs h-9 px-3 cursor-pointer">现金收入</button>
               <button type="button" class="tab-stock pill text-xs h-9 px-3 cursor-pointer">股票收入</button>
@@ -312,7 +313,7 @@
              class="border-l-2 border-brass-deep bg-brass-soft/40 px-4 py-2.5 text-[13px] leading-relaxed mb-3"
              th:text="${balanceGuard}">这次改动动了已校准的余额。</div>
 
-        <form th:action="@{/entry/expense}" method="post" class="flex flex-wrap items-end gap-2 mb-1">
+        <form th:action="@{/entry/expense}" method="post" class="flex flex-wrap items-end gap-2 mb-1" data-backfill-check>
           <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
           <input type="hidden" name="periodId" th:value="${period.id}">
           <div>
@@ -770,6 +771,29 @@
       </div>
     </div>
   </section>
+
+  <!--/* v1.34.2 · 往「之后已有人确认过余额」的期里补记时问一句(维护者 2026-10-15 拍板:每次问,默认 A)。
+         哪些账户要问由服务端算好放在 main 的 data-backfill-ids;表单带 data-backfill-check 才检查。
+         不开 JS / 不选 = 服务端按 A 处理(BackfillContext 默认),所以这一层只是「问」,不是「拦」。 */-->
+  <dialog class="bf-dialog" data-backfill-dialog aria-labelledby="bf-title">
+    <form method="dialog">
+      <h3 id="bf-title" class="bf-title">这个账户之后的余额已经确认过</h3>
+      <p class="bf-desc">你在补记 <b data-bf-period>2026-08</b> 的账。<span data-bf-names>这个账户</span>这一期和之后月份的余额都是确认过的 —— 这笔当时算进余额里了吗?</p>
+      <label class="bf-opt">
+        <input type="radio" name="bf-mode" value="KEEP" checked data-bf-keep>
+        <span><b>算进去了 —— 只补记这笔,余额不动</b><br>当时对着 App 填的余额已经包含了它(通常是这种)</span>
+      </label>
+      <label class="bf-opt">
+        <input type="radio" name="bf-mode" value="SHIFT" data-bf-shift>
+        <span><b>没算进去 —— 这一期和之后每个月的余额一起改</b><br>那时候填的余额漏了这笔,之后各月都差同样的数</span>
+      </label>
+      <div class="bf-actions">
+        <button type="submit" value="cancel" class="btn-paper text-xs" data-bf-cancel>取消</button>
+        <button type="submit" value="ok" class="btn-ink text-xs" data-bf-ok>记上</button>
+      </div>
+    </form>
+  </dialog>
+  <script th:src="@{/js/backfill-ask.js(v=${buildVersion})}"></script>
 </main>
 
 <footer th:replace="~{fragments/layout :: footer}"></footer>

@@ -3001,3 +3001,18 @@ body.adm-open #float-dock { display: none !important; }
   .acct-actions > a svg { width: 11px; height: 11px; flex: none; }
   .acct-actions-long { display: none; }
 }
+
+/* ── 补记到历史期的选择框(v1.34.2 · js/backfill-ask.js)── */
+.bf-dialog { border: 1px solid var(--ink); background: var(--card); color: var(--ink); padding: 0; max-width: 520px; width: calc(100% - 32px); }
+.bf-dialog::backdrop { background: rgba(26,23,20,.35); }
+.bf-dialog form { padding: 20px 22px; display: flex; flex-direction: column; gap: 12px; }
+.bf-title { font-family: 'Fraunces', 'Noto Serif SC', serif; font-size: 18px; }
+.bf-desc { font-size: 13px; color: var(--ink-soft); line-height: 1.7; }
+.bf-opt { display: grid; grid-template-columns: 18px 1fr; gap: 10px; align-items: start; padding: 10px 12px;
+          border: 1px solid var(--rule); font-size: 13px; line-height: 1.6; cursor: pointer; }
+.bf-opt span { color: var(--ink-soft); }
+.bf-opt b { color: var(--ink); font-weight: 600; }
+.bf-opt:has(input:checked) { border-color: var(--brass); background: rgba(196,148,62,.06); }
+.bf-opt input { margin-top: 4px; }
+.bf-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px; }
+.bf-actions button { justify-content: center; height: 38px; }

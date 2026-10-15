@@ -23,7 +23,8 @@ import java.util.Optional;
 public interface TransferMapper {
 
     String COLS = " t.id, t.period_id, t.from_account_id, t.to_account_id, t.amount, t.to_amount,"
-            + " t.occurred_at, t.note, t.submitted_by, t.submitted_at, t.is_draft AS draft ";
+            + " t.occurred_at, t.note, t.submitted_by, t.submitted_at, t.is_draft AS draft,"
+            + " t.backfill_mode AS backfillMode ";
 
     @Select("SELECT" + COLS + "FROM transfer t"
           + " JOIN period p ON p.id = t.period_id"
@@ -93,10 +94,11 @@ public interface TransferMapper {
     @Insert("""
             INSERT INTO transfer (
                 period_id, from_account_id, to_account_id, amount, to_amount,
-                occurred_at, note, submitted_by, is_draft, source_tag
+                occurred_at, note, submitted_by, is_draft, source_tag, backfill_mode
             )
             SELECT #{t.periodId}, #{t.fromAccountId}, #{t.toAccountId}, #{t.amount}, #{t.toAmount},
-                   #{t.occurredAt}, #{t.note}, #{t.submittedBy}, #{t.draft}, COALESCE(#{t.sourceTag}, 'UNKNOWN')
+                   #{t.occurredAt}, #{t.note}, #{t.submittedBy}, #{t.draft}, COALESCE(#{t.sourceTag}, 'UNKNOWN'),
+                   #{t.backfillMode}
               FROM period p
               JOIN account af ON af.id = #{t.fromAccountId}
               JOIN account at2 ON at2.id = #{t.toAccountId}

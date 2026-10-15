@@ -98,11 +98,16 @@ public class EntryController {
         }
         // 把 ledger 拼成 HTML 字符串塞 model(规避 Thymeleaf each + record nested List 的 accessor bug)
         java.util.Map<String, String> ledgerHtmlByAccount = new java.util.LinkedHashMap<>();
+        java.util.Set<Long> backfillAsk = entryService.accountsAskingBackfill(me.getFamilyId(), period);
         for (EntryRow r : rows) {
-            ledgerHtmlByAccount.put(String.valueOf(r.account().getId()), renderLedgerHtml(r));
+            ledgerHtmlByAccount.put(String.valueOf(r.account().getId()),
+                    renderLedgerHtml(r, backfillAsk.contains(r.account().getId())));
         }
         model.addAttribute("ledgerHtmlByAccount", ledgerHtmlByAccount);
         model.addAttribute("period", period);
+        // v1.34.2 · 这一期补记时要问「当时算进余额了没有」的账户(这一期余额确认过 + 之后也有确认过的余额)
+        model.addAttribute("backfillIds", backfillAsk.stream()
+                .map(String::valueOf).collect(java.util.stream.Collectors.joining(",")));
         // 账期选择器的候选:近 12 期,但**不能用 findLatest** —— 它按 period_start 倒序取,
         // 账期表若预建到很多年以后(beta 排到 2038),取到的 12 期全是未来空期,
         // 当前账期根本不在列表里 → 没有 option 带 selected → 选择器显示成「2038 · 12 · CLOSED」。
@@ -738,7 +743,8 @@ public class EntryController {
     }
 
     /** 把 EntryRow.ledger 渲染为预格式化的 HTML 片段(规避 Thymeleaf 在 each 嵌套 List 上的 accessor bug)。 */
-    private String renderLedgerHtml(EntryRow row) {
+    /** @param historical v1.34.2 · 这个账户这一期和之后的余额都确认过 → 删除的确认话术按「余额不动 / 一起改回去」说 */
+    private String renderLedgerHtml(EntryRow row, boolean historical) {
         if (row == null || row.ledger() == null || row.ledger().isEmpty()) return "";
         // CSRF token 用于本期内 ⋮ 删除按钮的 hx-headers
         String csrfToken = "";
@@ -806,6 +812,13 @@ public class EntryController {
                 } else {
                     confirmMsg = "确定删除这条流水?余额会自动反向冲销。";
                 }
+                if (historical) {
+                    // v1.34.2 · 这一期和之后的余额都确认过:删掉只撤掉记录,余额按当初记的方式处理(默认不动)
+                    confirmMsg = (isTransfer ? "删除这笔划转?" : "删除这条流水?")
+                            + "「" + row.account().getDisplayName() + "」这一期和之后月份的余额都确认过,删掉只撤掉这条记录、余额不动"
+                            + "(当初选了「这一期和之后每个月一起改」的,会把各月余额一起改回去)"
+                            + (isTransfer ? ";对方账户按它自己的情况处理" : "") + "。";
+                }
                 sb.append("<button type=\"button\" class=\"tap text-[11px] text-ink-subtle hover:text-rust px-1\" title=\"删除此条\" ")
                         .append("hx-post=\"").append(url).append("\" ")
                         .append("hx-target=\"#entry-block-").append(row.account().getId()).append("\" ")
@@ -857,7 +870,9 @@ public class EntryController {
         model.addAttribute("accounts", accountMapper.findActiveByFamily(me.getFamilyId()));
         addAccountOwnerMeta(me.getFamilyId(), model);   // v1.4.2 · HTMX 换行块也要带主理人元信息(否则换行后头像丢)
         java.util.Map<String, String> singleLedger = new java.util.LinkedHashMap<>();
-        singleLedger.put(String.valueOf(row.account().getId()), renderLedgerHtml(row));
+        Period blockPeriod = periodMapper.findById(me.getFamilyId(), periodId).orElse(null);
+        singleLedger.put(String.valueOf(row.account().getId()), renderLedgerHtml(row,
+                entryService.accountsAskingBackfill(me.getFamilyId(), blockPeriod).contains(row.account().getId())));
         model.addAttribute("ledgerHtmlByAccount", singleLedger);
         return "entry/_row :: block(row=${row}, oob=null)";
     }
