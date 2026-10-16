@@ -96,8 +96,9 @@
 
 > 完整发布记录与截图见 [Releases](https://github.com/LuoDi-Nate/financial-management/releases)(本段每版只留 2–4 行,细节不搬过来)。
 
-**[v1.34.0](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.34.0) – [v1.34.1](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.34.1) · 持仓和账户都能拖着排顺序 · 持仓改名 · 升级不再拖死服务器**
+**[v1.34.0](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.34.0) – [v1.34.2](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.34.2) · 持仓和账户都能拖着排顺序 · 持仓改名 · 升级不再拖死服务器 · 补历史账不再凭空多出收益**
 账户里的持仓可以拖着排,和券商 / 基金 App 的顺序对上,每月核对从上往下挨个对就行([#40](https://github.com/LuoDi-Nate/financial-management/issues/40));持仓页、填报页、截图导入、资产打标都按这个顺序。账户本身也能在账户簿里拖着排。持仓名字填错了可以直接改([#41](https://github.com/LuoDi-Nate/financial-management/issues/41))。v1.34.1 让 `deploy.sh` 升级时先编译再改库、编译带内存保护(内存不够就停下,线上不动),也可以用 `--jar` 传别处编好的包。
+v1.34.2:重开历史月份补记一笔时会问「当时的余额算进去了吗」—— 默认只补记、余额不动,也可以选这个月和之后每个月一起改,对方账户不再凭空多出一笔收益;新账户第一个月的收支不再算两遍;已关账月份不再把之后才建的账户算成「缺」。
 
 **[v1.33.0](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.33.0) · 固定收支 · 立即备份 · 删除账户**
 工资、物业、房贷月供、信用卡账单、保费这类每期都有的几笔设一次,到了日子在填报页一键确认([#38](https://github.com/LuoDi-Nate/financial-management/issues/38));「管理 → 备份」可以随手立即备份一份([#29](https://github.com/LuoDi-Nate/financial-management/issues/29))。账户可以删除了([#39](https://github.com/LuoDi-Nate/financial-management/issues/39)):删之前逐项写明会改写哪几期、和别的账户之间每一笔划转怎么改记(对方收益一分不变),删掉的进回收站,能原样恢复。
