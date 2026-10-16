@@ -240,6 +240,20 @@ async function openRow(ui, acc) {
   if (isOpen === false) await ui.click(`${fold} > summary`, '展开这一行');
 }
 
+/**
+ * v1.34.2 · 往「这一期余额确认过 + 之后已开始的期也确认过」的期里补记,提交前会弹框问 A / B(维护者 2026-10-15 拍板)。
+ * 这条是在页面上「补历史」:N 是现在才建的卡,当时的余额根本没算上这些钱 → 选 B「这一期和之后每个月一起改」,
+ * 对方账户之后各期就不会凭空多出等额损益(v1.33 时这条用例看到的 A 的 09 +1,000 / B 的 10 −300 正是这个)。
+ */
+async function answerBackfill(ui, label) {
+  const dlg = 'dialog[data-backfill-dialog][open]';
+  const asked = await ui.page.waitForSelector(dlg, { timeout: 2500 }).then(() => true).catch(() => false);
+  if (!asked) return false;
+  await ui.click(`${dlg} [data-bf-shift]`, `弹框选「没算进去 —— 这一期和之后每个月一起改」(${label})`);
+  await ui.click(`${dlg} [data-bf-ok]`, '点「记上」');
+  return true;
+}
+
 /** 在 from 那一行的「账户间划转」里搜对方、填金额、点划转 */
 async function transfer(ui, from, toName, search, amt) {
   state.step = `划转 ${from} → ${toName} ${amt}`;
@@ -250,11 +264,12 @@ async function transfer(ui, from, toName, search, amt) {
   await ui.page.waitForTimeout(300);
   await ui.click(`${form} .ss-item:has-text("${toName}")`, `候选里点「${toName}」`);
   await ui.fill(`${form} input[name="amount"]`, amt, `金额 ${amt}`);
-  await Promise.all([
-    ui.page.waitForResponse(r => r.url().includes(`/entry/${from}/transfer`), { timeout: 20000 }).catch(() => null),
-    ui.click(`${form} button:has-text("划转")`, '点「↔ 划转」'),
-  ]);
+  const resp = ui.page.waitForResponse(r => r.url().includes(`/entry/${from}/transfer`), { timeout: 20000 }).catch(() => null);
+  await ui.click(`${form} button:has-text("划转")`, '点「↔ 划转」');
+  const asked = await answerBackfill(ui, `划转 ${amt}`);
+  await resp;
   await ui.page.waitForTimeout(1200);
+  return asked;
 }
 
 async function createAccount(ui, name) {
@@ -321,14 +336,27 @@ module.exports = {
     report.section('2 · 管理 → 周期 → 重开 08 → 填报 08:A → N 1,000 · N 收入 200(工资)→ 关闭账期');
     await periodAction(ui, state.p8, 'reopen', '2026-08');
     await entryFor(ui, state.p8, '2026-08');
-    await transfer(ui, A, N_NAME, '删除用', 1000);
+    const aLater0 = db.col(`SELECT CONCAT(s.period_id, ':', s.end_balance) FROM period_snapshot s JOIN period p ON p.id=s.period_id
+      WHERE p.family_id=${fx.FAM} AND s.account_id=${A} AND p.period_start > '2026-08-01' ORDER BY p.period_start`);
+    const askedA = await transfer(ui, A, N_NAME, '删除用', 1000);
     state.step = '08 收入 200';
     await ui.fill('form[action$="/entry/income"] input[name="amount"]', 200, '收入金额 200');
     await ui.choose('categoryCode', 'salary', 'form[action$="/entry/income"]');
     await ui.choose('accountId', N, 'form[action$="/entry/income"]');
-    await ui.submit('form[action$="/entry/income"] button[type=submit]', '点「+ 加一笔」');
+    await ui.click('form[action$="/entry/income"] button[type=submit]', '点「+ 加一笔」');
+    await answerBackfill(ui, '收入 200');
+    await ui.page.waitForLoadState('networkidle').catch(() => {});
+    await ui.page.waitForTimeout(800);
     await ui.assert(Number(bal(N, state.p8)) === 1200, '真值层:N 的 08 余额 = 1,000(转入)+ 200(工资)= 1,200', bal(N, state.p8));
     await ui.assert(Number(bal(A, state.p8)) === a8before - 1000, '真值层:A 的 08 余额跟着少了 1,000(划转联动)', `${a8before} → ${bal(A, state.p8)}`);
+    if (askedA) {
+      const aLater1 = db.col(`SELECT CONCAT(s.period_id, ':', s.end_balance) FROM period_snapshot s JOIN period p ON p.id=s.period_id
+        WHERE p.family_id=${fx.FAM} AND s.account_id=${A} AND p.period_start > '2026-08-01' ORDER BY p.period_start`);
+      await ui.assert(aLater0.length > 0 && aLater0.length === aLater1.length && aLater0.every((kv, i) => {
+        const [p0, b0] = kv.split(':'); const [p1, b1] = aLater1[i].split(':');
+        return p0 === p1 && Math.abs(Number(b1) - Number(b0) + 1000) < 0.005;
+      }), `真值层:选了「一起改」→ A 之后 ${aLater0.length} 期的余额也都少 1,000(09 不再凭空多出 +1,000 的收益)`);
+    }
     await ui.assert(db.num(`SELECT COUNT(*) FROM cash_flow WHERE account_id=${N} AND period_id=${state.p8} AND kind='INCOME' AND amount=200 AND deleted_at IS NULL`) === 1,
       '真值层:N 在 08 有一笔工资收入 200');
     await periodAction(ui, state.p8, 'close', '2026-08');
@@ -343,10 +371,10 @@ module.exports = {
     state.step = '09 N 快捷支出 100';
     const exp = `#entry-block-${N} form[hx-post$="/entry/${N}/cash-flow"]`;
     await ui.fill(`${exp} input[name="amount"]`, 100, '快捷支出 100');
-    await Promise.all([
-      ui.page.waitForResponse(r => r.url().includes(`/entry/${N}/cash-flow`), { timeout: 20000 }).catch(() => null),
-      ui.click(`${exp} button`, '点「− 支出」'),
-    ]);
+    const respE = ui.page.waitForResponse(r => r.url().includes(`/entry/${N}/cash-flow`), { timeout: 20000 }).catch(() => null);
+    await ui.click(`${exp} button`, '点「− 支出」');
+    await answerBackfill(ui, '快捷支出 100');
+    await respE;
     await ui.page.waitForTimeout(1200);
     await ui.assert(Number(bal(N, state.p9)) === 800, '真值层:N 的 09 余额 = 1,200 − 300 − 100 = 800', bal(N, state.p9));
     await ui.assert(Number(bal(B, state.p9)) === b9before + 300, '真值层:B 的 09 余额跟着多了 300', `${b9before} → ${bal(B, state.p9)}`);

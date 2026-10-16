@@ -11732,6 +11732,75 @@ else
   log_skip "v1341-RELEASE-NO-PROD-BUILD" "release.sh 在 .claude/ 下,本工作区看不到(主工作区跑会检查)"
 fi
 
+# ════════════════════════════════════════════════════════════════════
+# v1.34.2 · 五个老问题(维护者 2026-10-15 拍板 · 原名 v1.33.1)
+# ════════════════════════════════════════════════════════════════════
+section "v1.34.2 · 五个老问题"
+QA1342_FV="$RD/src/main/java/com/family/finance/factview/FactViewServiceImpl.java"
+QA1342_ES="$RD/src/main/java/com/family/finance/service/EntryService.java"
+QA1342_SM="$RD/src/main/java/com/family/finance/repository/SnapshotMapper.java"
+QA1342_OP="$(awk '/public static BigDecimal openingOf\(/{f=1} f{print} f&&/^    }$/{exit}' "$QA1342_FV")"
+# ① 新账户首期开账基线扣「挂在这个账户上的收支」
+{ grep -qF 'row.incomeBase()' <<<"$QA1342_OP" && grep -qF 'row.expenseBase()' <<<"$QA1342_OP" \
+  && grep -qF '.subtract(in).subtract(netFlow)' <<<"$QA1342_OP" \
+  && grep -qF 'in.signum() == 0 && netFlow.signum() == 0' <<<"$QA1342_OP" \
+  && [ -f "$RD/src/test/java/com/family/finance/factview/OpeningBaselineFlowTest.java" ]; } \
+  && log_ok "v1342-OPENING-NET-FLOW(新账户首期开账基线扣挂账户的收支 · 都没有时原样 · 单测钉住)" \
+  || log_bad "v1342-OPENING-NET-FLOW 首期挂账户的收支又留在开账基线里了(钱赚少算 / 累计净投入重复)" "see FactViewServiceImpl.openingOf"
+# ② 补记到历史期:判据与 A / B 只在一个口子;记下方式;删时照此撤回;挪之后各期带 family_id
+QA1342_CR="$(awk '/private void creditAccountBalance\(/{f=1} f{print} f&&/^    }$/{exit}' "$QA1342_ES")"
+{ grep -qF 'backfillAsks(familyId, period, account.getId())' <<<"$QA1342_CR" \
+  && grep -qF 'BackfillContext.Mode.KEEP' <<<"$QA1342_CR" && grep -qF 'snapshotMapper.shiftAfter(' <<<"$QA1342_CR" \
+  && grep -qF 'applyDeltaToBalance(period, account, memberId, delta, reason, false)' <<<"$QA1342_CR" \
+  && [ "$(grep -cF '.backfillMode(BackfillContext.appliedName())' "$QA1342_ES")" -eq 2 ] \
+  && [ "$(grep -cF 'BackfillContext.override(BackfillContext.parse(' "$QA1342_ES")" -eq 2 ] \
+  && grep -qF 'one_off, backfill_mode' "$RD/src/main/java/com/family/finance/repository/CashFlowMapper.java" \
+  && grep -qF 'is_draft, source_tag, backfill_mode' "$RD/src/main/java/com/family/finance/repository/TransferMapper.java" \
+  && awk '/int shiftAfter\(/{exit} /UPDATE period_snapshot s/{f=1} f' "$QA1342_SM" | grep -qF 'p.family_id = #{familyId}' \
+  && grep -qh 'ADD COLUMN backfill_mode VARCHAR(8) NULL' "$RD"/db/migration/V74__*.sql \
+  && [ -f "$RD/src/test/java/com/family/finance/service/EntryBackfillTest.java" ]; } \
+  && log_ok "v1342-BACKFILL-ONE-SINK(补记到历史期:判据和 A / B 只在 creditAccountBalance · 新记录存方式 · 删时照此撤回 · 挪之后各期带 family_id · 单测钉住)" \
+  || log_bad "v1342-BACKFILL-ONE-SINK 补记到历史期的处理散了 / 没记方式 / 删时不按当初撤回" "see EntryService.creditAccountBalance"
+# ③ 判据两处一致:Java(backfillAsks)与页面 SQL(accountsAskingBackfill)
+QA1342_JA="$(awk '/private boolean backfillAsks\(/{f=1} f{print} f&&/^    }$/{exit}' "$QA1342_ES")"
+QA1342_SQ="$(awk '/List<Long> accountsAskingBackfill\(/{exit} /SELECT DISTINCT cur.account_id/{f=1} f' "$QA1342_SM")"
+{ grep -qF 'CARRIED_FORWARD' <<<"$QA1342_JA" && grep -qF 'countConfirmedAfter' <<<"$QA1342_JA" \
+  && grep -qF "cur.source_tag <> 'CARRIED_FORWARD'" <<<"$QA1342_SQ" && grep -qF "s.source_tag <> 'CARRIED_FORWARD'" <<<"$QA1342_SQ" \
+  && grep -qF 'p.period_start > pc.period_start' <<<"$QA1342_SQ" && grep -qF 'p.period_start <= CURRENT_DATE()' <<<"$QA1342_SQ" \
+  && awk '/int countConfirmedAfter\(/{exit} /SELECT COUNT\(\*\)/{f=1} f' "$QA1342_SM" | grep -qF "s.source_tag <> 'CARRIED_FORWARD'" \
+  && awk '/int countConfirmedAfter\(/{exit} /SELECT COUNT\(\*\)/{f=1} f' "$QA1342_SM" | grep -qF 'p.period_start <= CURRENT_DATE()'; } \
+  && log_ok "v1342-BACKFILL-JUDGE-ALIGNED(问不问 A / B:Java 判据与页面 SQL 同一组条件)" \
+  || log_bad "v1342-BACKFILL-JUDGE-ALIGNED 页面弹不弹框和服务端怎么处理对不上了" "see EntryService.backfillAsks · SnapshotMapper.accountsAskingBackfill"
+# ④ 页面:弹框默认 A,四类写表单带检查,「这期没有」不问
+QA1342_T="$RD/src/main/resources/templates/entry"
+{ grep -qF 'data-backfill-ids=${backfillIds}' "$QA1342_T/index.html" && grep -qF 'data-backfill-dialog' "$QA1342_T/index.html" \
+  && grep -q 'value="KEEP" checked data-bf-keep' "$QA1342_T/index.html" && grep -qF '/js/backfill-ask.js' "$QA1342_T/index.html" \
+  && [ "$(grep -c 'data-backfill-check' "$QA1342_T/index.html")" -ge 2 ] && [ "$(grep -c 'data-backfill-check' "$QA1342_T/_row.html")" -eq 2 ] \
+  && grep -qF 'data-backfill-check data-backfill-collect' "$QA1342_T/_fixed-flows.html" && grep -qF 'data-ff-skip data-no-backfill' "$QA1342_T/_fixed-flows.html" \
+  && grep -qF "dialog.querySelector('[data-bf-keep]').checked = true" "$RD/src/main/resources/static/js/backfill-ask.js"; } \
+  && log_ok "v1342-BACKFILL-UI(填报页补记到历史期弹框 · 默认 A · 收入 / 支出 / 快捷支出 / 划转 / 固定收支确认都问 · 「这期没有」不问)" \
+  || log_bad "v1342-BACKFILL-UI 有写表单没接上弹框,或默认不是 A" "see entry/*.html · js/backfill-ask.js"
+# ⑤ 封板完整度不算之后才建、又没快照的账户
+{ grep -qF 'a.getCreatedAt().toLocalDate().isAfter(anchor.getPeriodEnd())' "$RD/src/main/java/com/family/finance/service/report/SealedPeriodService.java" \
+  && grep -qF 'filledIds.contains(r.accountId()) || !bornAfter.contains(r.accountId())' "$RD/src/main/java/com/family/finance/service/report/SealedPeriodService.java" \
+  && [ -f "$RD/src/test/java/com/family/finance/service/report/SealedCompletenessBornAfterTest.java" ]; } \
+  && log_ok "v1342-COMPLETENESS-BORN-AFTER(封板「x / y 已填 · 缺」不算那个月之后才建、又没快照的账户 · 补过的照算)" \
+  || log_bad "v1342-COMPLETENESS-BORN-AFTER 已关账月又会把之后才建的账户算成缺" "see SealedPeriodService.buildCompleteness"
+# ⑥ 固定收支原因打码
+{ grep -qF 'class="ff-problem" data-priv' "$QA1342_T/_fixed-flows.html" \
+  && ! grep -q 'ff-calc" th:title=' "$QA1342_T/_fixed-flows.html"; } \
+  && log_ok "v1342-FF-PROBLEM-PRIV(固定收支「算不出来」的原因挂 data-priv · 「算」角标悬停不带算式 / 原因)" \
+  || log_bad "v1342-FF-PROBLEM-PRIV 隐私模式下固定收支的原因 / 悬停又露金额了" "see entry/_fixed-flows.html"
+# ⑦ flow 21 确定可复现:不再按百分比比仪表盘收益
+QA1342_F21="$RD/scripts/e2e/flows/21-dual-period-metrics.cjs"
+{ grep -qF 'async function snapSealed(ui)' "$QA1342_F21" && grep -qF "afterE['本月资产收益金额']" "$QA1342_F21" \
+  && ! grep -qF "afterE['本月资产收益'] === beforeE['本月资产收益']" "$QA1342_F21" \
+  && ! grep -qF "afterA['本月资产收益'] === base['本月资产收益']" "$QA1342_F21"; } \
+  && log_ok "v1342-FLOW21-DETERMINISTIC(flow 21:报表封板段不动 + 仪表盘收益金额对净资产 —— 不看行情、不看四舍五入)" \
+  || log_bad "v1342-FLOW21-DETERMINISTIC flow 21 又按百分比比仪表盘的实时收益(时红时绿)" "see scripts/e2e/flows/21-dual-period-metrics.cjs"
+[ -f "$RD/scripts/e2e/flows/52-old-fixes.cjs" ] && grep -qF 'data-bf-shift' "$RD/scripts/e2e/flows/52-old-fixes.cjs" \
+  && log_ok "v1342-E2E(flow 52:补记到历史期 A / B / 删 / 取消 · 封板完整度 · 角标)" || log_bad "v1342-E2E 缺 flow 52" "scripts/e2e/flows/52-old-fixes.cjs"
+
 echo
 echo "═══════════════════════════════════════"
 echo " 总结: PASS=$PASS  FAIL=$FAIL  SKIP=$SKIP"

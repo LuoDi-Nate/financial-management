@@ -129,7 +129,7 @@ public interface CashFlowMapper {
                 period_id, account_id, kind, category_code, amount, occurred_at, note, submitted_by, is_adjustment,
                 ref_holding_id, ref_shares, source_tag,
                 expense_category_id, import_batch_id, ext_tx_no, affects_balance,
-                one_off
+                one_off, backfill_mode
             )
             SELECT #{cf.periodId}, #{cf.accountId}, #{cf.kind}, #{cf.categoryCode}, #{cf.amount},
                    #{cf.occurredAt}, #{cf.note}, #{cf.submittedBy}, #{cf.adjustment},
@@ -138,7 +138,7 @@ public interface CashFlowMapper {
                    /* v1.24 FR-613 · 【显式列 INSERT 的老坑】表加了一列而这里没加,
                     * 不会报错、不会失败,只是那个勾【永远存不进去】。
                     * 两条写入路各有一条单测断言「读回来 == 写进去」(预检 SF2)。 */
-                   #{cf.oneOff}
+                   #{cf.oneOff}, #{cf.backfillMode}
               FROM period p
               JOIN account a ON a.id = #{cf.accountId}
              WHERE p.id = #{cf.periodId}
@@ -165,7 +165,8 @@ public interface CashFlowMapper {
     @Select("""
             SELECT cf.id, cf.period_id, cf.account_id, cf.kind, cf.category_code, cf.amount,
                    cf.occurred_at, cf.note, cf.submitted_by, cf.submitted_at,
-                   cf.ref_holding_id AS refHoldingId, cf.ref_shares AS refShares
+                   cf.ref_holding_id AS refHoldingId, cf.ref_shares AS refShares,
+                   cf.backfill_mode AS backfillMode
               FROM cash_flow cf
               JOIN period p ON p.id = cf.period_id
              WHERE p.family_id = #{familyId}

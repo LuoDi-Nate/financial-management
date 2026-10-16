@@ -51,7 +51,8 @@ class SealedPeriodServiceTest {
         return new SealedPeriodService(mock(FactViewService.class), mock(PeriodMapper.class),
                 mock(FamilyMapper.class), mock(com.family.finance.repository.SnapshotMapper.class),
                 mock(com.family.finance.service.member.MemberDirectory.class),
-                new com.family.finance.service.group.AccountGroupingResolver(am, gm, pm));
+                new com.family.finance.service.group.AccountGroupingResolver(am, gm, pm),
+                mock(com.family.finance.repository.AccountMapper.class));
     }
 
     private AccountPeriodFact row(long accId, String name, long periodId, int month,

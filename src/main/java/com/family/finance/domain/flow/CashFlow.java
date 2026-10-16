@@ -74,4 +74,10 @@ public class CashFlow {
      * 不出现在任何余额路径上。</p>
      */
     private boolean oneOff;
+
+    /**
+     * v1.34.2 · 往「之后已有人确认过余额」的账期里补记时用户选的方式:NULL 普通 / KEEP 余额不动 / SHIFT 之后各期一起挪。
+     * 删这一笔时按同一种方式撤回。见 {@code EntryService.creditAccountBalance}。
+     */
+    private String backfillMode;
 }

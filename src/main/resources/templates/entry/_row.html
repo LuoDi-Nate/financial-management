@@ -228,7 +228,8 @@
       <div>
         <div class="font-mono text-[10px] tracking-[0.16em] uppercase text-ink-subtle mb-1">快捷支出
           <span class="normal-case tracking-normal">· 收入去上方「收支填报」录</span></div>
-        <form th:hx-post="@{/entry/{id}/cash-flow(id=${row.account.id})}" th:hx-target="'#entry-block-' + ${row.account.id}" hx-swap="outerHTML" method="post" class="flex gap-2">
+        <form th:hx-post="@{/entry/{id}/cash-flow(id=${row.account.id})}" th:hx-target="'#entry-block-' + ${row.account.id}" hx-swap="outerHTML" method="post" class="flex gap-2"
+              data-backfill-check th:attr="data-account-ids=${row.account.id}">
           <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
           <input type="hidden" name="periodId" th:value="${period.id}">
           <input type="hidden" name="kind" value="EXPENSE">
@@ -240,7 +241,8 @@
       </div>
       <div>
         <div class="font-mono text-[10px] tracking-[0.16em] uppercase text-ink-subtle mb-1">账户间划转</div>
-        <form th:hx-post="@{/entry/{id}/transfer(id=${row.account.id})}" th:hx-target="'#entry-block-' + ${row.account.id}" hx-swap="outerHTML" method="post" class="flex flex-col gap-1.5">
+        <form th:hx-post="@{/entry/{id}/transfer(id=${row.account.id})}" th:hx-target="'#entry-block-' + ${row.account.id}" hx-swap="outerHTML" method="post" class="flex flex-col gap-1.5"
+              data-backfill-check th:attr="data-account-ids=${row.account.id}">
           <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
           <input type="hidden" name="periodId" th:value="${period.id}">
           <!-- v1.4.2 · 目标账户带主理人(名+头像色):两账户可能重名,只看名字会转错 -->

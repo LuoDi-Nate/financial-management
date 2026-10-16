@@ -55,6 +55,8 @@ public class SealedPeriodService {
     /** v1.15 FR-382 · 名字映射走名录(含已归档)—— 归档一个人,不该让历史数据里的他变成无名氏 */
     private final MemberDirectory memberDirectory;
     private final com.family.finance.service.group.AccountGroupingResolver groupingResolver;  // v1.20 FR-484
+    /** v1.34.2 · 完整度要知道账户是哪天建的(那个月结束之后才建的,不算那个月「缺」) */
+    private final com.family.finance.repository.AccountMapper accountMapper;
 
     /**
      * 载入一个封板期的完整快照。
@@ -135,18 +137,28 @@ public class SealedPeriodService {
      * <p>「应填」取自事实切片里该期的账户行数 —— queryBase 是 account × period 全交叉,
      * 所以"该期有行"恰好等价于"该期时这个账户在册"(归档语义已带时间,见 FactMapper v1.10 注释)。
      * 「已填」查 period_snapshot 实际提交的行。两者之差就是没填的。</p>
+     *
+     * <p><b>v1.34.2 · 那个月结束之后才建、那个月又没有快照的账户,不算「应填」</b>(维护者 2026-10-15 拍板)。
+     * 事实切片是「账户 × 账期」全交叉 —— 10 月建的账户在 8 月也有一行,于是已关账的 8 月被说成「缺」它
+     * (prod 4 个已关账月 5 处)。在那个月补过余额的照算(补过就是填了)。</p>
      */
     SealedSnapshot.Completeness buildCompleteness(FactSlice window, Period anchor) {
+        java.util.Set<Long> filledIds = snapshotMapper.findByPeriod(anchor.getFamilyId(), anchor.getId()).stream()
+                .map(com.family.finance.domain.snapshot.PeriodSnapshot::getAccountId)
+                .collect(java.util.stream.Collectors.toSet());
+        java.util.Set<Long> bornAfter = accountMapper.findAllByFamily(anchor.getFamilyId()).stream()
+                .filter(a -> a.getCreatedAt() != null && anchor.getPeriodEnd() != null
+                        && a.getCreatedAt().toLocalDate().isAfter(anchor.getPeriodEnd()))
+                .map(com.family.finance.domain.account.Account::getId)
+                .collect(java.util.stream.Collectors.toSet());
         var expectedRows = window.rows().stream()
                 .filter(r -> anchor.getId().equals(r.periodId()))
+                .filter(r -> filledIds.contains(r.accountId()) || !bornAfter.contains(r.accountId()))
                 .toList();
         java.util.Map<Long, String> nameById = expectedRows.stream()
                 .collect(java.util.stream.Collectors.toMap(
                         com.family.finance.factview.AccountPeriodFact::accountId,
                         com.family.finance.factview.AccountPeriodFact::accountName, (a, b) -> a));
-        java.util.Set<Long> filledIds = snapshotMapper.findByPeriod(anchor.getFamilyId(), anchor.getId()).stream()
-                .map(com.family.finance.domain.snapshot.PeriodSnapshot::getAccountId)
-                .collect(java.util.stream.Collectors.toSet());
         List<String> missing = nameById.entrySet().stream()
                 .filter(e -> !filledIds.contains(e.getKey()))
                 .map(java.util.Map.Entry::getValue)
