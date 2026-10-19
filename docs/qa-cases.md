@@ -2313,4 +2313,8 @@ Docker 化部署 + systemd/macOS 存量零丢迁移。**真机冒烟(docker buil
 | ID | 守什么 |
 |---|---|
 | v135-ACCT-HEAD-CENTER | **填报页账户卡标题行按竖直中线对齐**:原来 `items-baseline`,带框的 9px「本月已校准 · MM-dd」标签框挂在基线下面,比 15px 的账户名低约 3px(维护者截图「华泰证券-A股本月已校准 · 07-16」)。改 `items-center`。 |
-| v135-E2E | **e2e flow 53**:顶栏「填报」→ 华泰证券-A股卡上「本月已校准」标签日期 == 库里本期提交日期 → 账户名 / 标签 / 类型三者竖直中线差 ≤1.5px。 |
+| v135-E2E | **e2e flow 53**:① 顶栏「填报」→ 华泰证券-A股卡上「本月已校准」标签日期 == 库里本期提交日期 → 账户名 / 标签 / 类型三者竖直中线差 ≤1.5px;② 顶栏逐个点进仪表盘 / 填报 / 账户 / 报表 / 管理:每个按钮实测不大写、不加字距、无衬线、圆角 6px、高度 28–36,没加尺寸修饰的都是 32px;周期页开关账期按钮是 btn-danger(对库里账期数);③ 持仓页顶部可见按钮 ≤3 →「添加其他」菜单展开、点外面收起 → 菜单进「手填市值」添加页 → 持仓卡张数对库、每张卡按钮一排同高。只读。 |
+| v135-BTN-NO-CAPS | **按钮不大写、不加字距、用无衬线**(v1.35 · 维护者「按钮都那么大,还都是个方框」)。判据钉在 `style.css` 按钮主定义块:`var(--ui-sans)` · `text-transform: none` · `letter-spacing: 0` · 圆角 `var(--r-md)` · `min-height: 32px`。旧规格(等宽 12px + uppercase + .12em + 直角 + 12/20 内距 ≈ 42px)写回来就红。 |
+| v135-BTN-STATES | **状态四件套覆盖五个按钮类**:`:active` 下沉 1px(手机唯一的按下反馈)· `:focus-visible` 光圈(Tailwind preflight 去掉了 outline)· `[disabled]` 半透明(请求中的按钮原来外观不变会被重复点)。三条规则都要列全 ink / paper / brass / ghost / danger。 |
+| v135-BTN-DANGER | **不可逆操作用 `btn-danger`**:模板里不许再出现「`btn-*` + 行内 `color:var(--rust)`」(v1.35 改掉 14 处);持仓卡「归档」是 `btn-danger text-xs`。 |
+| v135-HOLD-ADD-MENU | **持仓页一行 ≤3 个按钮**:主按钮 +「添加其他 ▾」菜单(`details.row-more.menu-btn` · 场外基金 / 手填市值 / 账户内现金)+ 手动刷价;持仓卡操作排成一行(`hold-ops`);`js/menus.js` 让菜单点外面 / Esc 收起。 |

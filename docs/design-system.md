@@ -19,7 +19,7 @@
 |---|---|
 | 纸 | `--paper #F4EFE6` 米色底 + `body::before` 4 层噪点纹理 `mix-blend-mode:multiply` |
 | 墨 | `--ink #1A1714` 近黑不纯黑,主操作按钮用墨底 |
-| 账册细线 | 圆角几乎为 0(2px),**边框而非阴影**做主要分隔,`rule` / `rule-double` / `rule-triple-bottom` |
+| 账册细线 | **边框而非阴影**做主要分隔,`rule` / `rule-double` / `rule-triple-bottom`;圆角 v1.35 起:卡片 8px、按钮 / 输入框 6px、标签 4px(控件对齐主流规格,见 §2.1) |
 | 铜活字 | `--brass` 铜金作唯一系统强调色 |
 | 印章 | 首屏印章遮罩、报表"已关账"朱印 `.report-seal`(rotate -4deg) |
 | 装订 | `dog-ear` 翻页角、`folio` 76px 斜体页码水印、`bracket-card` 四角装饰 |
@@ -88,7 +88,7 @@ WEALTH → pill-forest    STOCK → pill-brass    INSURANCE → pill-slate
 
 | 类 | 视觉 | 用在哪 |
 |---|---|---|
-| `paper-card` | card 底 + 1px rule + 2px 圆角 + 极淡双层阴影 | 默认容器 |
+| `paper-card` | card 底 + 1px rule + 8px 圆角(v1.35 · 原 2px)+ 极淡双层阴影 | 默认容器 |
 | `paper-card-soft` | card-soft 底 + 0.5px 边 | 次级/嵌套 |
 | `envelope` | **1px 墨边 + 4px 硬投影(paper-deep)**,0 圆角 | 重要弹层(信函感) |
 | `bracket-card` | 1px 边 + 四角 14px brass 折角 | 提示 banner / 引导块 |
@@ -101,13 +101,19 @@ WEALTH → pill-forest    STOCK → pill-brass    INSURANCE → pill-slate
 
 ### 2.1 按钮规格(spec)
 
-> 标注约定:**「已有」** = style.css 已实现;**「待补」** = 现状缺失,本规格要求补上。
+> **v1.35 起整节改写**(维护者 2026-10-19:「为什么我们系统的按钮都那么大?还都是个方框」)。
+> 旧规格是 JetBrains Mono 12px + uppercase + `.12em` 字距 + 12/20 内距 + 直角,一个按钮约 42px,
+> 中文被拉成「添 加 持 仓」;规定里还写着「圆角 > 2px 破坏账册隐喻」。
+> 新规格对标 shadcn/ui(取它新默认风格 nova 那一档的密度),数值与七个组件库的对比见
+> [`docs/research/ui-frameworks-2026-10.md`](research/ui-frameworks-2026-10.md)。
+> **账册隐喻留在纸张、配色、标题字体、eyebrow / 表头的排印上;控件按现代产品的规格走。**
+> 实现全部在 `style.css` 按钮段;护栏 `v135-BTN-NO-CAPS` / `v135-BTN-STATES` / `v135-BTN-DANGER`,e2e flow 53 实测。
 
 #### 2.1.1 选哪个按钮:决策树
 
 ```
-这个操作会不可逆地删掉/改掉数据?
-├─ 是 → btn-danger【待补】(rust 系)
+这个操作会不可逆地删掉 / 改掉数据(删除、归档、彻底清除、断开、强制关账)?
+├─ 是 → btn-danger(最后一步确认用 btn-danger btn-danger-fill)
 └─ 否 ↓
    它是本区块用户最该点的那一个?
    ├─ 是 → btn-ink(每区块唯一)
@@ -115,126 +121,98 @@ WEALTH → pill-forest    STOCK → pill-brass    INSURANCE → pill-slate
       它和别的操作并列、地位相当?
       ├─ 是 → btn-paper
       └─ 否 ↓
-         它在列表行/表格单元格内,是密集的轻操作?
+         它在列表行 / 表格单元格内,是密集的轻操作?
          ├─ 是 → btn-ghost
-         └─ 否 → 它是引导用户进入付费/AI/新功能的钩子? → btn-brass(全站 ≤3 处)
+         └─ 否 → AI 入口 / 新能力的次操作 → btn-paper btn-accent(铜色软底);
+                 真正要抢眼的新功能钩子 → btn-brass(全站 ≤3 处)
 ```
 
-#### 2.1.2 五个变体的完整规格
+#### 2.1.2 变体
 
-| 变体 | 底 | 字 | 边 | 语义 | 单页上限 |
+| 变体 | 底 | 字 | 边 | 语义 | 上限 |
 |---|---|---|---|---|---|
-| `btn-ink`【已有】 | `--ink` | `--paper` | 无 | 本区块主操作 | 每区块 1 个 |
-| `btn-paper`【已有】 | 透明 | `--ink` | 1px `--ink` | 并列次操作 | 不限 |
-| `btn-ghost`【已有】 | 透明 | `--ink-soft` | 1px transparent(hover 才显 `--rule`) | 行内轻操作 | 行内 ≤3 个,超出收进 `⋯` |
-| `btn-brass`【已有】 | `--brass` | `--paper` | 无 | 新功能/AI 钩子 | 全站 ≤3 处 |
-| `btn-danger`【待补】 | 透明 | `--rust` | 1px `--rust` | 删除/归档/强制关账 | 每页 ≤1 个显式 |
+| `btn-ink` | `--ink` | `--card` | 同底色 | 本区块主操作 | 每区块 1 个 |
+| `btn-paper` | `--card`(白) | `--ink` | 1px `--rule-soft` + `--shadow-xs` | 并列次操作 | 不限 |
+| `btn-ghost` | 透明(悬停 `--paper-soft`) | `--ink-soft` | 无 | 行内轻操作 | 行内 ≤3 个 |
+| `btn-danger` | 透明(悬停 8% rust) | `--rust` | 1px 38% rust | 删除 / 归档 / 清除 / 断开 | 每行 ≤1 个 |
+| `btn-danger btn-danger-fill` | `--rust` | `--card` | — | 不可逆的**最后一步**确认 | 每页 ≤1 个 |
+| `btn-paper btn-accent` | `--brass-soft` | `--brass-text` | 无 | AI 入口、新能力的次操作 | — |
+| `btn-brass` | `--brass-deep` | `--card` | — | 要抢眼的新功能钩子(旧版铜底米字对比度只有 3.2:1,改深铜 4.9:1) | 全站 ≤3 处 |
 
-**`btn-danger` 为什么必须补**:现在删除/归档混用 `btn-ghost`(账户归档)、`btn-paper`(目标归档)、裸 `text-rust`(删收入笔)三种写法,与"编辑""导出"完全同权重。不可逆操作在视觉上必须与可逆操作可区分。
+**删除用描边、不用实心红**:实心红会抢走 `btn-ink` 主操作的视觉焦点,删除永远不该是页面上最醒目的东西。实心只留给「打完确认语之后的最后一下」。
 
-设计取舍:**用描边而非实心 rust 底**。实心红按钮会抢走 `btn-ink` 主操作的视觉焦点(删除永远不该是页面最醒目的东西),描边足以警示。
-
-```css
-/* 待补 · 追加到 style.css Buttons 段 */
-.btn-danger {
-  background: transparent; color: var(--rust);
-  font-family: "JetBrains Mono", ui-monospace, monospace;
-  font-size: calc(12px * var(--fs-scale,1));
-  letter-spacing: 0.12em; text-transform: uppercase;
-  padding: 11px 19px; border: 1px solid var(--rust);
-  cursor: pointer; transition: all 180ms ease;
-  display: inline-flex; align-items: center; gap: 10px;
-}
-.btn-danger:hover { background: var(--rust); color: var(--paper); }
-```
-
-#### 2.1.3 共性规格(五个变体都必须满足)
+#### 2.1.3 共性规格
 
 | 属性 | 值 | 为什么 |
 |---|---|---|
-| 字体 | JetBrains Mono | 账册"打字机标签"隐喻 |
-| 字号 | `calc(12px * var(--fs-scale,1))`(ghost 11.5px) | 必须走 scale 变量,否则字号档位失效 |
-| 字距 | `letter-spacing: .12em` | 全站统一,不许改 |
-| 大小写 | `text-transform: uppercase` | 中文不受影响,英文/数字统一 |
-| 布局 | `display:inline-flex; align-items:center; gap:10px` | 预留图标位,图标文字自动垂直居中 |
-| 圆角 | 0(不写 border-radius) | 账册纸张感;pill 才有 1px 圆角 |
-| 过渡 | `transition: all 180ms ease`(ghost 150ms) | — |
+| 字体 | `var(--ui-sans)`(苹方 / 微软雅黑 / Noto Sans SC 等系统无衬线) | 七个组件库没有一个按钮用等宽字体;中文在等宽字体里本来就回退到系统字体,和数字字母字重对不上 |
+| 字号 / 字重 | 13px / 500(小档 12px);都乘 `--fs-scale` | 主流 14px,数据型产品取小一档 |
+| 字距 / 大小写 | `letter-spacing: 0` · `text-transform: none` | 主流库源码里一个都没有;中文加字距只会被拉散 |
+| 圆角 | 6px(`--r-md`) | 主流 4–8px |
+| 布局 | `inline-flex` 居中 · `gap: 6px` · `white-space: nowrap` | 中文按钮被挤窄时会一字一行,宁可旁边的说明多折一行 |
+| 高度 | `min-height`(不是 `height`) | 万一真要换行,按钮跟着长高而不是把字截掉 |
+| 过渡 | 150ms 颜色 / 边框 / 阴影,按下 100ms | — |
 
-#### 2.1.4 三档尺寸
+#### 2.1.4 尺寸档:模板里给按钮写的字号类就是尺寸档
 
-现状是靠 Tailwind 覆写高度(`h-8` / `h-9` / `h-11`)+ 覆写字号(`text-[10px]` / `text-xs` / `text-sm`)。规格化为三档,**语义绑定尺寸**:
-
-| 档 | 高度 | padding | 字号 | 用在哪 |
+| 档 | PC | 手机(≤640px) | 怎么写 | 用在哪 |
 |---|---|---|---|---|
-| `sm` | 32px(`h-8`) | 0 12px | 10px | 列表行内、快捷支出、划转 |
-| `md`(默认) | 36px(`h-9`) | 11-12px / 19-20px | 12px | 常规表单、页头操作 |
-| `lg` | 44px(`h-11`) | 0 16px | 13px | 页面唯一重点(保存本月总支出、SIGN OFF) |
+| 小档 | 28px · 10px 内距 · 12px 字 | 32px | 按钮带 `text-xs` / `text-[10px]` / `text-[11px]` / `text-[12px]`(或 `btn-sm`) | 卡片内、列表行内、表单旁 |
+| 默认 | 32px · 12px 内距 · 13px 字 | 36px | 不写 | 页头、区块操作 |
+| 大档 | 40px · 20px 内距 · 14px 字 | 44px | `btn-lg` | 登录、引导这类大入口 |
 
-**移动端地板【待补】**:`<768px` 时 `sm` 档也必须 `min-height:40px`(见审计 P0-1)。视觉高度可以维持,靠 `.tap::after{inset:-12px}` 扩热区更好 —— 不改布局。
+- 为什么不新增 `btn-sm` 逐个改模板:模板里本来就用字号类表达「小一号」(160 多处),沿用它零改动就对;`:is(...)` 组合让优先级压过 Tailwind 的同名工具类。
+- 和输入框并排的按钮可以写 `h-9`,跟输入框齐高(填报页输入行)。
+- 模板给按钮加 `block` / `inline-block` 时自动换成 `flex` / `inline-flex`,文字照样竖直居中。
 
-#### 2.1.5 六个状态(现状只实现了 2 个)
+#### 2.1.5 状态(一次覆盖全部按钮类)
 
-| 状态 | 规格 | 现状 |
-|---|---|---|
-| default | 见 2.1.2 | 已有 |
-| `:hover` | ink→brass-deep / paper→反白 / ghost→出边 / danger→填充 | 已有 |
-| `:active` | `transform: translateY(1px)` + 无阴影 | **待补** |
-| `:focus-visible` | `outline: 2px solid var(--brass); outline-offset: 2px` | **待补** |
-| `[disabled]` | `opacity:.45; cursor:not-allowed; pointer-events:none` | **待补** |
-| loading | 文字保留 + 尾部 `htmx-indicator` 旋转 SVG + `hx-disabled-elt="this"` | 部分(仅 1 处) |
+| 状态 | 规格 |
+|---|---|
+| `:hover` | ink / brass 加深;paper / ghost 换 `--paper-soft` 底;danger 出 8% 红底 |
+| `:active` | `translateY(1px)` —— 手机没有 hover,这是唯一的按下反馈 |
+| `:focus-visible` | `box-shadow: var(--ring)`(2px 卡片色间隔 + 2px 55% 铜色光圈) |
+| `[disabled]` / `[aria-disabled=true]` / `.htmx-request` | 半透明 .5 · `cursor: not-allowed` —— 请求中的按钮看得出在等,不会被重复点 |
 
-三个缺失态的实际影响:
-- **`:active` 缺失** → 移动端**没有 hover**,`:active` 是唯一的按下反馈。现在移动端点按钮完全无触觉确认,只能等页面响应。
-- **`:focus-visible` 缺失** → Tailwind preflight 重置了 outline,键盘 Tab 走到按钮时看不到焦点在哪。
-- **`[disabled]` 缺失** → `entry/index.html:255` 的"刷新持仓估值"用了 `hx-disabled-elt="this"`,请求期间按钮真的被 disable 了,但**外观完全不变**,用户会重复点。
+#### 2.1.6 图标与文字
 
-```css
-/* 待补 · 一次覆盖全部按钮 */
-.btn-ink:active, .btn-paper:active, .btn-brass:active,
-.btn-ghost:active, .btn-danger:active { transform: translateY(1px); }
+- 图标一律 inline SVG,`stroke="currentColor"`(跟随按钮各状态变色),`aria-hidden="true"`
+- 尺寸:小档 12px,默认 13–14px;和文字间距由按钮的 `gap: 6px` 给,不要再写 `mr-1`
+- **纯图标按钮**必须有 `aria-label` + `title`,且 ≥32px
 
-.btn-ink:focus-visible, .btn-paper:focus-visible, .btn-brass:focus-visible,
-.btn-ghost:focus-visible, .btn-danger:focus-visible {
-  outline: 2px solid var(--brass); outline-offset: 2px;
-}
+#### 2.1.7 排列与文案
 
-.btn-ink[disabled], .btn-paper[disabled], .btn-brass[disabled],
-.btn-ghost[disabled], .btn-danger[disabled] {
-  opacity: .45; cursor: not-allowed; pointer-events: none;
-}
-```
+- **主操作唯一**:每个区块只有一个 `btn-ink`。
+- **一行最多 3 个按钮**,再多收进菜单(`details.row-more.menu-btn` + `btn-paper` 的 summary,见持仓页「添加其他 ▾」;菜单点外面 / 按 Esc 收起由 `js/menus.js` 管)。
+- **卡片里的操作排成一行、同高**,不要竖着叠整宽按钮(v1.35 前的持仓卡就是三个整宽大框竖排)。
+- **文案带后果**:危险操作写「动词 + 对象」(「归档此账户」而不是「归档」);不要用「计 · 算 · 对 · 照」这种手工字距。
+- **耗时预告**:预期 >3s 的操作在按钮旁标时长(填报区的 `+15s`)。
 
-#### 2.1.6 图标与文字的组合
-
-- 图标一律 inline SVG,`stroke="currentColor"`(**关键**:自动继承按钮各状态的文字色,不用为图标单独写状态)
-- 尺寸:`sm` 档配 12px,`md` 配 13-14px,`lg` 配 14-15px
-- 图标在**左**表示动作类型(`+ 加一笔`、`↻ 刷新`);在**右**表示方向/流转(`跨期流水档案 →`)
-- 图标必须带 `aria-hidden="true"`(文字已表意,避免读屏重复)
-- **纯图标按钮**(无文字)必须有 `aria-label` + `title`,且尺寸 ≥32px
-
-#### 2.1.7 排列与文案规则
-
-- **主操作唯一性**:每个页面/区块只允许一个 `btn-ink`。已核查通过 —— 填报页的"加一笔"/"保存本月总支出"/"保存"/"SIGN OFF" 各在独立区块。
-- **顺序**:次操作在左,主操作在右(`← 取消` / `保存 →` 的阅读顺序);移动端竖排时主操作在上。
-- **行内按钮上限 3 个**,超出收进 `⋯` 下拉(见审计 P1-7,现状列表行有 7 个)。
-- **文案带后果**:不写"提交"写"我已记账完毕 · SIGN OFF";不写"确定"写"保持上月"/"接受";危险操作文案必须含动词 + 对象("归档此账户"而非"归档")。
-- **耗时预告**:预期 >3s 的操作在按钮旁标时长(现有范例:填报区的 `+15s`)。
-
-#### 2.1.8 反例(不许这么做)
+#### 2.1.8 反例
 
 | 反例 | 为什么错 |
 |---|---|
-| 同一区块两个 `btn-ink` | 主操作失去唯一性,用户不知道该点哪个 |
-| 删除操作用 `btn-ink` | 不可逆操作占据最强视觉权重 |
-| 实心 rust 底的删除按钮 | 抢走主操作焦点 |
-| 按钮加 `border-radius` > 2px | 破坏账册纸张隐喻 |
-| 字号写死 `font-size:12px` | 绕过 `--fs-scale`,字号档位对它失效 |
-| 图标写死 `stroke="#1A1714"` | hover/disabled 时图标不跟随变色 |
+| 按钮加 `uppercase` / `tracking-*` / `font-mono` | 回到旧规格;护栏和 e2e flow 53 会红 |
+| `btn-paper` 加行内 `style="color:var(--rust)"` 表示危险 | 用 `btn-danger`(护栏 `v135-BTN-DANGER`) |
+| 同一区块两个 `btn-ink` | 主操作失去唯一性 |
+| 一排 5 个按钮 | 收进菜单 |
+| 字号写死 `font-size:12px` | 绕过 `--fs-scale`,字号档位失效 |
 | 用 `<div onclick>` 当按钮 | 键盘不可达,无原生 disabled |
 
 ---
 
 ### 2.2 标签规格(spec)
+
+> **v1.35 · 标签外观改了(本节下面的分类、语义映射仍然有效)**:`.pill` 去掉硬边框、等宽字体、大写和 `.1em` 字距,
+> 改成**软底圆角小标** —— 圆角 4px(`--r-sm`)· 无衬线 11px / 500(手机 10px)· 边框透明(`!important`,
+> 压过模板里行内写的 `border-color`)· 软底 + 字色表达类型。
+> - 模板里给 pill 写的 `text-[9px]` / `text-[10px]` 一律被压到 11px(9px 中文在手机上几乎读不出来)。
+> - `pill-mute` 是「描边空心」那一种,保留细边。
+> - 代码类(股票 / 基金代码)加 `font-mono` 或 `data-fund-code-pill` 仍走等宽。
+> - **和大字放在同一行时按竖直中线对齐**:`.items-baseline > .pill { align-self: center }`。
+>   按基线对齐时小标签会比旁边的大字低几像素(v1.35 填报卡「华泰证券-A股 · 本月已校准」就是这么错的,护栏 `v135-ACCT-HEAD-CENTER`)。
+> - 当按钮用的 pill(筛选 chip / 分段 tab)有悬停底色和键盘光圈;**挂在 `<select>` 上的 pill 补回细边**,否则看不出能点。
+> - 模板里手搓的带框小 span 自动得 4px 圆角,带框的链接 / 按钮 / summary / label 自动得 6px(`style.css` 末尾「控件收口」)。
 
 现状是**一个 `.pill` 类承担了四种语义完全不同的角色**,靠行内 style 和尺寸覆写勉强区分(64 处覆写 `.pill` 基类字号)。规格上必须先把四类拆开 —— 它们的**行为**不同,不只是颜色不同。
 
@@ -323,7 +301,7 @@ WEALTH → pill-forest    STOCK → pill-brass    INSURANCE → pill-slate
 |---|---|
 | 字体 | JetBrains Mono |
 | 字距 | `letter-spacing: .1em`(比按钮的 .12em 略紧) |
-| 圆角 | `1px`(**唯一有圆角的组件族**,与按钮的 0 区分) |
+| 圆角 | 4px(`--r-sm`,v1.35 · 原 1px;按钮 6px、卡片 8px) |
 | 边框 | 恒 1px(即便同色)—— 保证与纯文字区分 |
 | 布局 | `inline-flex; align-items:center; gap:6px` |
 | 内嵌图标 | 11px SVG,`stroke="currentColor"` |

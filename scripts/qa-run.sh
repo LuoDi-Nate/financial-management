@@ -11811,8 +11811,38 @@ grep -qF 'class="flex items-center gap-1.5 sm:gap-3 acct-head"' "$RD/src/main/re
   && ! grep -qF 'items-baseline gap-1.5 sm:gap-3 acct-head' "$RD/src/main/resources/templates/entry/_row.html" \
   && log_ok "v135-ACCT-HEAD-CENTER(填报页账户卡:账户名 / 已校准标签 / 类型按竖直中线对齐)" \
   || log_bad "v135-ACCT-HEAD-CENTER 账户卡标题行又按基线对齐了(带框标签会比账户名低 3px)" "see entry/_row.html .acct-head"
+QA135_CSS="$RD/src/main/resources/static/css/style.css"
+# v135-BTN-NO-CAPS · 按钮不大写、不加字距、用无衬线(维护者「按钮都那么大,还都是个方框」的根源就是这三样)
+#   判据钉在按钮的【主定义块】上:从 `.btn-ink, .btn-paper, .btn-brass, .btn-ghost, .btn-danger {` 到第一个 `}`
+QA135_BTN="$(awk '/^\.btn-ink, \.btn-paper, \.btn-brass, \.btn-ghost, \.btn-danger \{/,/^\}/' "$QA135_CSS")"
+{ [ -n "$QA135_BTN" ] && printf '%s' "$QA135_BTN" | grep -q 'font-family: var(--ui-sans)' \
+  && printf '%s' "$QA135_BTN" | grep -q 'text-transform: none' && printf '%s' "$QA135_BTN" | grep -q 'letter-spacing: 0;' \
+  && printf '%s' "$QA135_BTN" | grep -q 'border-radius: var(--r-md)' && printf '%s' "$QA135_BTN" | grep -q 'min-height: 32px' \
+  && ! grep -qE '^\.btn-(ink|paper|brass|ghost|danger) \{[^}]*uppercase' "$QA135_CSS"; } \
+  && log_ok "v135-BTN-NO-CAPS(按钮:无衬线 · 不大写 · 不加字距 · 圆角 6 · 默认 32px)" \
+  || log_bad "v135-BTN-NO-CAPS 按钮又写回大写 / 宽字距 / 直角了" "see style.css 按钮主定义块 · docs/design-system.md §2.1"
+# v135-BTN-STATES · 状态四件套覆盖五个按钮类(按下 / 键盘焦点 / 禁用)
+{ grep -qF '.btn-ink:active, .btn-paper:active, .btn-brass:active, .btn-ghost:active, .btn-danger:active' "$QA135_CSS" \
+  && grep -qF '.btn-ink:focus-visible, .btn-paper:focus-visible, .btn-brass:focus-visible, .btn-ghost:focus-visible, .btn-danger:focus-visible' "$QA135_CSS" \
+  && grep -qF '.btn-ink[disabled], .btn-paper[disabled], .btn-brass[disabled], .btn-ghost[disabled], .btn-danger[disabled]' "$QA135_CSS"; } \
+  && log_ok "v135-BTN-STATES(按下下沉 · Tab 光圈 · 禁用 / 请求中半透明 —— 五个按钮类全覆盖)" \
+  || log_bad "v135-BTN-STATES 有按钮类漏了状态" "see style.css 状态四件套"
+# v135-BTN-DANGER · 不可逆操作用 btn-danger,不再靠「btn-* + 行内红色」临时拼
+QA135_INL="$(grep -rnE '<(button|a|summary)[^>]*class="[^"]*btn-(ink|paper|ghost|brass)[^"]*"[^>]*style="[^"]*var\(--rust\)' "$RD/src/main/resources/templates" | head -3)"
+{ grep -q '^\.btn-danger ' "$QA135_CSS" && [ -z "$QA135_INL" ] \
+  && grep -qF 'class="btn-danger text-xs"' "$RD/src/main/resources/templates/stock/holdings.html"; } \
+  && log_ok "v135-BTN-DANGER(删除 / 归档 / 清除用 btn-danger · 模板里没有「按钮 + 行内红色」)" \
+  || log_bad "v135-BTN-DANGER 危险操作又用普通按钮加行内红色了" "${QA135_INL:-btn-danger 定义缺失}"
+# v135-HOLD-ADD-MENU · 持仓页一行 ≤3 个按钮:主按钮 +「添加其他 ▾」菜单 + 手动刷价
+QA135_H="$RD/src/main/resources/templates/stock/holdings.html"
+{ grep -qF 'data-add-more' "$QA135_H" && grep -qF 'class="row-more-pop menu-left"' "$QA135_H" \
+  && grep -qF 'flex flex-wrap items-start gap-1.5 lg:justify-end hold-ops' "$QA135_H" \
+  && grep -qF "/js/menus.js" "$RD/src/main/resources/templates/fragments/layout.html"; } \
+  && log_ok "v135-HOLD-ADD-MENU(持仓页「添加其他 ▾」菜单 · 持仓卡按钮一排 · 菜单点外面收起)" \
+  || log_bad "v135-HOLD-ADD-MENU 持仓页按钮又摆回一排五个 / 竖排大按钮了" "see stock/holdings.html"
 [ -f "$RD/scripts/e2e/flows/53-ui-refresh.cjs" ] && grep -qF 'spread <= 1.5' "$RD/scripts/e2e/flows/53-ui-refresh.cjs" \
-  && log_ok "v135-E2E(flow 53:账户卡标题行三者中线差 ≤1.5px · 标签日期对库)" || log_bad "v135-E2E 缺 flow 53" "scripts/e2e/flows/53-ui-refresh.cjs"
+  && grep -qF 'data-add-more' "$RD/scripts/e2e/flows/53-ui-refresh.cjs" \
+  && log_ok "v135-E2E(flow 53:账户卡标题行对齐 · 多页按钮实测尺寸 / 无大写 · 持仓页菜单走到添加页并落库)" || log_bad "v135-E2E 缺 flow 53 或没覆盖按钮实测" "scripts/e2e/flows/53-ui-refresh.cjs"
 
 echo
 echo "═══════════════════════════════════════"
