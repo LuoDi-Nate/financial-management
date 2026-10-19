@@ -3126,3 +3126,5 @@ section[class~="border-2"]:not([class*="rounded"]), div[class~="border-2"][class
 .bf-dialog { border-radius: var(--r-lg); }
 /* 横屏模式的「退出横屏」浮钮 / 帮助页演示里的按钮:跟按钮规格的字体与圆角 */
 .ls-exit { font-family: var(--ui-sans); letter-spacing: 0; border-radius: var(--r-md); }
+/* 顶栏品牌名旁的存钱罐(v1.35):图形在 viewBox 里偏下,实测比「账房」字身的墨迹中线低 2px —— 拉齐 */
+.nav-coin { transform: translateY(-2px); }

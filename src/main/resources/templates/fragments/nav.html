@@ -18,13 +18,15 @@
         </a>
         <span class="nav-brandtext flex flex-col leading-none">
           <!--/* v1.28.5 · issue #31 · 原来是「№ + 家庭名第一个字」,用户以为是显示不下被截断了。
-                 维护者定:换成一个和钱有关的小图标 —— 选了古钱(外圆内方),和「账房」的账册风一致。
-                 家庭名不丢:悬停图标看得到(title),读屏读得到(aria-label)。 */-->
-          <a th:href="@{/}" class="no-underline flex items-center gap-2">
+                 维护者定:换成一个和钱有关的小图标。家庭名不丢:悬停图标看得到(title),读屏读得到(aria-label)。
+                 v1.35 · 古钱(外圆内方)换成存钱罐(维护者 2026-10-19:「好丑,没对齐」)。图形取自 Lucide
+                 piggy-bank(ISC 许可,和全站 Feather 风同一套 24×24 描边)。class 仍叫 nav-coin —— 护栏 v1285 / e2e flow 40 认它。
+                 对齐:猪的身子在 viewBox 里偏下(y 5–20),实测图形中线比「账房」字身的墨迹中线低 2px(PC 和手机都是),用 translateY(-2px) 拉齐。 */-->
+          <a th:href="@{/}" class="no-underline flex items-center gap-1.5">
             <span class="font-display text-xl font-medium" th:text="${state.family.brandText}">账房</span>
-            <svg class="nav-coin shrink-0 text-brass-deep" width="15" height="15" viewBox="0 0 24 24" fill="none"
-                 stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"
-                 role="img" th:attr="aria-label=${state.family.name}"><title th:text="${state.family.name}">家</title><circle cx="12" cy="12" r="9"/><rect x="9" y="9" width="6" height="6" rx=".5"/></svg>
+            <svg class="nav-coin shrink-0 text-brass-deep" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"
+                 role="img" th:attr="aria-label=${state.family.name}"><title th:text="${state.family.name}">家</title><path d="M19 5c-1.5 0-2.8 1.4-3 2-3.5-1.5-11-.3-11 5 0 1.8 0 3 2 4.5V20h4v-2h3v2h4v-4c1-.5 1.7-1 2-2h2v-4h-2c0-1-.5-1.5-1-2V5z"/><path d="M2 9v1c0 1.1.9 2 2 2h1"/><path d="M16 11h.01"/></svg>
           </a>
           <!-- 版本号(账册「版次」标记 · brass 细线徽记)· 来源 app.version
                v1.9:可点 → 管理页版本卡;有新版时右上角一个 5px 描边圆点。
@@ -33,7 +35,7 @@
              class="ver-badge no-underline relative inline-flex items-center gap-1 font-mono text-[9px] tracking-[0.16em] text-brass-deep mt-[3px]"
              th:title="${updateInfo != null and updateInfo.hasUpdate()} ? '有新版 ' + ${updateInfo.latest()} + ' · 点击查看' : '当前版本 · 点击查看'"
            th:classappend="${updateInfo != null and updateInfo.hasUpdate()} ? ' has-upd' : ''">
-            <span class="inline-block w-1.5 h-1.5 border border-brass-deep rotate-45" style="opacity:.7"></span>
+            <span class="inline-block w-1.5 h-1.5 border border-brass-deep rotate-45 rounded-none" style="opacity:.7"></span>
             <span th:text="'v' + ${appVersion}">v1.4.0</span>
             <!-- v1.9.2 · 原来是个 brass-soft 描边圆点,填色对比度只有 1.2:1 —— 等于看不见(用户反馈)。
                  换成实心「NEW」标签:brass-deep 底 + 纸色字 ≈ 4.1:1,而且是文字、不用猜含义。
@@ -97,7 +99,7 @@
           <span class="text-xl leading-none">☰</span>
         </summary>
         <div class="fixed inset-x-0 top-16 bg-card border-y border-rule shadow-xl z-40">
-          <nav class="nav-drawer flex flex-col text-[15px] divide-y divide-rule">
+          <nav class="nav-drawer flex flex-col text-[13px] divide-y divide-rule">
             <a th:href="@{/dashboard}" class="px-6 py-4 hover:bg-card-soft no-underline flex items-center gap-3"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" aria-hidden="true"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>仪表盘</a>
             <a th:href="@{/entry}" class="px-6 py-4 hover:bg-card-soft no-underline flex items-center gap-3"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>填报<span
                 class="ml-1 px-1 rounded-sm bg-brass-soft text-brass-deep text-[9px] tracking-normal normal-case align-middle" title="支持 AI 截图导入持仓填报">AI</span>
@@ -111,7 +113,7 @@
             <a th:href="@{/help/how-to-use}" class="px-6 py-4 hover:bg-card-soft no-underline flex items-center gap-3"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" aria-hidden="true"><path d="M4 19.5V5a2 2 0 0 1 2-2h13v18H6a2 2 0 0 1-2-1.5Z"/><path d="M8 7h8M8 11h6"/></svg>使用手册</a>
             <form th:if="${_csrf != null}" th:action="@{/logout}" method="post" class="px-6 py-4 bg-card-soft">
               <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
-              <button class="text-[15px]">退出</button>
+              <button class="text-[13px]">退出</button>
             </form>
             <!-- v1.2.2 字号档位(issue #7)· 移动端入口 -->
             <div class="px-6 py-3 flex items-center gap-2 flex-wrap normal-case tracking-normal">

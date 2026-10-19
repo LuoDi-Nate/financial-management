@@ -2318,3 +2318,4 @@ Docker 化部署 + systemd/macOS 存量零丢迁移。**真机冒烟(docker buil
 | v135-BTN-STATES | **状态四件套覆盖五个按钮类**:`:active` 下沉 1px(手机唯一的按下反馈)· `:focus-visible` 光圈(Tailwind preflight 去掉了 outline)· `[disabled]` 半透明(请求中的按钮原来外观不变会被重复点)。三条规则都要列全 ink / paper / brass / ghost / danger。 |
 | v135-BTN-DANGER | **不可逆操作用 `btn-danger`**:模板里不许再出现「`btn-*` + 行内 `color:var(--rust)`」(v1.35 改掉 14 处);持仓卡「归档」是 `btn-danger text-xs`。 |
 | v135-HOLD-ADD-MENU | **持仓页一行 ≤3 个按钮**:主按钮 +「添加其他 ▾」菜单(`details.row-more.menu-btn` · 场外基金 / 手填市值 / 账户内现金)+ 手动刷价;持仓卡操作排成一行(`hold-ops`);`js/menus.js` 让菜单点外面 / Esc 收起。 |
+| v135-NAV-PIG | **顶栏品牌名旁的小图标是存钱罐**(v1.35 · 维护者「古钱好丑,没对齐」):nav.html 与 error.html 都是 Lucide piggy-bank 路径、不再有古钱的内方 `<rect>`;`.nav-coin` 上移 2px —— 实测图形墨迹中线比「账房」字身墨迹中线低 2px(PC / 手机一致)。e2e flow 40 断言图标是存钱罐、18px、上移 2px。 |

@@ -11840,6 +11840,13 @@ QA135_H="$RD/src/main/resources/templates/stock/holdings.html"
   && grep -qF "/js/menus.js" "$RD/src/main/resources/templates/fragments/layout.html"; } \
   && log_ok "v135-HOLD-ADD-MENU(持仓页「添加其他 ▾」菜单 · 持仓卡按钮一排 · 菜单点外面收起)" \
   || log_bad "v135-HOLD-ADD-MENU 持仓页按钮又摆回一排五个 / 竖排大按钮了" "see stock/holdings.html"
+# v135-NAV-PIG · 顶栏品牌名旁的图标是存钱罐(维护者 10-19「古钱好丑,没对齐」)· 错误页同步 · 上移 2px 对齐字身中线
+{ grep -qF 'M19 5c-1.5 0-2.8 1.4-3 2' "$RD/src/main/resources/templates/fragments/nav.html" \
+  && grep -qF 'M19 5c-1.5 0-2.8 1.4-3 2' "$RD/src/main/resources/templates/error.html" \
+  && ! grep -qF '<rect x="9" y="9" width="6" height="6"' "$RD/src/main/resources/templates/fragments/nav.html" \
+  && grep -qF '.nav-coin { transform: translateY(-2px); }' "$QA135_CSS"; } \
+  && log_ok "v135-NAV-PIG(顶栏 / 错误页的小图标是存钱罐 · 与品牌名中线对齐)" \
+  || log_bad "v135-NAV-PIG 顶栏图标又换回古钱或没对齐" "see fragments/nav.html · error.html · style.css .nav-coin"
 [ -f "$RD/scripts/e2e/flows/53-ui-refresh.cjs" ] && grep -qF 'spread <= 1.5' "$RD/scripts/e2e/flows/53-ui-refresh.cjs" \
   && grep -qF 'data-add-more' "$RD/scripts/e2e/flows/53-ui-refresh.cjs" \
   && log_ok "v135-E2E(flow 53:账户卡标题行对齐 · 多页按钮实测尺寸 / 无大写 · 持仓页菜单走到添加页并落库)" || log_bad "v135-E2E 缺 flow 53 或没覆盖按钮实测" "scripts/e2e/flows/53-ui-refresh.cjs"
