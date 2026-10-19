@@ -48,11 +48,11 @@
   .stage{border:1px solid var(--rule);background:var(--card)}
   .stage-hd{padding:10px 16px;border-bottom:1px solid var(--rule-soft);background:var(--card-soft);
     display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
-  .btn-run{font-family:'JetBrains Mono',monospace;font-size:11px;padding:6px 14px;border:1px solid var(--ink);
-    background:var(--ink);color:var(--paper);cursor:pointer;display:inline-flex;align-items:center;gap:7px}
+  /* v1.35 · 演示台的两个按钮跟全站按钮规格(无衬线 12px · 28px · 圆角 6);
+     本页原来自带一份 .btn-ghost 覆盖了全站的 —— 删掉,用全站的 btn-ghost + 小档 */
+  .btn-run{font-family:var(--ui-sans);font-size:12px;font-weight:500;min-height:28px;padding:3px 12px;border:1px solid var(--ink);
+    border-radius:var(--r-md);background:var(--ink);color:var(--card);cursor:pointer;display:inline-flex;align-items:center;gap:6px}
   .btn-run[disabled]{opacity:.45;cursor:default}
-  .btn-ghost{font-family:'JetBrains Mono',monospace;font-size:11px;padding:6px 12px;border:1px solid var(--rule);
-    background:transparent;color:var(--ink-soft);cursor:pointer}
 
   /* ── 演示 A · 填报顺序 ── */
   .lane{border:1px solid var(--rule-soft);padding:16px;background:var(--card)}
@@ -518,7 +518,7 @@
           <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M7 4l14 8-14 8z"/></svg>
           播放
         </button>
-        <button class="btn-ghost" id="resetA">重置</button>
+        <button class="btn-ghost text-xs" id="resetA">重置</button>
       </div>
     </div>
     <div class="p-5">

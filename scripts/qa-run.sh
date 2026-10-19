@@ -9590,8 +9590,10 @@ QA121_IMP_TPL="$RD/src/main/resources/templates/expense/import.html"
 #   它只验「可见」,不验「分量」),但我把它做成了 10px 灰字挂在分隔线右端,连着两轮没被发现。
 #   **入口存在 ≠ 入口找得到。** 所以这条护栏现在同时要求:主入口是支出区标题行上的
 #   btn-ghost 按钮(不是脚注链接),而且带一句说明它能省什么事。
+#   v1.35 · 判据从「页面里出现 btn-ghost」改成「/expense/import 这条链接本身带 btn-* 按钮类」:
+#   新按钮规格下它是 btn-paper(和「固定收支」同一档),原写法绑的是类名字面量,守的不是意图。
 { grep -q '/expense/import' "$QA121_GRID_TPL" \
-  && grep -q 'btn-ghost' "$RD/src/main/resources/templates/entry/index.html" \
+  && grep -A2 '/expense/import(periodId' "$RD/src/main/resources/templates/entry/index.html" | grep -qE 'class="btn-(ghost|paper|ink)' \
   && grep -q '一笔一笔记太慢' "$RD/src/main/resources/templates/entry/index.html" \
   && grep -q '"id": "expense-import"' "$RD/scripts/entry-points.json" \
   && grep -q '"id": "expense-categories"' "$RD/scripts/entry-points.json"; } \
@@ -11800,6 +11802,54 @@ QA1342_F21="$RD/scripts/e2e/flows/21-dual-period-metrics.cjs"
   || log_bad "v1342-FLOW21-DETERMINISTIC flow 21 又按百分比比仪表盘的实时收益(时红时绿)" "see scripts/e2e/flows/21-dual-period-metrics.cjs"
 [ -f "$RD/scripts/e2e/flows/52-old-fixes.cjs" ] && grep -qF 'data-bf-shift' "$RD/scripts/e2e/flows/52-old-fixes.cjs" \
   && log_ok "v1342-E2E(flow 52:补记到历史期 A / B / 删 / 取消 · 封板完整度 · 角标)" || log_bad "v1342-E2E 缺 flow 52" "scripts/e2e/flows/52-old-fixes.cjs"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# v1.35 · UI 精修(维护者 2026-10-19:按钮太大太方 · 填报卡账户名和「已校准」标签没对齐)
+# ══════════════════════════════════════════════════════════════════════════════
+# v135-ACCT-HEAD-CENTER · 账户卡标题行按竖直中线对齐:按基线对齐时,带框的小标签挂在基线下面,比账户名低 3px
+grep -qF 'class="flex items-center gap-1.5 sm:gap-3 acct-head"' "$RD/src/main/resources/templates/entry/_row.html" \
+  && ! grep -qF 'items-baseline gap-1.5 sm:gap-3 acct-head' "$RD/src/main/resources/templates/entry/_row.html" \
+  && log_ok "v135-ACCT-HEAD-CENTER(填报页账户卡:账户名 / 已校准标签 / 类型按竖直中线对齐)" \
+  || log_bad "v135-ACCT-HEAD-CENTER 账户卡标题行又按基线对齐了(带框标签会比账户名低 3px)" "see entry/_row.html .acct-head"
+QA135_CSS="$RD/src/main/resources/static/css/style.css"
+# v135-BTN-NO-CAPS · 按钮不大写、不加字距、用无衬线(维护者「按钮都那么大,还都是个方框」的根源就是这三样)
+#   判据钉在按钮的【主定义块】上:从 `.btn-ink, .btn-paper, .btn-brass, .btn-ghost, .btn-danger {` 到第一个 `}`
+QA135_BTN="$(awk '/^\.btn-ink, \.btn-paper, \.btn-brass, \.btn-ghost, \.btn-danger \{/,/^\}/' "$QA135_CSS")"
+{ [ -n "$QA135_BTN" ] && printf '%s' "$QA135_BTN" | grep -q 'font-family: var(--ui-sans)' \
+  && printf '%s' "$QA135_BTN" | grep -q 'text-transform: none' && printf '%s' "$QA135_BTN" | grep -q 'letter-spacing: 0;' \
+  && printf '%s' "$QA135_BTN" | grep -q 'border-radius: var(--r-md)' && printf '%s' "$QA135_BTN" | grep -q 'min-height: 32px' \
+  && ! grep -qE '^\.btn-(ink|paper|brass|ghost|danger) \{[^}]*uppercase' "$QA135_CSS"; } \
+  && log_ok "v135-BTN-NO-CAPS(按钮:无衬线 · 不大写 · 不加字距 · 圆角 6 · 默认 32px)" \
+  || log_bad "v135-BTN-NO-CAPS 按钮又写回大写 / 宽字距 / 直角了" "see style.css 按钮主定义块 · docs/design-system.md §2.1"
+# v135-BTN-STATES · 状态四件套覆盖五个按钮类(按下 / 键盘焦点 / 禁用)
+{ grep -qF '.btn-ink:active, .btn-paper:active, .btn-brass:active, .btn-ghost:active, .btn-danger:active' "$QA135_CSS" \
+  && grep -qF '.btn-ink:focus-visible, .btn-paper:focus-visible, .btn-brass:focus-visible, .btn-ghost:focus-visible, .btn-danger:focus-visible' "$QA135_CSS" \
+  && grep -qF '.btn-ink[disabled], .btn-paper[disabled], .btn-brass[disabled], .btn-ghost[disabled], .btn-danger[disabled]' "$QA135_CSS"; } \
+  && log_ok "v135-BTN-STATES(按下下沉 · Tab 光圈 · 禁用 / 请求中半透明 —— 五个按钮类全覆盖)" \
+  || log_bad "v135-BTN-STATES 有按钮类漏了状态" "see style.css 状态四件套"
+# v135-BTN-DANGER · 不可逆操作用 btn-danger,不再靠「btn-* + 行内红色」临时拼
+QA135_INL="$(grep -rnE '<(button|a|summary)[^>]*class="[^"]*btn-(ink|paper|ghost|brass)[^"]*"[^>]*style="[^"]*var\(--rust\)' "$RD/src/main/resources/templates" | head -3)"
+{ grep -q '^\.btn-danger ' "$QA135_CSS" && [ -z "$QA135_INL" ] \
+  && grep -qF 'class="btn-danger text-xs"' "$RD/src/main/resources/templates/stock/holdings.html"; } \
+  && log_ok "v135-BTN-DANGER(删除 / 归档 / 清除用 btn-danger · 模板里没有「按钮 + 行内红色」)" \
+  || log_bad "v135-BTN-DANGER 危险操作又用普通按钮加行内红色了" "${QA135_INL:-btn-danger 定义缺失}"
+# v135-HOLD-ADD-MENU · 持仓页一行 ≤3 个按钮:主按钮 +「添加其他 ▾」菜单 + 手动刷价
+QA135_H="$RD/src/main/resources/templates/stock/holdings.html"
+{ grep -qF 'data-add-more' "$QA135_H" && grep -qF 'class="row-more-pop menu-left"' "$QA135_H" \
+  && grep -qF 'flex flex-wrap items-start gap-1.5 lg:justify-end hold-ops' "$QA135_H" \
+  && grep -qF "/js/menus.js" "$RD/src/main/resources/templates/fragments/layout.html"; } \
+  && log_ok "v135-HOLD-ADD-MENU(持仓页「添加其他 ▾」菜单 · 持仓卡按钮一排 · 菜单点外面收起)" \
+  || log_bad "v135-HOLD-ADD-MENU 持仓页按钮又摆回一排五个 / 竖排大按钮了" "see stock/holdings.html"
+# v135-NAV-PIG · 顶栏品牌名旁的图标是存钱罐(维护者 10-19「古钱好丑,没对齐」)· 错误页同步 · 上移 2px 对齐字身中线
+{ grep -qF 'M19 5c-1.5 0-2.8 1.4-3 2' "$RD/src/main/resources/templates/fragments/nav.html" \
+  && grep -qF 'M19 5c-1.5 0-2.8 1.4-3 2' "$RD/src/main/resources/templates/error.html" \
+  && ! grep -qF '<rect x="9" y="9" width="6" height="6"' "$RD/src/main/resources/templates/fragments/nav.html" \
+  && grep -qF '.nav-coin { transform: translateY(-2px); }' "$QA135_CSS"; } \
+  && log_ok "v135-NAV-PIG(顶栏 / 错误页的小图标是存钱罐 · 与品牌名中线对齐)" \
+  || log_bad "v135-NAV-PIG 顶栏图标又换回古钱或没对齐" "see fragments/nav.html · error.html · style.css .nav-coin"
+[ -f "$RD/scripts/e2e/flows/53-ui-refresh.cjs" ] && grep -qF 'spread <= 1.5' "$RD/scripts/e2e/flows/53-ui-refresh.cjs" \
+  && grep -qF 'data-add-more' "$RD/scripts/e2e/flows/53-ui-refresh.cjs" \
+  && log_ok "v135-E2E(flow 53:账户卡标题行对齐 · 多页按钮实测尺寸 / 无大写 · 持仓页菜单走到添加页并落库)" || log_bad "v135-E2E 缺 flow 53 或没覆盖按钮实测" "scripts/e2e/flows/53-ui-refresh.cjs"
 
 echo
 echo "═══════════════════════════════════════"

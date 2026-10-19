@@ -30,8 +30,8 @@
   .ai-hint-note{ display:none; }
   .aiRan .ai-hint-note{ display:inline; }
   .muted-cell{ font-size:11px; color:var(--ink-subtle); }
-  .ai-btn{ font-family:'JetBrains Mono',monospace; font-size:10px; height:32px; width:100%;
-    box-sizing:border-box; padding:0 6px; border:1px solid var(--rule); border-radius:999px;
+  .ai-btn{ font-family:var(--ui-sans); font-size:12px; font-weight:500; height:32px; width:100%;
+    box-sizing:border-box; padding:0 6px; border:1px solid var(--rule-soft); border-radius:var(--r-md);
     background:var(--card); cursor:pointer; white-space:nowrap; }
   .ai-btn:hover{ border-color:var(--brass-deep); color:var(--brass-deep); }
   /* v1.6.20 · 卡片化整段限定 html:not(.ls-wide) —— 横屏模式要回到 PC 表格形态。
@@ -42,7 +42,7 @@
     html:not(.ls-wide) .tags-table thead{ display:none; }
     html:not(.ls-wide) .tags-table, html:not(.ls-wide) .tags-table tbody,
     html:not(.ls-wide) .tags-table tr, html:not(.ls-wide) .tags-table td{ display:block; width:100%; }
-    html:not(.ls-wide) .tags-table tr{ border:1px solid var(--rule); background:var(--card); margin-bottom:10px; padding:10px 12px; }
+    html:not(.ls-wide) .tags-table tr{ border:1px solid var(--rule); border-radius:var(--r-lg); background:var(--card); margin-bottom:10px; padding:10px 12px; }
     html:not(.ls-wide) .tags-table .acct-row{ background:var(--card-soft); border-width:2px; margin-top:14px; }
     html:not(.ls-wide) .tags-table .hold-row{ margin-left:14px; border-left:3px solid var(--brass-soft); }
     html:not(.ls-wide) .tags-table .hold-row td:first-child{ padding-left:0; }

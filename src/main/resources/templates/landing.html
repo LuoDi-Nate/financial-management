@@ -57,7 +57,7 @@
       <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2C6.5 2 2 6.6 2 12.2c0 4.5 2.9 8.3 6.8 9.6.5.1.7-.2.7-.5v-1.7c-2.8.6-3.4-1.4-3.4-1.4-.5-1.2-1.1-1.5-1.1-1.5-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.6 2.4 1.1 3 .9.1-.7.4-1.1.6-1.4-2.2-.3-4.6-1.1-4.6-5 0-1.1.4-2 1-2.7-.1-.3-.4-1.3.1-2.7 0 0 .8-.3 2.7 1 .8-.2 1.7-.3 2.5-.3s1.7.1 2.5.3c1.9-1.3 2.7-1 2.7-1 .5 1.4.2 2.4.1 2.7.6.7 1 1.6 1 2.7 0 3.9-2.4 4.7-4.6 5 .4.3.7.9.7 1.9v2.8c0 .3.2.6.7.5 3.9-1.3 6.8-5.1 6.8-9.6C22 6.6 17.5 2 12 2z"/></svg>
       Star<span class="ghstar-n" id="starnum"></span>
     </a>
-    <a th:href="@{/login}" class="text-sm border border-rule px-4 py-1.5 rounded-sm text-ink hover:bg-card-soft whitespace-nowrap">登录</a>
+    <a th:href="@{/login}" class="btn-paper no-underline">登录</a>
   </div>
 </header>
 
@@ -145,10 +145,10 @@ bash deploy/docker-up.sh</code></pre>
 <!-- 工程数字带(数字由 release skill 发版联动更新 · 详 release-prod SKILL.md) -->
 <section class="lp-stats border-y border-rule bg-card-soft relative z-10">
   <div class="max-w-[1080px] mx-auto px-6 py-8 grid grid-cols-2 md:grid-cols-4 gap-y-5 text-center">
-    <div><div class="font-display text-4xl text-ink"><span class="num" data-stat="version" data-to="51">21</span></div><div class="eyebrow mt-1.5">个版本迭代</div></div>
+    <div><div class="font-display text-4xl text-ink"><span class="num" data-stat="version" data-to="52">21</span></div><div class="eyebrow mt-1.5">个版本迭代</div></div>
     <div><div class="font-display text-4xl text-ink"><span class="num" data-stat="tests" data-to="1266">423</span></div><div class="eyebrow mt-1.5">单元测试</div></div>
     <div><div class="font-display text-4xl text-ink"><span class="num" data-stat="migrations" data-to="74">48</span></div><div class="eyebrow mt-1.5">数据库迁移</div></div>
-    <div><div class="font-display text-4xl text-ink"><span class="num" data-stat="blackbox" data-to="1012">479</span></div><div class="eyebrow mt-1.5">黑盒回归断言</div></div>
+    <div><div class="font-display text-4xl text-ink"><span class="num" data-stat="blackbox" data-to="1019">479</span></div><div class="eyebrow mt-1.5">黑盒回归断言</div></div>
   </div>
 </section>
 
@@ -198,10 +198,10 @@ bash deploy/docker-up.sh</code></pre>
 <footer class="max-w-3xl mx-auto px-6 py-16 text-center relative z-10">
   <h2 class="font-display text-3xl md:text-4xl font-medium tracking-tight">自托管一份,数据只待在你自己手里。</h2>
   <div class="mt-8 flex flex-wrap items-center justify-center gap-4">
-    <a th:href="@{/login}" class="bg-ink text-paper px-7 py-3 rounded-sm hover:bg-brass-deep transition">登录账房</a>
-    <a th:href="@{/help/how-to-use}" class="border px-7 py-3 rounded-sm no-underline hover:bg-card-soft transition"
-       style="border-color:var(--brass-deep);color:var(--brass-text)">先看使用手册</a>
-    <a href="https://github.com/LuoDi-Nate/financial-management" rel="noopener" target="_blank" class="border border-rule px-7 py-3 rounded-sm text-ink hover:bg-card-soft">查看源码 · 快速开始</a>
+    <!--/* v1.35 · 落地页底部三个入口走统一按钮规格(大档 40px):主操作 btn-ink,另两个 btn-paper / btn-accent */-->
+    <a th:href="@{/login}" class="btn-ink btn-lg no-underline">登录账房</a>
+    <a th:href="@{/help/how-to-use}" class="btn-paper btn-accent btn-lg no-underline">先看使用手册</a>
+    <a href="https://github.com/LuoDi-Nate/financial-management" rel="noopener" target="_blank" class="btn-paper btn-lg no-underline">查看源码 · 快速开始</a>
   </div>
   <div class="font-mono text-xs text-ink-subtle mt-8 break-all">https://github.com/LuoDi-Nate/financial-management</div>
 </footer>

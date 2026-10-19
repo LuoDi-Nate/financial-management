@@ -37,11 +37,11 @@
 <header th:unless="${nav != null}" class="sticky top-1 backdrop-blur border-b border-rule z-30"
         style="background:rgba(246,241,234,.95);">
   <div class="max-w-[1400px] mx-auto px-6 lg:px-10 flex items-center justify-between h-16">
-    <a href="/login" class="flex items-center gap-2 no-underline">
+    <a href="/login" class="flex items-center gap-1.5 no-underline">
       <span class="font-display text-xl font-medium">账房</span>
-      <!--/* v1.28.5 · issue #31 · 与顶栏一致:古钱小图标替代「№ 首字」 */-->
-      <svg class="shrink-0" style="color:var(--brass-deep)" width="15" height="15" viewBox="0 0 24 24" fill="none"
-           stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><rect x="9" y="9" width="6" height="6" rx=".5"/></svg>
+      <!--/* v1.28.5 · issue #31 · 与顶栏一致:小图标替代「№ 首字」· v1.35 古钱换成存钱罐(同顶栏) */-->
+      <svg class="nav-coin shrink-0" style="color:var(--brass-deep)" width="18" height="18" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 5c-1.5 0-2.8 1.4-3 2-3.5-1.5-11-.3-11 5 0 1.8 0 3 2 4.5V20h4v-2h3v2h4v-4c1-.5 1.7-1 2-2h2v-4h-2c0-1-.5-1.5-1-2V5z"/><path d="M2 9v1c0 1.1.9 2 2 2h1"/><path d="M16 11h.01"/></svg>
     </a>
     <a href="/login" class="font-mono text-[10px] tracking-[0.18em] uppercase text-ink-soft hover:text-ink no-underline">↩ 去登录</a>
   </div>

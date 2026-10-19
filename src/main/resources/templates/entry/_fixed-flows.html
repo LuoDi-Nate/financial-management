@@ -172,7 +172,7 @@
           <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
           <input type="hidden" name="periodId" th:value="${period.id}">
           <input type="hidden" name="mine" th:value="${mineOnly}">
-          <button type="submit" class="btn-ghost text-xs" onclick="return confirm('撤销这一笔?记进去的会删掉,余额跟着回去。')">撤销</button>
+          <button type="submit" class="btn-danger text-xs" onclick="return confirm('撤销这一笔?记进去的会删掉,余额跟着回去。')">撤销</button>
         </form>
       </div>
     </details>

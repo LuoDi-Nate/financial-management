@@ -170,13 +170,13 @@
                   onsubmit="return confirm('重新打开这一期?\n\n这些会在你再次关账时重新计算:\n· 该期的账户分类定格(资产类型 / 行业 / 平台等)\n· 该期的账户组定格\n· 该期的 AI 月度复盘解读(现在就会清掉)\n· 该期之后每一期的净资产变化 / 收益率 / 归因\n· 填报完成状态(家人需要重新签收)\n\n继续吗?');">
               <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
               <input type="text" name="reason" placeholder="必填理由" class="text-xs px-2 py-1 border border-rule" required>
-              <button class="btn-ghost" style="color:var(--rust)">重新打开</button>
+              <button class="btn-danger text-xs">重新打开</button>
             </form>
             <form th:if="${p.status.name() == 'OPEN'}" th:action="@{/admin/periods/{id}/force-close(id=${p.id})}" method="post"
                   onsubmit="return confirm('确认强制关闭周期 ' + this.dataset.label + '?\n\n未完成填报的账户将自动延续上期末余额作为本期值,系统会代所有成员签收并触发指标重算。\n\n此操作不可撤销(可后续通过重新打开恢复)。')"
                   th:data-label="${#temporals.format(p.periodStart,'yyyy-MM')}">
               <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-              <button class="btn-ghost" style="color:var(--rust)">关闭账期</button>
+              <button class="btn-danger text-xs">关闭账期</button>
             </form>
           </td>
         </tr>

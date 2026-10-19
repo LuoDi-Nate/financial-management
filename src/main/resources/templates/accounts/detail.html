@@ -372,7 +372,8 @@
       </svg>
       <span>返回账户簿</span>
     </a>
-    <div class="flex gap-2">
+    <!--/* v1.35 · 加 flex-wrap:按钮改成不折字(white-space:nowrap)之后,四个按钮在 390px 上排不下会撑出横向滚动,改成整颗换行 */-->
+    <div class="flex flex-wrap gap-2">
       <!-- v0.3 FR-52 · 持仓类型账户加持仓管理入口 · 其它类型不显(v0.14 走 supportsHoldings 含 METAL)-->
       <a th:if="${detail.account.type != null and T(com.family.finance.service.stock.StockHoldingService).supportsHoldings(detail.account.type)}"
          th:href="@{|/accounts/${detail.account.id}/holdings|}"

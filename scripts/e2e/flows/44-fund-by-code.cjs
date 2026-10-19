@@ -116,7 +116,9 @@ module.exports = {
       .map(a => a.textContent.trim()).filter(s => s.startsWith('+')));
     await ui.assert(ops[0] === '+ 添加持仓 · 场外基金', '第一个添加按钮是「场外基金」(黑底)', ops.join(' / '));
     await ui.assert(!ops.some(s => s.includes('自动估值')), '基金账户里没有「股票 · 自动估值」', ops.join(' / '));
-    await ui.click('a:has-text("+ 账户内现金")', '点「+ 账户内现金」');
+    // v1.35 · 「账户内现金 / 手填市值 / 场外基金(非基金账户)」收进了「添加其他 ▾」菜单
+    await ui.click('details[data-add-more] > summary', '点「添加其他」');
+    await ui.click('details[data-add-more] a:has-text("账户内现金")', '菜单里点「账户内现金」');
     await ui.choose('currency', 'CNY');
     await ui.fillByName('amount', '10000');
     await ui.submit('form button[type="submit"]', '添加现金行 ¥10,000');
@@ -321,7 +323,8 @@ module.exports = {
 
     // ── 11 · 手填转自动 / 改回手填 ──────────────────────────────────
     report.section('11 · 一条手填市值 ¥5,000 的「广发多因子」(穿透认出了 002943)→ 改为按净值自动估值 → 改回手填');
-    await ui.click('a:has-text("+ 添加持仓 · 手填市值")', '点「+ 添加持仓 · 手填市值」');
+    await ui.click('details[data-add-more] > summary', '点「添加其他」');
+    await ui.click('details[data-add-more] a:has-text("手填市值")', '菜单里点「手填市值」');
     await ui.fillByName('displayName', '广发多因子');
     await ui.fillByName('shares', '1');
     await ui.fillByName('unitValue', '5000');
@@ -383,9 +386,11 @@ module.exports = {
     const widths = await ui.page.evaluate(() => {
       const a = [...document.querySelectorAll('article')].find(x => x.querySelector('[data-nav-row="FUND"]'));
       return a ? [...a.querySelectorAll('details[data-nav-edit] > summary, form[action$="/nav-off"] button, form[action$="/archive"] button')]
-        .map(e => Math.round(e.getBoundingClientRect().width)) : [];
+        .map(e => { const r = e.getBoundingClientRect(); return { t: Math.round(r.top), h: Math.round(r.height) }; }) : [];
     });
-    await ui.assert(widths.length === 3 && new Set(widths).size === 1, '手机上基金行的「改份额 / 改回手填 / 归档」三个按钮同宽', widths.join(' / '));
+    // v1.35 · 三个按钮从「竖排同宽」改成「一排同高」(FR-1353)
+    await ui.assert(widths.length === 3 && new Set(widths.map(w => w.h)).size === 1 && Math.max(...widths.map(w => w.t)) - Math.min(...widths.map(w => w.t)) <= 2,
+      '手机上基金行的「改份额 / 改回手填 / 归档」三个按钮同高、排在一行', widths.map(w => `${w.t}/${w.h}`).join(' · '));
     await ui.page.screenshot({ path: '/tmp/e2e-44-holdings-mobile.png', fullPage: true }).catch(() => {});
     await ui.page.setViewportSize(vp);
     await ui.goto(`/accounts/${state.acc}/holdings`);

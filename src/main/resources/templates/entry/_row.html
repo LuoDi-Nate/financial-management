@@ -46,20 +46,22 @@
              同行的「本月已校准」badge / 类型 / 币种全是 flex-shrink-0,
              于是账户名成了唯一能被压的那个 —— 实测在 390px 下被压到【2px】,
              「招行理财-稳健」只剩一个省略号。账户名是这一行的主语,不能阉割。
-             改成:账户名不收缩、按内容占位;放不下的 tag 换到下一行(换它们无害)。 */-->
-      <div class="flex items-baseline gap-1.5 sm:gap-3 acct-head">
+             改成:账户名不收缩、按内容占位;放不下的 tag 换到下一行(换它们无害)。
+             v1.35 · 【items-center,不是 items-baseline】:按基线对齐时,带边框的 9px「本月已校准」
+             框会比 15px 的账户名低 3px(框的下边框挂在基线下面),看起来就是没对齐(维护者 2026-10-19)。
+             这一行里有带框的标签,就按竖直中线对齐。 */-->
+      <div class="flex items-center gap-1.5 sm:gap-3 acct-head">
         <span class="font-display text-sm sm:text-base truncate sm:max-w-none acct-name" th:text="${row.account.displayName}">招行储蓄卡-工资</span>
         <!--/* v1.20 FR-452 · 本月余额校准过没有,写在名字旁边,不用点进去。
                灰色那支同时是 FR-453 的锚点:它解释了为什么这个账户上的改动
                暂时不进「本期净资产变化」。 */-->
         <span th:if="${row.currentSnapshot != null and row.currentSnapshot.submittedAt != null}"
               data-calibrated
-              class="font-mono text-[9px] px-1.5 py-0.5 border whitespace-nowrap"
-              style="border-color:var(--forest);color:var(--forest);background:rgba(79,107,71,.09)"
+              class="pill pill-forest whitespace-nowrap"
               th:text="'本月已校准 · ' + ${#temporals.format(row.currentSnapshot.submittedAt,'MM-dd')}">本月已校准</span>
         <span th:if="${row.currentSnapshot == null or row.currentSnapshot.submittedAt == null}"
               data-not-calibrated
-              class="font-mono text-[9px] px-1.5 py-0.5 border border-rule text-ink-subtle whitespace-nowrap">本月还没校准</span>
+              class="pill pill-mute whitespace-nowrap">本月还没校准</span>
         <span class="flex-shrink-0 font-mono text-[10px] sm:text-[11px] tracking-wide"
               th:classappend="${row.account.type.name() == 'LOAN' ? 'text-rust' : (row.account.type.name() == 'WEALTH' ? 'text-forest' : (row.account.type.name() == 'STOCK' ? 'text-brass-deep' : (row.account.type.name() == 'FUND' ? 'text-fund' : 'text-ink-subtle')))}"
               th:text="${row.account.type.label}">现金</span>
