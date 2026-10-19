@@ -623,7 +623,7 @@
             <form method="post" th:action="@{/admin/ai-access/kill}"
                   onsubmit="return confirm('立刻断开:这个接入点的所有口令(含换绑中的新口令)会立即失效。确定吗?')">
               <input type="hidden" name="pointId" th:value="${p.pointId}"/>
-              <button type="submit" class="btn-paper text-[11px] py-1 px-2" style="color:var(--rust)">立刻断开</button>
+              <button type="submit" class="btn-danger text-xs">立刻断开</button>
             </form>
           </div>
           <div th:if="${p.rotating}" class="col-span-12 pl-1 mt-1">

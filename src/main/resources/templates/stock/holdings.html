@@ -85,12 +85,10 @@
               : '全局默认 / 托管')">OpenD 全局默认 / 托管</span>
       <span class="ls-acts">
         <!-- 两个按钮**同款** btn-paper:并列同类控件不能一个有框一个无框(visual-spec 并列同尺度那条)。
-             text-transform:none 是必须的 —— btn-* 全带 uppercase,不关掉「OpenD」会被渲染成「OPEND」,
-             那是个专有名词,大写后读起来像另一个东西(实测截图发现)。 -->
+             (v1.35 起按钮不再大写,原来为了「OpenD」不被渲染成「OPEND」加的 text-transform:none 已去掉) -->
         <a th:href="@{|/accounts/${account.id}/broker|}" class="btn-paper text-[11px] no-underline"
            title="本账户那条 1:1 关联:改券商 / 凭据 / OpenD 地址 · 立即同步 · 测试连接 · 解除关联">券商配置</a>
         <a th:if="${brokerLink.vendor.name() == 'FUTU'}" th:href="@{/admin/broker/opend(account=${account.id})}" class="btn-paper text-[11px] no-underline"
-           style="text-transform:none"
            title="富途 OpenD 常驻网关:一键下载 / 托管 / 自检">OpenD 网关</a>
       </span>
     </div>
@@ -113,21 +111,32 @@
     </p>
   </section>
 
-  <!-- 操作栏 -->
-  <section class="flex flex-wrap gap-3 mb-6">
+  <!-- 操作栏
+       v1.35 · FR-1353 · 原来一排 5 个大按钮(维护者 2026-10-19「按钮都那么大」)。一行 ≤3:
+       主按钮(这类账户最常用的添加方式)+「添加其他 ▾」菜单 +「手动刷价」。菜单只有一项时(贵金属账户)直接摆出来。 -->
+  <section class="flex flex-wrap items-center gap-2 mb-6 hold-actions">
     <a th:if="${account.type.name() == 'METAL'}" th:href="@{|/accounts/${account.id}/holdings/new-metal|}" class="btn-ink no-underline">+ 添加贵金属</a>
     <!--/* v1.30 · 「场外基金」按 PRD §3.1 出现(人民币的基金 / 证券 / 理财 / 现金账户);基金账户里它排第一,不出股票那个 */-->
     <a th:if="${account.type.name() == 'FUND' and fundAllowed}" th:href="@{|/accounts/${account.id}/holdings/new-fund|}"
        class="btn-ink no-underline" data-add-fund>+ 添加持仓 · 场外基金</a>
     <a th:if="${account.type.name() != 'METAL' and account.type.name() != 'FUND'}" th:href="@{|/accounts/${account.id}/holdings/new-auto|}" class="btn-ink no-underline">+ 添加持仓 · 自动估值</a>
-    <a th:if="${account.type.name() != 'FUND' and fundAllowed}" th:href="@{|/accounts/${account.id}/holdings/new-fund|}"
-       class="btn-paper no-underline" data-add-fund>+ 添加持仓 · 场外基金</a>
-    <a th:if="${account.type.name() != 'METAL'}" th:href="@{|/accounts/${account.id}/holdings/new-manual|}" class="btn-paper no-underline">+ 添加持仓 · 手填市值</a>
-    <a th:href="@{|/accounts/${account.id}/holdings/new-cash|}" class="btn-paper no-underline">+ 账户内现金</a>
+    <a th:if="${account.type.name() == 'METAL'}" th:href="@{|/accounts/${account.id}/holdings/new-cash|}" class="btn-paper no-underline">+ 账户内现金</a>
+    <details th:unless="${account.type.name() == 'METAL'}" class="row-more menu-btn" data-add-more>
+      <summary class="btn-paper">添加其他
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+      </summary>
+      <div class="row-more-pop menu-left">
+        <a th:if="${account.type.name() != 'FUND' and fundAllowed}" th:href="@{|/accounts/${account.id}/holdings/new-fund|}"
+           class="no-underline" data-add-fund>场外基金(按代码自动估值)</a>
+        <a th:href="@{|/accounts/${account.id}/holdings/new-manual|}" class="no-underline">手填市值(未上市 / 拉不到价)</a>
+        <a th:href="@{|/accounts/${account.id}/holdings/new-cash|}" class="no-underline">账户内现金</a>
+      </div>
+    </details>
     <!-- 券商入口见上方「券商对接」状态条(v1.6.24 从账户页搬回来);持仓行上另有「券商同步」来源徽章 -->
     <form th:action="@{|/accounts/${account.id}/holdings/refresh|}" method="post">
       <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
-      <button type="submit" class="btn-paper">⟳ 手动刷价</button>
+      <button type="submit" class="btn-paper">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 1 1-9-9c2.5 0 4.8 1 6.4 2.6"/><path d="M21 3v5h-5"/></svg>手动刷价</button>
     </form>
     <div class="ml-auto font-mono text-[10px] text-ink-subtle self-center"
          th:text="${priceSourceLabel}">数据源 · 新浪(主) + 腾讯(备)</div>
@@ -426,13 +435,15 @@
           </div>
         </div>
       </div>
-      <div class="flex flex-col gap-1.5">
+      <!--/* v1.35 · FR-1353 · 右侧操作从「三个整宽大按钮竖排」改成一排小按钮(PC 靠右、手机靠左);
+             改份额的表单改成浮层,不再把同排按钮挤开。归档是不可逆操作,用 btn-danger。 */-->
+      <div class="flex flex-wrap items-start gap-1.5 lg:justify-end hold-ops">
         <!--/* 期权等是券商同步行:手改会在下次同步被覆盖,而且卖出张数是负的,这个表单(张数 ≥ 0.0001)也装不下 */-->
         <!--/* v1.30 · 净值行:改份额(货币基金是改金额)· 可勾现金联动(FR-970);单价不给改(系统按净值写)*/-->
-        <details th:if="${h.navRow}" class="nav-edit w-full" data-nav-edit th:with="ni=${navInfo.get(h.id)}">
-          <summary class="btn-paper text-xs cursor-pointer list-none text-center block w-full" th:text="${ni.mmf} ? '改金额' : '改份额'">改份额</summary>
+        <details th:if="${h.navRow}" class="nav-edit" data-nav-edit th:with="ni=${navInfo.get(h.id)}">
+          <summary class="btn-paper text-xs cursor-pointer list-none" th:text="${ni.mmf} ? '改金额' : '改份额'">改份额</summary>
           <form th:action="@{|/accounts/${account.id}/holdings/${h.id}/fund-shares|}" method="post"
-                class="mt-2 p-3 border border-rule bg-card-soft space-y-2 w-[260px] max-w-full">
+                class="nav-edit-pop p-3 space-y-2 w-[260px] max-w-[calc(100vw-48px)]">
             <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
             <label class="font-mono text-[10px] uppercase text-ink-subtle block" th:text="${ni.mmf} ? '当前金额(和 App 一致)' : '持有份额'">持有份额</label>
             <input type="number" name="shares" min="0" th:step="${ni.mmf} ? '0.01' : '0.0001'"
@@ -468,11 +479,11 @@
         <form th:if="${h.navRow and navInfo.get(h.id).edited}"
               th:action="@{|/accounts/${account.id}/holdings/${h.id}/nav-resume|}" method="post">
           <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
-          <button type="submit" class="btn-ink text-xs w-full">继续自动更新</button>
+          <button type="submit" class="btn-ink text-xs">继续自动更新</button>
         </form>
         <form th:if="${h.navRow}" th:action="@{|/accounts/${account.id}/holdings/${h.id}/nav-off|}" method="post">
           <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
-          <button type="submit" class="btn-paper text-xs w-full"
+          <button type="submit" class="btn-paper text-xs"
                   onclick="return confirm('改回手填后不再自动更新:单价停在最后一次的净值,余额不变。继续?');">改回手填</button>
         </form>
         <a th:if="${!h.navRow and convertible.contains(h.id)}" th:href="@{|/accounts/${account.id}/holdings/${h.id}/to-nav|}"
@@ -503,9 +514,9 @@
         </form>
         <form th:action="@{|/accounts/${account.id}/holdings/${h.id}/archive|}" method="post">
           <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
-          <!--/* v1.30 · 基金行三个按钮(改份额 / 改回手填 / 归档)同宽 —— 并列同类控件同尺寸 */-->
-          <button type="submit" class="btn-paper text-xs" th:classappend="${h.navRow} ? 'w-full' : ''"
-                  onclick="return confirm('归档此持仓(可恢复)?');"><svg class="inline-block align-[-2px] mr-1" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="5" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8M10 12h4"/></svg>归档</button>
+          <!--/* v1.30 时三个按钮竖排同宽;v1.35 改成一排、同高,归档用危险样式 */-->
+          <button type="submit" class="btn-danger text-xs"
+                  onclick="return confirm('归档此持仓(可恢复)?');"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="5" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8M10 12h4"/></svg>归档</button>
         </form>
       </div>
     </div>

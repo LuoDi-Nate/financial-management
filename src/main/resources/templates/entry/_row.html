@@ -57,12 +57,11 @@
                暂时不进「本期净资产变化」。 */-->
         <span th:if="${row.currentSnapshot != null and row.currentSnapshot.submittedAt != null}"
               data-calibrated
-              class="font-mono text-[9px] px-1.5 py-0.5 border whitespace-nowrap"
-              style="border-color:var(--forest);color:var(--forest);background:rgba(79,107,71,.09)"
+              class="pill pill-forest whitespace-nowrap"
               th:text="'本月已校准 · ' + ${#temporals.format(row.currentSnapshot.submittedAt,'MM-dd')}">本月已校准</span>
         <span th:if="${row.currentSnapshot == null or row.currentSnapshot.submittedAt == null}"
               data-not-calibrated
-              class="font-mono text-[9px] px-1.5 py-0.5 border border-rule text-ink-subtle whitespace-nowrap">本月还没校准</span>
+              class="pill pill-mute whitespace-nowrap">本月还没校准</span>
         <span class="flex-shrink-0 font-mono text-[10px] sm:text-[11px] tracking-wide"
               th:classappend="${row.account.type.name() == 'LOAN' ? 'text-rust' : (row.account.type.name() == 'WEALTH' ? 'text-forest' : (row.account.type.name() == 'STOCK' ? 'text-brass-deep' : (row.account.type.name() == 'FUND' ? 'text-fund' : 'text-ink-subtle')))}"
               th:text="${row.account.type.label}">现金</span>

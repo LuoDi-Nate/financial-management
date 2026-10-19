@@ -52,6 +52,15 @@
   /* — Effects — */
   --shadow-paper: 0 1px 0 rgba(26, 23, 20, 0.04), 0 8px 24px -12px rgba(26, 23, 20, 0.08);
   --shadow-deep:  0 2px 0 rgba(26, 23, 20, 0.04), 0 24px 60px -32px rgba(26, 23, 20, 0.18);
+
+  /* — v1.35 · 控件 token(按钮 / 标签 / 输入框 / 卡片)· 见 docs/design-system.md §2.1 — */
+  --ui-sans:      -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB",
+                  "Microsoft YaHei", "Noto Sans SC", "Source Han Sans SC", "WenQuanYi Zen Hei", sans-serif;
+  --r-sm:         4px;    /* 标签 */
+  --r-md:         6px;    /* 按钮 / 输入框 / 下拉框 */
+  --r-lg:         8px;    /* 卡片 */
+  --shadow-xs:    0 1px 2px rgba(26, 23, 20, 0.06);
+  --ring:         0 0 0 2px var(--card), 0 0 0 4px rgba(176, 134, 66, 0.55);
 }
 
 /* v1.2.2 · 字号档位:大 +15% / 特大 +30%(标准不设 = 用 :root 的 1) */
@@ -137,7 +146,7 @@ h1, h2, h3, h4 {
 .paper-card {
   background: var(--card);
   border: var(--rule-thick) solid var(--rule);
-  border-radius: 2px;
+  border-radius: var(--r-lg);   /* v1.35 · 2px → 8px(方向 A:卡片圆角对齐控件) */
   box-shadow: var(--shadow-paper);
   position: relative;
 }
@@ -145,7 +154,7 @@ h1, h2, h3, h4 {
 .paper-card-soft {
   background: var(--card-soft);
   border: var(--rule-thin) solid var(--rule);
-  border-radius: 2px;
+  border-radius: var(--r-md);
 }
 
 .envelope {
@@ -182,71 +191,102 @@ h1, h2, h3, h4 {
 .rule-double  { border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); padding: 1px 0; }
 .rule-triple-bottom { border-bottom: 3px double var(--rule); padding-bottom: 4px; }
 
-/* Buttons */
-.btn-ink {
-  background: var(--ink);
-  color: var(--paper);
-  font-family: "JetBrains Mono", ui-monospace, monospace;
-  font-size: calc(12px * var(--fs-scale,1));
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  padding: 12px 20px;
-  border: none;
-  cursor: pointer;
-  transition: all 180ms ease;
+/* Buttons
+   v1.35 · 按钮重做(维护者 2026-10-19:「为什么按钮都那么大?还都是个方框」· 方向 A 精修账册)。
+   旧版是 12px 等宽 + uppercase + 0.12em 字距 + 12/20 内距 + 直角,一个按钮约 42px,中文被拉成「添 加 持 仓」。
+   规格对标 shadcn/ui(nova 那一档的密度)—— 数值与来源见 docs/research/ui-frameworks-2026-10.md:
+     · 尺寸档【沿用模板现有写法,不新增修饰类】:按钮带 text-xs / text-[10px] / text-[11px] / text-[12px]
+       = 小档 28px(卡片内、行内);其余 = 默认 32px;btn-lg = 40px(登录、引导这类大入口);手机各升一档
+     · 无衬线 13px / 500 · 不大写、不加字距 · 圆角 6px · 图标与文字间距 6px
+     · 用 min-height 而不是 height:长文字换行时按钮跟着长高,不会把字截掉
+   四层:btn-ink 主操作(每区块 1 个)· btn-paper 次操作(白底细边)· btn-ghost 行内轻操作 · btn-danger 删除/归档等不可逆
+   btn-brass:新功能 / AI 入口(全站 ≤3 处)。
+   护栏 v135-BTN-NO-CAPS / v135-BTN-STATES。 */
+.btn-ink, .btn-paper, .btn-brass, .btn-ghost, .btn-danger {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-}
-.btn-ink:hover { background: var(--brass-deep); }
-
-.btn-paper {
-  background: transparent;
-  color: var(--ink);
-  font-family: "JetBrains Mono", ui-monospace, monospace;
-  font-size: calc(12px * var(--fs-scale,1));
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  padding: 11px 19px;
-  border: 1px solid var(--ink);
-  cursor: pointer;
-  transition: all 180ms ease;
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-}
-.btn-paper:hover { background: var(--ink); color: var(--paper); }
-
-.btn-brass {
-  background: var(--brass);
-  color: var(--paper);
-  font-family: "JetBrains Mono", ui-monospace, monospace;
-  font-size: calc(12px * var(--fs-scale,1));
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  padding: 12px 20px;
-  border: none;
-  cursor: pointer;
-  transition: background 180ms ease;
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-}
-.btn-brass:hover { background: var(--brass-deep); }
-
-.btn-ghost {
-  background: transparent;
-  color: var(--ink-soft);
-  font-family: "JetBrains Mono", ui-monospace, monospace;
-  font-size: calc(11.5px * var(--fs-scale,1));
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  padding: 8px 14px;
+  justify-content: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 5px 12px;
+  font-family: var(--ui-sans);
+  font-size: calc(13px * var(--fs-scale,1));
+  font-weight: 500;
+  line-height: 1.25;
+  letter-spacing: 0;
+  text-transform: none;
+  text-decoration: none;
+  white-space: nowrap;   /* 中文按钮被挤窄时会一字一行(汇率页「↻ 立 / 即拉 / 取」);宁可旁边的说明文字多折一行 */
   border: 1px solid transparent;
+  border-radius: var(--r-md);
   cursor: pointer;
-  transition: all 150ms ease;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, box-shadow 150ms ease, transform 100ms ease;
 }
-.btn-ghost:hover { color: var(--ink); border-color: var(--rule); }
+.btn-ink    { background: var(--ink); color: var(--card); border-color: var(--ink); }
+.btn-ink:hover    { background: #322C26; border-color: #322C26; color: var(--card); }
+.btn-paper  { background: var(--card); color: var(--ink); border-color: var(--rule-soft); box-shadow: var(--shadow-xs); }
+.btn-paper:hover  { background: var(--paper-soft); border-color: var(--rule); color: var(--ink); }
+/* 旧 btn-brass 是铜底米字(对比度 3.2:1 不够小字);改深铜底,4.9:1 */
+.btn-brass  { background: var(--brass-deep); color: var(--card); border-color: var(--brass-deep); }
+.btn-brass:hover  { background: #76592A; border-color: #76592A; color: var(--card); }
+/* btn-accent:AI 入口 / 新能力的次操作(铜色软底)—— 叠在 btn-paper 上用;实心深铜的 btn-brass 全站 ≤3 处 */
+.btn-paper.btn-accent { background: var(--brass-soft); color: var(--brass-text); border-color: transparent; box-shadow: none; }
+.btn-paper.btn-accent:hover { background: #E1CE9E; color: var(--brass-deep); border-color: transparent; }
+.btn-ghost  { background: transparent; color: var(--ink-soft); }
+.btn-ghost:hover  { background: var(--paper-soft); color: var(--ink); }
+/* 不可逆操作:描边红字,不用实心红 —— 删除不该是页面上最醒目的东西(实心只给最后一步确认:btn-danger-fill) */
+.btn-danger { background: transparent; color: var(--rust); border-color: rgba(156, 74, 42, .38); }
+.btn-danger:hover { background: rgba(156, 74, 42, .08); border-color: var(--rust); color: var(--rust); }
+.btn-danger.btn-danger-fill { background: var(--rust); color: var(--card); border-color: var(--rust); }
+.btn-danger.btn-danger-fill:hover { background: #84391F; border-color: #84391F; color: var(--card); }
+
+/* 小档 28px:模板里给按钮写的字号类就是尺寸档(:is 让优先级 = 0,2,0,压过 Tailwind 同名工具类) */
+:is(.btn-ink, .btn-paper, .btn-brass, .btn-ghost, .btn-danger):is(.text-xs, .text-\[10px\], .text-\[11px\], .text-\[12px\], .btn-sm) {
+  min-height: 28px;
+  padding: 3px 10px;
+  font-size: calc(12px * var(--fs-scale,1));
+  line-height: 1.25;
+}
+/* 模板里写 text-sm / text-base 的按钮回到默认 13px —— 并排按钮字号一致 */
+:is(.btn-ink, .btn-paper, .btn-brass, .btn-ghost, .btn-danger):is(.text-sm, .text-base) {
+  font-size: calc(13px * var(--fs-scale,1));
+  line-height: 1.25;
+}
+:is(.btn-ink, .btn-paper, .btn-brass, .btn-ghost, .btn-danger).btn-lg {
+  min-height: 40px;
+  padding: 8px 20px;
+  font-size: calc(14px * var(--fs-scale,1));
+}
+/* 模板给按钮加了 block / inline-block 时(Tailwind 后注入、会压掉 inline-flex),换成对应的 flex,文字才竖直居中 */
+:is(.btn-ink, .btn-paper, .btn-brass, .btn-ghost, .btn-danger).block { display: flex; }
+:is(.btn-ink, .btn-paper, .btn-brass, .btn-ghost, .btn-danger).inline-block { display: inline-flex; }
+:is(.btn-ink, .btn-paper, .btn-brass, .btn-ghost, .btn-danger) svg { flex-shrink: 0; }
+summary:is(.btn-ink, .btn-paper, .btn-brass, .btn-ghost, .btn-danger)::-webkit-details-marker { display: none; }
+
+/* 状态四件套 —— 一次覆盖全部按钮类(design-system.md 当年写了「待补」一直没补)
+   · 按下:移动端没有 hover,这是唯一的按下反馈
+   · focus-visible:Tailwind preflight 去掉了 outline,键盘 Tab 走到哪看不见
+   · disabled / 请求中:原来外观不变,会被重复点 */
+.btn-ink:active, .btn-paper:active, .btn-brass:active, .btn-ghost:active, .btn-danger:active { transform: translateY(1px); }
+.btn-ink:focus-visible, .btn-paper:focus-visible, .btn-brass:focus-visible, .btn-ghost:focus-visible, .btn-danger:focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+}
+.btn-ink[disabled], .btn-paper[disabled], .btn-brass[disabled], .btn-ghost[disabled], .btn-danger[disabled],
+.btn-ink[aria-disabled="true"], .btn-paper[aria-disabled="true"], .btn-brass[aria-disabled="true"], .btn-ghost[aria-disabled="true"], .btn-danger[aria-disabled="true"],
+.btn-ink.htmx-request, .btn-paper.htmx-request, .btn-brass.htmx-request, .btn-ghost.htmx-request, .btn-danger.htmx-request {
+  opacity: .5;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+/* 手机端没有精确指针,点按区域各升一档:默认 36 / 小档 32 */
+@media (max-width: 640px) {
+  .btn-ink, .btn-paper, .btn-brass, .btn-ghost, .btn-danger { min-height: 36px; padding: 6px 14px; }
+  :is(.btn-ink, .btn-paper, .btn-brass, .btn-ghost, .btn-danger):is(.text-xs, .text-\[10px\], .text-\[11px\], .text-\[12px\], .btn-sm) { min-height: 32px; padding: 4px 11px; }
+  :is(.btn-ink, .btn-paper, .btn-brass, .btn-ghost, .btn-danger).btn-lg { min-height: 44px; }
+}
 
 /* Form */
 .field-input {
@@ -262,6 +302,11 @@ h1, h2, h3, h4 {
   transition: border-color 180ms ease;
 }
 .field-input:focus { border-bottom: 2px solid var(--brass); padding-bottom: 9px; }
+
+/* v1.35 · 带框的输入框 / 下拉框 / 文本框与按钮同圆角(6px)。field-input 是账册式下划线,不加圆角。 */
+input:is([type=text], [type=number], [type=search], [type=password], [type=email], [type=tel], [type=url],
+         [type=date], [type=month], [type=datetime-local], [type=time]):not(.field-input),
+select:not(.field-input), textarea:not(.field-input) { border-radius: var(--r-md); }
 
 .field-input-num {
   font-family: "JetBrains Mono", monospace;
@@ -281,21 +326,33 @@ h1, h2, h3, h4 {
   margin-bottom: 6px;
 }
 
-/* Pills / Chips / Tags */
+/* Pills / Chips / Tags
+   v1.35 · 标签:去掉硬边框、等宽字体、大写和 0.1em 字距 —— 换成软底圆角小标(对标 shadcn Badge / Nuxt Badge)。
+   · 字号统一 11px:模板里给 pill 写的 text-[9px] / text-[10px] 一律压到 11px(.pill[class] 优先级 0,2,0),
+     9px 的中文在手机上几乎读不出来
+   · 边框透明 + !important:很多 pill 用行内 style 写了 border-color 来表达类型,软底 + 字色已经够区分
+     (pill-mute 是「描边空心」那一种,单独保留细边)
+   · 代码类(股票 / 基金代码)加 font-mono 仍走等宽 */
 .pill {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  border: 1px solid var(--rule);
+  gap: 4px;
+  padding: 2px 8px;
+  border: 1px solid transparent !important;
   background: var(--paper-soft);
-  font-family: "JetBrains Mono", monospace;
-  font-size: calc(10.5px * var(--fs-scale,1));
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  font-family: var(--ui-sans);
+  font-size: calc(11px * var(--fs-scale,1));
+  font-weight: 500;
+  line-height: 1.45;
+  letter-spacing: 0;
+  text-transform: none;
   color: var(--ink-soft);
-  border-radius: 1px;
+  border-radius: var(--r-sm);
 }
+.pill[class] { font-size: calc(11px * var(--fs-scale,1)); letter-spacing: 0; }
+.pill.font-mono, .pill[data-fund-code-pill] { font-family: "JetBrains Mono", ui-monospace, monospace; }
+/* 和大字放在同一行(items-baseline)时按竖直中线对齐 —— 按基线对齐时小标签会比旁边的大字低几像素(v1.35 填报卡) */
+.items-baseline > .pill { align-self: center; }
 .pill-brass { background: var(--brass-soft); border-color: var(--brass); color: var(--brass-deep); }
 .pill-forest { background: var(--forest-soft); border-color: var(--forest); color: var(--forest); }
 .pill-rust { background: var(--rust-soft); border-color: var(--rust); color: var(--rust); }
@@ -312,7 +369,7 @@ h1, h2, h3, h4 {
 .kpi-card {
   background: var(--card);
   border: 1px solid var(--rule);
-  padding: 24px;
+  padding: 24px;   /* v1.35 · 不加圆角:KPI 卡是并排拼成一张表格的,各自圆角会在接缝处出豁口 */
   position: relative;
   transition: border-color 180ms ease;
 }
@@ -793,8 +850,8 @@ details:not([open]) > summary .lg-when-open  { display: none; }
 
 /* 补 .pill-mute —— 3 处模板在用(nav 字号钮/隐私钮 · dashboard「本期未填收支」)但此前无定义,
    语义 = 中性/未启用/无数据(spec §6.2 状态标签第 4 档) */
-.pill-mute { background: transparent; border-color: var(--rule-soft); color: var(--ink-subtle); }
-button.pill-mute:hover, summary.pill-mute:hover { border-color: var(--rule); color: var(--ink-soft); }
+.pill-mute { background: transparent; border-color: var(--rule-soft) !important; color: var(--ink-subtle); }
+button.pill-mute:hover, summary.pill-mute:hover { border-color: var(--rule) !important; color: var(--ink-soft); }
 
 /* ---------------------------------------------------------------
    v1.18 · 流水来源微标签(.src-tag)
@@ -859,24 +916,29 @@ button.pill-mute:hover, summary.pill-mute:hover { border-color: var(--rule); col
   list-style: none; cursor: pointer;
   display: inline-flex; align-items: center; justify-content: center;
   width: 32px; height: 30px; color: var(--ink-subtle);
-  border: 1px solid transparent; transition: color .15s, border-color .15s;
+  border: 1px solid transparent; border-radius: var(--r-md); transition: color .15s, border-color .15s, background-color .15s;
 }
 .row-more > summary::-webkit-details-marker { display: none; }
 .row-more > summary::marker { content: ''; }
-.row-more > summary:hover { color: var(--ink); border-color: var(--rule); }
-.row-more[open] > summary { color: var(--ink); border-color: var(--rule); }
+.row-more > summary:hover { color: var(--ink); background: var(--paper-soft); }
+.row-more[open] > summary { color: var(--ink); background: var(--paper-soft); }
+/* v1.35 · 菜单浮层:细边 + 柔和投影 + 圆角(原来是墨色粗框 + 4px 实心错位阴影,和新按钮不是一套) */
 .row-more-pop {
-  position: absolute; right: 0; top: 100%; z-index: 45; min-width: 156px;
-  background: var(--card); border: 1px solid var(--ink);
-  box-shadow: 4px 4px 0 var(--paper-deep), var(--shadow-deep);
-  padding: 4px 0; text-align: left;
+  position: absolute; right: 0; top: calc(100% + 4px); z-index: 45; min-width: 156px;
+  background: var(--card); border: 1px solid var(--rule-soft); border-radius: var(--r-lg);
+  box-shadow: 0 10px 30px -10px rgba(26, 23, 20, .22), 0 2px 6px rgba(26, 23, 20, .06);
+  padding: 4px; text-align: left;
 }
+.row-more-pop.menu-left { left: 0; right: auto; }
 .row-more-pop > a, .row-more-pop button {
   display: block; width: 100%; text-align: left; background: none; border: 0; cursor: pointer;
-  padding: 8px 14px; font-family: "JetBrains Mono", ui-monospace, monospace;
-  font-size: calc(11px * var(--fs-scale,1)); color: var(--ink-soft); white-space: nowrap;
+  padding: 7px 10px; border-radius: var(--r-md); font-family: var(--ui-sans);
+  font-size: calc(13px * var(--fs-scale,1)); color: var(--ink-soft); white-space: nowrap;
 }
-.row-more-pop > a:hover, .row-more-pop button:hover { background: var(--card-soft); color: var(--ink); }
+.row-more-pop > a:hover, .row-more-pop button:hover { background: var(--paper-soft); color: var(--ink); }
+/* 带按钮外观的菜单(持仓页「添加其他 ▾」):summary 用 btn-paper,不吃上面 32×30 的 ⋯ 规格 */
+.row-more.menu-btn > summary.btn-paper { width: auto; height: auto; color: var(--ink); border-color: var(--rule-soft); background: var(--card); }
+.row-more.menu-btn > summary.btn-paper:hover, .row-more.menu-btn[open] > summary.btn-paper { background: var(--paper-soft); border-color: var(--rule); }
 /* 不可逆操作用 rust 描边语义(spec §6.1 danger:有色=要你做决定) */
 .row-more-pop .row-more-danger { color: var(--rust); }
 .row-more-pop .row-more-danger:hover { background: rgba(156,74,42,.07); color: var(--rust); }
@@ -1401,7 +1463,6 @@ html.ls-wide .tags-head > a { font-size: calc(10px * var(--fs-scale, 1)) !import
 /* 说明卡:内距压薄 + 标题与「这是什么」同一行 */
 html.ls-wide .tags-note { padding: 6px 12px !important; margin-bottom: 6px !important; }
 html.ls-wide .tags-note .tags-note-fold { display: inline-block !important; margin-top: 0 !important; margin-left: 8px; }
-html.ls-wide .tags-note .btn-ink { padding-top: .25rem !important; padding-bottom: .25rem !important; }
 
 /* 券商对接状态条(v1.6.24)· 持仓页标题下,一眼看到本账户 ↔ 富途/老虎的 1:1 关联状况。
    用「左侧竖线 + 细框」而不是 paper-card:它是一条**关联信息**,不是一个内容区块;
@@ -1420,7 +1481,7 @@ html.ls-wide .tags-note .btn-ink { padding-top: .25rem !important; padding-botto
 @media (max-width: 639px) {
   .link-strip { flex-direction: column; align-items: stretch; row-gap: 4px; }
   .link-strip .ls-acts { margin-left: 0; margin-top: 8px; }
-  .link-strip .ls-acts > a { flex: 1; justify-content: center; min-height: 44px; }
+  .link-strip .ls-acts > a { flex: 1; justify-content: center; }   /* v1.35 · 高度跟按钮小档走(手机 32px),原 44px 比旁边所有按钮都高一截 */
 }
 
 /* v1.9 · 版本徽记的「有新版」圆点 ————————————————————————————
@@ -2333,14 +2394,9 @@ dialog::backdrop { background: rgba(26, 23, 20, .38); }
   /* ── ① 标签类:字距归零 + 收紧 padding ──
      中文本来就有字身间距,再加 0.1em letter-spacing 只是白白变宽。
      uppercase 对中文无效,但会让夹在里面的英文/数字变高。 */
-  .pill {
-    font-size: calc(8.5px * var(--fs-scale, 1));
-    padding: 2px 5px;
-    gap: 3px;
-    letter-spacing: 0.01em;
-  }
+  /* v1.35 · 标签手机端 10px(原 8.5px 太小);字距大写在全局已去掉 */
+  .pill, .pill[class] { font-size: calc(10px * var(--fs-scale, 1)); padding: 1px 6px; gap: 3px; }
   .badge { font-size: calc(8.5px * var(--fs-scale, 1)); padding: 1px 5px; letter-spacing: 0.02em; }
-  .btn-ghost { font-size: calc(10.5px * var(--fs-scale, 1)); padding: 6px 10px; letter-spacing: 0.06em; }
 
   /* ── ② 填报页流水行:手机端走 flex,不走 grid ──
      原来是 grid-cols-[auto_auto_1fr_auto](4 列),而有消费分类时这一行有
@@ -2402,11 +2458,8 @@ dialog::backdrop { background: rgba(26, 23, 20, .38); }
   /* ── ②b 填报页的账户行:账户名优先占位 ──
      它和流水行是同一个病,但更严重:那边是被 tag 挤窄,这边是被硬编码 max-w 锁死。 */
   /* 校准状态是次要信息,缩小之后大多数情况下还能和账户名同行 */
-  .acct-head > [data-calibrated], .acct-head > [data-not-calibrated] {
-    font-size: calc(8px * var(--fs-scale, 1));
-    padding: 0 4px;
-    letter-spacing: 0;
-  }
+  /* v1.35 · 改用 .pill 之后跟随标签的手机端 10px,这里只收窄内距 */
+  .acct-head > [data-calibrated], .acct-head > [data-not-calibrated] { padding: 1px 5px; }
 
   /* 账户卡:两栏 → 上下两段。
      头像和勾留在第一段的左侧(它们是行首标识),余额单独一段靠右 ——
@@ -2615,9 +2668,14 @@ dialog::backdrop { background: rgba(26, 23, 20, .38); }
 .remember-card .rc-acts { display: flex; gap: 8px; margin-top: 10px; align-items: center; flex-wrap: wrap; }
 .remember-card .rc-more { border-top: 1px solid var(--rule-soft); margin-top: 12px; padding-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
 @media (max-width: 767px) { .remember-card .rc-more { display: grid; } .remember-card .rc-more > * { text-align: center; } }
-.btn-line { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 11px; padding: 4px 10px; border: 1px solid var(--ink);
-  color: var(--ink); background: var(--paper); white-space: nowrap; text-decoration: none; cursor: pointer; }
-.btn-line:hover { background: var(--card-soft); }
+/* v1.35 · btn-line 与 btn-paper 小档同规格(原来是 11px 等宽 + 墨色粗框) */
+.btn-line { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 28px; padding: 3px 10px;
+  font-family: var(--ui-sans); font-size: calc(12px * var(--fs-scale,1)); font-weight: 500; line-height: 1.25;
+  border: 1px solid var(--rule-soft); border-radius: var(--r-md); box-shadow: var(--shadow-xs);
+  color: var(--ink); background: var(--card); white-space: nowrap; text-decoration: none; cursor: pointer;
+  transition: background-color 150ms ease, border-color 150ms ease; }
+.btn-line:hover { background: var(--paper-soft); border-color: var(--rule); }
+.btn-line:focus-visible { outline: none; box-shadow: var(--ring); }
 
 /* ===========================================================
    v1.28 · 看 AI 收到了什么(PRD §3 · fragments/_prompt-peek.html · js/prompt-peek.js)
@@ -3016,3 +3074,51 @@ body.adm-open #float-dock { display: none !important; }
 .bf-opt input { margin-top: 4px; }
 .bf-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px; }
 .bf-actions button { justify-content: center; height: 38px; }
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   v1.35 · 控件收口(维护者 2026-10-19「所有页面都要进行调整」)
+   ═══════════════════════════════════════════════════════════════════
+   btn-* / pill 之外,模板里还有不少手搓的小控件(Tailwind 拼的描边链接、分段切换、小标签)。
+   逐个改模板会漏,这里按「形状」统一收口 —— 只动圆角、字距、大小写,不动颜色和尺寸:
+   · 顶栏导航:等宽大写 + 0.14em 字距 → 无衬线 13px(中文不再被拉成「仪 表 盘」)
+   · 带完整描边的链接 / 按钮 / summary / label → 圆角 6px;带描边的小 span(标签)→ 4px
+   · 分段切换(外框 div.flex.border,子项只有 border-l)→ 外框圆角 + 裁切,子项保持连在一起
+   · 交互控件上的字距 / 大写去掉(纯标签、表头、eyebrow 不动 —— 那是账册的排印识别) */
+.nav-tabs, .nav-drawer { font-family: var(--ui-sans); letter-spacing: 0; text-transform: none; }
+.nav-tabs > a { font-weight: 500; }
+:is(a, button, summary, label)[class~="border"]:not([class*="rounded"]):not(.pill) { border-radius: var(--r-md); }
+span[class~="border"]:not([class*="rounded"]):not(.pill) { border-radius: var(--r-sm); }
+div.flex[class~="border"]:has(> :is(a, button, label)[class*="border-l"]) { border-radius: var(--r-md); overflow: hidden; }
+:is(button, summary)[class*="tracking-"], :is(a, label)[class~="border"][class*="tracking-"] { letter-spacing: .02em; }
+:is(button, summary).uppercase, :is(a, label)[class~="border"].uppercase { text-transform: none; }
+
+/* v1.35 · 持仓卡「改份额」:表单改成浮层,不再撑开同一排的按钮 */
+.nav-edit { position: relative; }
+.nav-edit > summary::-webkit-details-marker { display: none; }
+.nav-edit-pop {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 40;
+  background: var(--card); border: 1px solid var(--rule-soft); border-radius: var(--r-lg);
+  box-shadow: 0 10px 30px -10px rgba(26, 23, 20, .22), 0 2px 6px rgba(26, 23, 20, .06);
+}
+@media (max-width: 1023px) { .nav-edit-pop { left: 0; right: auto; } }
+/* 下拉框挂了 .pill(持仓卡「行业?」):标签去掉边框后它就看不出是能点的,补回细边 + 卡片底 */
+select.pill { border-color: var(--rule) !important; background-color: var(--card) !important; padding-right: 4px; }
+/* 手机菜单里的字号钮 */
+.fs-opt-m { font-family: var(--ui-sans); letter-spacing: 0; border-radius: var(--r-md); }
+.fs-opt { font-family: var(--ui-sans); letter-spacing: 0; }
+/* 当按钮用的 pill(筛选 chip / 建议项 / 分段 tab):给悬停和键盘焦点反馈,看得出能点 */
+:is(button, a, summary).pill { cursor: pointer; transition: background-color 150ms ease, color 150ms ease; }
+:is(button, a, summary).pill:not([class*="pill-"]):hover { background: var(--paper-deep); color: var(--ink); }
+:is(button, a, summary).pill:focus-visible { outline: none; box-shadow: var(--ring); }
+/* v1.35 · 组件级的可点控件补圆角(定义散在上面各处,统一在这里收口,不逐个改原定义 —— 原定义里的注释是各自的由来) */
+.filter-fold > summary, .cat-cell, .cat-chip, .flow-pg, .bkt, .flow-clear, .adm-bar, .danger-zone-btn,
+.bf-opt, .tpl-chip, .scope-pill { border-radius: var(--r-md); }
+.filter-fold > summary, .flow-clear, .danger-zone-btn { letter-spacing: .02em; }
+.flow-clear { font-family: var(--ui-sans); }
+/* 2px 墨色粗框的「当前步骤」区块(填报页第一步等)跟卡片同圆角 */
+section[class~="border-2"]:not([class*="rounded"]), div[class~="border-2"][class~="border-ink"]:not([class*="rounded"]) { border-radius: var(--r-lg); }
+/* 模板里给按钮叠了 tracking-* / font-mono / uppercase 工具类的(Tailwind 后注入会压过 btn 定义)—— 按钮一律无衬线、不加字距、不大写 */
+:is(.btn-ink, .btn-paper, .btn-brass, .btn-ghost, .btn-danger, .btn-line):is([class*="tracking-"], .font-mono, .uppercase) {
+  letter-spacing: 0; font-family: var(--ui-sans); text-transform: none;
+}

@@ -53,7 +53,7 @@
       </div>
       <!-- 需先加账户才可开周期(按序解锁) -->
       <a th:if="${hasAccount}" th:href="@{/admin/periods}" class="btn-ink no-underline shrink-0" th:text="${hasPeriod} ? '去管理' : '去开周期'">去开周期</a>
-      <span th:unless="${hasAccount}" class="btn-paper no-underline shrink-0 opacity-40" style="cursor:not-allowed" title="先完成第 ① 步「加账户」">先加账户</span>
+      <span th:unless="${hasAccount}" class="btn-paper no-underline shrink-0" aria-disabled="true" title="先完成第 ① 步「加账户」">先加账户</span>
     </div>
 
     <!-- ③ 填余额(需先开周期才可点) -->
@@ -65,7 +65,7 @@
       </div>
       <!-- 需先开周期才可记账(否则点进 /entry 会没有账期) -->
       <a th:if="${hasPeriod}" th:href="@{/entry}" class="btn-ink no-underline shrink-0">去填报</a>
-      <span th:unless="${hasPeriod}" class="btn-paper no-underline shrink-0 opacity-40" style="cursor:not-allowed" title="先完成第 ② 步「开本期周期」">先开周期</span>
+      <span th:unless="${hasPeriod}" class="btn-paper no-underline shrink-0" aria-disabled="true" title="先完成第 ② 步「开本期周期」">先开周期</span>
     </div>
 
   </div>

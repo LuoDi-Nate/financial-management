@@ -139,8 +139,7 @@
         <!--/* v1.32 FR-1130 · 收支模块里的小入口(维护者 review ①「是否在收支模块会有一个小入口」)。
                与「批量导入」同一种按钮,放在这一块的标题行上 —— 不用往下滚就看得见。 */-->
         <a th:href="@{/admin/fixed-flows(back=${'/entry?period=' + period.id})}" data-ff-entry
-           class="btn-ghost text-xs no-underline whitespace-nowrap"
-           style="border-color:var(--brass-deep);color:var(--brass-deep)">固定收支</a>
+           class="btn-paper text-xs no-underline whitespace-nowrap">固定收支</a>
         <span class="font-mono text-[10px] text-ink-subtle">+15s</span>
       </div>
     </div>
@@ -295,8 +294,7 @@
                  这一版最值钱的能力,不能给它脚注的视觉权重。
                  位置也重要:标题行在支出区最顶上,不用往下滚。 */-->
           <a th:if="${hasExpenseCats}" th:href="@{/expense/import(periodId=${period.id})}"
-             class="btn-ghost text-xs no-underline whitespace-nowrap"
-             style="border-color:var(--brass-deep);color:var(--brass-deep)">批量导入</a>
+             class="btn-paper text-xs no-underline whitespace-nowrap">批量导入</a>
         </div>
         <p th:if="${hasExpenseCats}" class="text-[11.5px] text-ink-subtle -mt-2 mb-3">
           一笔一笔记太慢?<b>传一份支付宝/微信的月账单</b>,几百笔自动归类,你只核对没把握的那十几笔。

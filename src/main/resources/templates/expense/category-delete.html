@@ -43,7 +43,7 @@
   <div class="flex items-center gap-3 flex-wrap">
     <form th:action="@{/expense/categories/{id}/delete(id=${catId})}" method="post">
       <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
-      <button type="submit" class="btn-ink"
+      <button type="submit" class="btn-danger btn-danger-fill"
               th:text="'转入「' + ${impact.targetName()} + '」并删除'">确认删除</button>
     </form>
     <a th:href="@{/expense/categories}" class="btn-ghost text-sm no-underline">算了</a>

@@ -35,4 +35,8 @@ module.exports = {
     await ui.assert(mids.length >= 3 && spread <= 1.5, '账户名 / 已校准标签 / 类型 三者竖直居中对齐(差 ≤1.5px)',
       mids.map(m => `${m.t}@${m.mid.toFixed(1)}`).join(' · '));
   },
+
+  async cleanup(ui, report) {
+    report.info('只读 flow:没有改任何数据,终态 = 开跑前');
+  },
 };

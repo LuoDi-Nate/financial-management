@@ -19,7 +19,7 @@
       <a th:href="@{|/goals/${goal.id}/edit|}" class="btn-paper text-xs no-underline">✎ 编辑参数</a>
       <form th:action="@{|/goals/${goal.id}/archive|}" method="post" class="inline">
         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
-        <button type="submit" class="btn-paper text-xs"
+        <button type="submit" class="btn-danger text-xs"
                 onclick="return confirm('归档此目标(可恢复)?');"><svg class="inline-block align-[-2px] mr-1" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="5" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8M10 12h4"/></svg>归档</button>
       </form>
     </div>
@@ -220,7 +220,7 @@
         <p class="text-sm text-ink-soft leading-relaxed font-serif mb-3" th:utext="${@aiText.priv(aiAlert.content)}">预警内容...</p>
         <form th:action="@{|/goals/${goal.id}/alert/dismiss|}" method="post">
           <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
-          <button type="submit" class="btn-paper text-xs" style="border-color:var(--rust);color:var(--rust)">我知道了</button>
+          <button type="submit" class="btn-paper text-xs">我知道了</button>
         </form>
       </div>
     </div>
@@ -264,8 +264,7 @@
           <p class="text-ink-subtle mb-4">周期关闭时系统会自动生成月报，也可立即手动触发。</p>
           <form th:action="@{|/goals/${goal.id}/report/generate|}" method="post">
             <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
-            <button type="submit" class="btn-paper text-xs"
-                    style="border-color:var(--brass-deep);color:var(--brass-deep)">
+            <button type="submit" class="btn-paper btn-accent text-xs">
               立即生成月报
             </button>
           </form>

@@ -39,7 +39,7 @@
     <div class="flex items-center justify-end gap-2 mt-2 flex-wrap">
       <button id="sunResetBtn" type="button" class="pill whitespace-nowrap inline-flex items-center gap-1" title="回到初始视图(默认看板「资产类型」· 清空下钻与指标 · 等同刷新后)" style="cursor:pointer">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>重置</button>
-      <button th:if="${lensAiAvailable}" id="lensInsightBtn" class="pill whitespace-nowrap" style="border-color:var(--brass-deep);color:var(--brass-deep)">AI 解读当前视图</button>
+      <button th:if="${lensAiAvailable}" id="lensInsightBtn" class="btn-paper btn-accent text-xs whitespace-nowrap">AI 解读当前视图</button>
     </div>
   </section>
 

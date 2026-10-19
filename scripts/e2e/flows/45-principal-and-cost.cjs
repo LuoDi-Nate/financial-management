@@ -116,7 +116,9 @@ module.exports = {
     // ── 2 · 已有账户里加一只以前就有的基金,选「以前就有、现在才补录」──────────
     report.section('2 · 蚂蚁财富-基金(一直在记的账户)→ 添加场外基金 1000 份 → 「这笔钱从哪来」选「以前就有、现在才补录」');
     await openHoldings(ui);
-    await ui.click('a[data-add-fund]', '点「+ 添加持仓 · 场外基金」');
+    // v1.35 · 非基金账户的「场外基金」在「添加其他 ▾」菜单里
+    await ui.click('details[data-add-more] > summary', '点「添加其他」');
+    await ui.click('details[data-add-more] a[data-add-fund]', '菜单里点「场外基金」');
     await ui.rendered('添加场外基金页');
     await ui.fill('#fund-q', '002943', '搜索框输入「002943」');
     await ui.page.waitForSelector('[data-fund-results] [data-fund-code="002943"]', { timeout: 15000 }).catch(() => {});

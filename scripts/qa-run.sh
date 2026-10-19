@@ -9590,8 +9590,10 @@ QA121_IMP_TPL="$RD/src/main/resources/templates/expense/import.html"
 #   它只验「可见」,不验「分量」),但我把它做成了 10px 灰字挂在分隔线右端,连着两轮没被发现。
 #   **入口存在 ≠ 入口找得到。** 所以这条护栏现在同时要求:主入口是支出区标题行上的
 #   btn-ghost 按钮(不是脚注链接),而且带一句说明它能省什么事。
+#   v1.35 · 判据从「页面里出现 btn-ghost」改成「/expense/import 这条链接本身带 btn-* 按钮类」:
+#   新按钮规格下它是 btn-paper(和「固定收支」同一档),原写法绑的是类名字面量,守的不是意图。
 { grep -q '/expense/import' "$QA121_GRID_TPL" \
-  && grep -q 'btn-ghost' "$RD/src/main/resources/templates/entry/index.html" \
+  && grep -A2 '/expense/import(periodId' "$RD/src/main/resources/templates/entry/index.html" | grep -qE 'class="btn-(ghost|paper|ink)' \
   && grep -q '一笔一笔记太慢' "$RD/src/main/resources/templates/entry/index.html" \
   && grep -q '"id": "expense-import"' "$RD/scripts/entry-points.json" \
   && grep -q '"id": "expense-categories"' "$RD/scripts/entry-points.json"; } \

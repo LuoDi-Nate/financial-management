@@ -173,8 +173,9 @@ module.exports = {
     // ── 5 · 新加一只排在最后 ─────────────────────────────────────────────
     report.section('5 · 再加一只手填持仓 → 排在最后,其余不动');
     await ui.goto(`/accounts/${ACC}/holdings`);
+    await ui.click('details[data-add-more] > summary', '点「添加其他」');   // v1.35 · 收进了菜单
     await Promise.all([ui.page.waitForNavigation({ waitUntil: 'networkidle' }).catch(() => {}),
-                       ui.click('main a[href$="/holdings/new-manual"]', '点「+ 添加持仓 · 手填市值」')]);
+                       ui.click('details[data-add-more] a[href$="/holdings/new-manual"]', '菜单里点「手填市值」')]);
     await ui.fill('input[name="displayName"]', NEW_NAME, `名称「${NEW_NAME}」`);
     await ui.fill('input[name="shares"]', 1, '股数 1');
     await ui.fill('input[name="unitValue"]', 100, '单股 100');
