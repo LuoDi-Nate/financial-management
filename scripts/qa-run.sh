@@ -11801,6 +11801,17 @@ QA1342_F21="$RD/scripts/e2e/flows/21-dual-period-metrics.cjs"
 [ -f "$RD/scripts/e2e/flows/52-old-fixes.cjs" ] && grep -qF 'data-bf-shift' "$RD/scripts/e2e/flows/52-old-fixes.cjs" \
   && log_ok "v1342-E2E(flow 52:补记到历史期 A / B / 删 / 取消 · 封板完整度 · 角标)" || log_bad "v1342-E2E 缺 flow 52" "scripts/e2e/flows/52-old-fixes.cjs"
 
+# ══════════════════════════════════════════════════════════════════════════════
+# v1.35 · UI 精修(维护者 2026-10-19:按钮太大太方 · 填报卡账户名和「已校准」标签没对齐)
+# ══════════════════════════════════════════════════════════════════════════════
+# v135-ACCT-HEAD-CENTER · 账户卡标题行按竖直中线对齐:按基线对齐时,带框的小标签挂在基线下面,比账户名低 3px
+grep -qF 'class="flex items-center gap-1.5 sm:gap-3 acct-head"' "$RD/src/main/resources/templates/entry/_row.html" \
+  && ! grep -qF 'items-baseline gap-1.5 sm:gap-3 acct-head' "$RD/src/main/resources/templates/entry/_row.html" \
+  && log_ok "v135-ACCT-HEAD-CENTER(填报页账户卡:账户名 / 已校准标签 / 类型按竖直中线对齐)" \
+  || log_bad "v135-ACCT-HEAD-CENTER 账户卡标题行又按基线对齐了(带框标签会比账户名低 3px)" "see entry/_row.html .acct-head"
+[ -f "$RD/scripts/e2e/flows/53-ui-refresh.cjs" ] && grep -qF 'spread <= 1.5' "$RD/scripts/e2e/flows/53-ui-refresh.cjs" \
+  && log_ok "v135-E2E(flow 53:账户卡标题行三者中线差 ≤1.5px · 标签日期对库)" || log_bad "v135-E2E 缺 flow 53" "scripts/e2e/flows/53-ui-refresh.cjs"
+
 echo
 echo "═══════════════════════════════════════"
 echo " 总结: PASS=$PASS  FAIL=$FAIL  SKIP=$SKIP"

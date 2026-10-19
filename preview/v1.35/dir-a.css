@@ -1,0 +1,55 @@
+/* v1.35 预览 · 方向 A「精修账册」—— 保留纸墨配色和衬线标题,只换控件:
+   按钮 32px(卡片内 28px)· 圆角 6px · 无衬线 13px 中字重 · 不大写不加字距 · 次按钮白底细边 + 极轻阴影。
+   规格对标 shadcn/ui(h-9 / h-8 · rounded-md · text-sm font-medium),密度按数据型产品取小一档。 */
+:root {
+  --ui-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB",
+             "Microsoft YaHei", "Noto Sans SC", "WenQuanYi Zen Hei", sans-serif;
+  --r-sm: 4px; --r-md: 6px; --r-lg: 10px;
+  --ring: 0 0 0 2px var(--card), 0 0 0 4px rgba(176,134,66,.55);
+  --shadow-xs: 0 1px 2px rgba(26,23,20,.06);
+}
+.btn-ink, .btn-paper, .btn-brass, .btn-ghost, .btn-line {
+  font-family: var(--ui-sans) !important;
+  font-size: calc(13px * var(--fs-scale,1)) !important;
+  font-weight: 500;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+  height: 32px; padding: 0 12px !important;
+  border-radius: var(--r-md);
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  line-height: 1; white-space: nowrap;
+  transition: background-color .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease, transform .1s ease;
+}
+.btn-ink.text-xs, .btn-paper.text-xs, .btn-brass.text-xs, .btn-ghost.text-xs, .btn-line,
+.btn-paper.text-\[11px\], .btn-ink.text-\[11px\] { height: 28px; padding: 0 10px !important; font-size: calc(12px * var(--fs-scale,1)) !important; }
+.btn-ink { background: var(--ink); color: var(--card); border: 1px solid var(--ink); }
+.btn-ink:hover { background: #2E2924; border-color: #2E2924; }
+.btn-paper { background: var(--card); color: var(--ink); border: 1px solid var(--rule-soft); box-shadow: var(--shadow-xs); }
+.btn-paper:hover { background: var(--paper-soft); color: var(--ink); border-color: var(--rule); }
+.btn-brass { background: var(--brass-soft); color: var(--brass-deep); border: 1px solid transparent; }
+.btn-brass:hover { background: #E2CF9F; }
+.btn-ghost { background: transparent; color: var(--ink-soft); border: 1px solid transparent; }
+.btn-ghost:hover { background: var(--paper-soft); color: var(--ink); border-color: transparent; }
+.btn-ink:active, .btn-paper:active, .btn-brass:active, .btn-ghost:active { transform: translateY(1px); }
+.btn-ink:focus-visible, .btn-paper:focus-visible, .btn-brass:focus-visible, .btn-ghost:focus-visible { outline: none; box-shadow: var(--ring); }
+.btn-ink svg, .btn-paper svg, .btn-ghost svg, .btn-brass svg { width: 14px; height: 14px; margin: 0 !important; }
+/* 标签:去掉硬边框 + 大字距,换成软底圆角小标 */
+.pill {
+  font-family: var(--ui-sans) !important; font-size: calc(11px * var(--fs-scale,1)) !important;
+  letter-spacing: 0 !important; text-transform: none !important; font-weight: 500;
+  padding: 2px 8px !important; border-radius: var(--r-sm); border-color: transparent !important; line-height: 1.5;
+  align-self: center;
+}
+.pill[data-fund-code-pill], .pill.font-mono { font-family: "JetBrains Mono", monospace !important; }
+[data-calibrated], [data-not-calibrated] { border-radius: var(--r-sm); border-color: transparent !important; font-family: var(--ui-sans) !important; font-size: 11px !important; padding: 1px 6px !important; }
+/* 输入 / 下拉:6px 圆角、细边 */
+select, input[type=text], input[type=number], input[type=search], textarea {
+  border-radius: var(--r-md);
+}
+input.field-input { border-radius: 0; }
+/* 卡片:圆角 + 更淡的边 */
+.paper-card { border-radius: var(--r-lg); border-color: var(--rule-soft) !important; }
+/* 持仓卡右侧操作:三个整宽大按钮竖排 → 一排小按钮 */
+article.paper-card > .grid > .flex.flex-col.gap-1\.5 { flex-direction: row; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+article.paper-card > .grid > .flex.flex-col.gap-1\.5 .w-full { width: auto !important; }
+article.paper-card > .grid > .flex.flex-col.gap-1\.5 details > summary { display: inline-flex !important; }

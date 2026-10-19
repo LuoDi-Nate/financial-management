@@ -1,0 +1,43 @@
+/* v1.35 预览 · 方向 B「shadcn 中性」—— 整站换成中性白灰:无衬线标题、白卡片圆角 12px + 细边 + 极轻阴影、
+   按钮 36px / 32px 圆角 8px、标签圆角胶囊。品牌的纸张底纹和铜色只留作强调。 */
+:root {
+  --ui-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB",
+             "Microsoft YaHei", "Noto Sans SC", "WenQuanYi Zen Hei", sans-serif;
+  --paper: #FAFAF9; --paper-soft: #F4F4F2; --paper-deep: #EDEDEA; --card: #FFFFFF; --card-soft: #FAFAF9;
+  --ink: #18181B; --ink-soft: #52525B; --ink-subtle: #71717A; --rule: #E4E4E7; --rule-soft: #EEEEF0;
+  --r-sm: 6px; --r-md: 8px; --r-lg: 12px;
+  --ring: 0 0 0 2px #fff, 0 0 0 4px rgba(24,24,27,.35);
+}
+body { background: var(--paper) !important; font-family: var(--ui-sans) !important; }
+body::before { display: none !important; }
+.font-display, h1, h2, h3, .font-serif { font-family: var(--ui-sans) !important; font-weight: 600 !important; letter-spacing: -0.01em; }
+.btn-ink, .btn-paper, .btn-brass, .btn-ghost, .btn-line {
+  font-family: var(--ui-sans) !important; font-size: calc(14px * var(--fs-scale,1)) !important; font-weight: 500;
+  letter-spacing: 0 !important; text-transform: none !important;
+  height: 36px; padding: 0 16px !important; border-radius: var(--r-md);
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; line-height: 1; white-space: nowrap;
+  transition: background-color .15s, border-color .15s, color .15s, box-shadow .15s;
+}
+.btn-ink.text-xs, .btn-paper.text-xs, .btn-brass.text-xs, .btn-ghost.text-xs, .btn-line,
+.btn-paper.text-\[11px\], .btn-ink.text-\[11px\] { height: 32px; padding: 0 12px !important; font-size: calc(13px * var(--fs-scale,1)) !important; }
+.btn-ink { background: #18181B; color: #FAFAFA; border: 1px solid #18181B; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+.btn-ink:hover { background: #27272A; }
+.btn-paper { background: #fff; color: #18181B; border: 1px solid var(--rule); box-shadow: 0 1px 2px rgba(0,0,0,.05); }
+.btn-paper:hover { background: #F4F4F5; color: #18181B; }
+.btn-brass { background: #F4F4F5; color: #18181B; border: 1px solid transparent; }
+.btn-ghost { background: transparent; color: #3F3F46; border: 1px solid transparent; }
+.btn-ghost:hover { background: #F4F4F5; }
+.btn-ink:focus-visible, .btn-paper:focus-visible, .btn-ghost:focus-visible { outline: none; box-shadow: var(--ring); }
+.btn-ink svg, .btn-paper svg, .btn-ghost svg { width: 16px; height: 16px; margin: 0 !important; }
+.pill {
+  font-family: var(--ui-sans) !important; font-size: 12px !important; font-weight: 500; letter-spacing: 0 !important; text-transform: none !important;
+  padding: 2px 10px !important; border-radius: 999px; border-color: transparent !important; align-self: center;
+}
+.pill[data-fund-code-pill] { font-family: ui-monospace, "JetBrains Mono", monospace !important; background: #F4F4F5 !important; color: #3F3F46 !important; }
+[data-calibrated], [data-not-calibrated] { border-radius: 999px; border-color: transparent !important; font-family: var(--ui-sans) !important; font-size: 11px !important; padding: 1px 8px !important; }
+select, input[type=text], input[type=number], input[type=search], textarea { border-radius: var(--r-md); border-color: var(--rule) !important; background: #fff !important; }
+.paper-card, .kpi-card { background: #fff !important; border: 1px solid var(--rule) !important; border-radius: var(--r-lg); box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+.font-mono.uppercase, .eyebrow { letter-spacing: .04em !important; }
+article.paper-card > .grid > .flex.flex-col.gap-1\.5 { flex-direction: row; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+article.paper-card > .grid > .flex.flex-col.gap-1\.5 .w-full { width: auto !important; }
+article.paper-card > .grid > .flex.flex-col.gap-1\.5 details > summary { display: inline-flex !important; }
