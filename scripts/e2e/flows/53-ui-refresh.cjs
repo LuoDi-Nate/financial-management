@@ -11,6 +11,7 @@
  *      点「添加其他」→ 菜单出现 → 点「手填市值」→ 落到手填市值添加页(不提交);
  *      每张持仓卡的操作按钮排在一行、同高
  *        → 库:页面上的持仓卡张数 == 库里这个账户未归档的持仓数
+ *   4  真手机(390 触屏):持仓页按钮默认 ≥36、小档 ≥32,不撑出横向滚动(同样对库里持仓数)
  *
  * 只读,不动数据。
  */
@@ -111,6 +112,25 @@ module.exports = {
     const oneRow = rows.every(r => r.length === 0 || (new Set(r.map(x => x[0])).size === 1 && new Set(r.map(x => x[1])).size === 1));
     await ui.assert(rows.length > 0 && oneRow, '每张持仓卡的操作按钮排在一行、同高', JSON.stringify(rows.slice(0, 2)));
     await ui.noConsoleErrors('控制台无报错');
+
+    // ── 4 · 真手机:点按区域升一档 ───────────────────────────────────
+    report.section('4 · 真手机 390px 触屏:持仓页按钮 默认 ≥36 · 小档 ≥32 · 不撑出横向滚动');
+    await ui.phone(async (m) => {
+      await m.goto('/dashboard');
+      await m.click('header details > summary:visible', '点右上角菜单');
+      await m.click('header details[open] a[href="/accounts"]:visible', '菜单里点「账户」');
+      await m.page.waitForLoadState('networkidle').catch(() => {});
+      await m.goto(`/accounts/${HOLD_ACC}/holdings`);
+      const hs = await m.page.evaluate(() => [...document.querySelectorAll('main .btn-ink, main .btn-paper, main .btn-danger, main .btn-ghost')]
+        .filter(e => e.getBoundingClientRect().height > 0)
+        .map(e => ({ small: /(^| )(text-xs|text-\[1[012]px\])( |$)/.test(e.className), h: Math.round(e.getBoundingClientRect().height) })));
+      const low = hs.filter(x => x.h < (x.small ? 32 : 36));
+      await m.assert(hs.length > 0 && low.length === 0, `手机上持仓页 ${hs.length} 个按钮:默认 ≥36 · 小档 ≥32`, low.map(x => x.h).join('/') || '全部达标');
+      const over = await m.page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+      await m.assert(over <= 1, '手机上持仓页没有横向滚动', `溢出 ${over}px`);
+      const n = db.num(`SELECT COUNT(*) FROM stock_holding WHERE account_id=${HOLD_ACC} AND archived_at IS NULL`);
+      await m.assert(await m.page.locator('main article.paper-card').count() === n, '真值层:手机上持仓卡张数 == 库里未归档持仓数', String(n));
+    });
   },
 
   async cleanup(ui, report) {

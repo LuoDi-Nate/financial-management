@@ -2899,7 +2899,7 @@ body.adm-open #float-dock { display: none !important; }
   .ff-row { padding: 11px 12px; }
   .ff-l3 { justify-content: stretch; }
   .ff-l3 > button, .ff-l3 > form, .ff-l3 > .btn-ink, .ff-l3 > .btn-paper { flex: 1 1 0; }
-  .ff-l3 button { width: 100%; min-height: 36px; justify-content: center; }
+  .ff-l3 button, .ff-l3 button[class] { width: 100%; min-height: 36px; justify-content: center; }   /* v1.35 · [class] 提权:压过按钮小档在手机上的 32px,这一行要整行好点(FR-1118) */
   .ff-amt-in { width: 6.5rem; }
 }
 @media (max-width: 767.98px) {
@@ -3032,7 +3032,7 @@ body.adm-open #float-dock { display: none !important; }
 /* 一键排法:三个按钮同宽同高(并列同类元素同尺寸 · visual-spec「操作行 / 按钮组」)*/
 .sort-quick { display: grid; grid-template-columns: auto repeat(3, 9.5rem); gap: 8px; align-items: center; justify-content: start; }
 .sort-quick-label { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: .14em; color: var(--ink-subtle); margin-right: 4px; }
-.sort-quick-btn { justify-content: center; height: 38px; padding: 0 8px; letter-spacing: .06em; white-space: nowrap; }
+.sort-quick-btn { justify-content: center; height: 32px; padding: 0 8px; white-space: nowrap; }   /* v1.35 · 跟按钮默认档(原 38px + .06em 字距) */
 /* 底部提示条:已保存 · 撤销 */
 .sort-toast { position: fixed; left: 50%; bottom: 28px; transform: translate(-50%, 20px); opacity: 0; pointer-events: none;
               background: var(--ink); color: var(--paper); padding: 10px 14px 10px 16px; display: flex; align-items: center; gap: 14px;
@@ -3048,7 +3048,7 @@ body.adm-open #float-dock { display: none !important; }
   .sort-toast { bottom: 18px; width: calc(100% - 32px); justify-content: space-between; }
   .sort-quick { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
   .sort-quick-label { grid-column: 1 / -1; }
-  .sort-quick-btn { height: 42px; padding: 0 4px; letter-spacing: 0; }
+  .sort-quick-btn { height: 36px; padding: 0 4px; }   /* v1.35 · 手机默认档 36(原 42) */
 }
 
 /* ── 账户簿页头四个按钮(v1.34)──
@@ -3122,3 +3122,7 @@ section[class~="border-2"]:not([class*="rounded"]), div[class~="border-2"][class
 :is(.btn-ink, .btn-paper, .btn-brass, .btn-ghost, .btn-danger, .btn-line):is([class*="tracking-"], .font-mono, .uppercase) {
   letter-spacing: 0; font-family: var(--ui-sans); text-transform: none;
 }
+/* 弹框(补记到历史期 / 原生 dialog)跟卡片同圆角 */
+.bf-dialog { border-radius: var(--r-lg); }
+/* 横屏模式的「退出横屏」浮钮 / 帮助页演示里的按钮:跟按钮规格的字体与圆角 */
+.ls-exit { font-family: var(--ui-sans); letter-spacing: 0; border-radius: var(--r-md); }
