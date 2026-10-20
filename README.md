@@ -96,8 +96,9 @@
 
 > 完整发布记录与截图见 [Releases](https://github.com/LuoDi-Nate/financial-management/releases)(本段每版只留 2–4 行,细节不搬过来)。
 
-**[v1.35.0](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.35.0) · UI 精修:按钮不再又大又方**
+**[v1.35.0](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.35.0) – [v1.35.1](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.35.1) · UI 精修:按钮不再又大又方 · 品牌小图标可选**
 全站按钮从 42px 直角大写降到 32px、圆角、无衬线,删除 / 归档这类操作统一成红色描边;标签换成浅底圆角小标;持仓页按钮收进「添加其他 ▾」菜单;顶栏小图标换成存钱罐。规格对照 shadcn/ui 等主流组件库([调研](docs/research/ui-frameworks-2026-10.md)),只改外观、不改数据。
+v1.35.1:品牌名旁的小图标可以在「管理 → 家庭设置」里从 47 个图标里挑,点一下就换。
 
 **[v1.34.0](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.34.0) – [v1.34.2](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.34.2) · 持仓和账户都能拖着排顺序 · 持仓改名 · 升级不再拖死服务器 · 补历史账不再凭空多出收益**
 账户里的持仓可以拖着排,和券商 / 基金 App 的顺序对上,每月核对从上往下挨个对就行([#40](https://github.com/LuoDi-Nate/financial-management/issues/40));持仓页、填报页、截图导入、资产打标都按这个顺序。账户本身也能在账户簿里拖着排。持仓名字填错了可以直接改([#41](https://github.com/LuoDi-Nate/financial-management/issues/41))。v1.34.1 让 `deploy.sh` 升级时先编译再改库、编译带内存保护(内存不够就停下,线上不动),也可以用 `--jar` 传别处编好的包。
