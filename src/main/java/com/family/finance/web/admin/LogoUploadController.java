@@ -146,6 +146,26 @@ public class LogoUploadController {
         return "redirect:/admin/family";
     }
 
+    /**
+     * v1.35.1 · 换品牌名旁的小图标(维护者 2026-10-20)。和预设 logo 同一处入口(管理 → 家庭设置 → 品牌标识),
+     * 但互不影响:不动 logo_path / logo_preset,也不进 favicon / iOS 主屏图标 —— 它只在顶栏品牌名旁边。
+     * 页面用 fetch 调,成功回 200 + 新图标 code;不认识的 code 回 400。
+     */
+    @PostMapping("/mark")
+    public ResponseEntity<String> selectMark(@RequestParam("mark") String mark,
+                                             @AuthenticationPrincipal MemberPrincipal me) {
+        try {
+            com.family.finance.domain.family.BrandMark m = familyService.updateBrandMark(me.getFamilyId(), mark);
+            auditLogService.write(me.getFamilyId(), me.getMemberId(), AuditLogType.LOGO_UPLOAD,
+                    "family", me.getFamilyId(),
+                    "切换品牌名旁小图标 → " + m.label(),
+                    java.util.Map.of("mark", m.code()));
+            return ResponseEntity.ok(m.code());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
     @PostMapping("/remove")
     public String remove(@AuthenticationPrincipal MemberPrincipal me) throws IOException {
         Path uploadRoot = Paths.get(props.uploadRoot()).toAbsolutePath().normalize();

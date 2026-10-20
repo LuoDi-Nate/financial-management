@@ -2319,3 +2319,9 @@ Docker 化部署 + systemd/macOS 存量零丢迁移。**真机冒烟(docker buil
 | v135-BTN-DANGER | **不可逆操作用 `btn-danger`**:模板里不许再出现「`btn-*` + 行内 `color:var(--rust)`」(v1.35 改掉 14 处);持仓卡「归档」是 `btn-danger text-xs`。 |
 | v135-HOLD-ADD-MENU | **持仓页一行 ≤3 个按钮**:主按钮 +「添加其他 ▾」菜单(`details.row-more.menu-btn` · 场外基金 / 手填市值 / 账户内现金)+ 手动刷价;持仓卡操作排成一行(`hold-ops`);`js/menus.js` 让菜单点外面 / Esc 收起。 |
 | v135-NAV-PIG | **顶栏品牌名旁的小图标是存钱罐**(v1.35 · 维护者「古钱好丑,没对齐」):nav.html 与 error.html 都是 Lucide piggy-bank 路径、不再有古钱的内方 `<rect>`;`.nav-coin` 上移 2px —— 实测图形墨迹中线比「账房」字身墨迹中线低 2px(PC / 手机一致)。e2e flow 40 断言图标是存钱罐、18px、上移 2px。 |
+
+### v1.35.1 · 品牌名旁的小图标可以自己选(维护者 2026-10-20)
+
+| ID | 守什么 |
+|---|---|
+| v1351-BRAND-MARK | **小图标选择链路**:选项只来自 `BrandMark` 枚举(47 个 Lucide 图形 · 单测 `BrandMarkTest` 钉住 20–50 个、code 唯一 ≤32、只有路径类元素、默认存钱罐、选回默认存 NULL、非法 code 拒绝);`family.brand_mark`(V75 · 可空);`FamilyMapper` 两处 SELECT 都带新列;入口在 管理 → 家庭设置 → 品牌标识(`data-brand-mark-picker` · fetch `/admin/family/logo/mark`);顶栏按 `BrandMark.of(state.family.brandMark)` 渲染、每个图标用自己量出来的竖直偏移;e2e flow 54 在。 |

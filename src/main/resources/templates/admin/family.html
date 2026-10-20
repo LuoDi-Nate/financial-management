@@ -89,6 +89,30 @@
             <input class="field-input" name="brandText" th:value="${family.brandText}" required>
             <p class="font-mono text-[10px] text-ink-subtle mt-1 tracking-wider">显示于每页左上角 · 不超过 30 字符</p>
           </div>
+          <!--/* v1.35.1 · 品牌名旁的小图标(维护者 2026-10-20:「允许那个存钱罐的小 icon 被用户定制,入口放在和网页 icon 的入口里」)。
+                 47 个 Lucide 图形按组排(BrandMark);点一下就存,顶栏和下面的预览立刻换,不用点「保存修改」。
+                 和左边的网页 logo 互不影响:不进 favicon / iOS 主屏图标。 */-->
+          <div data-brand-mark-picker th:with="cur=${T(com.family.finance.domain.family.BrandMark).of(family.brandMark)}">
+            <label class="field-label">品牌名旁的小图标 · BRAND MARK</label>
+            <div class="flex items-center gap-1.5 mt-1 mb-3" data-bm-preview-row>
+              <span class="font-display text-xl font-medium" th:text="${family.brandText}">账房</span>
+              <svg class="shrink-0 text-brass-deep" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" data-bm-preview
+                   th:style="'transform:' + ${cur.transform()}" th:utext="${cur.svg()}"></svg>
+              <span class="text-[12px] text-ink-subtle ml-2" data-bm-status th:text="'当前 · ' + ${cur.label()}">当前 · 存钱罐</span>
+            </div>
+            <div th:each="g : ${T(com.family.finance.domain.family.BrandMark).grouped()}" class="bm-group">
+              <div class="bm-group-label" th:text="${g.key}">钱财</div>
+              <div class="flex flex-wrap gap-1.5">
+                <button type="button" th:each="m : ${g.value}" class="bm-opt"
+                        th:attr="data-mark=${m.code()},data-transform=${m.transform()},data-label=${m.label()},aria-pressed=${m == cur},title=${m.label()},aria-label=${m.label()}">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
+                       stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" th:utext="${m.svg()}"></svg>
+                </button>
+              </div>
+            </div>
+            <p class="font-mono text-[10px] text-ink-subtle mt-2 tracking-wider">点一下就换,不用点「保存修改」· 只在每页左上角品牌名旁显示,不影响网页图标和 iOS 主屏图标</p>
+          </div>
         </div>
       </div>
 
@@ -140,6 +164,34 @@ document.querySelectorAll('.logo-preset-btn').forEach(btn => {
     });
     if (resp.ok) location.reload();
     else { btn.disabled = false; alert('切换预设失败:' + resp.status); }
+  });
+});
+
+// v1.35.1 · 品牌名旁的小图标:点一下就存,顶栏和预览立刻换(失败时原样不动、提示原因)
+document.querySelectorAll('[data-brand-mark-picker] .bm-opt').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const mark = btn.dataset.mark;
+    if (!mark || btn.getAttribute('aria-pressed') === 'true') return;
+    const fd = new FormData();
+    fd.append('mark', mark);
+    btn.disabled = true;
+    const resp = await fetch('/admin/family/logo/mark', { method: 'POST', body: fd, headers: { [csrfHeader]: csrfToken } });
+    btn.disabled = false;
+    const status = document.querySelector('[data-bm-status]');
+    if (!resp.ok) { if (status) status.textContent = '没换成:' + (await resp.text()); return; }
+    const svgInner = btn.querySelector('svg').innerHTML;
+    document.querySelectorAll('[data-brand-mark-picker] .bm-opt').forEach(b => b.setAttribute('aria-pressed', b === btn ? 'true' : 'false'));
+    const pv = document.querySelector('[data-bm-preview]');
+    if (pv) { pv.innerHTML = svgInner; pv.style.transform = btn.dataset.transform; }
+    const nav = document.querySelector('header svg.nav-coin');
+    if (nav) {
+      const title = nav.querySelector('title');
+      nav.innerHTML = svgInner;
+      if (title) nav.insertBefore(title, nav.firstChild);
+      nav.style.transform = btn.dataset.transform;
+      nav.setAttribute('data-brand-mark', mark);
+    }
+    if (status) status.textContent = '已换成「' + btn.dataset.label + '」';
   });
 });
 

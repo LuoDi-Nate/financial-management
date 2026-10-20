@@ -22,11 +22,15 @@
                  v1.35 · 古钱(外圆内方)换成存钱罐(维护者 2026-10-19:「好丑,没对齐」)。图形取自 Lucide
                  piggy-bank(ISC 许可,和全站 Feather 风同一套 24×24 描边)。class 仍叫 nav-coin —— 护栏 v1285 / e2e flow 40 认它。
                  对齐:猪的身子在 viewBox 里偏下(y 5–20),实测图形中线比「账房」字身的墨迹中线低 2px(PC 和手机都是),用 translateY(-2px) 拉齐。 */-->
-          <a th:href="@{/}" class="no-underline flex items-center gap-1.5">
+          <!--/* v1.35.1 · 图标可以在「管理 → 家庭设置 → 品牌标识」里换(BrandMark · 47 个 Lucide 图形 · 默认存钱罐)。
+                 每个图形的竖直偏移 dy 是量出来的(见 BrandMark 注释),写在 style 里,压过 .nav-coin 的默认 -2px。 */-->
+          <a th:href="@{/}" class="no-underline flex items-center gap-1.5"
+             th:with="bm=${T(com.family.finance.domain.family.BrandMark).of(state.family.brandMark)}">
             <span class="font-display text-xl font-medium" th:text="${state.family.brandText}">账房</span>
             <svg class="nav-coin shrink-0 text-brass-deep" width="18" height="18" viewBox="0 0 24 24" fill="none"
                  stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"
-                 role="img" th:attr="aria-label=${state.family.name}"><title th:text="${state.family.name}">家</title><path d="M19 5c-1.5 0-2.8 1.4-3 2-3.5-1.5-11-.3-11 5 0 1.8 0 3 2 4.5V20h4v-2h3v2h4v-4c1-.5 1.7-1 2-2h2v-4h-2c0-1-.5-1.5-1-2V5z"/><path d="M2 9v1c0 1.1.9 2 2 2h1"/><path d="M16 11h.01"/></svg>
+                 role="img" th:attr="aria-label=${state.family.name},data-brand-mark=${bm.code()}" th:style="'transform:' + ${bm.transform()}"
+                 th:utext="'<title>' + ${#strings.escapeXml(state.family.name)} + '</title>' + ${bm.svg()}"></svg>
           </a>
           <!-- 版本号(账册「版次」标记 · brass 细线徽记)· 来源 app.version
                v1.9:可点 → 管理页版本卡;有新版时右上角一个 5px 描边圆点。

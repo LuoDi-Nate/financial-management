@@ -14,7 +14,7 @@ import java.util.Optional;
 public interface FamilyMapper {
 
     @Select("""
-            SELECT id, name, brand_text, logo_path, logo_preset, base_currency, period_type,
+            SELECT id, name, brand_text, logo_path, logo_preset, brand_mark, base_currency, period_type,
                    cpi_assumption, allocation_anchor, allocation_anchor_custom, risk_appetite,
                    reporting_template, expense_entry_mode, report_remind_lead_days, metric_prefs,
                    close_delay_days, auto_close_enabled,
@@ -25,7 +25,7 @@ public interface FamilyMapper {
     List<Family> findAll();
 
     @Select("""
-            SELECT id, name, brand_text, logo_path, logo_preset, base_currency, period_type,
+            SELECT id, name, brand_text, logo_path, logo_preset, brand_mark, base_currency, period_type,
                    cpi_assumption, allocation_anchor, allocation_anchor_custom, risk_appetite,
                    reporting_template, expense_entry_mode, report_remind_lead_days, metric_prefs,
                    close_delay_days, auto_close_enabled,
@@ -58,6 +58,10 @@ public interface FamilyMapper {
      */
     @Update("UPDATE family SET logo_preset = #{preset}, logo_path = NULL WHERE id = #{familyId}")
     int updateLogoPreset(@Param("familyId") long familyId, @Param("preset") String preset);
+
+    /** v1.35.1 · 品牌名旁的小图标(BrandMark code;NULL = 默认存钱罐)。只动这一列,不碰 logo。 */
+    @Update("UPDATE family SET brand_mark = #{mark} WHERE id = #{familyId}")
+    int updateBrandMark(@Param("familyId") long familyId, @Param("mark") String mark);
 
     // ---------- v0.4 决策辅助字段 ----------
 

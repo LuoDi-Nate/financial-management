@@ -3128,3 +3128,13 @@ section[class~="border-2"]:not([class*="rounded"]), div[class~="border-2"][class
 .ls-exit { font-family: var(--ui-sans); letter-spacing: 0; border-radius: var(--r-md); }
 /* 顶栏品牌名旁的存钱罐(v1.35):图形在 viewBox 里偏下,实测比「账房」字身的墨迹中线低 2px —— 拉齐 */
 .nav-coin { transform: translateY(-2px); }
+/* v1.35.1 · 管理 → 家庭设置:品牌名旁小图标的选择格(并列同尺寸 36×36 · 选中 = 墨边 + 光圈) */
+.bm-group { margin-top: 8px; }
+.bm-group-label { font-family: var(--ui-sans); font-size: calc(11px * var(--fs-scale,1)); color: var(--ink-subtle); margin-bottom: 4px; }
+.bm-opt { width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--rule-soft); border-radius: var(--r-md); background: var(--card); color: var(--brass-deep);
+  cursor: pointer; transition: background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease; }
+.bm-opt:hover { background: var(--paper-soft); border-color: var(--rule); }
+.bm-opt[aria-pressed="true"] { border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink); background: var(--card); }
+.bm-opt:focus-visible { outline: none; box-shadow: var(--ring); }
+.bm-opt[disabled] { opacity: .5; cursor: wait; }
