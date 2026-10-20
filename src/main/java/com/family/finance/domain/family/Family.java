@@ -19,6 +19,8 @@ public class Family {
     private String logoPath;
     /** v0.2 FR-1/FR-34:预设图标 code(icon1..icon4),默认 icon2。驱动 iOS apple-touch-icon + PWA manifest;web favicon/nav 在 logo_path 为空时用 */
     private String logoPreset;
+    /** v1.35.1 · 品牌名旁小图标的 code(见 {@link BrandMark});NULL = 默认存钱罐 */
+    private String brandMark;
     private String baseCurrency;
     private PeriodType periodType;
     /** v0.4 FR-61a · 通胀对照线假设值(% · 默认 2.00 = 2%) */

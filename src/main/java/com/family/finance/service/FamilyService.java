@@ -41,4 +41,17 @@ public class FamilyService {
         }
         familyMapper.updateLogoPreset(familyId, preset);
     }
+
+    /**
+     * v1.35.1 · 换品牌名旁的小图标。只认 {@link com.family.finance.domain.family.BrandMark} 里有的 code;
+     * 选回默认存钱罐时存 NULL(和从没选过的家庭同一种状态)。
+     * @return 换成的那个图标
+     * @throws IllegalArgumentException code 不认识
+     */
+    public com.family.finance.domain.family.BrandMark updateBrandMark(long familyId, String code) {
+        com.family.finance.domain.family.BrandMark mark = com.family.finance.domain.family.BrandMark.byCode(code)
+                .orElseThrow(() -> new IllegalArgumentException("不认识的图标: " + code));
+        familyMapper.updateBrandMark(familyId, mark.isDefault() ? null : mark.code());
+        return mark;
+    }
 }

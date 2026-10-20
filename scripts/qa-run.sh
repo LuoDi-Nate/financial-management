@@ -11119,11 +11119,12 @@ QA1284_ME="$RD/src/main/java/com/family/finance/service/explain/MetricExplainSer
 
 section "v1.28.5 · issue #31:左上角换成古钱小图标"
 # v1285-NAV-COIN · 顶栏不再拼「№ + 家庭名首字」;古钱图标带完整家庭名的 title / aria-label
+#   v1.35.1 · 图标改成可选(BrandMark),<title> 由 th:utext 拼进 svg(家庭名经 escapeXml)—— 判据跟着改,守的仍是「图标带完整家庭名」
 QA1285_NAV="$RD/src/main/resources/templates/fragments/nav.html"
 { ! grep -q "'№ ' + \${#strings.substring(state.family.name" "$QA1285_NAV" \
   && grep -q 'class="nav-coin' "$QA1285_NAV" \
   && grep -q 'aria-label=${state.family.name}' "$QA1285_NAV" \
-  && grep -q '<title th:text="${state.family.name}">' "$QA1285_NAV" \
+  && grep -qF "'<title>' + \${#strings.escapeXml(state.family.name)} + '</title>'" "$QA1285_NAV" \
   && ! grep -q '№ 张' "$RD/src/main/resources/templates/error.html" \
   && [ -f "$RD/scripts/e2e/flows/40-nav-coin.cjs" ]; } \
   && log_ok "v1285-NAV-COIN(顶栏古钱图标 · 家庭名在 title / aria-label · 错误页同步 · flow 40 在)" \
@@ -11840,16 +11841,38 @@ QA135_H="$RD/src/main/resources/templates/stock/holdings.html"
   && grep -qF "/js/menus.js" "$RD/src/main/resources/templates/fragments/layout.html"; } \
   && log_ok "v135-HOLD-ADD-MENU(持仓页「添加其他 ▾」菜单 · 持仓卡按钮一排 · 菜单点外面收起)" \
   || log_bad "v135-HOLD-ADD-MENU 持仓页按钮又摆回一排五个 / 竖排大按钮了" "see stock/holdings.html"
-# v135-NAV-PIG · 顶栏品牌名旁的图标是存钱罐(维护者 10-19「古钱好丑,没对齐」)· 错误页同步 · 上移 2px 对齐字身中线
-{ grep -qF 'M19 5c-1.5 0-2.8 1.4-3 2' "$RD/src/main/resources/templates/fragments/nav.html" \
+# v135-NAV-PIG · 顶栏品牌名旁的图标默认是存钱罐(维护者 10-19「古钱好丑,没对齐」)· 错误页同步 · 按量出来的偏移对齐字身中线
+#   v1.35.1 · 图形挪进 BrandMark 枚举(可选 47 个),默认仍是这只;判据跟着搬
+QA1351_BM="$RD/src/main/java/com/family/finance/domain/family/BrandMark.java"
+{ grep -qF 'PIGGY_BANK("piggy-bank", "存钱罐", "钱财", -2.0, "<path d=\"M19 5c-1.5 0-2.8 1.4-3 2' "$QA1351_BM" \
+  && grep -qF 'public static final BrandMark DEFAULT = PIGGY_BANK;' "$QA1351_BM" \
   && grep -qF 'M19 5c-1.5 0-2.8 1.4-3 2' "$RD/src/main/resources/templates/error.html" \
   && ! grep -qF '<rect x="9" y="9" width="6" height="6"' "$RD/src/main/resources/templates/fragments/nav.html" \
   && grep -qF '.nav-coin { transform: translateY(-2px); }' "$QA135_CSS"; } \
-  && log_ok "v135-NAV-PIG(顶栏 / 错误页的小图标是存钱罐 · 与品牌名中线对齐)" \
-  || log_bad "v135-NAV-PIG 顶栏图标又换回古钱或没对齐" "see fragments/nav.html · error.html · style.css .nav-coin"
+  && log_ok "v135-NAV-PIG(顶栏 / 错误页的小图标默认是存钱罐 · 与品牌名中线对齐)" \
+  || log_bad "v135-NAV-PIG 顶栏默认图标又换回古钱或没对齐" "see BrandMark.java · error.html · style.css .nav-coin"
 [ -f "$RD/scripts/e2e/flows/53-ui-refresh.cjs" ] && grep -qF 'spread <= 1.5' "$RD/scripts/e2e/flows/53-ui-refresh.cjs" \
   && grep -qF 'data-add-more' "$RD/scripts/e2e/flows/53-ui-refresh.cjs" \
   && log_ok "v135-E2E(flow 53:账户卡标题行对齐 · 多页按钮实测尺寸 / 无大写 · 持仓页菜单走到添加页并落库)" || log_bad "v135-E2E 缺 flow 53 或没覆盖按钮实测" "scripts/e2e/flows/53-ui-refresh.cjs"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# v1.35.1 · 品牌名旁的小图标可以自己选(维护者 2026-10-20)
+# ══════════════════════════════════════════════════════════════════════════════
+# v1351-BRAND-MARK · 选项只来自 BrandMark 枚举(20–50 个 · 单测钉住只有路径类元素);存 family.brand_mark(可空 · NULL = 存钱罐);
+#   入口在 管理 → 家庭设置 → 品牌标识;顶栏按所选图标 + 它自己量出来的偏移渲染;两处 SELECT 都带上新列
+QA1351_FM="$RD/src/main/java/com/family/finance/repository/FamilyMapper.java"
+{ [ -f "$RD/db/migration/V75__family_brand_mark.sql" ] && grep -q 'ADD COLUMN brand_mark VARCHAR(32) NULL' "$RD/db/migration/V75__family_brand_mark.sql" \
+  && [ "$(grep -c 'logo_preset, brand_mark, base_currency' "$QA1351_FM")" -eq 2 ] \
+  && grep -qF 'UPDATE family SET brand_mark = #{mark} WHERE id = #{familyId}' "$QA1351_FM" \
+  && grep -qF 'T(com.family.finance.domain.family.BrandMark).of(state.family.brandMark)' "$RD/src/main/resources/templates/fragments/nav.html" \
+  && grep -qF "th:style=\"'transform:' + \${bm.transform()}\"" "$RD/src/main/resources/templates/fragments/nav.html" \
+  && grep -qF 'data-brand-mark-picker' "$RD/src/main/resources/templates/admin/family.html" \
+  && grep -qF "fetch('/admin/family/logo/mark'" "$RD/src/main/resources/templates/admin/family.html" \
+  && grep -qF '@PostMapping("/mark")' "$RD/src/main/java/com/family/finance/web/admin/LogoUploadController.java" \
+  && [ -f "$RD/src/test/java/com/family/finance/domain/family/BrandMarkTest.java" ] \
+  && [ -f "$RD/scripts/e2e/flows/54-brand-mark.cjs" ]; } \
+  && log_ok "v1351-BRAND-MARK(品牌名旁小图标可选 · 只来自 BrandMark · 家庭设置里换 · 顶栏按量出来的偏移对齐 · flow 54 在)" \
+  || log_bad "v1351-BRAND-MARK 小图标选择链路缺了一环" "see BrandMark.java · FamilyMapper · nav.html · admin/family.html · LogoUploadController · V75"
 
 echo
 echo "═══════════════════════════════════════"
