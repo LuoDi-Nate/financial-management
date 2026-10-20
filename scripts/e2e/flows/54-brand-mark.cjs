@@ -8,12 +8,13 @@
  *      顶栏里猫的竖直偏移 = 它自己量出来的 -1.5px(不是存钱罐的 -2px)
  *   3  再点「存钱罐」→ 换回来 → 库:brand_mark 回到 NULL
  *
- * cleanup:brand_mark 置回 NULL(终态 = 存钱罐)。
+ * cleanup:brand_mark 还原成开跑前的值(维护者在 beta 上自己选过的不冲掉)。
  */
 const db = require('../lib/db.cjs');
 const fx = require('../lib/fixture.cjs');
 
 const mark = () => db.one(`SELECT IFNULL(brand_mark, 'NULL') FROM family WHERE id=${fx.FAM}`);
+const state54 = {};
 
 async function navMark(ui) {
   return ui.page.evaluate(() => {
@@ -32,6 +33,7 @@ module.exports = {
   async run(ui, report) {
     ui.flow = this.name;
     const fam = db.one(`SELECT name FROM family WHERE id=${fx.FAM}`);
+    state54.mark = mark();                                             // 开跑前维护者在 beta 上自己选的(cleanup 还原,不冲掉)
     db.raw(`UPDATE family SET brand_mark=NULL WHERE id=${fx.FAM}`);   // 前置:从没选过
 
     report.section('1 · 管理 → 家庭设置 → 品牌标识:选择格');
@@ -75,7 +77,9 @@ module.exports = {
   },
 
   async cleanup(ui, report) {
-    db.raw(`UPDATE family SET brand_mark=NULL WHERE id=${fx.FAM}`);
-    await ui.assert(mark() === 'NULL', '还原:brand_mark 回到 NULL(存钱罐)');
+    const before = state54.mark || 'NULL';
+    if (before === 'NULL') db.raw(`UPDATE family SET brand_mark=NULL WHERE id=${fx.FAM}`);
+    else db.raw(`UPDATE family SET brand_mark='${before.replace(/[^a-z0-9_-]/gi, '')}' WHERE id=${fx.FAM}`);
+    await ui.assert(mark() === before, `还原:brand_mark 回到开跑前的「${before}」(v1.36 起不再一律置 NULL,免得冲掉维护者自己选的)`, mark());
   },
 };

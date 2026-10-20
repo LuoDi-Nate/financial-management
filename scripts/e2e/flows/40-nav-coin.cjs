@@ -8,6 +8,11 @@
 const db = require('../lib/db.cjs');
 const fx = require('../lib/fixture.cjs');
 
+/* v1.35.1 起小图标可以在家庭设置里换。这条守的是「默认是存钱罐」,所以开跑前先置回默认,
+   cleanup 再还原成开跑前的选择 —— 不能把维护者在 beta 上自己选的图标冲掉(v1.36 全量跑时撞上:beta 选了钱包,这里红了)。 */
+const state = {};
+const markNow = () => db.one(`SELECT IFNULL(brand_mark, 'NULL') FROM family WHERE id=${fx.FAM}`);
+
 async function check(ui, label) {
   await ui.goto('/');
   await ui.rendered(`${label} · 首页`);
@@ -35,6 +40,11 @@ module.exports = {
 
   async run(ui, report) {
     ui.flow = this.name;
+    state.mark = markNow();
+    if (state.mark !== 'NULL') {
+      db.raw(`UPDATE family SET brand_mark=NULL WHERE id=${fx.FAM}`);
+      report.info(`beta 上选的是「${state.mark}」· 先置回默认(存钱罐),cleanup 还原`);
+    }
     report.section('1 · 电脑');
     await check(ui, '电脑');
     report.section('2 · 手机(390px)');
@@ -44,5 +54,11 @@ module.exports = {
     await ui.noConsoleErrors('控制台无报错');
   },
 
-  async cleanup(ui) { await ui.page.setViewportSize({ width: 1440, height: 900 }).catch(() => {}); },
+  async cleanup(ui, report) {
+    await ui.page.setViewportSize({ width: 1440, height: 900 }).catch(() => {});
+    if (state.mark && state.mark !== 'NULL') {
+      db.raw(`UPDATE family SET brand_mark='${state.mark.replace(/[^a-z0-9_-]/gi, '')}' WHERE id=${fx.FAM}`);
+      report.info(`还原:小图标回到开跑前的「${state.mark}」`);
+    }
+  },
 };
