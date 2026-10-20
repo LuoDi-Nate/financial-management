@@ -385,7 +385,7 @@ bash scripts/regression-data.sh # 数据层/口径回归(原 e2e.sh · curl 端�
 
 | 版本 | 文档 |
 |---|---|
-| `v1.36` | [PRD](prd/v1.36.md)(待评审)· [现状实测图](preview/v1.36/shots/) |
+| `v1.36` | [PRD](prd/v1.36.md)(已评审)· [技术设计](tech-design/v1.36.md)(待评审)· [现状实测图](preview/v1.36/shots/) |
 | `v1.35` | [PRD](prd/v1.35.md)(已实施)· [技术设计](tech-design/v1.35.md) · [预览](preview/v1.35/) · [UI 调研](docs/research/ui-frameworks-2026-10.md) |
 | `v1.34` | [PRD](prd/v1.34.md)(已实施)· [技术设计](tech-design/v1.34.md) · [预览](preview/v1.34/) |
 | `v1.33` | [PRD](prd/v1.33.md)(已实施)· [技术设计](tech-design/v1.33.md) · [预览](preview/v1.33/) · [影响梳理](docs/research/account-delete-impact.md) |
