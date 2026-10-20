@@ -92,41 +92,13 @@
     setTimeout(run, 400);
   }
 
-  /* ── 图表重排 ──────────────────────────────────────────────────────
-     用户反馈:「横竖屏切换后,归因模块的柱子都排到屏幕外了」。
-     只派发 window resize 不够可靠:
-       · Chart.js 的自适应靠容器 ResizeObserver,但重编译是异步的(~114ms),
-         派发那一刻容器尺寸还没落定 → 它按旧宽度重算,之后就不再动了;
-       · ECharts 根本不自动跟容器,必须显式 resize();
-       · 归因等区块是 HTMX 懒加载的,进入横屏时可能刚渲染完,时机更飘。
-     所以显式点名重排,并在重编译落定后再补两次(与滚动还原同一节奏)。 */
+  /* ── 图表重排 ── v1.36 起实现搬到 viewport.js(window.vpRelayoutCharts · 全站只此一份)。
+     横屏时 body 被旋转,Chart.js 无参 resize() 量到的是屏幕坐标 → 必须显式给容器尺寸(explicit)。
+     切换时打时间戳:viewport.js 看到就不碰滚动位置,滚动由这里的 restoreAnchor / restoreY 管。 */
   function relayoutCharts() {
-    var run = function () {
-      window.dispatchEvent(new Event('resize'));
-      try {
-        /* Chart.js:**显式给容器尺寸**。无参 resize() 实测在这里不生效 ——
-           横屏后画布仍停在竖屏宽度(比容器窄 400+px,半张图空着)。
-           容器尺寸用 offsetWidth/Height(布局坐标),不用 rect:body 被旋转后 rect 宽高会互换。 */
-        if (window.Chart && Chart.getChart) {
-          document.querySelectorAll('canvas').forEach(function (cv) {
-            var ch = Chart.getChart(cv); if (!ch) return;
-            var box = cv.parentElement;
-            if (box && box.offsetWidth > 0) ch.resize(box.offsetWidth, box.offsetHeight);
-            else ch.resize();
-          });
-        }
-        if (window.echarts) {
-          document.querySelectorAll('[_echarts_instance_]').forEach(function (el) {
-            var ec = window.echarts.getInstanceByDom(el);
-            if (ec && !ec.isDisposed()) ec.resize();
-          });
-        }
-      } catch (e) { console.warn('[landscape] 图表重排异常', e); }
-    };
-    requestAnimationFrame(function () { requestAnimationFrame(run); });
-    setTimeout(run, 180);
-    setTimeout(run, 420);
+    if (window.vpRelayoutCharts) window.vpRelayoutCharts({ explicit: true });
   }
+  function markSwitch() { window.__lsSwitchAt = Date.now(); }
 
   /* ── 断点切换 ── */
   function setScreens(screens) {
@@ -194,6 +166,7 @@
 
   function enter() {
     if (root.classList.contains('ls-wide')) return;
+    markSwitch();
     var y = curY() || lastY, anchor = currentAnchor();
     if (!setScreens(wideScreens())) return;      /* 运行时编译器不在 → 不做半套 */
     root.classList.add('ls-wide');
@@ -207,6 +180,7 @@
 
   function exit() {
     if (!root.classList.contains('ls-wide')) return;
+    markSwitch();
     var y = curY() || lastY, anchor = currentAnchor();
     root.classList.remove('ls-wide');
     try { sessionStorage.removeItem('lsWide'); } catch (e) {}
@@ -296,13 +270,21 @@
     if (oriTimer) clearTimeout(oriTimer);
     oriTimer = setTimeout(function () { oriTimer = null; root.classList.remove('ori-turning'); }, 460);
   }
-  function onTurn() { syncAngle(); oriCurtain(); restoreY(lastY); }
+  /* v1.36 · 只有冻结旋转参与的转向(进 / 出)才归这里管滚动、打时间戳让 viewport.js 让路。
+     折叠屏从内屏横着合到外屏竖着也会触发转向事件,但那不涉及冻结 —— 由 viewport.js 按章节还原。 */
+  var freezeMq = window.matchMedia ? window.matchMedia(FREEZE_Q) : null;
+  var lastFrozen = !!(freezeMq && freezeMq.matches);
+  function onTurn() {
+    var fz = !!(freezeMq && freezeMq.matches);
+    if (fz || lastFrozen) markSwitch();
+    lastFrozen = fz;
+    syncAngle(); oriCurtain(); restoreY(lastY);
+  }
 
   syncAngle();
-  if (window.matchMedia) {
-    var mq = window.matchMedia(FREEZE_Q);
-    if (mq.addEventListener) mq.addEventListener('change', onTurn);
-    else if (mq.addListener) mq.addListener(onTurn);
+  if (freezeMq) {
+    if (freezeMq.addEventListener) freezeMq.addEventListener('change', onTurn);
+    else if (freezeMq.addListener) freezeMq.addListener(onTurn);
   }
   window.addEventListener('orientationchange', onTurn);
   if (window.screen && window.screen.orientation && window.screen.orientation.addEventListener) {

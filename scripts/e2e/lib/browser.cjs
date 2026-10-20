@@ -342,6 +342,30 @@ Ui.prototype.phone = async function (fn) {
   }
 };
 
+/**
+ * v1.36 · 指定尺寸的触屏页面(iPhone Duo 折叠屏的各种姿态)。
+ *
+ * 和 ui.phone 一样另开 context、登录、跑完就关;区别是尺寸自定、DPR 用 1(省内存,beta 只有 3.5G)。
+ * 折叠 / 展开 = 在回调里 `ui.page.setViewportSize(...)` 原地改尺寸,页面不刷新 —— 和真机折叠一样。
+ * 隐私模式开着跑:失败截图里不出明文金额。
+ */
+Ui.prototype.device = async function (width, height, fn) {
+  const ctx = await this.page.context().browser().newContext({
+    viewport: { width, height }, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
+  await ctx.addInitScript(() => { try { sessionStorage.setItem('privacy', '1'); sessionStorage.removeItem('lsWide'); } catch (e) {} });
+  const ui = new Ui(await ctx.newPage(), this.report);
+  ui.flow = this.flow;
+  watchConsole(ui);
+  /* 同一登录再开一个页签(分屏两个窗口)· 共用这个 context 的 cookie */
+  ui.newTab = async () => { const t = new Ui(await ctx.newPage(), this.report); t.flow = this.flow; watchConsole(t); return t; };
+  try {
+    await login(ui.page);
+    return await fn(ui);
+  } finally {
+    await ctx.close().catch(() => {});
+  }
+};
+
 /** 开浏览器 + 登录。viewport 给 PC;真手机(触屏)断言用 ui.phone(fn)。 */
 async function open(report, { width = 1440, height = 900 } = {}) {
   const browser = await chromium.launch({ executablePath: CHROME, args: ['--no-sandbox'] });

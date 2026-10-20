@@ -811,7 +811,11 @@
   </script>
 
   <script th:inline="javascript">
-    (() => {
+    /* v1.36 · 建图包成可重复调用的 boot:宽窄翻转(vpchange · 折叠屏 / 分屏 / 拖窗口)和字号档位切换(fontscalechange)
+       都用手上的数据原地重画 —— 21 处 vpNarrow(640) 决定的半径 / 图例 / 柱子个数 / 标题长短才跟得上新宽度。
+       单次绑定、指针指向最新 boot(照 _attribution 的 __attrBoot):HTMX 换片(币种镜头)只换指针,监听不累加。
+       开头的 destroy 循环保证重画不叠层。 */
+    window.__dashBoot = () => {
       const chartFont = window.chartFont || function (b) { return b; };   // v1.2.2 字号档位:Chart.js 字号跟随
       const data = {
         labels: [[${trendLabels}]],
@@ -912,6 +916,7 @@
         /* 2026-07-19 · 移动自绘图例(chart 创建后填充):点击项 = toggle 对应曲线显隐(找回原生 legend 的交互),
            关闭态 40% 透明 + 删除线;热区随 .tap 扩大 */
         const nwLegendM = document.getElementById('nwLegendM');
+        if (nwLegendM) nwLegendM.innerHTML = '';               // v1.36 · 重画时先清:宽屏形态不该留着窄屏的自绘图例
         if (nwLegendM && mobLegend && cpiSeries) {
           nwLegendM.innerHTML = datasets.map((d, i) =>
             '<button type="button" data-di="' + i + '" class="tap inline-flex items-center gap-1" style="background:none;border:0;padding:0;color:inherit;font:inherit;cursor:pointer">' +
@@ -1203,7 +1208,14 @@
           plugins: [ChartDataLabels]
         });
       }
-    })();
+    };
+    window.__dashBoot();
+    if (!window.__dashBound) {
+      window.__dashBound = true;
+      const reboot = () => { if (window.__dashBoot && document.getElementById('dashboard-region')) window.__dashBoot(); };
+      window.addEventListener('vpchange', reboot);
+      window.addEventListener('fontscalechange', reboot);
+    }
   </script>
 </div>
 </body>

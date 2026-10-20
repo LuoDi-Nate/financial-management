@@ -71,7 +71,7 @@
     <div th:unless="${#lists.isEmpty(attr.slices())}" id="attrWaterfall" style="width:100%;height:280px"></div>
     <p class="font-mono text-[10px] text-ink-subtle mt-1">基准(期初)→ 人赚 → 钱赚(按当前维度 · TopN)→ 开账基线 → 本期净变化 · 恒等闭合,算不平显「未归因」</p>
 
-    <div class="grid md:grid-cols-2 gap-4 mt-4">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
       <div>
         <!--/* v1.20 FR-465 · 建了组之后,这里的维值可能是一个组 —— 给它一个点开的入口。
                默认折叠是刻意的:不折叠就违背了 issue #17 的原始诉求。 */-->
@@ -268,6 +268,8 @@
     if (!window.__attrFsBound) {
       window.__attrFsBound = true;
       window.addEventListener('fontscalechange', function () { if (window.__attrBoot) window.__attrBoot(); });
+      /* v1.36 · 宽窄翻转(折叠屏 / 分屏)同理:横轴标签倾斜角按 vpNarrow(640) 算,要重出图 */
+      window.addEventListener('vpchange', function () { if (window.echarts && window.__attrBoot && document.getElementById('attrWaterfall')) window.__attrBoot(); });
     }
 
     /* 隐私开关 → 重出图(canvas 里的金额不受 CSS 模糊管辖)。

@@ -446,6 +446,9 @@
       });
     })();
   </script>
+  <!-- v1.36 · 页面打开后尺寸变了(折叠屏 / 分屏 / 拖窗口):图表重排、宽窄翻转派发 vpchange、
+       变宽展开筛选条、滚回正在看的那一节 · 必须排在 landscape.js 前面(它调这里的 vpRelayoutCharts) -->
+  <script th:src="@{/js/viewport.js(v=${buildVersion})}" defer></script>
   <!-- v1.6.2 · 横屏查看(全局 + 局部)· nav 入口在所有页面都要能用,故提为全站脚本 -->
   <script th:src="@{/js/landscape.js(v=${buildVersion})}" defer></script>
   <!-- v0.2 FR-33 / FR-34 · 移动端引导(微信内 + iOS Safari PWA) -->
@@ -493,9 +496,22 @@
         <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
       </svg>
     </a>
-    <!-- 超级 Agent 的图表:Chart.js + datalabels(与全站其他图表同一份依赖,不另引)-->
-    <script th:src="@{/vendor/chart.umd.min.js(v=${buildVersion})}" defer></script>
-    <script th:src="@{/vendor/chartjs-plugin-datalabels.min.js(v=${buildVersion})}" defer></script>
+    <!-- 超级 Agent 的图表:Chart.js + datalabels(与全站其他图表同一份依赖,不另引)。
+         v1.36 · 只在页面自己没带时才补。带图的页面在 body 顶部已同步加载了一份,这里再无条件 defer 一份,
+         会在页面建完图之后把 window.Chart 换成第二份 —— 第一份建的图从此 Chart.getChart 找不到:
+         横屏 / 折叠后的显式重排、隐私开关的重绘都对它们失效(v1.36 折叠实测发现)。
+         ask-charts.js 只在出图那一刻才用 window.Chart,晚到不影响;动态插入 + async=false 保住两者先后。 -->
+    <script th:inline="javascript">
+      (function () {
+        if (window.Chart) return;
+        var core = /*[[@{/vendor/chart.umd.min.js(v=${buildVersion})}]]*/ '';
+        var labels = /*[[@{/vendor/chartjs-plugin-datalabels.min.js(v=${buildVersion})}]]*/ '';
+        var list = [core, labels];
+        for (var i = 0; i < list.length; i++) {
+          var s = document.createElement('script'); s.src = list[i]; s.async = false; document.head.appendChild(s);
+        }
+      })();
+    </script>
     <script th:src="@{/js/ask-charts.js(v=${buildVersion})}" defer></script>
     <script th:src="@{/js/ask.js(v=${buildVersion})}" defer></script>
   </th:block>
