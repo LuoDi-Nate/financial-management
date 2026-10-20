@@ -5229,6 +5229,7 @@ RG="$RD/src/main/resources/templates/dashboard/_region.html"
 #      (横屏后画布仍是竖屏宽,比容器窄 400+px),ECharts 根本不跟容器。
 #      改为**显式给容器 offsetWidth/Height**(布局坐标,不能用 rect:旋转后宽高互换),
 #      并在重编译落定后补两次(rAF×2 + 180ms + 420ms)。
+#      v1.36 起实现搬到 viewport.js(window.vpRelayoutCharts · 全站一份),landscape.js 的 relayoutCharts 调它并传 explicit。
 #   ⑤ 打标页手机端:真正瓶颈不是说明段(只占 186px),是 62 行 × 卡片化 ≈ 13800px →
 #      加「只看未打标」纯前端过滤(手机默认开),说明段收成 details,底部常驻保存条。
 #      过滤只切 display,隐藏行照样随「保存全部」提交,不丢数据。
@@ -5247,8 +5248,8 @@ LJS="$RD/src/main/resources/static/js/lens.js"
   && grep -qF "height: 44px !important;" "$CSS" \
   && grep -qF "backdrop-filter: none !important;" "$CSS" \
   && grep -q "function relayoutCharts" "$JSL" \
-  && grep -qF "ch.resize(box.offsetWidth, box.offsetHeight);" "$JSL" \
-  && grep -q "isDisposed()" "$JSL" \
+  && grep -qF "ch.resize(box.offsetWidth, box.offsetHeight);" "$RD/src/main/resources/static/js/viewport.js" \
+  && grep -q "isDisposed()" "$RD/src/main/resources/static/js/viewport.js" \
   && grep -q 'id="tagsOnlyTodo"' "$TAG" \
   && grep -q "tags-savebar" "$TAG" \
   && grep -q "tags-intro" "$TAG" \
@@ -11903,8 +11904,8 @@ QA136_UA=$(grep -rlE 'navigator\.userAgent' "$RD/src/main/resources/templates" "
 # v136-VIEWPORT · 尺寸变化只有一份处理:viewport.js 在 landscape.js 之前加载(后者调前者的 vpRelayoutCharts);
 #   Chart.js 每页只有一份(布局里那份只在页面自己没带时才补 —— 再加载一份会换掉 window.Chart,先建的图从此找不到)
 QA136_L="$RD/src/main/resources/templates/fragments/layout.html"
-QA136_VL=$(grep -n 'js/viewport.js' "$QA136_L" | head -1 | cut -d: -f1)
-QA136_LL=$(grep -n 'js/landscape.js' "$QA136_L" | head -1 | cut -d: -f1)
+QA136_VL=$(grep -nE '<script[^>]*js/viewport\.js' "$QA136_L" | head -1 | cut -d: -f1)
+QA136_LL=$(grep -nE '<script[^>]*js/landscape\.js' "$QA136_L" | head -1 | cut -d: -f1)
 { [ -n "$QA136_VL" ] && [ -n "$QA136_LL" ] && [ "$QA136_VL" -lt "$QA136_LL" ] \
   && grep -q 'window.vpRelayoutCharts' "$RD/src/main/resources/static/js/viewport.js" \
   && grep -q 'window.vpRelayoutCharts' "$RD/src/main/resources/static/js/landscape.js" \
