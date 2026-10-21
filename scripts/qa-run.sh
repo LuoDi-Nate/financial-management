@@ -4973,10 +4973,11 @@ V15IND="$RD/src/main/java/com/family/finance/domain/lens/IndustryTag.java"
 #     v1.6.3 承认图型容量有限 → 小块聚合成「其他 N 项」(Top N + Other 惯例),59 块 → 内环 6 块
 #   另修两个隐蔽点:①窄屏判断不能用 clientWidth(布局时机不同会读到 630/321 两个值,导致阈值悄悄走 PC 档)
 #                  ②聚合块必须带 children(下游多处直接 .forEach),否则 TypeError 被 Promise.all catch 静默吞掉
+#                  v1.36.1:外环聚合块的 children 是空数组(只有内环聚合块要占位子块,否则多出第三层「其他 undefined」)—— 仍是数组,forEach 安全
 { grep -q "function aggSmall" "$RD/src/main/resources/static/js/lens.js" \
   && grep -q "AGG_MIN_DEG = isNarrow() ? 18 : 4" "$RD/src/main/resources/static/js/lens.js" \
   && grep -q "其他 ' + small.length + ' 项" "$RD/src/main/resources/static/js/lens.js" \
-  && grep -qF "children: [{ name: '其他'" "$RD/src/main/resources/static/js/lens.js" \
+  && grep -qF "children: ring ? [] : [{ name: '其他'" "$RD/src/main/resources/static/js/lens.js" \
   && grep -q "function isNarrow()" "$RD/src/main/resources/static/js/lens.js" \
   && ! grep -q "= el.clientWidth < 480" "$RD/src/main/resources/static/js/lens.js" \
   && grep -q "(n.children || \[\]).forEach" "$RD/src/main/resources/static/js/lens.js" \
