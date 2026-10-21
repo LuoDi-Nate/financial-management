@@ -12,6 +12,7 @@
  *        正在看的那一节还在原处 · 变宽后筛选条看得见 · 图实例不叠层
  *        → 库:筛选条「N 个已选」== 库里未归档账户数
  *   3  报表 + 资产透视折叠:同上(画布宽度 / 不横滑 / 那一节还在 / 旭日图跟着缩)
+ *        v1.36.1:旭日图只有两层、每块都有标签(外环合并块不再多出第三层「其他 undefined」)
  *        → 库:报表筛选条「N 个已选」== 库里未归档账户数
  *   4  外屏打开再展开:筛选条原来是收起的,展开后看得见(v1.35 是整条消失)
  *   5  折叠时正在填:951 在工商银行-备用金填余额(不提交)→ 合上 → 值还在 → 保存
@@ -205,6 +206,13 @@ module.exports = {
         const sun = await ui.page.evaluate(() => { const e = document.getElementById('sunburst'); const c = e && e.querySelector('canvas');
           return c ? { c: Math.round(c.getBoundingClientRect().width), e: Math.round(e.getBoundingClientRect().width) } : null; });
         await ui.assert(!!sun && sun.c <= sun.e + 2, `${label}:旭日图画布跟着容器`, JSON.stringify(sun));
+        /* v1.36.1 · 外环合并出的「其他 N 项」曾带一个占位子块 → 旭日多出第三层,标签成了「其他 undefined」 */
+        const rings = await ui.page.evaluate(() => { const ec = echarts.getInstanceByDom(document.getElementById('sunburst'));
+          const d = ec.getOption().series[0].data; let deep = 0; const noLbl = [];
+          d.forEach(n => { if (n._lbl === undefined) noLbl.push(n.name);
+            (n.children || []).forEach(c => { if (c._lbl === undefined) noLbl.push(c.name); if ((c.children || []).length) deep++; }); });
+          return { deep, noLbl }; });
+        await ui.assert(rings.deep === 0 && rings.noLbl.length === 0, `${label}:旭日图只有两层、每块都有标签(不再出「其他 undefined」)`, JSON.stringify(rings));
         await ui.assert(s.pageOver <= 1, `${label}:不横向滚动(v1.35 合上后整页被撑到 918px)`, `多出 ${s.pageOver}px`);
       }
     });
