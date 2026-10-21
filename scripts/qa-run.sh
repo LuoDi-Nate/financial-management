@@ -4973,10 +4973,11 @@ V15IND="$RD/src/main/java/com/family/finance/domain/lens/IndustryTag.java"
 #     v1.6.3 承认图型容量有限 → 小块聚合成「其他 N 项」(Top N + Other 惯例),59 块 → 内环 6 块
 #   另修两个隐蔽点:①窄屏判断不能用 clientWidth(布局时机不同会读到 630/321 两个值,导致阈值悄悄走 PC 档)
 #                  ②聚合块必须带 children(下游多处直接 .forEach),否则 TypeError 被 Promise.all catch 静默吞掉
+#                  v1.36.1:外环聚合块的 children 是空数组(只有内环聚合块要占位子块,否则多出第三层「其他 undefined」)—— 仍是数组,forEach 安全
 { grep -q "function aggSmall" "$RD/src/main/resources/static/js/lens.js" \
   && grep -q "AGG_MIN_DEG = isNarrow() ? 18 : 4" "$RD/src/main/resources/static/js/lens.js" \
   && grep -q "其他 ' + small.length + ' 项" "$RD/src/main/resources/static/js/lens.js" \
-  && grep -qF "children: [{ name: '其他'" "$RD/src/main/resources/static/js/lens.js" \
+  && grep -qF "children: ring ? [] : [{ name: '其他'" "$RD/src/main/resources/static/js/lens.js" \
   && grep -q "function isNarrow()" "$RD/src/main/resources/static/js/lens.js" \
   && ! grep -q "= el.clientWidth < 480" "$RD/src/main/resources/static/js/lens.js" \
   && grep -q "(n.children || \[\]).forEach" "$RD/src/main/resources/static/js/lens.js" \
@@ -11921,6 +11922,23 @@ QA136_F="$RD/scripts/e2e/flows/55-iphone-duo.cjs"
   && grep -q 'newTab' "$QA136_F" && grep -q 'ui.phone' "$QA136_F" && grep -q 'period_snapshot' "$QA136_F"; } \
   && log_ok "v136-E2E(flow 55:六种姿态 · 折叠 / 展开 · 填了一半合上再存 · 分屏两窗口落库 · 普通 iPhone 转屏不变)" \
   || log_bad "v136-E2E 缺 flow 55 或没覆盖折叠 / 分屏 / 普通转屏" "scripts/e2e/flows/55-iphone-duo.cjs"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 许可证改 AGPL-3.0 + 双许可(维护者 2026-10-21:「保持开放性,但阻止组织滥用去做他们的商业化」→ 选 AGPLv3 + 双许可)
+# ══════════════════════════════════════════════════════════════════════════════
+# v1361-LICENSE-AGPL · 对外的许可说法只有一个:LICENSE 是 AGPLv3 原文;NOTICE 写明 v1.36.0 及以前仍是 Apache、
+#   商业授权怎么申请、PR #2 的 Apache 来源;CONTRIBUTING 有贡献者授权条款(双许可成立的前提);
+#   README 徽章 / License 段、落地页都说 AGPL,不再出现「Apache 2.0」作为本项目许可
+QA1361_R="$RD/README.md"
+{ head -1 "$RD/LICENSE" | grep -q 'GNU AFFERO GENERAL PUBLIC LICENSE' && grep -q 'Version 3, 19 November 2007' "$RD/LICENSE" \
+  && [ -f "$RD/NOTICE" ] && grep -q 'AGPL-3.0-only' "$RD/NOTICE" && grep -q 'v1.36.0 及以前' "$RD/NOTICE" && grep -q '商业授权' "$RD/NOTICE" && grep -q 'f1eabc4' "$RD/NOTICE" \
+  && grep -q '贡献者授权' "$RD/CONTRIBUTING.md" && grep -q 'including commercial licenses' "$RD/CONTRIBUTING.md" \
+  && grep -q 'License-AGPL_v3' "$QA1361_R" && ! grep -q 'License-Apache' "$QA1361_R" \
+  && sed -n '/^## License/,/^## /p' "$QA1361_R" | grep -q 'AGPL-3.0' \
+  && grep -q 'AGPL-3.0 开源' "$RD/src/main/resources/templates/landing.html" \
+  && ! grep -q 'Apache-2.0 开源' "$RD/src/main/resources/templates/landing.html"; } \
+  && log_ok "v1361-LICENSE-AGPL(LICENSE 是 AGPLv3 原文 · NOTICE 写明旧版仍 Apache + 商业授权 + PR #2 来源 · CONTRIBUTING 有贡献者授权 · README / 落地页口径一致)" \
+  || log_bad "v1361-LICENSE-AGPL 许可证说法不一致或缺件" "see LICENSE · NOTICE · CONTRIBUTING.md · README 徽章与 License 段 · landing.html"
 
 echo
 echo "═══════════════════════════════════════"

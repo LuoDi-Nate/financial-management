@@ -466,7 +466,10 @@
           /* v1.6.4 BUG 修(用户报「一块饼图直接消失」):
              聚合块此前 children:[] —— 旭日里内环块没有子块,它对应的那段外环就是**白色缺口**,
              看上去像饼图缺了一块。必须给一个占满父角度的同族子块(更浅一档灰,不抢维值配色)。 */
-          children: [{ name: '其他', value: sumV, _mv: kind === 'ratio' ? null : sumMv, _val: sumVal,
+          /* v1.36.1 BUG 修(维护者手机上看到环外多出一个「其他 undefined」):这个占位子块只该给**内环**的聚合块。
+             外环也会合并小块(aggSmall(d.children, …, 1)),原来同样塞了子块 → 旭日多出第三层,
+             第三层不在 levels 里、也没算 _lbl,标签就成了「其他 undefined」叠在外环外面。外环是最后一层,不需要占位。 */
+          children: ring ? [] : [{ name: '其他', value: sumV, _mv: kind === 'ratio' ? null : sumMv, _val: sumVal,
                        _agg: true, itemStyle: { color: aggTint(1) } }],
           /* 聚合块不能与「未分类」同色 —— 前者是一堆小块的桶、后者是真实维值,同色会读混。
              取同族中性色向纸面提亮一档:仍是一家人,但分得开。 */
