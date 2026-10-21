@@ -96,8 +96,9 @@
 
 > 完整发布记录与截图见 [Releases](https://github.com/LuoDi-Nate/financial-management/releases)(本段每版只留 2–4 行,细节不搬过来)。
 
-**[v1.36.0](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.36.0) · iPhone Duo 折叠屏:合上、打开、分屏都不走样**
+**[v1.36.0](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.36.0) – [v1.36.1](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.36.1) · iPhone Duo 折叠屏:合上、打开、分屏都不走样 · 许可证改 AGPL-3.0**
 页面打开以后宽度变了(折叠屏合上 / 打开、分屏、电脑拖窗口),图表跟着重排并换成窄屏或宽屏样式,正在看的那一节留在原处,筛选条不再消失,填了一半的不丢。顺带修掉 v1.19 起图表库加载两份、横屏重排和隐私重绘对仪表盘图表失效的老问题。只看宽高、不认设备([PRD](prd/v1.36.md))。
+v1.36.1:许可证改为 **AGPL-3.0 + 双许可**(自用和商用照旧;改了做成网络服务要公开源码;组织可申请商业授权;v1.36.0 及以前仍是 Apache-2.0,见 [NOTICE](NOTICE));修掉手机上旭日图多出的「其他 undefined」。
 
 **[v1.35.0](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.35.0) – [v1.35.1](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.35.1) · UI 精修:按钮不再又大又方 · 品牌小图标可选**
 全站按钮从 42px 直角大写降到 32px、圆角、无衬线,删除 / 归档这类操作统一成红色描边;标签换成浅底圆角小标;持仓页按钮收进「添加其他 ▾」菜单;顶栏小图标换成存钱罐。规格对照 shadcn/ui 等主流组件库([调研](docs/research/ui-frameworks-2026-10.md)),只改外观、不改数据。
