@@ -4,7 +4,7 @@
 > 算得出真实年化、分得清「人赚的」和「钱赚的」;大账户手 key 太累?**AI 截图一拍就把每支真实持仓识别拆开**;
 > 还有 AI 帮你诊断持仓与配置、看清风险敞口、把再平衡落成可执行的行动(只解读,不荐产品、不预测涨跌)。
 
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](LICENSE)
 [![Java 21](https://img.shields.io/badge/Java-21-orange)](https://openjdk.org/projects/jdk/21/)
 [![Spring Boot 3.3](https://img.shields.io/badge/Spring%20Boot-3.3-green)](https://spring.io/projects/spring-boot)
 
@@ -121,7 +121,7 @@ v1.35.1:品牌名旁的小图标可以在「管理 → 家庭设置」里从 47 
 - **决策辅助** — 账户级基准对照 / 提前还贷决策器(NPV 18 年视角)/ 应急金不闲置提示
 - **截止前强提醒** — 3 种填报模板 · 截止前 N 天短信(阿里云,可选)+ 站内 banner 兜底
 - **全在管理页热改** — LLM key / 股票开关 + cron / 汇率 cron / checkup 阈值 / 会话期 等运营参数实时生效不重启(DB > env > 代码默认 三层 fallback)
-- **一键部署 + 隐私可移植** — Docker compose 一键(amd64 + arm64,覆盖 NAS / Apple Silicon)或 systemd 直装 · 自托管,数据只在自己服务器 · 真名脱敏后才喂 LLM · 手机号 / aksk / key 双重防回归 · CSV 一键导出 · Apache 2.0
+- **一键部署 + 隐私可移植** — Docker compose 一键(amd64 + arm64,覆盖 NAS / Apple Silicon)或 systemd 直装 · 自托管,数据只在自己服务器 · 真名脱敏后才喂 LLM · 手机号 / aksk / key 双重防回归 · CSV 一键导出 · AGPL-3.0 开源
 
 > 想知道每个能力是哪个版本加的、完整迭代史 → 见 [CHANGELOG.md](CHANGELOG.md)。
 
@@ -134,7 +134,7 @@ v1.35.1:品牌名旁的小图标可以在「管理 → 家庭设置」里从 47 
 | 前端 | Thymeleaf + HTMX 1.9 + Chart.js 4 + ECharts(无 SPA、无构建管线) |
 | 认证 | Spring Security + bcrypt + Session Cookie |
 | 部署 | **Docker compose 一键(v0.7,推荐)** · 或 Linux systemd + nginx 反代 :80 → :20000 · macOS launchd(可选)直连 :20000 |
-| 测试 | JUnit 5 · **1273 单元** / 1800+ e2e 断言(36 条浏览器主线,真浏览器 + 真 DB)/ **1025 黑盒回归**护栏 —— 每条护栏守的是哪个坑,见 [QA case 库](docs/qa-cases.md) |
+| 测试 | JUnit 5 · **1273 单元** / 1800+ e2e 断言(36 条浏览器主线,真浏览器 + 真 DB)/ **1026 黑盒回归**护栏 —— 每条护栏守的是哪个坑,见 [QA case 库](docs/qa-cases.md) |
 
 ## 快速开始(自托管部署)
 
@@ -478,7 +478,7 @@ financial-management/
 ├── docs/qa-cases.md                      # QA case 库
 ├── icons/                                # 用户可替换的图标源 PNG
 └── scripts/
-    ├── qa-run.sh                         # 黑盒回归护栏(1025 条)
+    ├── qa-run.sh                         # 黑盒回归护栏(1026 条)
     ├── e2e/run.cjs                       # 端到端(真浏览器点 + 回库查真值)
     └── release-shots.cjs                 # 发版截图(隐私模式默认开)
 ```
@@ -546,7 +546,14 @@ financial-management/
 
 ## License
 
-Apache 2.0 · 见 [`LICENSE`](LICENSE)。
+**AGPL-3.0**(v1.36.0 之后的版本)· 见 [`LICENSE`](LICENSE) 与 [`NOTICE`](NOTICE)。
+
+- 个人、家庭、公司内部自用、修改、再分发都可以,也可以商用;
+- 改了之后通过网络给别人用(比如做成托管服务),必须把改过的完整源码按 AGPL 公开;
+- 不想公开改动的组织(闭源改造、嵌进闭源产品或服务)可以申请**商业授权**,开 issue 联系作者;
+- **v1.36.0 及以前的版本仍是 Apache 2.0**,不受影响。
+
+贡献代码需同意 [`CONTRIBUTING.md`](CONTRIBUTING.md) 里的贡献者授权条款(为了让双许可成立)。
 
 ## 致谢
 

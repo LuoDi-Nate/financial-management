@@ -2341,3 +2341,12 @@ Docker 化部署 + systemd/macOS 存量零丢迁移。**真机冒烟(docker buil
 | v136-VIEWPORT | **尺寸变化只有一份处理**:`viewport.js` 先于 `landscape.js` 加载;两边都经 `window.vpRelayoutCharts`,`landscape.js` 里不再有自己的 ECharts 重排;布局不再无条件 `<script>` 引 Chart.js(`if (window.Chart) return;` 缺时才补)。 |
 | v136-E2E | **e2e flow 55**:六种 Duo 尺寸从汉堡菜单逐页进(不横滑、按钮不截字、951 仍是汉堡菜单)· 仪表盘 / 资产透视 / 报表 951 → 382 → 951(图不超出容器、账户分布图换形态、那一节离顶部差 ≤40px、筛选条看得见)· 外屏打开再展开筛选条露出 · 填了一半合上再存(库里余额 == 填的值)· 分屏两个窗口先后存都落库 · 普通 iPhone 竖 → 横 → 竖和 v1.35 一样;cleanup 整库还原 + 重启。 |
 
+
+### 许可证改 AGPL-3.0 + 双许可(维护者 2026-10-21)
+
+> 维护者:「我想保持开放性,但阻止组织滥用我们开源去做他们的商业化」。在 OSI 开源许可里做不到「禁止商用」,
+> 选了 AGPLv3(保住开源 + 改了做成网络服务必须公开源码)+ 双许可(组织可买商业授权)。v1.36.0 及以前仍是 Apache-2.0。
+
+| ID | 守的东西 |
+|---|---|
+| v1361-LICENSE-AGPL | **对外的许可说法只有一个**:`LICENSE` 是 AGPLv3 原文(取自 choosealicense,GitHub 能识别);`NOTICE` 写明 AGPL-3.0-only、v1.36.0 及以前仍是 Apache、商业授权开 issue 申请、PR #2(f1eabc4)按 Apache 贡献的来源;`CONTRIBUTING.md` 有中英双语贡献者授权条款(授予维护者按包括商业授权在内的任意条款再许可 —— 双许可成立的前提);README 徽章 / License 段、落地页都说 AGPL,不再出现「Apache 2.0」作为本项目许可。 |
