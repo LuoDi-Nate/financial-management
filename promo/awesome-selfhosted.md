@@ -14,7 +14,7 @@ name: Financial Management
 website_url: https://github.com/LuoDi-Nate/financial-management
 description: Household net-worth tracker built on account-level monthly snapshots instead of per-transaction bookkeeping: multi-currency balances, real returns (XIRR/TWR), look-through from funds to underlying holdings, and LLM-generated portfolio reviews. (alternative to Kubera)
 licenses:
-  - Apache-2.0
+  - AGPL-3.0
 platforms:
   - Java
   - Docker
@@ -27,7 +27,7 @@ source_code_url: https://github.com/LuoDi-Nate/financial-management
 
 | 字段 | 值 | 说明 |
 |---|---|---|
-| `licenses` | `Apache-2.0` | SPDX 标识符,上游 `licenses.yml` 里已有,无需新增 |
+| `licenses` | `AGPL-3.0` | 2026-10-21 起改为 AGPL(维护者定 · v1.36.0 及以前仍是 Apache-2.0);上游 `licenses.yml` 里已有这个标识(Firefly III 用的就是它)。**PR #3176 里的这一行要你自己改**(上游禁止 AI 代写) |
 | `platforms` | `Java` `Docker` | 部署方式两条都成立(systemd 直装 + compose) |
 | `tags` | `Money, Budgeting & Management` | 字符串必须**一字不差**(对应上游 `tags/money-budgeting--management.yml`) |
 | `demo_url` | **待定** | 见下面「开放决定」 |

@@ -1,0 +1,51 @@
+家庭账房 · financial-management
+Copyright (C) 2026 LuoDi-Nate and contributors
+https://github.com/LuoDi-Nate/financial-management
+
+许可证 / License
+================
+
+自 v1.36.0 之后的版本起,本项目按 GNU Affero General Public License v3.0 发布
+(SPDX: AGPL-3.0-only,全文见 LICENSE)。
+
+Starting with the first release after v1.36.0, this project is licensed under the
+GNU Affero General Public License v3.0 (SPDX: AGPL-3.0-only). See LICENSE.
+
+v1.36.0 及以前的版本(含其 git tag)仍按 Apache License 2.0 发布,不受本次变更影响。
+
+Releases up to and including v1.36.0 remain available under the Apache License 2.0.
+
+AGPL 的要点 / What AGPL means here
+---------------------------------
+
+- 个人、家庭、公司内部自用、学习、修改、再分发:都可以,也可以商用。
+- 如果你修改了本项目,并通过网络把它提供给别人使用(例如做成托管服务),
+  必须把修改后的完整源码以 AGPL-3.0 向这些用户公开(AGPL 第 13 条)。
+
+- Using, studying, modifying and redistributing are all allowed, including commercially.
+- If you modify this project and let others use it over a network (e.g. as a hosted
+  service), you must offer them the complete corresponding source of your modified
+  version under the AGPL-3.0 (section 13).
+
+商业授权 / Commercial license
+-----------------------------
+
+不想或不能遵守 AGPL 条款的组织(例如想闭源改造、或把它嵌入闭源产品 / 服务),
+可以向作者申请单独的商业授权。请在 GitHub 上开 issue 联系作者。
+
+Organizations that cannot comply with the AGPL (e.g. closed-source modifications or
+embedding in proprietary products or services) may obtain a separate commercial
+license from the author. Please open a GitHub issue to get in touch.
+
+第三方贡献 / Third-party contributions
+--------------------------------------
+
+commit f1eabc4(PR #2,加密账户刷新报价)由 Huanyu 贡献,当时按 Apache License 2.0 提交;
+这部分代码的 Apache-2.0 授权与版权归属保持不变,随本项目整体按 AGPL-3.0 分发。
+
+Commit f1eabc4 (PR #2, crypto account quote refresh) was contributed by Huanyu under
+the Apache License 2.0. That contribution keeps its original Apache-2.0 grant and
+attribution and is distributed as part of this project under the AGPL-3.0.
+
+此后的贡献按 CONTRIBUTING.md 中的贡献者授权条款接收。
+Later contributions are accepted under the contributor terms in CONTRIBUTING.md.

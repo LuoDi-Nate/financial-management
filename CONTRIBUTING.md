@@ -72,6 +72,34 @@ bash scripts/qa-e2e.sh         # 36 端到端真值校验(会清 DB,本地跑)
 
 新功能 PR 必须有对应的 ≥1 条 QA case,数学密集型加 1-3 个单元测试。
 
-## License
+## License 与贡献者授权
 
-提交贡献即表示你同意你的代码以 Apache 2.0 协议发布(见 `LICENSE`)。
+本项目自 v1.36.0 之后的版本起按 **AGPL-3.0-only** 发布(见 [`LICENSE`](LICENSE) 与 [`NOTICE`](NOTICE)),
+同时向不能遵守 AGPL 的组织提供商业授权(双许可)。为了让双许可能成立,提交贡献需要同意下面的授权条款。
+
+**提交 PR(或以其它方式提交代码、文档、图片)即表示你同意:**
+
+1. 你提交的内容是你自己的原创,或你有权以下列方式授权它;
+2. 你保留自己贡献的著作权;
+3. 你授予本项目维护者(LuoDi-Nate)一项永久、全球、非独占、免费、不可撤销的许可:可以复制、修改、
+   公开展示、再许可和分发你的贡献,**既可以按 AGPL-3.0,也可以按包括商业授权在内的其它许可条款**;
+   如果贡献涉及你拥有的专利,同时授予实施这些专利所需的许可;
+4. 你的贡献同时按 AGPL-3.0 向所有人开放。
+
+不同意的话,欢迎开 issue 描述想法,由维护者自行实现。
+
+---
+
+**Contributor terms (English).** This project is licensed under **AGPL-3.0-only** for releases after v1.36.0
+and is also offered under separate commercial licenses (dual licensing). By submitting a pull request
+(or otherwise contributing code, documentation or images) you agree that:
+
+1. the contribution is your original work, or you otherwise have the right to license it as below;
+2. you keep the copyright in your contribution;
+3. you grant the project maintainer (LuoDi-Nate) a perpetual, worldwide, non-exclusive, no-charge,
+   irrevocable license to reproduce, modify, publicly display, sublicense and distribute your contribution
+   **under the AGPL-3.0 or under any other license terms, including commercial licenses**, together with
+   a license under any patents you own that are necessarily infringed by the contribution;
+4. your contribution is also made available to everyone under the AGPL-3.0.
+
+If you do not agree, please open an issue describing the idea instead.
