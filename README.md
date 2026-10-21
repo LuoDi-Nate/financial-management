@@ -96,13 +96,12 @@
 
 > 完整发布记录与截图见 [Releases](https://github.com/LuoDi-Nate/financial-management/releases)(本段每版只留 2–4 行,细节不搬过来)。
 
+**[v1.36.0](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.36.0) · iPhone Duo 折叠屏:合上、打开、分屏都不走样**
+页面打开以后宽度变了(折叠屏合上 / 打开、分屏、电脑拖窗口),图表跟着重排并换成窄屏或宽屏样式,正在看的那一节留在原处,筛选条不再消失,填了一半的不丢。顺带修掉 v1.19 起图表库加载两份、横屏重排和隐私重绘对仪表盘图表失效的老问题。只看宽高、不认设备([PRD](prd/v1.36.md))。
+
 **[v1.35.0](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.35.0) – [v1.35.1](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.35.1) · UI 精修:按钮不再又大又方 · 品牌小图标可选**
 全站按钮从 42px 直角大写降到 32px、圆角、无衬线,删除 / 归档这类操作统一成红色描边;标签换成浅底圆角小标;持仓页按钮收进「添加其他 ▾」菜单;顶栏小图标换成存钱罐。规格对照 shadcn/ui 等主流组件库([调研](docs/research/ui-frameworks-2026-10.md)),只改外观、不改数据。
 v1.35.1:品牌名旁的小图标可以在「管理 → 家庭设置」里从 47 个图标里挑,点一下就换。
-
-**[v1.34.0](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.34.0) – [v1.34.2](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.34.2) · 持仓和账户都能拖着排顺序 · 持仓改名 · 升级不再拖死服务器 · 补历史账不再凭空多出收益**
-账户里的持仓可以拖着排,和券商 / 基金 App 的顺序对上,每月核对从上往下挨个对就行([#40](https://github.com/LuoDi-Nate/financial-management/issues/40));持仓页、填报页、截图导入、资产打标都按这个顺序。账户本身也能在账户簿里拖着排。持仓名字填错了可以直接改([#41](https://github.com/LuoDi-Nate/financial-management/issues/41))。v1.34.1 让 `deploy.sh` 升级时先编译再改库、编译带内存保护(内存不够就停下,线上不动),也可以用 `--jar` 传别处编好的包。
-v1.34.2:重开历史月份补记一笔时会问「当时的余额算进去了吗」—— 默认只补记、余额不动,也可以选这个月和之后每个月一起改,对方账户不再凭空多出一笔收益;新账户第一个月的收支不再算两遍;已关账月份不再把之后才建的账户算成「缺」。
 
 ## 主要能力
 
@@ -385,7 +384,7 @@ bash scripts/regression-data.sh # 数据层/口径回归(原 e2e.sh · curl 端�
 
 | 版本 | 文档 |
 |---|---|
-| `v1.36` | [PRD](prd/v1.36.md)(已评审)· [技术设计](tech-design/v1.36.md)(待评审)· [现状实测图](preview/v1.36/shots/) |
+| `v1.36` | [PRD](prd/v1.36.md)(已实施)· [技术设计](tech-design/v1.36.md) · [实测对比图](preview/v1.36/shots/) |
 | `v1.35` | [PRD](prd/v1.35.md)(已实施)· [技术设计](tech-design/v1.35.md) · [预览](preview/v1.35/) · [UI 调研](docs/research/ui-frameworks-2026-10.md) |
 | `v1.34` | [PRD](prd/v1.34.md)(已实施)· [技术设计](tech-design/v1.34.md) · [预览](preview/v1.34/) |
 | `v1.33` | [PRD](prd/v1.33.md)(已实施)· [技术设计](tech-design/v1.33.md) · [预览](preview/v1.33/) · [影响梳理](docs/research/account-delete-impact.md) |
