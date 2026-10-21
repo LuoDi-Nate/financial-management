@@ -2325,3 +2325,19 @@ Docker 化部署 + systemd/macOS 存量零丢迁移。**真机冒烟(docker buil
 | ID | 守什么 |
 |---|---|
 | v1351-BRAND-MARK | **小图标选择链路**:选项只来自 `BrandMark` 枚举(47 个 Lucide 图形 · 单测 `BrandMarkTest` 钉住 20–50 个、code 唯一 ≤32、只有路径类元素、默认存钱罐、选回默认存 NULL、非法 code 拒绝);`family.brand_mark`(V75 · 可空);`FamilyMapper` 两处 SELECT 都带新列;入口在 管理 → 家庭设置 → 品牌标识(`data-brand-mark-picker` · fetch `/admin/family/logo/mark`);顶栏按 `BrandMark.of(state.family.brandMark)` 渲染、每个图标用自己量出来的竖直偏移;e2e flow 54 在。 |
+
+### v1.36 · iPhone Duo(折叠屏):页面打开以后尺寸还会变(维护者 2026-10-20)
+
+> 教训:**「首次打开正常」不等于「尺寸变了以后正常」**。v1.35 在五种 Duo 尺寸下首次打开全部正常,
+> 一折叠就有三处走样:资产透视被旭日图撑到 918px、报表被撑到 457px、筛选条整条消失;读到一半的那一节还会被挤走。
+> 顺带查出一个从 v1.19 起就在的病:布局无条件再加载一份 Chart.js,先建的图 `Chart.getChart` 找不到,
+> 手机整页横屏的显式重排、隐私开关的重绘对仪表盘 / 报表的图一直没生效。
+
+| ID | 守的东西 |
+|---|---|
+| v136-GRID-BASE-COLS | **写了宽屏列数的网格必须写窄屏列数**(`grid grid-cols-1 md:grid-cols-2`):只写 `md:grid-cols-2` 时窄屏列宽按内容最小宽度算,图表画布停在旧宽度就把整页撑宽(报表折叠后 457px 的根因 · v1.36 补了 10 处)。 |
+| v136-VP-CHARTS-SUBSCRIBE | **按宽窄分叉形态的图要订阅 `vpchange`**:一个文件里读了 `vpNarrow(` 又 `new Chart(` / `echarts.init(`,就必须出现 `'vpchange'`(仪表盘 `__dashBoot` · 归因 `__attrBoot` · 资产透视 `renderSunburst`)。 |
+| v136-NO-UA-LAYOUT | **布局只看宽高,不认设备**:前端读 `navigator.userAgent` 的只能是装 App 引导 `mobile-guide.js`(它判断的是「是不是 iOS」)。 |
+| v136-VIEWPORT | **尺寸变化只有一份处理**:`viewport.js` 先于 `landscape.js` 加载;两边都经 `window.vpRelayoutCharts`,`landscape.js` 里不再有自己的 ECharts 重排;布局不再无条件 `<script>` 引 Chart.js(`if (window.Chart) return;` 缺时才补)。 |
+| v136-E2E | **e2e flow 55**:六种 Duo 尺寸从汉堡菜单逐页进(不横滑、按钮不截字、951 仍是汉堡菜单)· 仪表盘 / 资产透视 / 报表 951 → 382 → 951(图不超出容器、账户分布图换形态、那一节离顶部差 ≤40px、筛选条看得见)· 外屏打开再展开筛选条露出 · 填了一半合上再存(库里余额 == 填的值)· 分屏两个窗口先后存都落库 · 普通 iPhone 竖 → 横 → 竖和 v1.35 一样;cleanup 整库还原 + 重启。 |
+

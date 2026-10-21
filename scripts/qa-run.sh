@@ -5229,6 +5229,7 @@ RG="$RD/src/main/resources/templates/dashboard/_region.html"
 #      (横屏后画布仍是竖屏宽,比容器窄 400+px),ECharts 根本不跟容器。
 #      改为**显式给容器 offsetWidth/Height**(布局坐标,不能用 rect:旋转后宽高互换),
 #      并在重编译落定后补两次(rAF×2 + 180ms + 420ms)。
+#      v1.36 起实现搬到 viewport.js(window.vpRelayoutCharts · 全站一份),landscape.js 的 relayoutCharts 调它并传 explicit。
 #   ⑤ 打标页手机端:真正瓶颈不是说明段(只占 186px),是 62 行 × 卡片化 ≈ 13800px →
 #      加「只看未打标」纯前端过滤(手机默认开),说明段收成 details,底部常驻保存条。
 #      过滤只切 display,隐藏行照样随「保存全部」提交,不丢数据。
@@ -5247,8 +5248,8 @@ LJS="$RD/src/main/resources/static/js/lens.js"
   && grep -qF "height: 44px !important;" "$CSS" \
   && grep -qF "backdrop-filter: none !important;" "$CSS" \
   && grep -q "function relayoutCharts" "$JSL" \
-  && grep -qF "ch.resize(box.offsetWidth, box.offsetHeight);" "$JSL" \
-  && grep -q "isDisposed()" "$JSL" \
+  && grep -qF "ch.resize(box.offsetWidth, box.offsetHeight);" "$RD/src/main/resources/static/js/viewport.js" \
+  && grep -q "isDisposed()" "$RD/src/main/resources/static/js/viewport.js" \
   && grep -q 'id="tagsOnlyTodo"' "$TAG" \
   && grep -q "tags-savebar" "$TAG" \
   && grep -q "tags-intro" "$TAG" \
@@ -11873,6 +11874,53 @@ QA1351_FM="$RD/src/main/java/com/family/finance/repository/FamilyMapper.java"
   && [ -f "$RD/scripts/e2e/flows/54-brand-mark.cjs" ]; } \
   && log_ok "v1351-BRAND-MARK(品牌名旁小图标可选 · 只来自 BrandMark · 家庭设置里换 · 顶栏按量出来的偏移对齐 · flow 54 在)" \
   || log_bad "v1351-BRAND-MARK 小图标选择链路缺了一环" "see BrandMark.java · FamilyMapper · nav.html · admin/family.html · LogoUploadController · V75"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# v1.36 · iPhone Duo(折叠屏):页面打开以后尺寸还会变(维护者 2026-10-20)
+# ══════════════════════════════════════════════════════════════════════════════
+# v136-GRID-BASE-COLS · 窄屏下网格的列都能缩:只写了宽屏列数(md:grid-cols-2)的网格,窄屏没有列定义,
+#   列宽按内容最小宽度算 —— 图表画布停在旧宽度时把整列连同整页撑宽(报表折叠后 457px)。必须同时写不带前缀的 grid-cols-*
+QA136_GRID=$(grep -rhoE 'class="[^"]*\bgrid\b[^"]*"' "$RD/src/main/resources/templates" | grep -E '(sm|md|lg|xl):grid-cols-' | grep -vE 'class="([^"]* )?grid-cols-' | head -3)
+[ -z "$QA136_GRID" ] \
+  && log_ok "v136-GRID-BASE-COLS(写了宽屏列数的网格都写了窄屏列数 · 不会被画布撑宽)" \
+  || log_bad "v136-GRID-BASE-COLS 有网格只写了宽屏列数,窄屏会被内容撑宽" "$QA136_GRID"
+
+# v136-VP-CHARTS-SUBSCRIBE · 依赖宽窄形态的图,宽窄一变就跟着重画:读了 vpNarrow 又建图的文件,必须订阅 vpchange
+QA136_SUB=""
+while IFS= read -r f; do
+  grep -qE 'new Chart\(|echarts\.init\(' "$f" || continue
+  grep -q "'vpchange'" "$f" || QA136_SUB="$QA136_SUB ${f#$RD/}"
+done < <(grep -rlE 'vpNarrow\(' "$RD/src/main/resources/templates" "$RD/src/main/resources/static/js")
+[ -z "$QA136_SUB" ] \
+  && log_ok "v136-VP-CHARTS-SUBSCRIBE(读 vpNarrow 建图的地方都订阅了 vpchange · 折叠 / 分屏后图跟着换形态)" \
+  || log_bad "v136-VP-CHARTS-SUBSCRIBE 这些图按宽窄建形态,却没订阅 vpchange(折叠后停在旧形态)" "$QA136_SUB"
+
+# v136-NO-UA-LAYOUT · 布局只看宽高,不认设备(苹果对折叠屏网页的唯一建议):前端读 navigator.userAgent 的只能是装 App 引导
+QA136_UA=$(grep -rlE 'navigator\.userAgent' "$RD/src/main/resources/templates" "$RD/src/main/resources/static/js" | grep -v '/mobile-guide\.js$')
+[ -z "$QA136_UA" ] \
+  && log_ok "v136-NO-UA-LAYOUT(前端只有装 App 引导读 UA · 布局不认设备)" \
+  || log_bad "v136-NO-UA-LAYOUT 前端又有地方按 UA 认设备了" "$QA136_UA"
+
+# v136-VIEWPORT · 尺寸变化只有一份处理:viewport.js 在 landscape.js 之前加载(后者调前者的 vpRelayoutCharts);
+#   Chart.js 每页只有一份(布局里那份只在页面自己没带时才补 —— 再加载一份会换掉 window.Chart,先建的图从此找不到)
+QA136_L="$RD/src/main/resources/templates/fragments/layout.html"
+QA136_VL=$(grep -nE '<script[^>]*js/viewport\.js' "$QA136_L" | head -1 | cut -d: -f1)
+QA136_LL=$(grep -nE '<script[^>]*js/landscape\.js' "$QA136_L" | head -1 | cut -d: -f1)
+{ [ -n "$QA136_VL" ] && [ -n "$QA136_LL" ] && [ "$QA136_VL" -lt "$QA136_LL" ] \
+  && grep -q 'window.vpRelayoutCharts' "$RD/src/main/resources/static/js/viewport.js" \
+  && grep -q 'window.vpRelayoutCharts' "$RD/src/main/resources/static/js/landscape.js" \
+  && ! grep -q 'getInstanceByDom' "$RD/src/main/resources/static/js/landscape.js" \
+  && ! grep -qE '<script[^>]*vendor/chart\.umd\.min\.js' "$QA136_L" \
+  && grep -q 'if (window.Chart) return;' "$QA136_L"; } \
+  && log_ok "v136-VIEWPORT(尺寸变化只有 viewport.js 一份处理 · 先于 landscape.js 加载 · 每页一份 Chart.js)" \
+  || log_bad "v136-VIEWPORT 尺寸变化处理分叉了,或 Chart.js 又被加载两份" "see fragments/layout.html · static/js/viewport.js · static/js/landscape.js"
+
+# v136-E2E · 折叠场景有真浏览器覆盖:六种姿态 · 折叠 / 展开 · 填了一半 · 分屏两窗口 · 普通 iPhone 转屏,且带清理
+QA136_F="$RD/scripts/e2e/flows/55-iphone-duo.cjs"
+{ [ -f "$QA136_F" ] && grep -q 'async cleanup' "$QA136_F" && grep -q 'setViewportSize' "$QA136_F" \
+  && grep -q 'newTab' "$QA136_F" && grep -q 'ui.phone' "$QA136_F" && grep -q 'period_snapshot' "$QA136_F"; } \
+  && log_ok "v136-E2E(flow 55:六种姿态 · 折叠 / 展开 · 填了一半合上再存 · 分屏两窗口落库 · 普通 iPhone 转屏不变)" \
+  || log_bad "v136-E2E 缺 flow 55 或没覆盖折叠 / 分屏 / 普通转屏" "scripts/e2e/flows/55-iphone-duo.cjs"
 
 echo
 echo "═══════════════════════════════════════"

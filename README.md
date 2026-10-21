@@ -135,7 +135,7 @@ v1.34.2:重开历史月份补记一笔时会问「当时的余额算进去了吗
 | 前端 | Thymeleaf + HTMX 1.9 + Chart.js 4 + ECharts(无 SPA、无构建管线) |
 | 认证 | Spring Security + bcrypt + Session Cookie |
 | 部署 | **Docker compose 一键(v0.7,推荐)** · 或 Linux systemd + nginx 反代 :80 → :20000 · macOS launchd(可选)直连 :20000 |
-| 测试 | JUnit 5 · **1273 单元** / 1600+ e2e 断言(35 条浏览器主线,真浏览器 + 真 DB)/ **1020 黑盒回归**护栏 —— 每条护栏守的是哪个坑,见 [QA case 库](docs/qa-cases.md) |
+| 测试 | JUnit 5 · **1273 单元** / 1800+ e2e 断言(36 条浏览器主线,真浏览器 + 真 DB)/ **1025 黑盒回归**护栏 —— 每条护栏守的是哪个坑,见 [QA case 库](docs/qa-cases.md) |
 
 ## 快速开始(自托管部署)
 
@@ -381,12 +381,13 @@ bash scripts/regression-data.sh # 数据层/口径回归(原 e2e.sh · curl 端�
 每版做了什么、为什么那么做,都写在各自的文档里;这里只放入口,不复述。
 
 <details>
-<summary><b>展开全部 51 个版本</b>(v0.1 → v1.34)</summary>
+<summary><b>展开全部 53 个版本</b>(v0.1 → v1.36)</summary>
 
 | 版本 | 文档 |
 |---|---|
-| `v1.34` | [PRD](prd/v1.34.md)(已实施)· [技术设计](tech-design/v1.34.md) · [预览](preview/v1.34/) |
+| `v1.36` | [PRD](prd/v1.36.md)(已评审)· [技术设计](tech-design/v1.36.md)(待评审)· [现状实测图](preview/v1.36/shots/) |
 | `v1.35` | [PRD](prd/v1.35.md)(已实施)· [技术设计](tech-design/v1.35.md) · [预览](preview/v1.35/) · [UI 调研](docs/research/ui-frameworks-2026-10.md) |
+| `v1.34` | [PRD](prd/v1.34.md)(已实施)· [技术设计](tech-design/v1.34.md) · [预览](preview/v1.34/) |
 | `v1.33` | [PRD](prd/v1.33.md)(已实施)· [技术设计](tech-design/v1.33.md) · [预览](preview/v1.33/) · [影响梳理](docs/research/account-delete-impact.md) |
 | `v1.32` | [PRD](prd/v1.32.md)(已实施)· [技术设计](tech-design/v1.32.md) · [预览](preview/v1.32/) |
 | `v1.31` | [PRD](prd/v1.31.md)(第一批已实施)· [技术设计](tech-design/v1.31.md) · [预览](preview/v1.31/) |
@@ -478,7 +479,7 @@ financial-management/
 ├── docs/qa-cases.md                      # QA case 库
 ├── icons/                                # 用户可替换的图标源 PNG
 └── scripts/
-    ├── qa-run.sh                         # 黑盒回归护栏(1020 条)
+    ├── qa-run.sh                         # 黑盒回归护栏(1025 条)
     ├── e2e/run.cjs                       # 端到端(真浏览器点 + 回库查真值)
     └── release-shots.cjs                 # 发版截图(隐私模式默认开)
 ```

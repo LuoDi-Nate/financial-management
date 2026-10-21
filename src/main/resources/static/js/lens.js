@@ -1133,6 +1133,9 @@
     /* 隐私模式开关切换(html.privacy)→ 重绘旭日:canvas 里的金额 label 不受 CSS 模糊管辖,必须重出图 */
     new MutationObserver(function () { if (chart) renderSunburst(); })
       .observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    /* v1.36 · 宽窄翻转(折叠屏 / 分屏 / 拖窗口)→ 重画旭日:小块合并阈值、环宽、标签方向都按 isNarrow() 算。
+       走和隐私切换同一个入口(会重新查一次,只读)。尺寸本身由 viewport.js 的 vpRelayoutCharts 统一重排。 */
+    window.addEventListener('vpchange', function () { if (chart) renderSunburst(); });
   }
   var lensSec = document.getElementById('lens-section');
   if (lensSec && 'IntersectionObserver' in window) {
