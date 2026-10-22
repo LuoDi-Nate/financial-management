@@ -18,7 +18,7 @@
   'use strict';
 
   var root = document.documentElement;
-  var FREEZE_Q = '(pointer: coarse) and (orientation: landscape) and (max-height: 479px) and (min-width: 480px)';
+  var FREEZE_Q = '(pointer: coarse) and (orientation: landscape) and (max-height: 459px) and (min-width: 480px)';   // 与 landscape.js 同值
 
   /* ── 图表重排 ──────────────────────────────────────────────────────
      只派发 window resize 不够可靠:
@@ -155,6 +155,8 @@
     if (w === lastW && h === lastH) { unfreezeLater(); return; }
     var widthChanged = w !== lastW;
     lastW = w; lastH = h;
+    /* v1.37 · 窗口形状变了 → 重算侧边操作栏 / 折痕区(判据在 layout.html 头部);侧边栏进出会改内容宽,下面的重排一并处理 */
+    var shapeChanged = window.vpSyncShape ? window.vpSyncShape() : false;
     /* 整页横屏(用户点出来的 ls-wide)整段归 landscape.js:断点、图表、滚动都由它管,这里只同步宽窄状态 */
     if (root.classList.contains('ls-wide')) { n640 = vpNarrow(640); n768 = vpNarrow(768); unfreezeLater(); return; }
     var owned = landscapeOwns();
@@ -170,7 +172,7 @@
     }
     /* 普通手机转屏(竖 ↔ 冻结横屏)宽窄不翻转 → 与 v1.35 完全一样,不重排;
        折叠屏从内屏横着合到外屏横着会翻转 → 要重排,而且 body 已被旋转,得显式给尺寸 */
-    if (!owned || flipped) window.vpRelayoutCharts({ explicit: rotated() });
+    if (!owned || flipped || shapeChanged) window.vpRelayoutCharts({ explicit: rotated() });
 
     /* 冻结旋转期间(普通手机转屏)滚动归 landscape.js;但宽窄翻转了(折叠屏内屏横着 ↔ 外屏横着)
        布局完全不同,它的按像素还原必错 —— 这时由这里按章节还原(时序在它之后,写同一个容器,后写者生效)。 */
@@ -188,4 +190,14 @@
     timer = setTimeout(settle, 150);
   });
   document.addEventListener('DOMContentLoaded', record);
+  /* v1.37 · 侧边操作栏的「目录」只在本页有目录时出现(它点的是原来的目录浮钮)· 「更多」点外面 / 点菜单里的链接就收起 */
+  document.addEventListener('DOMContentLoaded', function () {
+    var hasToc = !!document.getElementById('toc-fab-btn');
+    document.querySelectorAll('[data-rail-toc]').forEach(function (b) { b.hidden = !hasToc; });
+    document.addEventListener('click', function (e) {
+      document.querySelectorAll('details[data-rail-more][open]').forEach(function (d) {
+        if (!d.contains(e.target) || (e.target.closest && e.target.closest('.rail-more-panel a'))) d.open = false;
+      });
+    });
+  });
 })();

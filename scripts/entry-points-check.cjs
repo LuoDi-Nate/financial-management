@@ -112,6 +112,12 @@ const JUDGE = (href) => {
       isMobile: !!vpCfg.isMobile, hasTouch: !!vpCfg.isMobile,
       deviceScaleFactor: vpCfg.isMobile ? 2 : 1,
     });
+    /* v1.37 · 不真调大模型(维护者 2026-10-21:回归别烧 API 账单)—— 体检 / 仪表盘页面一打开就会自动请求 AI 区块,
+       这里只验入口看不看得见,AI 请求一律回空壳。拦截清单与 e2e 共用一份(scripts/e2e/lib/browser.cjs 的 AI_ROUTE)。 */
+    if (process.env.E2E_REAL_AI !== '1') {
+      const { AI_ROUTE } = require('./e2e/lib/browser.cjs');
+      await ctx.route(AI_ROUTE, r => r.fulfill({ status: 200, contentType: 'text/html', body: '<div data-ai-stub></div>' }));
+    }
     const page = await ctx.newPage();
     try {
       await page.goto(BASE + '/login', { waitUntil: 'domcontentloaded', timeout: 20000 });

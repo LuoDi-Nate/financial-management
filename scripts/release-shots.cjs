@@ -110,14 +110,22 @@ const { chromium } = require(PW);
     await p.close();
   }
 
+  /* v1.37 · 截图不真调大模型(维护者 2026-10-21:回归 / 截图别烧 API 账单)· 拦截清单与 e2e 共用 */
+  const stubAi = async (ctx) => {
+    if (process.env.E2E_REAL_AI === '1') return;
+    const { AI_ROUTE } = require('./e2e/lib/browser.cjs');
+    await ctx.route(AI_ROUTE, r => r.fulfill({ status: 200, contentType: 'text/html', body: '<div data-ai-stub></div>' }));
+  };
   const pc = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 });
   await armPrivacy(pc);
+  await stubAi(pc);
   await login(pc);
   await shoot(pc, spec.pc || [], 'pc');
   await pc.close();
 
   const mob = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
   await armPrivacy(mob);
+  await stubAi(mob);
   await login(mob);
   await shoot(mob, spec.mobile || [], 'mobile');
   await mob.close();

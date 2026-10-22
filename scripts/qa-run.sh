@@ -11940,6 +11940,56 @@ QA1361_R="$RD/README.md"
   && log_ok "v1361-LICENSE-AGPL(LICENSE 是 AGPLv3 原文 · NOTICE 写明旧版仍 Apache + 商业授权 + PR #2 来源 · CONTRIBUTING 有贡献者授权 · README / 落地页口径一致)" \
   || log_bad "v1361-LICENSE-AGPL 许可证说法不一致或缺件" "see LICENSE · NOTICE · CONTRIBUTING.md · README 徽章与 License 段 · landing.html"
 
+# ══════════════════════════════════════════════════════════════════════════════
+# v1.37 · iPhone Duo 侧边操作栏 · 折痕避让 · 外屏横握不冻结 · 自动化不烧 AI(维护者 2026-10-22)
+# ══════════════════════════════════════════════════════════════════════════════
+QA137_L="$RD/src/main/resources/templates/fragments/layout.html"
+QA137_N="$RD/src/main/resources/templates/fragments/nav.html"
+QA137_C="$RD/src/main/resources/static/css/style.css"
+QA137_V="$RD/src/main/resources/static/js/viewport.js"
+QA137_LS="$RD/src/main/resources/static/js/landscape.js"
+# v137-RAIL-ONE-SOURCE · 出不出侧边栏只有一处判据:layout.html 头部定义一次;CSS 只认 html.vp-rail / html.vp-fold,
+#   不另写 display-mode 媒体查询;viewport.js 在尺寸变化时调同一个 vpSyncShape 重算
+{ [ "$(grep -c 'window.VP_RAIL_SHAPE_Q=' "$QA137_L")" -eq 1 ] && [ "$(grep -c 'window.VP_FOLD_Q=' "$QA137_L")" -eq 1 ] \
+  && grep -q 'window.vpSyncShape=function' "$QA137_L" \
+  && ! grep -q 'display-mode' "$QA137_C" && grep -q 'html.vp-rail .side-rail' "$QA137_C" && grep -q 'html.vp-fold dialog\[open\]' "$QA137_C" \
+  && grep -q 'window.vpSyncShape()' "$QA137_V" \
+  && ! grep -rqE 'VP_RAIL_SHAPE_Q *=' "$RD/src/main/resources/static/js"; } \
+  && log_ok "v137-RAIL-ONE-SOURCE(侧边栏 / 折痕区判据只在 layout 头部一处 · CSS 只认类名 · 尺寸变化重算同一个函数)" \
+  || log_bad "v137-RAIL-ONE-SOURCE 侧边栏判据分叉了" "see layout.html 头部 VP_RAIL_SHAPE_Q · style.css html.vp-rail · viewport.js vpSyncShape"
+
+# v137-RAIL-ONE-MENU · 完整导航只有一份源码:汉堡菜单里定义 drawer 片段,侧边栏「更多」引用它(菜单里有「退出」)
+{ [ "$(grep -c 'th:fragment="drawer(me, state)"' "$QA137_N")" -eq 1 ] \
+  && [ "$(grep -c 'fragments/nav :: drawer(' "$QA137_N")" -eq 1 ] \
+  && grep -q 'data-side-rail' "$QA137_N" && grep -q 'data-rail-more' "$QA137_N" && grep -q 'data-rail-priv' "$QA137_N" \
+  && sed -n '/th:fragment="drawer(me, state)"/,/<\/nav>/p' "$QA137_N" | grep -q '@{/logout}'; } \
+  && log_ok "v137-RAIL-ONE-MENU(导航只写一份 drawer 片段 · 汉堡菜单和侧边栏「更多」共用 · 含退出)" \
+  || log_bad "v137-RAIL-ONE-MENU 侧边栏菜单和汉堡菜单不再共用一份" "see nav.html drawer 片段"
+
+# v137-FREEZE-HEIGHT · 冻结旋转只给普通手机横屏:JS(landscape.js / viewport.js)与 CSS 冻结块的高度上限同值,且 < 460
+#   (iPhone Duo 外屏横握 / 帐篷高约 466,要按横向排 + 侧边栏,不能被转成侧着的)
+QA137_FZ=$( { grep -oE "FREEZE_Q = '[^']*'" "$QA137_LS" "$QA137_V"; grep -oE '@media \(pointer: coarse\) and \(orientation: landscape\) and \(max-height: [0-9]+px\) and \(min-width: 480px\)' "$QA137_C"; } | grep -oE 'max-height: [0-9]+px' | sort -u)
+{ [ "$(printf '%s\n' "$QA137_FZ" | grep -c .)" -eq 1 ] && [ "$(printf '%s' "$QA137_FZ" | grep -oE '[0-9]+')" -lt 460 ]; } \
+  && log_ok "v137-FREEZE-HEIGHT(冻结旋转高度上限三处同值 $QA137_FZ · 外屏横握不冻结)" \
+  || log_bad "v137-FREEZE-HEIGHT 冻结旋转高度上限不一致或 ≥ 460" "$QA137_FZ"
+
+# v137-E2E-AI-STUB · 自动化默认不真调大模型(维护者 2026-10-21「api 账单消耗巨大」):e2e 每个浏览器上下文默认拦 AI 接口;
+#   要真调的 flow 标 realAi 且默认跳过;入口可见性检查、发版截图也拦
+QA137_B="$RD/scripts/e2e/lib/browser.cjs"
+{ grep -q 'const AI_ROUTE' "$QA137_B" && [ "$(grep -c 'await stubAi(ctx)' "$QA137_B")" -ge 3 ] \
+  && grep -q "f.realAi" "$RD/scripts/e2e/run.cjs" \
+  && grep -q 'realAi: true' "$RD/scripts/e2e/flows/31-analysis-template.cjs" && grep -q 'realAi: true' "$RD/scripts/e2e/flows/34-prompt-peek.cjs" \
+  && grep -q 'AI_ROUTE' "$RD/scripts/entry-points-check.cjs" && grep -q 'AI_ROUTE' "$RD/scripts/release-shots.cjs"; } \
+  && log_ok "v137-E2E-AI-STUB(e2e / 入口检查 / 发版截图默认拦 AI · 真调 AI 的 flow 默认跳过)" \
+  || log_bad "v137-E2E-AI-STUB 自动化又可能真调大模型了" "see scripts/e2e/lib/browser.cjs AI_ROUTE · run.cjs realAi"
+
+# v137-E2E · flow 56 覆盖六种姿态(主屏 App 用 navigator.standalone 模拟)· 普通设备不变 · 带清理
+QA137_F="$RD/scripts/e2e/flows/56-duo-side-rail.cjs"
+{ [ -f "$QA137_F" ] && grep -q 'async cleanup' "$QA137_F" && grep -q "app: true" "$QA137_F" \
+  && grep -q 'freeze' "$QA137_F" && grep -q 'newCatDlg' "$QA137_F" && grep -q 'expense_category' "$QA137_F"; } \
+  && log_ok "v137-E2E(flow 56:外屏竖 / 横、内屏横 / 竖、折叠往返、浏览器对照、普通设备不变)" \
+  || log_bad "v137-E2E 缺 flow 56 或没覆盖六种姿态" "scripts/e2e/flows/56-duo-side-rail.cjs"
+
 echo
 echo "═══════════════════════════════════════"
 echo " 总结: PASS=$PASS  FAIL=$FAIL  SKIP=$SKIP"

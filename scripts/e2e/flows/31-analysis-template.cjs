@@ -21,6 +21,7 @@ async function waitFooter(ui, panel) {
 }
 
 module.exports = {
+  realAi: true,   // v1.37 · 这条要真调大模型(AI 区块用真的),默认跳过,E2E_REAL_AI=1 才跑
   name: '31-analysis-template',
   title: 'v1.27 · 分析模板:内置模板 → 基于它定制 → 保存并当场重跑 · 首次提示按人记 · 设为默认 / 删除',
 

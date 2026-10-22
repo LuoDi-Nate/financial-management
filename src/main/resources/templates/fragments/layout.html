@@ -39,6 +39,35 @@
     if(document.documentElement.classList.contains('ls-wide'))
       return Math.max(window.innerWidth,window.innerHeight)<w;
     return window.innerWidth<w||window.innerHeight<480;};</script>
+  <!-- v1.37 · iPhone Duo 侧边操作栏 / 折痕的判据(唯一出处 · 护栏 v137-RAIL-ONE-SOURCE)。
+       苹果:外屏(合上)和内屏横向时,顶部、底部的操作挪到右侧一列;只有内屏竖向保留横向顶栏。
+       网页拿不到「系统栏是不是竖排」,只能按窗口形状近似(prd/v1.37.md §3.0 第 2 条):
+         侧边栏 = 主屏 App · 触屏 · (竖着且矮宽:宽高比 ≥ 0.58、宽 < 560 | 横着且不矮:高 ≥ 460、宽 < 1024)
+         折痕区 = 触屏 · 横着 · 高 ≥ 460 · 宽 760–1023(浏览器里也算 —— 折痕不分打开方式)
+       普通 iPhone 竖着宽高比约 0.46(SE 0.56)、横着高 ≤ 440,iPad 竖宽 ≥ 744 / 横宽 ≥ 1024,电脑不是触屏 → 都不中。
+       阈值等真机实测后定稿。?app=1 = 在电脑 Chrome 里按主屏 App 预览(存本次会话),?app=0 清掉。
+       首次绘制前就挂好 html.vp-rail / html.vp-fold,不闪;之后由 viewport.js 在尺寸变化时重算。 -->
+  <script>(function(){
+    var d=document.documentElement;
+    window.VP_RAIL_SHAPE_Q='(pointer: coarse) and (orientation: portrait) and (min-aspect-ratio: 29/50) and (max-width: 559px), '
+      +'(pointer: coarse) and (orientation: landscape) and (min-height: 460px) and (max-width: 1023px)';
+    window.VP_FOLD_Q='(pointer: coarse) and (orientation: landscape) and (min-height: 460px) and (min-width: 760px) and (max-width: 1023px)';
+    try{var m=location.search.match(/[?&]app=([01])/);
+      if(m){if(m[1]==='1')sessionStorage.setItem('previewApp','1');else sessionStorage.removeItem('previewApp');}}catch(e){}
+    window.vpIsApp=function(){
+      try{if(sessionStorage.getItem('previewApp')==='1')return true;}catch(e){}
+      return navigator.standalone===true||!!(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);};
+    window.vpSyncShape=function(){
+      if(!window.matchMedia)return false;
+      var rail=vpIsApp()&&matchMedia(VP_RAIL_SHAPE_Q).matches, fold=matchMedia(VP_FOLD_Q).matches;
+      var changed=d.classList.contains('vp-rail')!==rail||d.classList.contains('vp-fold')!==fold;
+      d.classList.toggle('vp-rail',rail); d.classList.toggle('vp-fold',fold);
+      /* 侧边栏模式下才让页面铺到安全区里(外屏右上角的摄像头、侧边的系统状态栏由 env() 让位)· 真机确认 */
+      var vm=document.querySelector('meta[name=viewport]');
+      if(vm){var c='width=device-width, initial-scale=1'+(rail?', viewport-fit=cover':'');if(vm.content!==c)vm.content=c;}
+      return changed;};
+    vpSyncShape();
+  })();</script>
   <link rel="stylesheet" th:href="@{/css/style.css(v=${buildVersion})}">
   <script th:src="@{/vendor/tailwind.js(v=${buildVersion})}"></script>
   <script th:src="@{/vendor/htmx.min.js(v=${buildVersion})}"></script>

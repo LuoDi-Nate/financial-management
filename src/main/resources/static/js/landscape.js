@@ -253,7 +253,9 @@
           抵消就是转 -angle → angle 270(设备顺时针)挂 html.ori-cw 取 +90°。
           iOS 16.4+ 有 screen.orientation,更老回落 window.orientation。
        ② 滚动位置交接 + 旋转遮帘(iOS 自己的旋转动画抹不掉,只能盖成纯纸面)。 */
-  var FREEZE_Q = '(pointer: coarse) and (orientation: landscape) and (max-height: 479px) and (min-width: 480px)';
+  /* v1.37 · 高度上限 479 → 459(与 style.css 冻结块同值 · 护栏 v137-FREEZE-HEIGHT):普通手机横屏高 ≤ 440 照旧冻结;
+     iPhone Duo 外屏横握 / 帐篷(高约 466)不冻结,按横向排 + 侧边操作栏。 */
+  var FREEZE_Q = '(pointer: coarse) and (orientation: landscape) and (max-height: 459px) and (min-width: 480px)';
 
   function syncAngle() {
     var a = null;
