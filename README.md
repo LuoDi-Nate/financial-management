@@ -135,7 +135,7 @@ v1.35.1:品牌名旁的小图标可以在「管理 → 家庭设置」里从 47 
 | 前端 | Thymeleaf + HTMX 1.9 + Chart.js 4 + ECharts(无 SPA、无构建管线) |
 | 认证 | Spring Security + bcrypt + Session Cookie |
 | 部署 | **Docker compose 一键(v0.7,推荐)** · 或 Linux systemd + nginx 反代 :80 → :20000 · macOS launchd(可选)直连 :20000 |
-| 测试 | JUnit 5 · **1273 单元** / 1800+ e2e 断言(36 条浏览器主线,真浏览器 + 真 DB)/ **1026 黑盒回归**护栏 —— 每条护栏守的是哪个坑,见 [QA case 库](docs/qa-cases.md) |
+| 测试 | JUnit 5 · **1273 单元** / 1800+ e2e 断言(37 条浏览器主线,真浏览器 + 真 DB)/ **1032 黑盒回归**护栏 —— 每条护栏守的是哪个坑,见 [QA case 库](docs/qa-cases.md) |
 
 ## 快速开始(自托管部署)
 
@@ -480,7 +480,7 @@ financial-management/
 ├── docs/qa-cases.md                      # QA case 库
 ├── icons/                                # 用户可替换的图标源 PNG
 └── scripts/
-    ├── qa-run.sh                         # 黑盒回归护栏(1026 条)
+    ├── qa-run.sh                         # 黑盒回归护栏(1032 条)
     ├── e2e/run.cjs                       # 端到端(真浏览器点 + 回库查真值)
     └── release-shots.cjs                 # 发版截图(隐私模式默认开)
 ```
