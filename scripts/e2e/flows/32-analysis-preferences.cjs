@@ -19,6 +19,7 @@ const cfg = k => db.one(`SELECT value_text FROM family_runtime_config WHERE fami
 const esc = s => s.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 
 module.exports = {
+  realAi: true,   // v1.37 · 这条要真调大模型(AI 区块用真的),默认跳过,E2E_REAL_AI=1 才跑
   name: '32-analysis-preferences',
   title: 'v1.27 · 分析偏好:设置页写一条 → 超级 Agent 下一句带上(回显确认)→ 确认卡只有点了才存',
 

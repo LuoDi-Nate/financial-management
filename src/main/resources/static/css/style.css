@@ -1131,7 +1131,9 @@ html.ls-wide > body {
 
    fixed 浮层(浮钮 / toast)会以被 transform 的 body 为包含块 → 自动跟着一起转,
    位置天然正确,不需要单独校正。 */
-@media (pointer: coarse) and (orientation: landscape) and (max-height: 479px) and (min-width: 480px) {
+/* v1.37 · 高度上限 479 → 459(与 landscape.js 的 FREEZE_Q 同值 · 护栏 v137-FREEZE-HEIGHT):
+   冻结旋转只留给普通手机横屏(高 ≤ 440);iPhone Duo 外屏横握 / 帐篷(高约 466)是免手持正着看,按横向排 + 侧边操作栏。 */
+@media (pointer: coarse) and (orientation: landscape) and (max-height: 459px) and (min-width: 480px) {
   html:not(.ls-wide) { overflow: hidden; }
   html:not(.ls-wide) > body {
     position: fixed; top: 0; left: 0; margin: 0;
@@ -3138,3 +3140,73 @@ section[class~="border-2"]:not([class*="rounded"]), div[class~="border-2"][class
 .bm-opt[aria-pressed="true"] { border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink); background: var(--card); }
 .bm-opt:focus-visible { outline: none; box-shadow: var(--ring); }
 .bm-opt[disabled] { opacity: .5; cursor: wait; }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   v1.37 · iPhone Duo 侧边操作栏(html.vp-rail)与折痕避让(html.vp-fold)
+   判据唯一出处在 layout.html 头部(VP_RAIL_SHAPE_Q / VP_FOLD_Q),这里只认类名 —— 护栏 v137-RAIL-ONE-SOURCE。
+   苹果 HIG:外屏和内屏横向时,顶部、底部的操作挪到右侧一列(灵动岛 → 状态栏 → 工具栏 → 标签栏);
+   只有内屏竖向保留横向顶栏。半折时按钮、弹层离开中间折痕;网格优先偶数列。
+   ══════════════════════════════════════════════════════════════════════════════ */
+:root { --rail-w: 52px; --rail-pad: 0px; }
+html.vp-rail { --rail-pad: calc(var(--rail-w) + env(safe-area-inset-right)); }
+.side-rail { display: none; }
+html.vp-rail .side-rail {
+  display: flex; flex-direction: column; align-items: center;
+  position: fixed; top: 0; right: 0; bottom: 0; z-index: 9990;
+  width: var(--rail-pad);
+  padding: calc(10px + env(safe-area-inset-top)) env(safe-area-inset-right) calc(10px + env(safe-area-inset-bottom)) 0;
+  background: var(--card-soft); border-left: 1px solid var(--rule);
+}
+/* 内容让出侧边栏;页头不再吸顶(品牌名和版本跟着内容滚走),右侧那组按钮和右下浮钮都进了侧边栏 */
+html.vp-rail body { padding-right: var(--rail-pad); }
+html.vp-rail header { position: relative !important; top: 0 !important;
+  /* 页头的毛玻璃(backdrop-filter)会给里面的 position:fixed 当包含块 —— 侧边栏就被关在页头盒子里了(实测右边缘差一个侧边栏宽)。
+     侧边栏模式下页头不吸顶,也就不需要毛玻璃 */
+  -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+html.vp-rail header .nav-actions,
+html.vp-rail #float-dock,
+html.vp-rail .ask-fab { display: none !important; }   /* 宽屏那颗「超级 Agent」药丸也收进侧边栏(实测内屏横时压住了「更多」) */
+html.vp-rail .toc-sheet { right: var(--rail-pad); }
+.side-rail .rail-g { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.side-rail .rail-gap { flex: 1; min-height: 8px; }
+.rail-btn {
+  width: 40px; height: 40px; border-radius: var(--r-md); border: 0; background: transparent;
+  display: flex; align-items: center; justify-content: center; position: relative;
+  color: var(--ink-soft); cursor: pointer; list-style: none; -webkit-tap-highlight-color: transparent;
+}
+.rail-btn svg { width: 19px; height: 19px; }
+.rail-btn:active { background: var(--rule-soft); }
+.rail-btn.on { background: var(--ink); color: var(--paper); }
+.rail-btn:focus-visible { outline: none; box-shadow: var(--ring); }
+.rail-badge {
+  position: absolute; top: 3px; right: 1px; min-width: 15px; height: 15px; padding: 0 3px;
+  border-radius: 8px; background: var(--rust); color: #fff;
+  font: 600 9px/15px var(--ui-sans); text-align: center;
+}
+.rail-more > summary { list-style: none; }
+.rail-more > summary::-webkit-details-marker { display: none; }
+.rail-more[open] > summary { background: var(--ink); color: var(--paper); }
+.rail-more-panel {
+  position: fixed; top: 0; bottom: 0; right: var(--rail-pad);
+  width: min(300px, calc(100vw - var(--rail-pad) - 24px)); overflow-y: auto;
+  padding-top: env(safe-area-inset-top);
+  background: var(--card); border-left: 1px solid var(--rule); box-shadow: -10px 0 28px rgba(0,0,0,.14);
+}
+/* 太矮(外屏横握)放不下 → 账户 / 报表先收进「更多」(苹果:从下往上收;填报和隐私眼最后才收) */
+@media (max-height: 439px) {
+  html.vp-rail .rail-tabs a[aria-label="账户"],
+  html.vp-rail .rail-tabs a[aria-label="报表"] { display: none; }
+}
+
+/* 内屏横向:平放和半折网页分不出来,一律按「可能半折」排 —— 弹框、目录抽屉、更新提示开在右半边,
+   奇数列网格改偶数列,中线落在列缝(苹果:prefer an even number of columns · 弹层半折时滑到一侧)。 */
+html.vp-fold dialog[open] {
+  margin: auto calc(var(--rail-pad) + 16px) auto calc(50vw + 20px) !important;
+  max-width: calc(50vw - 36px - var(--rail-pad)) !important;
+}
+html.vp-fold .upd-modal { left: calc(50vw + 20px); right: calc(var(--rail-pad) + 16px); transform: none; width: auto; }
+html.vp-fold .toc-sheet { left: calc(50vw + 20px); }
+html.vp-fold .md\:grid-cols-3,
+html.vp-fold .sm\:grid-cols-3:not([class*="md:grid-cols-"]) { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+html.vp-fold .md\:grid-cols-5 { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
+

@@ -27,6 +27,7 @@ async function openPeek(ui, panelSel, label) {
 const raw = (ui, sel) => ui.page.locator(sel).first().inputValue().catch(() => '');
 
 module.exports = {
+  realAi: true,   // v1.37 · 这条要真调大模型(AI 区块用真的),默认跳过,E2E_REAL_AI=1 才跑
   name: '34-prompt-peek',
   title: 'v1.28 · 看 AI 收到了什么:>_ 终端面板 · 逐字 = 库里的原文 · 账户代号 · 命令 · 你的设置标色 · 隐私模式 · 调仓老建议 · 开关 · 超级 Agent',
 

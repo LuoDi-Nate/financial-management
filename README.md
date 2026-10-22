@@ -381,10 +381,11 @@ bash scripts/regression-data.sh # 数据层/口径回归(原 e2e.sh · curl 端�
 每版做了什么、为什么那么做,都写在各自的文档里;这里只放入口,不复述。
 
 <details>
-<summary><b>展开全部 53 个版本</b>(v0.1 → v1.36)</summary>
+<summary><b>展开全部 54 个版本</b>(v0.1 → v1.37)</summary>
 
 | 版本 | 文档 |
 |---|---|
+| `v1.37` | [PRD](prd/v1.37.md)(已实施)· [技术设计](tech-design/v1.37.md) · [预览](preview/v1.37/side-rail.html) · [Duo 官方规范调研](docs/research/iphone-duo-hig-2026-10.md) |
 | `v1.36` | [PRD](prd/v1.36.md)(已实施)· [技术设计](tech-design/v1.36.md) · [实测对比图](preview/v1.36/shots/) |
 | `v1.35` | [PRD](prd/v1.35.md)(已实施)· [技术设计](tech-design/v1.35.md) · [预览](preview/v1.35/) · [UI 调研](docs/research/ui-frameworks-2026-10.md) |
 | `v1.34` | [PRD](prd/v1.34.md)(已实施)· [技术设计](tech-design/v1.34.md) · [预览](preview/v1.34/) |

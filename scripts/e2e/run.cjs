@@ -42,6 +42,12 @@ const KEEP = process.env.E2E_KEEP === '1';
     .sort()
     .map(f => require(path.join(FLOW_DIR, f)))
     .filter(f => !filter || f.name.includes(filter));
+  /* v1.37 · 要真调大模型的 flow 默认跳过(维护者 2026-10-21:回归别烧 API 账单)· E2E_REAL_AI=1 才跑,此时整轮不拦 AI */
+  const realAi = flows.filter(f => f.realAi);
+  if (realAi.length && process.env.E2E_REAL_AI !== '1') {
+    console.log(`\x1b[33m跳过 ${realAi.length} 条要真调大模型的 flow:${realAi.map(f => f.name).join(' · ')}(要跑设 E2E_REAL_AI=1)\x1b[0m`);
+    flows.splice(0, flows.length, ...flows.filter(f => !f.realAi));
+  }
 
   if (!flows.length) { console.error('没有匹配的 flow'); process.exit(2); }
 

@@ -2351,3 +2351,17 @@ Docker 化部署 + systemd/macOS 存量零丢迁移。**真机冒烟(docker buil
 |---|---|
 | v1361-LICENSE-AGPL | **对外的许可说法只有一个**:`LICENSE` 是 AGPLv3 原文(取自 choosealicense,GitHub 能识别);`NOTICE` 写明 AGPL-3.0-only、v1.36.0 及以前仍是 Apache、商业授权开 issue 申请、PR #2(f1eabc4)按 Apache 贡献的来源;`CONTRIBUTING.md` 有中英双语贡献者授权条款(授予维护者按包括商业授权在内的任意条款再许可 —— 双许可成立的前提);README 徽章 / License 段、落地页都说 AGPL,不再出现「Apache 2.0」作为本项目许可。 |
 | e2e flow 55 §3a | **旭日图最多两层、每块都有标签**:外环合并小块得到的「其他 N 项」不再带占位子块(只有内环聚合块需要它填满外环)—— 原来多出的第三层不在 `levels` 里、没算 `_lbl`,手机上环外叠出一个「其他 undefined」(v1.6.4 起就有,v1.36 发版截图时发现)。断言读 ECharts 实际数据:没有第三层节点、每个内外环节点都有 `_lbl`。 |
+
+### v1.37 · iPhone Duo 侧边操作栏 · 折痕避让 · 外屏横握不冻结 · 自动化不烧 AI(维护者 2026-10-22)
+
+> 教训一:**抓苹果文档只拿到页面壳,就当成「官方没写」**。v1.36 因此漏了六种姿态和「操作放右侧竖排」,被维护者指出「你应该根本没有调研到」。苹果文档要走 `tutorials/data/…json` 拿正文,Tech Talk 读字幕。
+> 教训二:**「回归时限制 AI」只落在了零散几条 flow 上**(36 条里 13 条自己拦),没有全局闸门,两天打出了 70 多次真实调用。这次改成 harness 默认拦、要真调的 flow 显式声明并默认跳过。
+
+| ID | 守的东西 |
+|---|---|
+| v137-RAIL-ONE-SOURCE | **侧边栏 / 折痕区判据只有一处**:`layout.html` 头部的 `VP_RAIL_SHAPE_Q` / `VP_FOLD_Q` 和 `vpSyncShape()`;style.css 只认 `html.vp-rail` / `html.vp-fold`,不另写 `display-mode` 媒体查询;`viewport.js` 在尺寸变化时调同一个 `vpSyncShape()`。 |
+| v137-RAIL-ONE-MENU | **完整导航只写一份**:汉堡菜单里的 `drawer` 片段,侧边栏「更多」用 `th:replace` 引同一个(含「退出」)—— 新加全站入口只改这里。 |
+| v137-FREEZE-HEIGHT | **冻结旋转只给普通手机横屏**:`landscape.js`、`viewport.js` 的 `FREEZE_Q` 与 style.css 冻结块的高度上限同值且 < 460(现为 459);iPhone Duo 外屏横握 / 帐篷(高约 466)不被转成侧着的。 |
+| v137-E2E-AI-STUB | **自动化默认不真调大模型**:`browser.cjs` 的 `AI_ROUTE` 在每个浏览器上下文默认拦截(诊断 / 洞察 / 复盘 / 透视解读 / 调仓 / 目标建议 / 月报 / 超级 Agent / 截图识别 / 测试模型);31 / 32 / 34 标 `realAi`,`run.cjs` 默认跳过,`E2E_REAL_AI=1` 才跑;入口可见性检查、发版截图也拦。**拦不住的**:关账后服务端在后台生成的目标月报 / 提醒(待服务端开关)。 |
+| v137-E2E | **e2e flow 56**:主屏 App(注入 `navigator.standalone`)下外屏竖(侧边栏、点「填报」、角标 = 库里待填数、「更多」含管理 / 退出、隐私眼)· 外屏横(不冻结、「N 个已选」= 库)· 内屏横两组尺寸(折痕区、网格偶数列、「新建类目」弹框在右半边、库里类目数不变)· 内屏竖(顶栏)· 折叠往返 · 浏览器对照 · 普通 iPhone / SE / Pro Max / iPad / 电脑不变 · 普通 iPhone 横屏照旧冻结。 |
+

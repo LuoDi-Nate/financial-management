@@ -45,6 +45,25 @@ const USER = process.env.E2E_USER || 'diwa';
 const PASS = process.env.E2E_PASS || 'demo1234';
 const SHOTS = path.join(__dirname, '..', 'shots');
 
+/**
+ * v1.37 · 自动化默认不真调大模型(维护者 2026-10-21:「beta 环境和 AI 相关的能力在回归时要限制,api 账单消耗巨大」)。
+ *
+ * 浏览器发出去的 AI 请求一律在这里拦下、回一个空壳:诊断 / 洞察 / 复盘 / 透视解读 / 调仓建议 / 目标建议 / 月报 /
+ * 超级 Agent 提问 / 截图识别 / 管理页「测试模型」。要验真实 AI 输出的 flow 声明 `realAi: true`,
+ * run.cjs 默认跳过它们,`E2E_REAL_AI=1` 才跑(此时整轮都不拦)。
+ * 拦不住的:关账后服务端自己在后台生成的目标月报 / 提醒 —— 那要服务端开关(维护者待办),别在回归里随手关账。
+ */
+const AI_ROUTE = /\/(checkup\/(diagnose|insight)|review\/insight|lens\/insight|reports\/rebalance\/advise|goals\/advise\/|goals\/\d+\/report\/generate|ask\/new|ask\/\d+\/stream|entry\/import\/\d+\/scan|admin\/ai-access\/llm\/test)(\b|\/|\?|$)/;
+const REAL_AI = process.env.E2E_REAL_AI === '1';
+async function stubAi(ctx) {
+  if (REAL_AI) return;
+  await ctx.route(AI_ROUTE, r => {
+    const json = /json/.test(r.request().headers()['accept'] || '');
+    return r.fulfill({ status: 200, contentType: json ? 'application/json' : 'text/html',
+                       body: json ? '{}' : '<div data-ai-stub></div>' });
+  });
+}
+
 const { chromium } = require(PW_CORE);
 
 class Ui {
@@ -331,6 +350,7 @@ function watchConsole(ui) {
 Ui.prototype.phone = async function (fn) {
   const ctx = await this.page.context().browser().newContext({
     viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true });
+  await stubAi(ctx);
   const ui = new Ui(await ctx.newPage(), this.report);
   ui.flow = this.flow;
   watchConsole(ui);
@@ -349,10 +369,13 @@ Ui.prototype.phone = async function (fn) {
  * 折叠 / 展开 = 在回调里 `ui.page.setViewportSize(...)` 原地改尺寸,页面不刷新 —— 和真机折叠一样。
  * 隐私模式开着跑:失败截图里不出明文金额。
  */
-Ui.prototype.device = async function (width, height, fn) {
+Ui.prototype.device = async function (width, height, fn, opts = {}) {
   const ctx = await this.page.context().browser().newContext({
     viewport: { width, height }, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
+  await stubAi(ctx);
   await ctx.addInitScript(() => { try { sessionStorage.setItem('privacy', '1'); sessionStorage.removeItem('lsWide'); } catch (e) {} });
+  /* v1.37 · 按「主屏 App」打开:iOS 主屏 App 真实走的是 navigator.standalone(无头 Chromium 模拟不了 display-mode) */
+  if (opts.app) await ctx.addInitScript(() => { try { Object.defineProperty(navigator, 'standalone', { get: () => true }); } catch (e) {} });
   const ui = new Ui(await ctx.newPage(), this.report);
   ui.flow = this.flow;
   watchConsole(ui);
@@ -370,6 +393,7 @@ Ui.prototype.device = async function (width, height, fn) {
 async function open(report, { width = 1440, height = 900 } = {}) {
   const browser = await chromium.launch({ executablePath: CHROME, args: ['--no-sandbox'] });
   const ctx = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1 });
+  await stubAi(ctx);
   const page = await ctx.newPage();
   const ui = new Ui(page, report);
   watchConsole(ui);
@@ -378,4 +402,4 @@ async function open(report, { width = 1440, height = 900 } = {}) {
   return ui;
 }
 
-module.exports = { open, BASE, SHOTS, USER, PASS, NAV_TIMEOUT };
+module.exports = { open, BASE, SHOTS, USER, PASS, NAV_TIMEOUT, AI_ROUTE, REAL_AI, stubAi };

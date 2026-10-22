@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>v1.37 Preview · iPhone Duo 侧边操作栏</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..700&family=JetBrains+Mono:wght@300;400;500&family=Noto+Serif+SC:wght@300;400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/style.css">
+<style>
+  body{background:var(--paper-deep);margin:0;color:var(--ink)}
+  .wrap{max-width:1320px;margin:0 auto;padding:28px 20px 80px}
+  h1,h2,h3{font-family:'Fraunces','Noto Serif SC',serif;font-weight:500;margin:0}
+  .mono{font-family:'JetBrains Mono',monospace}
+  .note{font-size:12.5px;color:var(--ink-soft);line-height:1.85}
+  .zone{margin-top:46px}
+  .zone-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+  .zone-no{font-family:'JetBrains Mono',monospace;font-size:16px;color:var(--paper);background:var(--brass-deep);line-height:1;padding:5px 10px}
+  .zone-t{font-family:'Fraunces','Noto Serif SC',serif;font-size:21px}
+  .zone-fr{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink-subtle);letter-spacing:.06em}
+  .zone-line{height:2px;background:var(--brass-deep);opacity:.35;margin:10px 0 18px}
+  .row{display:flex;gap:30px;flex-wrap:wrap;align-items:flex-start}
+  .cap{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.08em;color:var(--ink-subtle);margin-top:10px}
+  .cap b{color:var(--forest);font-weight:500}
+  .cap.bad b{color:var(--rust)}
+  .row > div:not(.side){display:flex;flex-direction:column;width:min-content}
+  .cap{line-height:1.7}
+  .side{max-width:330px;font-size:12.5px;line-height:1.9;color:var(--ink-soft)}
+  .side b{color:var(--ink)}
+
+  /* ── 设备外框(黑色机身 · 等比缩小)── */
+  .dev{background:#141414;border-radius:30px;padding:10px;box-shadow:0 10px 30px rgba(0,0,0,.18);position:relative}
+  .scr{background:var(--paper);border-radius:22px;overflow:hidden;position:relative;display:flex}
+  .cam{position:absolute;width:9px;height:9px;border-radius:50%;background:#000;box-shadow:0 0 0 2px #2a2a2a;z-index:5}
+  .fold{position:absolute;top:0;bottom:0;left:50%;width:28px;margin-left:-14px;background:linear-gradient(90deg,transparent,rgba(122,90,57,.10) 35%,rgba(122,90,57,.16) 50%,rgba(122,90,57,.10) 65%,transparent);border-left:1px dashed rgba(122,90,57,.35);border-right:1px dashed rgba(122,90,57,.35);z-index:4;pointer-events:none}
+  .fold-lbl{position:absolute;bottom:6px;left:50%;transform:translateX(-50%);font:9px 'JetBrains Mono',monospace;color:var(--brass-deep);background:var(--paper);padding:1px 4px;white-space:nowrap;z-index:6}
+
+  /* 尺寸:外屏 466×678 · 内屏 626×890(按 3 倍换算)· 统一缩到 0.62 */
+  .outer-p .scr{width:289px;height:420px}
+  .outer-l .scr{width:420px;height:289px}
+  .outer-l .rail{padding-top:22px}
+  .inner-l .scr{width:500px;height:351px}
+  .inner-p .scr{width:351px;height:500px}
+
+  /* ── 页面内容(示意)── */
+  .page{flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden}
+  .topbar{height:40px;border-bottom:1px solid var(--rule);display:flex;align-items:center;gap:8px;padding:0 12px;flex-shrink:0;background:var(--paper)}
+  .topbar.slim{height:28px}
+  .brand{font-family:'Fraunces','Noto Serif SC',serif;font-size:14px}
+  .ver{font:8px 'JetBrains Mono',monospace;color:var(--brass-deep)}
+  .sp{flex:1}
+  .ham{width:22px;height:22px;border:1px solid var(--rule);border-radius:5px;display:flex;align-items:center;justify-content:center}
+  .ava{width:20px;height:20px;border-radius:50%;background:var(--ink);color:var(--paper);font-size:10px;display:flex;align-items:center;justify-content:center}
+  .body{padding:10px 12px;flex:1;overflow:hidden}
+  .eyebrow{font:8px 'JetBrains Mono',monospace;letter-spacing:.14em;color:var(--brass-deep)}
+  .h{font-family:'Fraunces','Noto Serif SC',serif;font-size:18px;margin:2px 0 8px}
+  .h em{font-style:italic;color:var(--brass-deep)}
+  .kpis{display:grid;gap:6px;margin-bottom:8px}
+  .k2{grid-template-columns:1fr 1fr}
+  .k4{grid-template-columns:repeat(4,1fr)}
+  .k3{grid-template-columns:repeat(3,1fr)}
+  .kpi{border:1px solid var(--rule);background:var(--card);padding:6px 7px;border-radius:5px}
+  .kpi .l{font:8px 'JetBrains Mono',monospace;color:var(--ink-subtle)}
+  .kpi .v{font-family:'Fraunces',serif;font-size:13px;filter:blur(3px)}
+  .chart{border:1px solid var(--rule);background:var(--card);border-radius:6px;height:92px;position:relative;overflow:hidden}
+  .chart svg{position:absolute;inset:8px}
+  .bars{display:flex;align-items:flex-end;gap:5px;position:absolute;left:10px;right:10px;bottom:8px;top:14px}
+  .bars i{flex:1;background:rgba(122,90,57,.55);border-radius:2px 2px 0 0}
+  .pair{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+
+  /* 旧:右下浮钮 */
+  .dock{position:absolute;right:8px;bottom:10px;display:flex;flex-direction:column;gap:6px;z-index:3}
+  .dock span{width:26px;height:26px;border-radius:50%;background:var(--card);border:1px solid var(--rule);box-shadow:0 2px 6px rgba(0,0,0,.15)}
+
+  /* ── 新:侧边操作栏 ── */
+  .rail{width:44px;flex-shrink:0;border-left:1px solid var(--rule);background:var(--card-soft,#f6f1e7);display:flex;flex-direction:column;align-items:center;padding:8px 0;gap:3px;position:relative}
+  .rail .sys{font:7px 'JetBrains Mono',monospace;color:var(--ink-subtle);text-align:center;line-height:1.3;margin:14px 0 4px}
+  .rail .g{display:flex;flex-direction:column;gap:3px;align-items:center}
+  .rail .gap{flex:1}
+  .rb{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--ink-soft);position:relative}
+  .rb.on{background:var(--ink);color:var(--paper)}
+  .rb svg{width:16px;height:16px}
+  .rb .badge{position:absolute;top:3px;right:3px;min-width:12px;height:12px;border-radius:6px;background:var(--rust);color:#fff;font:8px/12px 'JetBrains Mono',monospace;text-align:center;padding:0 2px}
+  .rail .div{width:20px;height:1px;background:var(--rule);margin:4px 0}
+
+  /* Safari 外屏右侧工具栏(示意 · 不是我们的)*/
+  .safari{width:46px;flex-shrink:0;background:#e9e6e1;border-left:1px solid #d6d1c9;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:10px 0;font:7px 'JetBrains Mono',monospace;color:#8a8278}
+  .safari i{display:block;width:22px;height:22px;border-radius:6px;background:#d8d2c8;margin:3px 0}
+
+  /* 弹框 */
+  .modal{position:absolute;z-index:7;background:var(--card);border:1px solid var(--ink);border-radius:8px;box-shadow:0 10px 28px rgba(0,0,0,.25);padding:10px 12px;width:200px}
+  .modal .t{font-family:'Fraunces','Noto Serif SC',serif;font-size:13px;margin-bottom:6px}
+  .modal .d{font-size:10px;color:var(--ink-soft);line-height:1.6;margin-bottom:8px}
+  .modal .b{display:flex;gap:6px;justify-content:flex-end}
+  .modal .b span{font-size:10px;padding:4px 8px;border-radius:5px;border:1px solid var(--ink)}
+  .modal .b .ok{background:var(--ink);color:var(--paper)}
+  .scrim{position:absolute;inset:0;background:rgba(20,16,12,.28);z-index:6}
+  .rot{transform:rotate(-90deg);transform-origin:center}
+  .x{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:8;pointer-events:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>v1.37 · iPhone Duo 侧边操作栏 <span class="mono" style="font-size:12px;color:var(--ink-subtle)">preview · 示意,非实拍</span></h1>
+  <p class="note" style="max-width:860px;margin-top:10px">
+    苹果对 iPhone Duo 的核心要求:<b>外屏(合上)和内屏横向时,原本在顶部、底部的操作挪到右侧一列</b>(从上到下:灵动岛 → 状态栏 → 工具栏 → 标签栏),纵向全给内容、右手拇指够得着;
+    只有<b>内屏竖向</b>保留横向顶栏。半折时按钮离开中间折痕。下面按六种姿态逐个画出「现在」和「改后」。尺寸按官方像素 ÷ 3 等比缩小(外屏 466×678 · 内屏 626×890),只示意布局。
+  </p>
+
+  <!-- 1 外屏竖握 -->
+  <div class="zone">
+    <div class="zone-head"><span class="zone-no">1</span><span class="zone-t">合上 · 外屏竖握(主屏 App)</span><span class="zone-fr">FR-1380</span></div>
+    <div class="zone-line"></div>
+    <div class="row">
+      <div>
+        <div class="dev outer-p"><div class="scr">
+          <span class="cam" style="top:8px;right:16px"></span>
+          <div class="page">
+            <div class="topbar"><span class="brand">账房</span><span class="ver">◇v1.36</span><span class="sp"></span><span class="ham">≡</span><span class="ava">迪</span></div>
+            <div class="body">
+              <div class="eyebrow">2026 · 10 · 月度账册</div>
+              <div class="h">家庭仪表盘,<em>实时汇总。</em></div>
+              <div class="kpis k2"><div class="kpi"><div class="l">净资产</div><div class="v">¥ 1,234,567</div></div><div class="kpi"><div class="l">总资产</div><div class="v">¥ 2,345,678</div></div></div>
+              <div class="chart"><div class="bars"><i style="height:40%"></i><i style="height:55%"></i><i style="height:48%"></i><i style="height:70%"></i><i style="height:62%"></i><i style="height:80%"></i></div></div>
+            </div>
+          </div>
+          <div class="dock"><span></span><span></span><span></span></div>
+        </div></div>
+        <div class="cap bad"><b>现在</b> · 顶栏占一行 · 右下角四个浮钮压在内容上</div>
+      </div>
+      <div>
+        <div class="dev outer-p"><div class="scr">
+          <span class="cam" style="top:8px;right:16px"></span>
+          <div class="page">
+            <div class="body" style="padding-top:12px">
+              <div class="eyebrow">账房 · 2026 · 10 · 月度账册</div>
+              <div class="h">家庭仪表盘,<em>实时汇总。</em></div>
+              <div class="kpis k2"><div class="kpi"><div class="l">净资产</div><div class="v">¥ 1,234,567</div></div><div class="kpi"><div class="l">总资产</div><div class="v">¥ 2,345,678</div></div></div>
+              <div class="chart" style="height:120px"><div class="bars"><i style="height:40%"></i><i style="height:55%"></i><i style="height:48%"></i><i style="height:70%"></i><i style="height:62%"></i><i style="height:80%"></i></div></div>
+              <div class="kpis k2" style="margin-top:8px"><div class="kpi"><div class="l">本月收入</div><div class="v">¥ 45,000</div></div><div class="kpi"><div class="l">本月支出</div><div class="v">¥ 12,300</div></div></div>
+            </div>
+          </div>
+          <div class="rail">
+            <div class="sys">状态栏<br>(系统)</div>
+            <div class="g">
+              <span class="rb" title="本页目录"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg></span>
+              <span class="rb" title="超级 Agent"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1 7.6-12.2 8.5 8.5 0 0 1 8.5 8.4z"/></svg></span>
+              <span class="rb" title="隐私"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M17.9 17.9A10 10 0 0 1 12 20c-7 0-10-8-10-8a18 18 0 0 1 5.1-5.9M9.9 4.2A9 9 0 0 1 12 4c7 0 10 8 10 8a18 18 0 0 1-2.2 3.2M1 1l22 22"/></svg></span>
+            </div>
+            <div class="gap"></div>
+            <div class="g">
+              <span class="rb on" title="仪表盘"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg></span>
+              <span class="rb" title="填报"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg><span class="badge">2</span></span>
+              <span class="rb" title="账户"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg></span>
+              <span class="rb" title="报表"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 3v18h18M7 15v-4M12 15V8M17 15v-7"/></svg></span>
+              <span class="rb" title="更多"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></span>
+            </div>
+          </div>
+        </div></div>
+        <div class="cap"><b>改后</b> · 右侧一列:上段本页工具 · 下段主页面切换(底对齐) · 纵向全给内容</div>
+      </div>
+      <div class="side">
+        <b>为什么这么排</b>:苹果原话「顶部和底部的按钮挪到右侧,纵向空间给内容,右手拇指够得着」。侧边这一列系统还要放灵动岛和状态栏,所以我们的按钮从状态栏下面开始。<br><br>
+        <b>上段</b>(本页工具):本页目录 · 超级 Agent · 隐私眼 —— 原来右下角的浮钮。<br>
+        <b>下段</b>(像苹果的标签栏,底对齐):仪表盘 · 填报(角标 = 待填数)· 账户 · 报表 · 更多。<br>
+        <b>「更多」</b>里是完整菜单(目标 / 体检 / 管理 / 手册 / 字号 / 账期 / 退出)。<br><br>
+        只放图标,长按显示名称;放不下时从下往上收进「更多」,<b>填报和隐私眼最后才收</b>。品牌名和版本挪到页面第一行,跟着内容滚走。
+      </div>
+    </div>
+  </div>
+
+  <!-- 2 外屏横握 / 帐篷 -->
+  <div class="zone">
+    <div class="zone-head"><span class="zone-no">2</span><span class="zone-t">合上横握 · 帐篷(立在桌上看外屏)</span><span class="zone-fr">FR-1383</span></div>
+    <div class="zone-line"></div>
+    <div class="row">
+      <div>
+        <div class="dev outer-l"><div class="scr" style="align-items:center;justify-content:center;background:var(--paper-deep)">
+          <div class="rot" style="width:289px;height:420px;flex-shrink:0;display:flex;background:var(--paper);transform:rotate(-90deg) scale(.68)">
+            <div class="page"><div class="topbar"><span class="brand">账房</span><span class="sp"></span><span class="ham">≡</span></div>
+              <div class="body"><div class="h">家庭仪表盘</div><div class="kpis k2"><div class="kpi"><div class="l">净资产</div><div class="v">¥ 1,234</div></div><div class="kpi"><div class="l">总资产</div><div class="v">¥ 2,345</div></div></div><div class="chart"></div></div></div>
+          </div>
+        </div></div>
+        <div class="cap bad"><b>现在</b> · 触发「手机横屏冻结旋转」→ 页面被转成侧着的(帐篷姿态下要歪头看)</div>
+      </div>
+      <div>
+        <div class="dev outer-l"><div class="scr">
+          <span class="cam" style="top:12px;right:9px"></span>
+          <div class="page"><div class="body">
+            <div class="eyebrow">账房 · 2026 · 10</div>
+            <div class="h">家庭仪表盘,<em>实时汇总。</em></div>
+            <div class="kpis k4"><div class="kpi"><div class="l">净资产</div><div class="v">¥ 1,234</div></div><div class="kpi"><div class="l">总资产</div><div class="v">¥ 2,345</div></div><div class="kpi"><div class="l">收入</div><div class="v">¥ 45,000</div></div><div class="kpi"><div class="l">支出</div><div class="v">¥ 12,300</div></div></div>
+            <div class="chart" style="height:110px"><div class="bars"><i style="height:40%"></i><i style="height:55%"></i><i style="height:48%"></i><i style="height:70%"></i><i style="height:62%"></i><i style="height:80%"></i><i style="height:66%"></i><i style="height:74%"></i></div></div>
+          </div></div>
+          <div class="rail">
+            <div class="g"><span class="rb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg></span><span class="rb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M17.9 17.9A10 10 0 0 1 12 20c-7 0-10-8-10-8a18 18 0 0 1 5.1-5.9M1 1l22 22"/></svg></span></div>
+            <div class="gap"></div>
+            <div class="g"><span class="rb on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg></span><span class="rb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg><span class="badge">2</span></span><span class="rb"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></span></div>
+          </div>
+        </div></div>
+        <div class="cap"><b>改后</b> · 按横向排版 · 侧边栏在右(高度不够,账户 / 报表收进「更多」)</div>
+      </div>
+      <div class="side">
+        「手机横屏冻结旋转」是给<b>普通手机</b>横过来看宽表格用的:把页面转回竖排,免得断点乱跳。<br><br>
+        外屏横握和帐篷姿态是<b>免手持看</b>,页面应当正着、按横向排。判据靠高度区分:普通手机横屏高度最多约 440,Duo 外屏横握约 466。普通手机横屏<b>照旧冻结旋转</b>。<br><br>
+        高度矮,侧边栏放不下全部按钮 → 从下往上收进「更多」。
+      </div>
+    </div>
+  </div>
+
+  <!-- 3 内屏横 + 4 半折 -->
+  <div class="zone">
+    <div class="zone-head"><span class="zone-no">3</span><span class="zone-t">打开 · 横 / 半折(书本)</span><span class="zone-fr">FR-1380 · FR-1384</span></div>
+    <div class="zone-line"></div>
+    <div class="row">
+      <div>
+        <div class="dev inner-l"><div class="scr">
+          <div class="fold"></div><span class="fold-lbl">折痕 · 中间约 40pt</span>
+          <div class="page">
+            <div class="topbar"><span class="brand">账房</span><span class="ver">◇v1.36</span><span class="sp"></span><span class="ham">≡</span><span class="ava">迪</span></div>
+            <div class="body">
+              <div class="h">家庭仪表盘,<em>实时汇总。</em></div>
+              <div class="kpis k3"><div class="kpi"><div class="l">净资产</div><div class="v">¥ 1,234,567</div></div><div class="kpi"><div class="l">总资产</div><div class="v">¥ 2,345,678</div></div><div class="kpi"><div class="l">总负债</div><div class="v">¥ 1,111,111</div></div></div>
+              <div class="chart" style="height:110px"></div>
+            </div>
+          </div>
+          <div class="scrim"></div>
+          <div class="modal" style="left:50%;top:50%;transform:translate(-50%,-50%)"><div class="t">关闭 2026-10 账期?</div><div class="d">关账后本期余额定格……</div><div class="b"><span>取消</span><span class="ok">关账</span></div></div>
+          <div class="dock"><span></span><span></span><span></span></div>
+        </div></div>
+        <div class="cap bad"><b>现在</b> · 3 列卡片中间那张压折痕 · 弹框居中正压折痕 · 顶栏 + 浮钮</div>
+      </div>
+      <div>
+        <div class="dev inner-l"><div class="scr">
+          <div class="fold" style="left:calc(50% - 22px)"></div>
+          <div class="page">
+            <div class="body">
+              <div class="eyebrow">账房 · 2026 · 10 · 月度账册</div>
+              <div class="h">家庭仪表盘,<em>实时汇总。</em></div>
+              <div class="kpis k4"><div class="kpi"><div class="l">净资产</div><div class="v">¥ 1,234,567</div></div><div class="kpi"><div class="l">总资产</div><div class="v">¥ 2,345,678</div></div><div class="kpi"><div class="l">总负债</div><div class="v">¥ 1,111,111</div></div><div class="kpi"><div class="l">储蓄率</div><div class="v">32%</div></div></div>
+              <div class="pair"><div class="chart" style="height:150px"><div class="bars"><i style="height:40%"></i><i style="height:55%"></i><i style="height:48%"></i><i style="height:70%"></i></div></div><div class="chart" style="height:150px"><div class="bars"><i style="height:60%"></i><i style="height:35%"></i><i style="height:72%"></i><i style="height:50%"></i></div></div></div>
+            </div>
+          </div>
+          <div class="rail">
+            <div class="sys">状态栏</div>
+            <div class="g"><span class="rb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg></span><span class="rb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 11.5a8.4 8.4 0 0 1-9 8.4 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1 7.6-12.2 8.5 8.5 0 0 1 8.5 8.4z"/></svg></span><span class="rb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M17.9 17.9A10 10 0 0 1 12 20c-7 0-10-8-10-8a18 18 0 0 1 5.1-5.9M1 1l22 22"/></svg></span></div>
+            <div class="gap"></div>
+            <div class="g"><span class="rb on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg></span><span class="rb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg><span class="badge">2</span></span><span class="rb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg></span><span class="rb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 3v18h18M7 15v-4M12 15V8M17 15v-7"/></svg></span><span class="rb"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></span></div>
+          </div>
+          <div class="scrim"></div>
+          <div class="modal" style="right:62px;top:50%;transform:translateY(-50%)"><div class="t">关闭 2026-10 账期?</div><div class="d">关账后本期余额定格……</div><div class="b"><span>取消</span><span class="ok">关账</span></div></div>
+        </div></div>
+        <div class="cap"><b>改后</b> · 侧边栏在右(和外屏位置连贯) · 卡片 4 列、图表 2 列,中线落在列缝 · 弹框开在右半边</div>
+      </div>
+      <div class="side">
+        <b>平放和半折网页分不出来</b>(Safari 拿不到折痕),所以内屏横向一律按「可能半折」排:<br>
+        · 卡片网格用<b>偶数列</b>(苹果原话「prefer an even number of columns」);<br>
+        · 弹框、确认框<b>开在右半边</b>(苹果的弹层半折时也是滑到一侧);<br>
+        · 正中那条不放按钮;滚动的文字、图表不用避开。<br><br>
+        内屏横向时,侧边栏<b>还在右边</b> —— 苹果:「打开到内屏横向时,控制位置和外屏保持一致」。
+      </div>
+    </div>
+  </div>
+
+  <!-- 5 内屏竖 -->
+  <div class="zone">
+    <div class="zone-head"><span class="zone-no">4</span><span class="zone-t">打开 · 竖 / 笔记本</span><span class="zone-fr">FR-1381 · 不做什么</span></div>
+    <div class="zone-line"></div>
+    <div class="row">
+      <div>
+        <div class="dev inner-p"><div class="scr">
+          <div class="page">
+            <div class="topbar"><span class="brand">账房</span><span class="ver">◇v1.37</span><span class="sp"></span><span class="ham">≡</span><span class="ava">迪</span></div>
+            <div class="body">
+              <div class="eyebrow">2026 · 10 · 月度账册</div>
+              <div class="h">家庭仪表盘,<em>实时汇总。</em></div>
+              <div class="kpis k2"><div class="kpi"><div class="l">净资产</div><div class="v">¥ 1,234,567</div></div><div class="kpi"><div class="l">总资产</div><div class="v">¥ 2,345,678</div></div><div class="kpi"><div class="l">总负债</div><div class="v">¥ 1,111,111</div></div><div class="kpi"><div class="l">储蓄率</div><div class="v">32%</div></div></div>
+              <div class="chart" style="height:150px"><div class="bars"><i style="height:40%"></i><i style="height:55%"></i><i style="height:48%"></i><i style="height:70%"></i><i style="height:62%"></i><i style="height:80%"></i></div></div>
+            </div>
+          </div>
+          <div class="dock"><span></span><span></span><span></span></div>
+        </div></div>
+        <div class="cap"><b>不变</b> · 横向顶栏 + 浮钮(苹果唯一保留横向栏的姿态)</div>
+      </div>
+      <div class="side">
+        <b>打开 · 竖</b>:纵向空间够,苹果保留横向顶栏,我们也保持现状。<br><br>
+        <b>笔记本</b>(竖着半折、下半平放):苹果建议可点元素挪到下半、媒体放上半,但这是<b>可选的专属布局</b>,而且「不能把功能绑在某个姿态上」。网页分不清笔记本和平放的内屏竖向,<b>这一版不做</b>。
+      </div>
+    </div>
+  </div>
+
+  <!-- 6 Safari vs 主屏 App -->
+  <div class="zone">
+    <div class="zone-head"><span class="zone-no">5</span><span class="zone-t">外屏:Safari 里 vs 主屏 App 里</span><span class="zone-fr">§3.0 第 1 条</span></div>
+    <div class="zone-line"></div>
+    <div class="row">
+      <div>
+        <div class="dev outer-p"><div class="scr">
+          <div class="page">
+            <div class="topbar slim"><span class="brand" style="font-size:12px">账房</span><span class="sp"></span><span class="ham" style="width:18px;height:18px">≡</span></div>
+            <div class="body">
+              <div class="h" style="font-size:15px">家庭仪表盘</div>
+              <div class="kpis k2"><div class="kpi"><div class="l">净资产</div><div class="v">¥ 1,234</div></div><div class="kpi"><div class="l">总资产</div><div class="v">¥ 2,345</div></div></div>
+              <div class="chart" style="height:120px"></div>
+            </div>
+          </div>
+          <div class="safari"><span>网址</span><span><i></i><i></i><i></i><i></i></span></div>
+        </div></div>
+        <div class="cap"><b>Safari 里(推荐 A)</b> · 右侧那列是 Safari 自己的 · 我们只把顶栏压薄</div>
+      </div>
+      <div>
+        <div class="dev outer-p"><div class="scr">
+          <div class="page"><div class="body"><div class="h" style="font-size:15px">家庭仪表盘</div><div class="kpis k2"><div class="kpi"><div class="l">净资产</div><div class="v">¥ 1</div></div><div class="kpi"><div class="l">总资产</div><div class="v">¥ 2</div></div></div><div class="chart" style="height:120px"></div></div></div>
+          <div class="rail" style="width:40px"><div class="g"><span class="rb"></span><span class="rb"></span></div><div class="gap"></div><div class="g"><span class="rb on"></span><span class="rb"></span><span class="rb"></span></div></div>
+          <div class="safari"><span>网址</span><span><i></i><i></i><i></i></span></div>
+        </div></div>
+        <div class="cap bad"><b>Safari 里也加侧边栏(B)</b> · 两列并排 · 内容只剩约 330 宽</div>
+      </div>
+      <div class="side">
+        Safari 在外屏上自己就把工具栏放在右侧一列(第三方模拟器实测),而且这列<b>不算安全区</b>。我们再加一列,内容会被挤得很窄。<br><br>
+        <b>推荐 A</b>:侧边栏只在「主屏 App」里出现(没有 Safari 那一列,我们这一列就是整个 App 的操作栏);Safari 里只把顶栏压薄一档。
+      </div>
+    </div>
+  </div>
+
+  <p class="note" style="margin-top:40px">示意图按官方像素 ÷ 3 等比缩小;两块屏真实的网页可用尺寸要真机实测(第三方报过另一组数)。金额一律模糊处理。</p>
+</div>
+</body>
+</html>
