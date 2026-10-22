@@ -132,6 +132,12 @@ module.exports = {
     report.section('5 · 全都标了(PRD FR-826)');
     db.raw(`UPDATE account SET analysis_excluded=1 WHERE family_id=${fx.FAM} AND type<>'LOAN'`);
     await ui.page.unroute(/\/checkup\/(diagnose|insight)/).catch(() => {});
+    /* v1.37 · harness 在整个浏览器上下文默认拦 AI;这一步要的是服务端真实回应 ——
+       全都标了「不参与」时服务端走「这次不分析」早返回,不会调模型,所以这里放行,验完再拦回去 */
+    const { AI_ROUTE, stubAi } = require('../lib/browser.cjs');
+    await ui.page.context().unroute(AI_ROUTE).catch(() => {});
+    const INSIGHT = /\/checkup\/insight/;   // 资产洞察没有「不分析」早返回,照旧拦着,只放行诊断
+    await ui.page.route(INSIGHT, r => r.fulfill({ status: 200, contentType: 'text/html', body: '<div></div>' }));
     await ui.goto('/checkup?scope=ADJUSTABLE');
     await ui.visible('#allocation [data-scope-empty]', '资产配置卡是空态「所有资产都标成了不参与配置分析」');
     const famRules = await ui.page.locator('#checkup-advice article.advice-card').evaluateAll(es => es.map(e => e.getAttribute('data-rule')));
@@ -139,6 +145,8 @@ module.exports = {
     await ui.page.waitForSelector('#ai-diagnose-panel[data-vendor]', { timeout: 60000 }).catch(() => {});
     const vendor = await ui.page.locator('#ai-diagnose-panel').getAttribute('data-vendor').catch(() => null);
     await ui.assert(vendor === 'skipped', 'AI 综合诊断没有调用模型(「这次不分析」)', String(vendor));
+    await stubAi(ui.page.context());
+    await ui.page.unroute(INSIGHT).catch(() => {});
     await ui.goto('/reports?scope=ADJUSTABLE');
     await ui.visible('#allocation-diff [data-scope-empty]', '报表配置锚对照同样是空态');
     await ui.noConsoleErrors('体检 / 报表控制台无报错');

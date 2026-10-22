@@ -402,4 +402,4 @@ async function open(report, { width = 1440, height = 900 } = {}) {
   return ui;
 }
 
-module.exports = { open, BASE, SHOTS, USER, PASS, NAV_TIMEOUT, AI_ROUTE, REAL_AI };
+module.exports = { open, BASE, SHOTS, USER, PASS, NAV_TIMEOUT, AI_ROUTE, REAL_AI, stubAi };
