@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>v1.38 Preview · 贷款趋势建议换成固定还款</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..700&family=JetBrains+Mono:wght@300;400;500&family=Noto+Serif+SC:wght@300;400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/style.css">
+<style>
+  body{background:var(--paper-deep);margin:0;color:var(--ink)}
+  .wrap{max-width:1180px;margin:0 auto;padding:28px 20px 80px}
+  h1,h2,h3{font-family:'Fraunces','Noto Serif SC',serif;font-weight:500;margin:0}
+  .mono{font-family:'JetBrains Mono',monospace}
+  .note{font-size:12.5px;color:var(--ink-soft);line-height:1.85}
+  .zone{margin-top:46px}
+  .zone-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+  .zone-no{font-family:'JetBrains Mono',monospace;font-size:16px;color:var(--paper);background:var(--brass-deep);line-height:1;padding:5px 10px}
+  .zone-t{font-family:'Fraunces','Noto Serif SC',serif;font-size:21px}
+  .zone-fr{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink-subtle);letter-spacing:.06em}
+  .zone-line{height:2px;background:var(--brass-deep);opacity:.35;margin:10px 0 18px}
+  .cap{font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.06em;color:var(--ink-subtle);margin:8px 0 10px;line-height:1.7}
+  .side{font-size:12.5px;line-height:1.9;color:var(--ink-soft)}
+  .side b{color:var(--ink)}
+  .grid2{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:28px;align-items:start}
+  @media (max-width:860px){.grid2{grid-template-columns:1fr}}
+  .priv{filter:blur(4px)}
+
+  /* 填报页「固定收支」那一行(按线上 .ff 的尺寸手写) */
+  .ff{background:var(--paper);border:1px solid #C9BBA0}
+  .ff-sum{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 14px;font-size:13px}
+  .ff-nm{font-weight:600}
+  .ff-cnt{color:var(--rust)}
+  .ff-sub{color:var(--ink-soft);font-size:12.5px}
+  .ff-nudge{color:var(--brass-deep);font-size:12.5px}
+  .ff-nudge b{font-weight:600}
+  .ff-sp{flex:1}
+  .ff-tg{font-size:12px;color:var(--ink-subtle)}
+  .ff-link{font-size:12px;color:var(--brass-deep)}
+  .btn-ink{display:inline-flex;align-items:center;height:30px;padding:0 12px;border-radius:6px;background:var(--ink);color:var(--paper);font-size:12.5px;border:0}
+  .btn-line{display:inline-flex;align-items:center;height:30px;padding:0 12px;border-radius:6px;background:var(--paper);color:var(--ink);font-size:12.5px;border:1px solid #C9BBA0}
+  .ff-body{border-top:1px solid #DCCFB5;padding:4px 14px 12px}
+  .ff-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 16px;align-items:center;padding:10px 0;border-bottom:1px dashed #DCCFB5;font-size:13px}
+  .ff-row:last-child{border-bottom:0}
+  .ff-l2{font-size:12px;color:var(--ink-soft);grid-column:1}
+  .ff-acts{display:flex;gap:8px;grid-row:1 / span 2;grid-column:2}
+  .av{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:#7A5A39;color:#fff;font-size:11px;margin-right:6px}
+  .tag{font-family:'JetBrains Mono',monospace;font-size:10px;padding:0 5px;border:1px solid;margin-left:6px}
+  .tag-due{border-color:var(--rust);color:var(--rust)}
+  .tag-nudge{border-color:var(--brass-deep);color:var(--brass-deep)}
+  .nudge-head{font-size:12.5px;color:var(--ink-soft);line-height:1.8;padding:10px 0 4px}
+  .nudge-head b{color:var(--ink)}
+  .grp{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--ink-subtle);letter-spacing:.08em;padding:10px 0 2px}
+
+  .phone{width:330px;background:#141414;border-radius:36px;padding:12px}
+  .phone .scr{background:var(--paper-soft);border-radius:26px;overflow:hidden;padding:12px}
+  .phone .ff-row{grid-template-columns:1fr}
+  .phone .ff-acts{grid-row:auto;grid-column:1}
+  .phone .ff-acts > *{flex:1;justify-content:center}
+
+  /* 表单 */
+  .form{background:var(--paper);border:1px solid #C9BBA0;padding:18px 20px}
+  .frow{display:grid;grid-template-columns:110px minmax(0,1fr);gap:8px 14px;align-items:center;font-size:13px;margin:9px 0}
+  .flab{color:var(--ink-soft);font-size:12.5px}
+  .fin{min-height:32px;padding:5px 10px !important;line-height:1.5;border:1px solid #C9BBA0;border-radius:6px;background:#FBF8F1;padding:0 10px;display:flex;align-items:center;font-size:13px}
+  .fin.pre{border-color:var(--forest)}
+  .fin.need{border-color:var(--rust);background:#fff}
+  .pre-tip{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--forest);margin-left:8px}
+  .hint{font-size:12px;color:var(--ink-soft);line-height:1.8;background:var(--paper-soft);border-left:3px solid var(--brass);padding:8px 12px;margin-top:12px}
+  .hint.start{border-left-color:var(--forest)}
+  .seg{display:inline-flex;border:1px solid #C9BBA0;border-radius:6px;overflow:hidden}
+  .seg span{padding:5px 10px;font-size:12px}
+  .seg span.on{background:var(--ink);color:var(--paper)}
+  .forms{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+  @media (max-width:980px){.forms{grid-template-columns:1fr}}
+
+  /* 管理页表格 */
+  .tbl{width:100%;border-collapse:collapse;background:var(--paper);border:1px solid #C9BBA0;font-size:13px}
+  .tbl th{font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.06em;color:var(--ink-subtle);text-align:left;padding:8px 12px;border-bottom:1px solid #C9BBA0;font-weight:400}
+  .tbl td{padding:9px 12px;border-bottom:1px dashed #DCCFB5}
+  .tbl tr.sub td{background:var(--paper-soft);font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--ink-soft);letter-spacing:.04em}
+  .st{font-family:'JetBrains Mono',monospace;font-size:10.5px;padding:1px 6px;border:1px solid}
+  .st.ok{border-color:var(--forest);color:var(--forest)}
+  .st.no{border-color:var(--brass-deep);color:var(--brass-deep)}
+  .st.self{border-color:#B9AC93;color:var(--ink-subtle)}
+  .acct{background:var(--paper);border:1px solid #C9BBA0;padding:12px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:13px;margin-bottom:10px}
+  .acct .lab{font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--ink-subtle);letter-spacing:.06em}
+  .bad{text-decoration:line-through;color:var(--ink-subtle)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="eyebrow">v1.38 · 预 · 览</div>
+  <h1 style="font-size:34px;margin-top:6px">贷款趋势建议换成固定还款</h1>
+  <p class="note" style="max-width:860px;margin-top:10px">
+    旧的「接受 / 保持上月」整条下线。每个贷款都要有个归宿:<b>设成固定还款</b>,或者<b>不设、每月自己填</b>;
+    没有归宿的,填报页「固定收支」那一行一直提醒,直到都处理完。金额全部隐私糊化。
+  </p>
+
+  <!-- ① -->
+  <div class="zone">
+    <div class="zone-head"><span class="zone-no">1</span><span class="zone-t">填报页「固定收支」那一行</span><span class="zone-fr">FR-1401 · FR-1402 · FR-1404</span></div>
+    <div class="zone-line"></div>
+    <div class="grid2">
+      <div>
+        <div class="cap">今天(v1.37)· 这期没点过「接受」时 —— 本版去掉</div>
+        <div class="ff" style="opacity:.6">
+          <div class="ff-sum"><span class="ff-nm">固定收支</span><span class="ff-cnt">2 笔贷款还款建议</span><span class="ff-sp"></span><span class="ff-tg">展开</span><span class="ff-link">管理</span></div>
+          <div class="ff-body">
+            <div class="ff-row"><div><span class="av">迪</span>房贷-招行 <span class="tag tag-nudge">建议</span></div>
+              <div class="ff-acts"><span class="btn-ink bad">接受</span><span class="btn-line bad">保持上月</span></div>
+              <div class="ff-l2">按上两月差值,本月预计还到 <span class="priv">−1,234,567</span>(较上月 <span class="priv">−3,456</span>)· 还没设固定还款</div></div>
+          </div>
+        </div>
+        <div class="cap" style="margin-top:4px">点过「接受」之后这一行就什么都没有了 —— 10-21 prod 上看到的就是这样</div>
+
+        <div class="cap" style="margin-top:26px">本版 · 收起(只有提醒时)</div>
+        <div class="ff">
+          <div class="ff-sum"><span class="ff-nm">固定收支</span><span class="ff-nudge">还有 <b>2</b> 个贷款没设固定还款 · 设一下</span><span class="ff-sp"></span><span class="ff-tg">展开</span><span class="ff-link">管理</span></div>
+        </div>
+
+        <div class="cap" style="margin-top:18px">本版 · 收起(同时有待确认)</div>
+        <div class="ff">
+          <div class="ff-sum"><span class="ff-nm">固定收支</span><span class="ff-cnt">3 笔待确认</span><span class="ff-sub">共 <span class="priv">¥7,100</span></span><span class="ff-nudge">· 还有 <b>2</b> 个贷款没设固定还款</span><span class="ff-sp"></span><span class="btn-ink">全部确认(3)</span><span class="ff-tg">展开</span><span class="ff-link">管理</span></div>
+        </div>
+
+        <div class="cap" style="margin-top:18px">本版 · 展开</div>
+        <div class="ff">
+          <div class="ff-sum"><span class="ff-nm">固定收支</span><span class="ff-cnt">3 笔待确认</span><span class="ff-sub">共 <span class="priv">¥7,100</span></span><span class="ff-nudge">· 还有 <b>2</b> 个贷款没设固定还款</span><span class="ff-sp"></span><span class="btn-ink">全部确认(3)</span><span class="ff-tg">收起</span><span class="ff-link">管理</span></div>
+          <div class="ff-body">
+            <div class="ff-row"><div><span class="av" style="background:#4F6B47">娃</span>工资 <span class="tag tag-due">待确认</span></div>
+              <div class="ff-acts"><span class="btn-ink">确认</span><span class="btn-line">这期没有</span></div>
+              <div class="ff-l2">收入 · → 工资卡 · 10 号 · <span class="priv">¥25,000</span></div></div>
+            <div class="ff-row"><div><span class="av">迪</span>物业费 <span class="tag tag-due">待确认</span></div>
+              <div class="ff-acts"><span class="btn-ink">确认</span><span class="btn-line">这期没有</span></div>
+              <div class="ff-l2">支出 · ← 支付宝 · 5 号 · <span class="priv">¥420</span></div></div>
+            <div class="ff-row"><div><span class="av">迪</span>车贷 <span class="tag tag-due">待确认</span></div>
+              <div class="ff-acts"><span class="btn-ink">确认</span><span class="btn-line">这期没有</span></div>
+              <div class="ff-l2">还款 · 自动 · 按上两月差值 · ← 工资卡 · 1 号 · 本金 <span class="priv">¥2,680</span></div></div>
+
+            <div class="grp">没设固定还款的贷款 · 2</div>
+            <div class="nudge-head">原来的「接受 / 保持上月」换成了固定还款:<b>设一次</b>,以后每期跟着别的固定收支一起确认,还会顺带记上从哪个账户还的。</div>
+            <div class="ff-row"><div><span class="av">迪</span>房贷-招行 <span class="tag tag-nudge">没设</span></div>
+              <div class="ff-acts"><span class="btn-ink">设成固定还款</span><span class="btn-line">不设,每月自己填</span></div>
+              <div class="ff-l2">房贷 · 上月末欠 <span class="priv">¥1,234,567</span></div></div>
+            <div class="ff-row"><div><span class="av" style="background:#4F6B47">娃</span>房贷-公积金 <span class="tag tag-nudge">没设</span></div>
+              <div class="ff-acts"><span class="btn-ink">设成固定还款</span><span class="btn-line">不设,每月自己填</span></div>
+              <div class="ff-l2">房贷 · 上月末欠 <span class="priv">¥456,789</span> · 填过年利率 3.1%</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="side">
+        <b>一直在</b>:不管这期确认了什么,只要还有贷款没归宿,摘要上就带着这句。<br><br>
+        <b>不算进「待确认」数</b>:导航「填报」角标、仪表盘那句「M 笔固定收支待确认」都不加它 —— 它是一次性的设置,不是这期要做的事;算进去的话,角标会一直挂着一个永远「确认」不掉的数。<br><br>
+        <b>颜色用黄铜</b>:和「待确认」的锈红分开,一眼看出哪些是本期要点的、哪些是还没设好的。<br><br>
+        手机见右下。
+      </div>
+    </div>
+
+    <div style="display:flex;gap:30px;flex-wrap:wrap;margin-top:24px;align-items:flex-start">
+      <div>
+        <div class="cap">手机 · 展开(按钮整行点得中,沿用 v1.31 卡片排法)</div>
+        <div class="phone"><div class="scr">
+          <div class="ff">
+            <div class="ff-sum"><span class="ff-nm">固定收支</span><span class="ff-nudge">还有 <b>2</b> 个贷款没设固定还款</span><span class="ff-sp"></span><span class="ff-tg">收起</span></div>
+            <div class="ff-body">
+              <div class="nudge-head">原来的「接受 / 保持上月」换成了固定还款:<b>设一次</b>,以后每期跟着别的固定收支一起确认。</div>
+              <div class="ff-row"><div><span class="av">迪</span>房贷-招行 <span class="tag tag-nudge">没设</span></div>
+                <div class="ff-l2">房贷 · 上月末欠 <span class="priv">¥1,234,567</span></div>
+                <div class="ff-acts"><span class="btn-ink">设成固定还款</span><span class="btn-line">不设,自己填</span></div></div>
+              <div class="ff-row"><div><span class="av" style="background:#4F6B47">娃</span>房贷-公积金 <span class="tag tag-nudge">没设</span></div>
+                <div class="ff-l2">房贷 · 上月末欠 <span class="priv">¥456,789</span></div>
+                <div class="ff-acts"><span class="btn-ink">设成固定还款</span><span class="btn-line">不设,自己填</span></div></div>
+            </div>
+          </div>
+        </div></div>
+      </div>
+      <div class="side" style="max-width:420px;padding-top:30px">
+        手机上「不设,每月自己填」缩成「不设,自己填」,两个按钮各占一半宽。<br><br>
+        <b>点「不设,自己填」会先问一句</b>:「以后这笔贷款每期自己填余额,不再提醒。随时可以在 管理 › 固定收支 改回来。」—— 防手滑。
+      </div>
+    </div>
+  </div>
+
+  <!-- ② -->
+  <div class="zone">
+    <div class="zone-head"><span class="zone-no">2</span><span class="zone-t">点「设成固定还款」· 表单按账户预填好</span><span class="zone-fr">FR-1406 · FR-1407 · FR-1408</span></div>
+    <div class="zone-line"></div>
+    <div class="forms">
+      <div>
+        <div class="cap">A · 房贷,没填年利率(最常见)</div>
+        <div class="form">
+          <b style="font-size:15px">设固定还款 · 房贷-招行</b>
+          <div class="frow"><span class="flab">种类</span><div class="seg"><span class="on">贷款月供</span><span>信用卡账单</span></div></div>
+          <div class="frow"><span class="flab">金额</span><div class="fin pre">自动 · 按上两月差值<span class="pre-tip">预填</span></div></div>
+          <div class="frow"><span class="flab">从哪个账户还</span><div class="fin pre">工资卡(默认还款来源)<span class="pre-tip">预填</span></div></div>
+          <div class="frow"><span class="flab">每月几号</span><div class="fin pre">1 号<span class="pre-tip">预填</span></div></div>
+          <div class="hint">确认时除了更新贷款余额,还会从「工资卡」记一笔<b>还贷(本金)</b>。如果你每月还另外手记还贷,或者从银行账单导入了这笔,以后就不用再记了。</div>
+          <div style="margin-top:12px"><span class="btn-ink">保存</span></div>
+        </div>
+      </div>
+      <div>
+        <div class="cap">B · 填过年利率的贷款</div>
+        <div class="form">
+          <b style="font-size:15px">设固定还款 · 房贷-公积金</b>
+          <div class="frow"><span class="flab">种类</span><div class="seg"><span class="on">贷款月供</span><span>信用卡账单</span></div></div>
+          <div class="frow"><span class="flab">金额</span><div class="fin pre">月供固定,按年利率 3.1% 拆本金 / 利息<span class="pre-tip">预填</span></div></div>
+          <div class="frow"><span class="flab">每月月供</span><div class="fin need">请填月供</div></div>
+          <div class="frow"><span class="flab">从哪个账户还</span><div class="fin need">请选(这笔贷款没设默认还款来源)</div></div>
+          <div class="frow"><span class="flab">每月几号</span><div class="fin pre">1 号<span class="pre-tip">预填</span></div></div>
+          <div class="hint">按年利率拆,利息也会记上(「利息支出」)。不知道月供,可以改回「自动 · 按上两月差值」。</div>
+          <div style="margin-top:12px"><span class="btn-ink">保存</span></div>
+        </div>
+      </div>
+      <div>
+        <div class="cap">C · 信用卡 + 本期余额已经填过</div>
+        <div class="form">
+          <b style="font-size:15px">设固定还款 · 招行信用卡</b>
+          <div class="frow"><span class="flab">种类</span><div class="seg"><span>贷款月供</span><span class="on">信用卡账单</span></div></div>
+          <div class="frow"><span class="flab">金额</span><div class="fin pre">全额还上期账单<span class="pre-tip">预填</span></div></div>
+          <div class="frow"><span class="flab">从哪个账户还</span><div class="fin pre">工资卡<span class="pre-tip">预填</span></div></div>
+          <div class="frow"><span class="flab">每月几号</span><div class="fin pre">1 号<span class="pre-tip">预填</span></div></div>
+          <div class="hint start">这张卡本期余额已经填过,<b>从 2026-11 开始</b>。这期不会再出一条待确认,免得同一期记两次。</div>
+          <div class="hint">信用卡账单只记一笔划转(工资卡 → 信用卡),不记支出 —— 消费在刷卡时已经记过了。</div>
+          <div style="margin-top:12px"><span class="btn-ink">保存</span></div>
+        </div>
+      </div>
+    </div>
+    <p class="note" style="margin-top:10px">绿框 = 已经预填好;红框 = 需要人补。A 这种情况只点「保存」。</p>
+  </div>
+
+  <!-- ③ -->
+  <div class="zone">
+    <div class="zone-head"><span class="zone-no">3</span><span class="zone-t">选了「不设,每月自己填」之后</span><span class="zone-fr">FR-1402 · FR-1405</span></div>
+    <div class="zone-line"></div>
+    <div class="grid2">
+      <div>
+        <div class="cap">提醒少一个;这个贷款在填报页就是普通的一行「待填」</div>
+        <div class="ff">
+          <div class="ff-sum"><span class="ff-nm">固定收支</span><span class="ff-nudge">还有 <b>1</b> 个贷款没设固定还款 · 设一下</span><span class="ff-sp"></span><span class="ff-tg">展开</span><span class="ff-link">管理</span></div>
+        </div>
+        <div class="acct" style="margin-top:12px">
+          <span class="av" style="background:#4F6B47">娃</span><b>亲友借款-老家</b><span class="lab">贷款</span>
+          <span style="margin-left:auto" class="lab">上月末</span><span class="priv">−50,000</span>
+          <span class="tag tag-due">待填</span>
+        </div>
+      </div>
+      <div class="side">
+        适合:<b>不按月还</b>的(亲友借款、有钱就还一点)、<b>只付息</b>的、<b>快还清</b>的。<br><br>
+        选了之后和别的账户一样,每期自己填余额。以前点「接受」替你算的那个数没了 ——
+        <b>想让系统替你算,就设固定还款</b>(它用的是同一个算法)。
+      </div>
+    </div>
+  </div>
+
+  <!-- ④ -->
+  <div class="zone">
+    <div class="zone-head"><span class="zone-no">4</span><span class="zone-t">管理 › 固定收支 · 新增「贷款」一组</span><span class="zone-fr">FR-1403</span></div>
+    <div class="zone-line"></div>
+    <table class="tbl">
+      <tr><th>贷款</th><th>负责人</th><th>每期还款</th><th></th></tr>
+      <tr class="sub"><td colspan="4">已设固定还款 · 2</td></tr>
+      <tr><td>车贷</td><td>迪娃</td><td><span class="st ok">自动 · 按上两月差值 · 从 工资卡 · 1 号</span></td><td style="text-align:right"><span class="ff-link">改</span></td></tr>
+      <tr><td>招行信用卡</td><td>迪娃</td><td><span class="st ok">全额还上期 · 从 工资卡 · 1 号 · 2026-11 起</span></td><td style="text-align:right"><span class="ff-link">改</span></td></tr>
+      <tr class="sub"><td colspan="4">没设 · 1</td></tr>
+      <tr><td>房贷-招行</td><td>迪娃</td><td><span class="st no">还没设</span></td><td style="text-align:right;white-space:nowrap"><span class="btn-ink">设成固定还款</span> <span class="btn-line">不设,每月自己填</span></td></tr>
+      <tr class="sub"><td colspan="4">选了每月自己填 · 1</td></tr>
+      <tr><td>亲友借款-老家</td><td>娃娃</td><td><span class="st self">不设 · 每月自己填余额</span></td><td style="text-align:right"><span class="ff-link">改回来</span></td></tr>
+    </table>
+    <p class="note" style="margin-top:8px">这一组放在「还款」那一组前面。已归档、欠款为 0 的贷款不列。</p>
+  </div>
+
+  <!-- ⑤ -->
+  <div class="zone">
+    <div class="zone-head"><span class="zone-no">5</span><span class="zone-t">贷款账户详情页那一行(v1.32 已有,多一种状态)</span><span class="zone-fr">FR-1403</span></div>
+    <div class="zone-line"></div>
+    <div class="acct"><span class="lab">每期还款</span><span>自动 · 按上两月差值 · 从 工资卡 · 每月 1 号</span><span class="ff-link" style="margin-left:auto">改</span></div>
+    <div class="acct"><span class="lab">每期还款</span><span style="color:var(--brass-deep)">还没设</span><span style="margin-left:auto"><span class="btn-ink">设固定还款</span> <span class="btn-line">不设,每月自己填</span></span></div>
+    <div class="acct"><span class="lab">每期还款</span><span style="color:var(--ink-subtle)">不设(每月自己填余额)</span><span class="ff-link" style="margin-left:auto">改</span></div>
+  </div>
+
+</div>
+</body>
+</html>
