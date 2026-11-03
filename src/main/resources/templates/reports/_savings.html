@@ -39,17 +39,17 @@
     <!-- KPI 速览 -->
     <div class="grid grid-cols-2 md:grid-cols-5 grid-hairline mb-6">
       <div class="bg-card p-5">
-        <div class="font-mono text-[10px] uppercase text-ink-subtle mb-1">月均收入(近 12 月) <th:block th:insert="~{fragments/_kpi-info :: i('近 12 月有填数据的月份收入均值。未填月份不参与。', ${calc.avgIncome})}"/></div>
+        <div class="font-mono text-[10px] uppercase text-ink-subtle mb-1"><span th:text="'月均收入（' + ${savingsWindowLabel} + '）'">月均收入</span> <th:block th:insert="~{fragments/_kpi-info :: i('截至所选账期、当前时间范围内有收支数据的月份收入均值。未填月份不参与。', ${calc.avgIncome})}"/></div>
         <div class="font-display text-2xl tnum"
-             data-priv th:text="${avgMonthlyIncome != null and avgMonthlyIncome.signum() > 0 ? ('¥' + #numbers.formatInteger(avgMonthlyIncome, 0, 'COMMA')) : '—'}">¥35,000</div>
+             data-priv th:text="${avgMonthlyIncome != null ? ('¥' + #numbers.formatInteger(avgMonthlyIncome, 0, 'COMMA')) : '—'}">¥35,000</div>
       </div>
       <div class="bg-card p-5">
-        <div class="font-mono text-[10px] uppercase text-ink-subtle mb-1">月均支出(近 12 月) <th:block th:insert="~{fragments/_kpi-info :: i('近 12 月有填数据的月份支出均值。未填月份不参与。', ${calc.avgExpense})}"/></div>
+        <div class="font-mono text-[10px] uppercase text-ink-subtle mb-1"><span th:text="'月均支出（' + ${savingsWindowLabel} + '）'">月均支出</span> <th:block th:insert="~{fragments/_kpi-info :: i('截至所选账期、当前时间范围内有收支数据的月份支出均值。未填月份不参与。', ${calc.avgExpense})}"/></div>
         <div class="font-display text-2xl tnum num-neg"
-             data-priv th:text="${avgMonthlyExpense != null and avgMonthlyExpense.signum() > 0 ? ('¥' + #numbers.formatInteger(avgMonthlyExpense, 0, 'COMMA')) : '—'}">¥18,000</div>
+             data-priv th:text="${avgMonthlyExpense != null ? ('¥' + #numbers.formatInteger(avgMonthlyExpense, 0, 'COMMA')) : '—'}">¥18,000</div>
       </div>
       <div class="bg-card p-5">
-        <div class="font-mono text-[10px] uppercase text-ink-subtle mb-1">储蓄率(最近期) <th:block th:insert="~{fragments/_kpi-info :: i('（收入 − 支出）÷ 收入。取最近一期数据。', ${calc.savingsRate})}"/></div>
+        <div class="font-mono text-[10px] uppercase text-ink-subtle mb-1"><span th:text="${savingsRatePeriod != null ? #temporals.format(savingsRatePeriod, 'yyyy-MM') + ' 储蓄率' : '储蓄率'}">储蓄率</span> <th:block th:insert="~{fragments/_kpi-info :: i('（收入 − 支出）÷ 收入。取报表所选账期，不回退到旧总额记录。', ${calc.savingsRate})}"/></div>
         <!-- v1.12 FR-353 · |值| > 500% = 收入分母太小,数字失真 → 说出来 + 给补录入口,不摆一个 −2383%。
              正常范围的值走下面那行原表达式,渲染逐字不变。 -->
         <div th:if="${savingsRateInsufficient}">
@@ -62,12 +62,12 @@
              th:text="${savingsRate != null ? (#numbers.formatInteger(savingsRate.multiply(new java.math.BigDecimal(100)), 0) + '%') : '—'}">48%</div>
       </div>
       <div class="bg-card p-5">
-        <div class="font-mono text-[10px] uppercase text-ink-subtle mb-1">月储蓄能力(中位) <th:block th:insert="~{fragments/_kpi-info :: i('近 12 月「收入 − 支出」的中位数，比均值抗噪。', ${calc.savingsMedian})}"/></div>
+        <div class="font-mono text-[10px] uppercase text-ink-subtle mb-1">月储蓄能力(中位) <th:block th:insert="~{fragments/_kpi-info :: i('当前时间范围内有收支数据的月份「收入 − 支出」的中位数，比均值抗噪。', ${calc.savingsMedian})}"/></div>
         <div class="font-display text-2xl tnum"
-             data-priv th:text="${savingsMonthlyMedian != null and savingsMonthlyMedian.signum() != 0 ? ('¥' + #numbers.formatInteger(savingsMonthlyMedian, 0, 'COMMA')) : '—'}">¥17,500</div>
+             data-priv th:text="${savingsMonthlyMedian != null ? ('¥' + #numbers.formatInteger(savingsMonthlyMedian, 0, 'COMMA')) : '—'}">¥17,500</div>
       </div>
       <div class="bg-card p-5">
-        <div class="font-mono text-[10px] uppercase text-ink-subtle mb-1">已填月份 <th:block th:insert="~{fragments/_kpi-info :: i('近 12 期中实际填过收入/支出的期数。', ${calc.filledMonths})}"/></div>
+        <div class="font-mono text-[10px] uppercase text-ink-subtle mb-1">已填月份 <th:block th:insert="~{fragments/_kpi-info :: i('当前时间范围内实际填过收入/支出的期数。', ${calc.filledMonths})}"/></div>
         <div class="font-display text-2xl tnum"
              th:text="${savingsFilledMonths} + '/' + ${savingsTotalMonths}">8/12</div>
       </div>
@@ -78,7 +78,7 @@
       <div class="flex items-baseline justify-between mb-4">
         <div>
           <div class="eyebrow mb-1">月 · 度 · 收 · 支 · 双 · 柱</div>
-          <h3 class="font-display text-xl font-medium">近 12 期</h3>
+          <h3 class="font-display text-xl font-medium" th:text="${savingsWindowLabel}">月度收支</h3>
         </div>
         <div class="flex items-center gap-4 text-[10px] font-mono">
           <span class="flex items-center gap-1"><span class="w-3 h-3 inline-block" style="background:var(--forest)"></span><span class="text-ink-soft">收入</span></span>
@@ -102,7 +102,7 @@
           <span class="flex items-center gap-1"><span class="inline-block" style="width:14px;height:10px;background:rgba(79,107,71,.18)"></span><span class="text-ink-soft">储蓄</span></span>
         </div>
       </div>
-      <p class="text-xs text-ink-subtle mb-3">两线之间填充 = 储蓄。摸清攒钱能力的趋势(非逐笔流水)· PMC 源 · 仅取真实填报月份。</p>
+      <p class="text-xs text-ink-subtle mb-3">两线之间填充 = 储蓄。统计截至所选月份的已录收支，未填月份留空。</p>
       <div style="height:260px"><canvas id="savings-trend"></canvas></div>
     </section>
   </th:block>

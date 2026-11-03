@@ -175,7 +175,8 @@ public class MetricExplainService {
             BigDecimal familyBenchmarkPct, int benchmarkAccountCount, BigDecimal benchmarkTotalBalance,
             boolean savingsAvailable, int filledCount, int totalMonths,
             BigDecimal sumIncome, BigDecimal sumExpense, BigDecimal avgIncome, BigDecimal avgExpense,
-            BigDecimal latestIncome, BigDecimal latestExpense, BigDecimal savingsRate, BigDecimal savingsMedian
+            BigDecimal latestIncome, BigDecimal latestExpense, BigDecimal savingsRate, BigDecimal savingsMedian,
+            java.time.LocalDate savingsPeriodStart
     ) {}
 
     public Map<String, String> reports(ReportsMetricInputs in) {
@@ -232,7 +233,8 @@ public class MetricExplainService {
                     "近 " + in.totalMonths() + " 月有填 " + n + " 个月 · 支出合计 " + money(b, in.sumExpense())
                             + " ÷ " + n + " = " + money(b, in.avgExpense()));
             m.put("savingsRate",
-                    "最近一期:(收入 " + money(b, in.latestIncome()) + " − 支出 " + money(b, in.latestExpense())
+                    (in.savingsPeriodStart() == null ? "所选账期" : in.savingsPeriodStart().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM")) + " 账期")
+                            + ":(收入 " + money(b, in.latestIncome()) + " − 支出 " + money(b, in.latestExpense())
                             + ") ÷ 收入 " + money(b, in.latestIncome()) + " = " + pctFromRatio(in.savingsRate(), 1));
             m.put("savingsMedian",
                     "近 " + n + " 个填报月每月(收入 − 支出)排序取中位 = " + signedMoney(b, in.savingsMedian()));

@@ -132,7 +132,7 @@ class MetricExplainServiceTest {
                 bd("5.4"), 6, bd("100000"),
                 true, 8, 12,
                 bd("280000"), bd("144000"), bd("35000"), bd("18000"),
-                bd("36000"), bd("17000"), bd("0.528"), bd("17500"));
+                bd("36000"), bd("17000"), bd("0.528"), bd("17500"), java.time.LocalDate.of(2026, 5, 1));
 
         Map<String, String> m = svc.reports(in);
 
@@ -146,7 +146,7 @@ class MetricExplainServiceTest {
                 .contains("与「人赚」同口径");
         assertThat(m.get("benchmark")).contains("6 个账户", "5.4%");
         assertThat(m.get("avgIncome")).isEqualTo("近 12 月有填 8 个月 · 收入合计 ¥280,000 ÷ 8 = ¥35,000");
-        assertThat(m.get("savingsRate")).contains("收入 ¥36,000", "支出 ¥17,000", "= 52.8%");
+        assertThat(m.get("savingsRate")).contains("2026-05 账期", "收入 ¥36,000", "支出 ¥17,000", "= 52.8%");
         // v1.8 · 这条 tooltip 额外写明支出口径 + 「与收入侧方向相反」——
         //   那条反直觉的不一致必须同时出现在四处(类注释 / 方法注释 / 本 tooltip / how-to-record),
         //   少写一处下一个人就会靠猜,所以断言从 isEqualTo 收紧成「包含四处该有的话」。
@@ -168,7 +168,7 @@ class MetricExplainServiceTest {
                 bd("5.4"), 6, bd("100000"),
                 false, 0, 12,
                 BigDecimal.ZERO, BigDecimal.ZERO, null, null,
-                null, null, null, null);
+                null, null, null, null, null);
         Map<String, String> m = svc.reports(in);
         assertThat(m).containsKeys("familyXirr", "benchmark", "familyTwr", "netInflow", "pnl");
         assertThat(m).doesNotContainKeys("avgIncome", "avgExpense", "savingsRate", "savingsMedian", "filledMonths");

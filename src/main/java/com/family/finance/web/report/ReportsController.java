@@ -764,6 +764,14 @@ public class ReportsController {
         BigDecimal savSumInc = BigDecimal.ZERO, savSumExp = BigDecimal.ZERO,
                    savAvgInc = null, savAvgExp = null, savLatestInc = null, savLatestExp = null,
                    savRateDec = null, savMedian = null;
+        LocalDate savPeriodStart = null;
+        String savingsWindowLabel = switch (normalizeRange(range)) {
+            case "ALL" -> "全部已定稿账期";
+            case "YTD" -> anchor.getPeriodStart().getYear() + " 年截至 " + anchor.getPeriodStart().getMonthValue() + " 月";
+            default -> "近 " + savingsWindowPeriods(range) + " 期";
+        };
+        model.addAttribute("savingsWindowLabel", savingsWindowLabel);
+        model.addAttribute("savingsRatePeriod", null);
         try {
             // v1.8 · 折线与本段 KPI 必须同口径同期集合(见 HouseholdCashflowService.recentSeries 注释:
             // 直读 PMC 会造成「KPI 有值、折线空白」——正是 v1.6.29 那类被用户报障的同屏矛盾)。
@@ -771,17 +779,27 @@ public class ReportsController {
             //   同区的其他图都跟 range 走,只有它不跟 → 用户切 3M 却看到 12 个月的收支柱,
             //   两个图放在一起读会得出错误结论(维护者第 6 条)。
             //   ALL 用 240 期(20 年)当上界:recentSeries 是「近 N 期」语义,给个足够大的数即可。
-            var series = householdCashflowService.recentSeries(me.getFamilyId(), savingsWindowPeriods(range));
+            FactSlice savingsSlice = factViewService.load(new FactFilter(me.getFamilyId(), family.getPeriodType(),
+                    rangeStart(range, anchor.getPeriodStart()), anchor.getPeriodStart(), false, null,
+                    family.getBaseCurrency()));
+            int expectedPeriods = switch (normalizeRange(range)) {
+                case "ALL" -> 0;
+                case "YTD" -> anchor.getPeriodStart().getMonthValue();
+                default -> savingsWindowPeriods(range);
+            };
+            var savings = householdCashflowService.reportSavings(savingsSlice, expectedPeriods);
+            var series = savings.series();
             List<String> savLabels = series.stream()
                 .map(pt -> pt.periodStart() == null ? String.valueOf(pt.periodId())
                                                     : pt.periodStart().toString().substring(2, 7)).toList();
             List<BigDecimal> savIncome = series.stream().map(pt -> pt.income()).toList();
             List<BigDecimal> savExpense = series.stream().map(pt -> pt.expense()).toList();
-            int[] ratio = householdCashflowService.filledMonthRatio(me.getFamilyId());
-            savAvgInc = householdCashflowService.avgMonthlyIncome(me.getFamilyId());
-            savAvgExp = householdCashflowService.avgMonthlyExpense(me.getFamilyId());
-            savMedian = householdCashflowService.medianMonthlySavings(me.getFamilyId());
-            savRateDec = householdCashflowService.currentSavingsRate(me.getFamilyId());
+            savAvgInc = savings.averageIncome();
+            savAvgExp = savings.averageExpense();
+            savMedian = savings.medianSavings();
+            savRateDec = savings.latest().rate();
+            savPeriodStart = savings.latest().periodStart();
+            model.addAttribute("savingsRatePeriod", savPeriodStart);
             model.addAttribute("savingsLabels", savLabels);
             model.addAttribute("savingsIncome", savIncome);
             model.addAttribute("savingsExpense", savExpense);
@@ -792,16 +810,16 @@ public class ReportsController {
             model.addAttribute("savingsRateInsufficient", MetricDisplay.ratioAbsurd(savRateDec));
             model.addAttribute("avgMonthlyExpense", savAvgExp);
             model.addAttribute("avgMonthlyIncome", savAvgInc);
-            model.addAttribute("savingsFilledMonths", ratio[0]);
-            model.addAttribute("savingsTotalMonths", ratio[1]);
-            model.addAttribute("savingsAvailable", ratio[0] > 0);
+            model.addAttribute("savingsFilledMonths", savings.filledPeriods());
+            model.addAttribute("savingsTotalMonths", savings.totalPeriods());
+            model.addAttribute("savingsAvailable", savings.filledPeriods() > 0);
             model.addAttribute("goalsProgress", goalProgressService.computeAll(me.getFamilyId()));
             // stash for tooltip
-            savAvail = ratio[0] > 0;
-            savFilled = ratio[0];
-            savTotal = ratio[1];
-            for (BigDecimal x : savIncome) if (x != null) savSumInc = savSumInc.add(x);
-            for (BigDecimal x : savExpense) if (x != null) savSumExp = savSumExp.add(x);
+            savAvail = savings.filledPeriods() > 0;
+            savFilled = savings.filledPeriods();
+            savTotal = savings.totalPeriods();
+            savSumInc = savings.sumIncome();
+            savSumExp = savings.sumExpense();
             if (!series.isEmpty()) {
                 var latest = series.get(series.size() - 1);
                 savLatestInc = latest.income();
@@ -861,7 +879,7 @@ public class ReportsController {
                 familyBenchmarkPct, bmInputs.size(), bmTotalBal,
                 savAvail, savFilled, savTotal,
                 savSumInc, savSumExp, savAvgInc, savAvgExp,
-                savLatestInc, savLatestExp, savRateDec, savMedian);
+                savLatestInc, savLatestExp, savRateDec, savMedian, savPeriodStart);
         model.addAttribute("calc", metricExplain.reports(reportsInputs));
     }
 

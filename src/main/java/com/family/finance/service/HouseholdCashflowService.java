@@ -118,6 +118,54 @@ public class HouseholdCashflowService {
         return savingsRateView(familyId).rate();
     }
 
+    /** 报表只读传入的家庭本位币切片；不能回查今天的最近一期或最近一条旧总额记录。 */
+    public ReportSavings reportSavings(FactSlice slice, int expectedPeriods) {
+        List<Long> ids = slice.closedPeriodIds() == null ? List.of() : slice.closedPeriodIds();
+        if (ids.isEmpty()) {
+            return new ReportSavings(List.of(), 0, Math.max(0, expectedPeriods), BigDecimal.ZERO, BigDecimal.ZERO,
+                    null, null, null, SavingsRateView.NONE);
+        }
+        var expenses = expenseLedger.byPeriods(slice.filter().familyId(), ids);
+        var totals = cashflowMapper.findFamilyAggregateForPeriods(slice.filter().familyId(), ids).stream()
+                .collect(Collectors.toMap(PeriodMemberCashflowMapper.SinglePeriodAggregate::periodId, a -> a));
+        List<SeriesPoint> series = new java.util.ArrayList<>();
+        List<SeriesPoint> filled = new java.util.ArrayList<>();
+        for (Long id : ids) {
+            var cf = factViewService.cashflowBreakdown(slice, id);
+            var expense = expenses.get(id);
+            var total = totals.get(id);
+            boolean hasData = cf.income().signum() != 0 || cf.expense().signum() != 0 || (expense != null && expense.filled())
+                    || (total != null && total.filledMembers() != null && total.filledMembers() > 0);
+            SeriesPoint point = new SeriesPoint(id, slice.periodStartOf(id),
+                    hasData ? cf.income() : null, hasData ? cf.expense() : null);
+            series.add(point);
+            if (hasData) filled.add(point);
+        }
+        BigDecimal sumIncome = filled.stream().map(SeriesPoint::income).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal sumExpense = filled.stream().map(SeriesPoint::expense).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal avgIncome = null, avgExpense = null, median = null;
+        if (!filled.isEmpty()) {
+            BigDecimal count = BigDecimal.valueOf(filled.size());
+            avgIncome = sumIncome.divide(count, 2, RoundingMode.HALF_EVEN);
+            avgExpense = sumExpense.divide(count, 2, RoundingMode.HALF_EVEN);
+            List<BigDecimal> savings = filled.stream().map(p -> p.income().subtract(p.expense())).sorted().toList();
+            int n = savings.size();
+            median = n % 2 == 1 ? savings.get(n / 2)
+                    : savings.get(n / 2 - 1).add(savings.get(n / 2)).divide(BigDecimal.valueOf(2), 2, RoundingMode.HALF_EVEN);
+        }
+        SeriesPoint latest = series.isEmpty() ? null : series.getLast();
+        BigDecimal rate = latest == null || latest.income() == null || latest.income().signum() == 0 ? null
+                : latest.income().subtract(latest.expense()).divide(latest.income(), 6, RoundingMode.HALF_EVEN);
+        return new ReportSavings(List.copyOf(series), filled.size(), expectedPeriods > 0 ? expectedPeriods : ids.size(),
+                sumIncome, sumExpense, avgIncome, avgExpense, median,
+                latest == null ? SavingsRateView.NONE : new SavingsRateView(rate, latest.periodId(), latest.periodStart()));
+    }
+
+    public record ReportSavings(List<SeriesPoint> series, int filledPeriods, int totalPeriods,
+                                BigDecimal sumIncome, BigDecimal sumExpense,
+                                BigDecimal averageIncome, BigDecimal averageExpense, BigDecimal medianSavings,
+                                SavingsRateView latest) {}
+
     public BigDecimal medianMonthlySavings(long familyId) {
         List<FamilyPeriodAggregate> recent = cashflowMapper.findFamilyAggregateRecent(familyId, 6);
         if (recent.isEmpty()) {

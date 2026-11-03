@@ -11990,6 +11990,22 @@ QA137_F="$RD/scripts/e2e/flows/56-duo-side-rail.cjs"
   && log_ok "v137-E2E(flow 56:外屏竖 / 横、内屏横 / 竖、折叠往返、浏览器对照、普通设备不变)" \
   || log_bad "v137-E2E 缺 flow 56 或没覆盖六种姿态" "scripts/e2e/flows/56-duo-side-rail.cjs"
 
+section "v1.37.1 · 报表收支与观察账期一致"
+QA1371_R="$RD/src/main/java/com/family/finance/web/report/ReportsController.java"
+QA1371_H="$RD/src/main/java/com/family/finance/service/HouseholdCashflowService.java"
+QA1371_S="$RD/src/main/resources/templates/reports/_savings.html"
+QA1371_E="$RD/src/main/java/com/family/finance/service/explain/MetricExplainService.java"
+{ grep -qF 'reportSavings(savingsSlice, expectedPeriods)' "$QA1371_R" \
+  && grep -qF 'anchor.getPeriodStart(), false, null,' "$QA1371_R" \
+  && grep -qF 'factViewService.cashflowBreakdown(slice, id)' "$QA1371_H" \
+  && ! java_code_only "$QA1371_R" | grep -qE 'householdCashflowService\.(currentSavingsRate|recentSeries|avgMonthlyIncome|avgMonthlyExpense|medianMonthlySavings)\('; } \
+  && log_ok "v1371-SAVINGS-SINGLE-SNAPSHOT(报表卡片、图、说明面板同源 · 不再回查全局最近记录)" \
+  || log_bad "v1371-SAVINGS-SINGLE-SNAPSHOT 报表收支取数重新分叉" "see reportSavings / savingsSlice"
+{ grep -qF 'savingsRatePeriod' "$QA1371_S" && grep -qF '#temporals.format(savingsRatePeriod' "$QA1371_S" \
+  && grep -qF 'savingsPeriodStart' "$QA1371_E" && grep -qF 'savingsWindowLabel' "$QA1371_S"; } \
+  && log_ok "v1371-SAVINGS-PERIOD-VISIBLE(储蓄率及说明面板点名账期 · 范围标签动态)" \
+  || log_bad "v1371-SAVINGS-PERIOD-VISIBLE 储蓄区账期或窗口标签丢失" "see reports/_savings.html / MetricExplainService"
+
 echo
 echo "═══════════════════════════════════════"
 echo " 总结: PASS=$PASS  FAIL=$FAIL  SKIP=$SKIP"
