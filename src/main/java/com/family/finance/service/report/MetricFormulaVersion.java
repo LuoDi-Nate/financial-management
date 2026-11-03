@@ -29,9 +29,12 @@ public final class MetricFormulaVersion {
      *       <td>「本期归因」扣掉账户间划转与补录本金(原来按余额变化排名,转出方成了「拉下来」的、
      *           转入的新账户整笔算成「资本纳入」);新账户的资本纳入改用与家庭开账基线同一个函数。
      *           <b>只有这一块的数字变</b>,其余封板指标逐字不变</td></tr>
+     *   <tr><td>3</td><td>2026-11-03 · v1.37.1</td>
+     *       <td>封板抬头的余额来源按当期快照记录统计,不再按账户类型猜测;
+     *           未填不计,延续、联动、导入及未知来源单列。金额与收益恒等式不变</td></tr>
      * </table>
      */
-    public static final int CURRENT = 2;
+    public static final int CURRENT = 3;
 
     /**
      * 月均支出窗口长度(期)· 紧急储备月数的分母。
