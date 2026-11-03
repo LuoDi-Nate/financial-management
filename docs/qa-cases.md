@@ -2380,4 +2380,6 @@ Docker 化部署 + systemd/macOS 存量零丢迁移。**真机冒烟(docker buil
 | ReportExpenseContextTest | 三个月的逐笔抽屉沿用历史观察期和日历范围，未来观察期不能引入进行期。 |
 | v1371-REPORT-FACTS / v1371-BENCHMARK-INTERVALS | 历史风险图、净流入卡片和基准窗口不能绕过同一期事实。 |
 | v1371-EXPENSE-CONTEXT / e2e 57 | 合成历史三个月及后续月份，从顶栏进入报告，验证储蓄率、均值、中位数、人赚、支出汇总和抽屉，切换维度及美元，电脑和手机截图；清理全部样本，不关账、不调用真实 AI。 |
+| e2e 57 截图 | 小额财富水位不显示成「0 万」；收支柱顶标签完整，手机图例不把一个词拆成两行。 |
+| SealedCompletenessBornAfterTest / v1371-SNAPSHOT-SOURCE | 按快照来源而不是账户类型判断；净值自动更新也是自动，未知来源不当手填；未填不计，三项之和等于已填。 |
 

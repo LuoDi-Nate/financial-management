@@ -76,12 +76,12 @@
 
     <!-- 月度收支双柱 -->
     <section class="paper-card p-6 mb-6">
-      <div class="flex items-baseline justify-between mb-4">
+      <div class="flex items-baseline justify-between flex-wrap gap-3 mb-4">
         <div>
           <div class="eyebrow mb-1">月 · 度 · 收 · 支 · 双 · 柱</div>
           <h3 class="font-display text-xl font-medium" th:text="${savingsWindowLabel}">月度收支</h3>
         </div>
-        <div class="flex items-center gap-4 text-[10px] font-mono">
+        <div class="flex items-center gap-4 text-[10px] font-mono whitespace-nowrap">
           <span class="flex items-center gap-1"><span class="w-3 h-3 inline-block" style="background:var(--forest)"></span><span class="text-ink-soft">收入</span></span>
           <span class="flex items-center gap-1"><span class="w-3 h-3 inline-block" style="background:var(--rust)"></span><span class="text-ink-soft">支出</span></span>
           <span class="flex items-center gap-1"><span class="w-3 h-3 inline-block bg-card-soft border border-rule-soft"></span><span class="text-ink-soft">无数据</span></span>
@@ -151,7 +151,7 @@
           tooltip: { callbacks: { label: c => c.dataset.label + ': ' + (c.parsed.y == null ? '无数据' : '¥' + c.parsed.y.toLocaleString()) } }
         },
         scales: {
-          y: { beginAtZero: true, ticks: { callback: v => '¥' + (v/1000).toFixed(0) + 'k', font: { family: 'JetBrains Mono', size: 10 } }, grid: { color: 'rgba(0,0,0,.04)' } },
+          y: { beginAtZero: true, grace: '15%', ticks: { callback: v => '¥' + (v/1000).toFixed(0) + 'k', font: { family: 'JetBrains Mono', size: 10 } }, grid: { color: 'rgba(0,0,0,.04)' } },
           x: { ticks: { font: { family: 'JetBrains Mono', size: 10 } }, grid: { display: false } }
         }
       },

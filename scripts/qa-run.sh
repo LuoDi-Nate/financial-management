@@ -12024,6 +12024,12 @@ QA1371_X="$RD/src/main/resources/templates/reports/_expense-section.html"
   && [ -f "$RD/scripts/e2e/flows/57-report-metrics.cjs" ]; } \
   && log_ok "v1371-EXPENSE-CONTEXT(构成与抽屉共用观察账期/范围 · flow 57 验证真实点击)" \
   || log_bad "v1371-EXPENSE-CONTEXT 支出构成或明细丢失观察上下文" "see expensePeriods / flow 57"
+QA1371_C="$RD/src/main/java/com/family/finance/service/report/SealedPeriodService.java"
+{ grep -qF 'LedgerSource.parse(snapshot.getSourceTag())' "$QA1371_C" \
+  && grep -qF 'source.isAutomatic()' "$QA1371_C" \
+  && grep -qF 'cp.otherValued()' "$RD/src/main/resources/templates/reports/_sealed.html"; } \
+  && log_ok "v1371-SNAPSHOT-SOURCE(封板余额来源有据可查 · 未记录不冒充手填)" \
+  || log_bad "v1371-SNAPSHOT-SOURCE 余额来源又按类型猜测" "see SealedPeriodService buildCompleteness"
 
 echo
 echo "═══════════════════════════════════════"

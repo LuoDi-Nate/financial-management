@@ -285,6 +285,7 @@ public class ReportsController {
     private void populateModel(MemberPrincipal me, String range, String accountsCsv, String currency, String asof,
                                String scopeParam, String tplParam, Model model) {
         Family family = familyService.require(me.getFamilyId());
+        model.addAttribute("baseCurrency", family.getBaseCurrency());
         // v0.5.5 FR-94 · 报表锚定「最近已关账(≤今天)账期」快照;无则退外壳锚 + closedSnapshot=false
         // v0.11.5 · 观察账期:报表是每月快照,可在「已关账账期」里回看任一期(asof 命中则锚它,否则默认最近已关账)
         ReportsAnchorResolver.AnchorChoice defaultChoice = resolveAnchor(me.getFamilyId());

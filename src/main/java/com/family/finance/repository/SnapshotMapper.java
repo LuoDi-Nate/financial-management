@@ -107,7 +107,8 @@ public interface SnapshotMapper {
                                                     @Param("accountId") long accountId);
 
     @Select("""
-            SELECT ps.id, ps.period_id, ps.account_id, ps.end_balance, ps.submitted_by, ps.submitted_at, ps.note
+            SELECT ps.id, ps.period_id, ps.account_id, ps.end_balance, ps.submitted_by, ps.submitted_at, ps.note,
+                   ps.source_tag AS sourceTag
               FROM period_snapshot ps
               JOIN period p ON p.id = ps.period_id
              WHERE p.family_id = #{familyId}

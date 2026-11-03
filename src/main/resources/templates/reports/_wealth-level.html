@@ -137,7 +137,11 @@
   const cpiLine = /*[[${waterLevel.cpiLine}]]*/ [];
   const m2Line = /*[[${waterLevel.m2Line}]]*/ [];
   const symbol = /*[[${currencySymbol}]]*/ '¥';
-  const wan = (v) => symbol + (Number(v)/10000).toFixed(0) + '万';
+  const wan = (v) => {
+    const n = Number(v), a = Math.abs(n);
+    return (n < 0 ? '−' : '') + symbol + (a >= 10000
+      ? (a / 10000).toFixed(1) + '万' : a.toLocaleString('zh-CN', { maximumFractionDigits: 0 }));
+  };
   const el = document.getElementById('waterLevelChart');
   if (!el || typeof Chart === 'undefined') return;
   new Chart(el.getContext('2d'), {

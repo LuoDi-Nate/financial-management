@@ -61,8 +61,9 @@
            th:text="${cp.filled()} + ' / ' + ${cp.expected()} + ' 已填 · 缺 '
                     + ${#strings.listJoin(cp.missingNames(), '、')}
                     + ${cp.missingCount() > 3 ? ' 等 ' + cp.missingCount() + ' 个' : ''}">未填</a>
-        <span class="pill whitespace-nowrap"
-              th:text="'估值 · 自动 ' + ${cp.autoValued()} + ' · 手填 ' + ${cp.manualValued()}">估值</span>
+        <span class="pill" style="white-space:normal"
+              title="按本期期末余额最后一次写入的来源统计。其他含延续上期、系统联动、截图导入和未记录来源；未填账户不计。"
+              th:text="'余额来源 · 自动 ' + ${cp.autoValued()} + ' · 手填 ' + ${cp.manualValued()} + ' · 其他/未记录 ' + ${cp.otherValued()}">余额来源</span>
         <!--/* v1.20 FR-485 · 完整性是一张【待办清单】,合并了就不知道该去填谁 */-->
         <span th:if="${hasGroups}" class="font-mono text-[10px] text-ink-subtle">
           · 余额逐个账户填,这里不按分组折叠

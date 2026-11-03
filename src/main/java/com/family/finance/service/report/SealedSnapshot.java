@@ -68,11 +68,12 @@ public record SealedSnapshot(
      * @param missingNames 未填账户名(最多前 3 个,给页面点名用)
      * @param autoValued   估值自动拉价的账户数
      * @param manualValued 手填的账户数
+     * @param otherValued  已填但来源是延续、系统联动、导入或未记录的账户数
      * @param fxDate       该期汇率对应日期;null = 无外币账户,无需换算
      * @param closedAt     关账时间
      */
     public record Completeness(int filled, int expected, List<String> missingNames,
-                               int autoValued, int manualValued,
+                               int autoValued, int manualValued, int otherValued,
                                LocalDate fxDate, java.time.LocalDateTime closedAt) {
         public boolean complete() {
             return expected > 0 && filled >= expected;

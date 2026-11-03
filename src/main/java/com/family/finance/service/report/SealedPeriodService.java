@@ -143,7 +143,8 @@ public class SealedPeriodService {
      * (prod 4 个已关账月 5 处)。在那个月补过余额的照算(补过就是填了)。</p>
      */
     SealedSnapshot.Completeness buildCompleteness(FactSlice window, Period anchor) {
-        java.util.Set<Long> filledIds = snapshotMapper.findByPeriod(anchor.getFamilyId(), anchor.getId()).stream()
+        var snapshots = snapshotMapper.findByPeriod(anchor.getFamilyId(), anchor.getId());
+        java.util.Set<Long> filledIds = snapshots.stream()
                 .map(com.family.finance.domain.snapshot.PeriodSnapshot::getAccountId)
                 .collect(java.util.stream.Collectors.toSet());
         java.util.Set<Long> bornAfter = accountMapper.findAllByFamily(anchor.getFamilyId()).stream()
@@ -165,19 +166,18 @@ public class SealedPeriodService {
                 .sorted()
                 .limit(3)
                 .toList();
-        // 估值来源:该期有持仓估值写回的算「自动拉价」,其余算手填。
-        //   用事实里的 periodPnlBase 判不准(那是算出来的),所以按账户类型近似:
-        //   STOCK/CRYPTO/METAL 三类才有自动拉价链路。
-        int auto = (int) expectedRows.stream()
-                .filter(r -> switch (r.accountType()) {
-                    case STOCK, CRYPTO, METAL -> true;
-                    default -> false;
-                })
-                .count();
+        int filled = (int) nameById.keySet().stream().filter(filledIds::contains).count();
+        int auto = 0, manual = 0;
+        for (var snapshot : snapshots) {
+            if (!nameById.containsKey(snapshot.getAccountId())) continue;
+            var source = com.family.finance.domain.ledger.LedgerSource.parse(snapshot.getSourceTag());
+            if (source.isAutomatic()) auto++;
+            else if ("manual".equals(source.getGroup())) manual++;
+        }
         return new SealedSnapshot.Completeness(
-                (int) nameById.keySet().stream().filter(filledIds::contains).count(),
+                filled,
                 nameById.size(), missing,
-                auto, Math.max(0, nameById.size() - auto),
+                auto, manual, Math.max(0, filled - auto - manual),
                 anchor.getPeriodEnd(), anchor.getClosedAt());
     }
 

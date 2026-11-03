@@ -9,7 +9,12 @@ const ASOF = '1999-03-01';
 
 async function selectMonth(ui) {
   await ui.goto('/accounts');
-  await ui.click('header a[href="/reports"] >> nth=0', '顶栏进入报表');
+  if (await ui.page.locator('header a[href="/reports"]').first().isVisible()) {
+    await ui.click('header a[href="/reports"] >> nth=0', '顶栏进入报表');
+  } else {
+    await ui.click('header details:has(.nav-drawer) > summary', '打开手机导航');
+    await ui.click('header .nav-drawer a[href="/reports"]', '手机导航进入报表');
+  }
   await ui.page.selectOption('select[data-base]', ASOF);
   await ui.page.waitForLoadState('networkidle');
   await ui.click('#sec-trend a[hx-get*="range=3M"] >> nth=0', '趋势切到三个月');
@@ -58,6 +63,8 @@ module.exports = {
             (${apr},${cash},99999,${member})`);
     db.raw(`INSERT INTO period_member_cashflow(family_id,period_id,member_id,total_income_input,total_expense_input)
             VALUES(${FAM},${jan},${member},20000,1000)`);
+    db.raw(`UPDATE period_snapshot SET source_tag='MANUAL' WHERE period_id=${mar} AND account_id=${cash}`);
+    db.raw(`UPDATE period_snapshot SET source_tag='SYNC_FUND_NAV' WHERE period_id=${mar} AND account_id=${capital}`);
     db.raw(`INSERT INTO cash_flow(period_id,account_id,kind,category_code,amount,submitted_by,note) VALUES
             (${feb},${cash},'INCOME','salary',20000,${member},'${PREFIX}'),
             (${feb},${cash},'EXPENSE','consumption',5000,${member},'${PREFIX}'),
@@ -66,6 +73,9 @@ module.exports = {
             (${apr},${cash},'EXPENSE','consumption',9999,${member},'${PREFIX}')`);
 
     await selectMonth(ui);
+    const sealed = await ui.page.locator('#sec-sealed').innerText();
+    await ui.assert(/自动\s+1/.test(sealed) && /手填\s+1/.test(sealed) && /其他\/未记录\s+0/.test(sealed),
+      '封板按实际余额来源统计,现金账户的净值同步也算自动');
     const cards = await savingsValues(ui);
     await ui.assert(cards[2].includes('1999-03') && cards[2].includes('60%'), '储蓄率取观察月,不回退一月的 95%', cards[2]);
     await ui.assert(cards[0].includes('16,667') && cards[3].includes('15,000'), '均值与中位数同时包含后续逐笔月份', cards.join(' | '));
@@ -79,7 +89,8 @@ module.exports = {
     await ui.click('#sec-expense-mix a[hx-get*="mix=account"]', '切换支出维度');
     await ui.assert(new URL(ui.page.url()).searchParams.get('asof') === ASOF &&
       new URL(ui.page.url()).searchParams.get('range') === '3M', '维度切换保留账期和范围');
-    await ui.click('#sec-expense-mix [hx-get*="expense-mix/detail"] >> nth=0', '展开逐笔明细');
+    await ui.click(`#sec-expense-mix [hx-get*="expense-mix/detail"][hx-get*="groupKey=${cash}"]`, '展开逐笔明细');
+    await ui.page.waitForSelector(`#mix-detail-${cash} [data-priv]`);
     const drawer = await ui.page.locator(`#mix-detail-${cash}`).innerText();
     await ui.assert(drawer.includes('5,000') && drawer.includes('4,000') && !drawer.includes('9,999'), '抽屉和汇总属于同一组三个月', drawer);
 
@@ -92,6 +103,14 @@ module.exports = {
     await ui.assert(values.length === 2 && values.every(t => t.includes('$') && !t.includes('¥')),
       '币种切换同步更新财富水位金额', values.join(' | '));
     await ui.assert((await ui.page.locator('#sec-savings').innerText()).includes('CNY'), '收支区明确仍按家庭本位币统计');
+    const charts = await ui.page.evaluate(() => {
+      const wealth = Chart.getChart(document.getElementById('waterLevelChart'));
+      const bars = Chart.getChart(document.getElementById('savings-bars'));
+      return { small: wealth?.options.scales.y.ticks.callback(1250),
+        headroom: bars && bars.scales.y.max > Math.max(...bars.data.datasets.flatMap(d => d.data).filter(v => v != null)) };
+    });
+    await ui.assert(charts.small === '$1,250', '小额财富曲线保留金额,不显示成 0 万', charts.small);
+    await ui.assert(charts.headroom, '收支柱顶为金额标签留出空间');
     await ui.page.locator('#sec-savings').screenshot({ path: '/tmp/e2e-57-savings-pc.png' });
     await ui.page.locator('#sec-wealth').screenshot({ path: '/tmp/e2e-57-wealth-pc.png' });
 

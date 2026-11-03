@@ -70,6 +70,33 @@ class SealedCompletenessBornAfterTest {
     }
 
     @Test
+    void 来源按当期余额记录而不是账户类型判断() {
+        var auto = snap(1);
+        auto.setSourceTag("SYNC_FUND_NAV");
+        var manual = snap(2);
+        manual.setSourceTag("MANUAL");
+        var carry = snap(3);
+        carry.setSourceTag("CARRIED_FORWARD");
+        var unknown = snap(4);
+        unknown.setSourceTag("FUTURE_UNKNOWN_SOURCE");
+        var cp = run(List.of(), List.of(auto, manual, carry, unknown));
+        assertThat(cp.filled()).isEqualTo(4);
+        assertThat(cp.autoValued()).isEqualTo(1);
+        assertThat(cp.manualValued()).isEqualTo(1);
+        assertThat(cp.otherValued()).isEqualTo(2);
+    }
+
+    @Test
+    void 未填账户不冒充手填() {
+        var cp = run(List.of(), List.of());
+        assertThat(cp.expected()).isEqualTo(4);
+        assertThat(cp.filled()).isZero();
+        assertThat(cp.autoValued()).isZero();
+        assertThat(cp.manualValued()).isZero();
+        assertThat(cp.otherValued()).isZero();
+    }
+
+    @Test
     void 之后才建又没快照的账户_不算应填_也不算缺() {
         var cp = run(
                 List.of(account(1, LocalDate.of(2026, 1, 5)), account(2, LocalDate.of(2026, 3, 9)),
