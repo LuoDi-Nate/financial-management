@@ -280,8 +280,8 @@
     <div class="flex items-center gap-2 flex-wrap mb-3">
       <span class="font-mono text-[9px] tracking-[0.14em] text-ink-subtle mr-1">维度</span>
       <a th:each="d : ${mixDims}"
-         th:href="@{/reports(mix=${d.code()},mixWin=${mixWinValue})}"
-         th:hx-get="@{/reports(mix=${d.code()},mixWin=${mixWinValue})}"
+         th:href="@{/reports(mix=${d.code()},mixWin=${mixWinValue},range=${range},asof=${asof},currency=${currency},accounts=${accountsCsv})}"
+         th:hx-get="@{/reports(mix=${d.code()},mixWin=${mixWinValue},range=${range},asof=${asof},currency=${currency},accounts=${accountsCsv})}"
          hx-select="#sec-expense-mix" hx-target="#sec-expense-mix" hx-swap="outerHTML"
          hx-push-url="true" hx-indicator="#mix-busy"
          class="pill text-xs h-8 px-3 no-underline flex items-center"
@@ -346,7 +346,7 @@
           <div th:each="sl : ${mixComposition.slices()}" class="py-2">
             <button type="button"
                     class="w-full flex items-center gap-3 text-left cursor-pointer hover:bg-card-soft px-1"
-                    th:hx-get="@{/reports/expense-mix/detail(dim=${mixDim.code()},groupKey=${sl.groupKey()},mixWin=${mixWinValue})}"
+                    th:hx-get="@{/reports/expense-mix/detail(dim=${mixDim.code()},groupKey=${sl.groupKey()},mixWin=${mixWinValue},range=${range},asof=${asof})}"
                     th:hx-target="'#mix-detail-' + ${sl.groupKey()}"
                     hx-swap="innerHTML">
               <span class="pill text-[10px]" th:text="${sl.label()}">日常开支</span>

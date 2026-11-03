@@ -145,7 +145,7 @@ public class ReportsController {
         // v1.11.1 · 窗口不再独立 —— 与三区的时间范围统一(维护者第 5 条:
         //   「后面几个带时间范围的组件没有统一时间筛选组件」)。mixWin 仍接受(老链接不 404),
         //   但没显式传时用 range 推出来的期数。
-        populateExpenseComposition(me, mix, mixWin != null ? mixWin : savingsWindowPeriods(range), model);
+        populateExpenseComposition(me, mix, mixWin, range, model);
         // v1.11.2 · **必须看 HX-Target,不能只看 HX-Request**。
         //
         //   这里原来是「只要带 HX-Request 就回 `_region :: region` 片段」—— 那是给
@@ -173,26 +173,17 @@ public class ReportsController {
      * v1.8 FR-272 · 支出构成。只在**逐笔模式**下渲染 —— 总额模式没有构成可言,
      * 硬塞一个空图比不显示更糟。窗口 1/6/12 期,取「近 N 个已关账期 + 当前进行中期」。
      */
-    /**
-     * 支出构成的「本期」锚点:**优先取进行中(OPEN)的那一期**,没有再退回「不晚于今天的最近一期」。
-     *
-     * <p>不能只用 today:家庭可以提前开下一期(比如 8 月就把 9 月开出来开始录),
-     * 那时用户心里的「本期」是那个 OPEN 期,而 {@code period_start <= today} 会把它排除,
-     * 构成直接空图。反过来也不能只用 OPEN 期 —— 有的家庭关账后迟迟不开新期,那时得回落到今天。</p>
-     */
-    private java.time.LocalDate compositionAsOf(long familyId) {
-        java.time.LocalDate today = java.time.LocalDate.now();
-        // v1.23 · 取**最晚**可写期(latest 就是这个意思)。双活跃下有两期 OPEN,
-        //   补录期的 start 更早,拿它当上界会把进行期整个排除在窗口外。
-        var open = periodMapper.findRecordableOpen(familyId);
-        return (open.isEmpty() ? java.util.Optional.<com.family.finance.domain.period.Period>empty()
-                               : java.util.Optional.of(open.getLast()))
-                .map(com.family.finance.domain.period.Period::getPeriodStart)
-                .filter(start -> start.isAfter(today))
-                .orElse(today);
+    /** 构成与抽屉共用观察账期和趋势范围,不能把进行中的下一期混进封板报告。 */
+    private List<Period> expensePeriods(long familyId, Period anchor, String range, Integer requestedWindow) {
+        int window = requestedWindow != null && requestedWindow > 0 ? Math.min(requestedWindow, 240)
+                : "YTD".equals(normalizeRange(range)) ? anchor.getPeriodStart().getMonthValue()
+                : savingsWindowPeriods(range);
+        LocalDate start = rangeStart(range, anchor.getPeriodStart());
+        return periodMapper.findRecentAsOf(familyId, anchor.getPeriodStart(), window).stream()
+                .filter(p -> !p.getPeriodStart().isBefore(start)).toList();
     }
 
-    private void populateExpenseComposition(MemberPrincipal me, String mix, Integer mixWin, Model model) {
+    private void populateExpenseComposition(MemberPrincipal me, String mix, Integer mixWin, String range, Model model) {
         var mode = expenseLedger.modeOf(me.getFamilyId());
         /* v1.24 FR-674 · 显式开关关掉 → 整个支出章节退回上一版形态 1 的样子。
          * 判在【这一处】而不是模板里:回流读数(紧急储备并列读数等)走
@@ -207,9 +198,12 @@ public class ReportsController {
         }
         // v1.11.1 · 不再只认 1/6/12 —— 现在期数由统一的时间范围推出(1/3/6/YTD/12/240),
         //   任意正整数都合法;非法值回落 1 期(本期)。
-        int win = (mixWin != null && mixWin > 0) ? Math.min(mixWin, 240) : 1;
+        Period anchor = (Period) model.getAttribute("anchorPeriod");
+        int win = mixWin != null && mixWin > 0 ? Math.min(mixWin, 240)
+                : "YTD".equals(normalizeRange(range)) ? anchor.getPeriodStart().getMonthValue()
+                : savingsWindowPeriods(range);
         var dim = com.family.finance.service.expense.ExpenseLedgerService.Dim.fromCode(mix);
-        var periods = periodMapper.findRecentAsOf(me.getFamilyId(), compositionAsOf(me.getFamilyId()), win);
+        var periods = expensePeriods(me.getFamilyId(), anchor, range, mixWin);
         var periodIds = periods.stream().map(com.family.finance.domain.period.Period::getId).toList();
         var comp = expenseLedger.composition(me.getFamilyId(), periodIds, dim);
 
@@ -218,7 +212,8 @@ public class ReportsController {
         model.addAttribute("mixWinValue", win);
         model.addAttribute("mixComposition", comp);
         model.addAttribute("mixPeriodIds", periodIds);
-        model.addAttribute("mixWindowLabel", win == 1 ? "本期" : ("近 " + win + " 期"));
+        model.addAttribute("mixWindowLabel", "截至 " + anchor.getPeriodStart().toString().substring(0, 7)
+                + " · " + ("ALL".equals(normalizeRange(range)) ? "全部账期" : "近 " + win + " 期"));
         // 只填了总数的账期 → 如实列出月份,不隐藏
         // 归档账户上的历史逐笔:不进构成(全站统计都排归档),但如实说清有多少笔,
         // 否则用户看到「录了 6 笔、构成只有 3 笔」会以为程序丢数据。
@@ -237,13 +232,23 @@ public class ReportsController {
                                    @RequestParam String dim,
                                    @RequestParam String groupKey,
                                    @RequestParam(name = "mixWin", required = false) Integer mixWin,
+                                   @RequestParam(defaultValue = "1Y") String range,
+                                   @RequestParam(required = false) String asof,
                           // v1.27 FR-827 · 配置锚对照与 AI 调仓的分析范围 / 模板(临时切 · 记在网址上)
                           @RequestParam(name = "scope", required = false) String scopeParam,
                           @RequestParam(name = "tpl", required = false) String tplParam,
                                    Model model) {
-        int win = (mixWin != null && (mixWin == 1 || mixWin == 6 || mixWin == 12)) ? mixWin : 1;
         var d = com.family.finance.service.expense.ExpenseLedgerService.Dim.fromCode(dim);
-        var periodIds = periodMapper.findRecentAsOf(me.getFamilyId(), compositionAsOf(me.getFamilyId()), win).stream()
+        var choice = resolveAnchor(me.getFamilyId());
+        Period anchor = choice.anchor();
+        if (asof != null && choice.closedSnapshot()) {
+            Period defaultAnchor = anchor;
+            anchor = periodMapper.findAllByFamily(me.getFamilyId()).stream()
+                    .filter(p -> p.getStatus() == PeriodStatus.CLOSED || p.getId().equals(defaultAnchor.getId()))
+                    .filter(p -> p.getPeriodStart() != null && !p.getPeriodStart().isAfter(defaultAnchor.getPeriodStart()))
+                    .filter(p -> asof.equals(p.getPeriodStart().toString())).findFirst().orElse(anchor);
+        }
+        var periodIds = expensePeriods(me.getFamilyId(), anchor, range, mixWin).stream()
                 .map(com.family.finance.domain.period.Period::getId).toList();
         model.addAttribute("mixDetailRows", periodIds.isEmpty() ? java.util.List.of()
                 : cashFlowMapper.expenseBreakdownDetail(me.getFamilyId(), periodIds, d.code(), groupKey));
@@ -366,6 +371,13 @@ public class ReportsController {
         // 见 FactViewService.accountPerformance(slice, sealedAttrs) 的注释:两个页面在这一列上刻意不同。
         List<AccountPerformance> accountRows = factViewService.accountPerformance(slice, true);
         DecompositionPoint lastDecomposition = decomposition.isEmpty() ? null : decomposition.getLast();
+        var periodFlows = factViewService.periodFlows(slice);
+        BigDecimal cumOpeningBaseline = periodFlows.stream()
+                .map(com.family.finance.factview.PeriodFlow::openingBaseline)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal cumNetInflow = periodFlows.stream()
+                .map(com.family.finance.factview.PeriodFlow::netInflow)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
         List<Account> allAccounts = accountMapper.findActiveByFamily(me.getFamilyId());
         List<FxRate> fxRates = fxMapper.findLatestByFamily(me.getFamilyId(), 36);
 
@@ -548,7 +560,7 @@ public class ReportsController {
         if (reportsHasMetrics) {
             model.addAttribute("familyXirr", percent(familyXirrDecimal));
             model.addAttribute("familyTwr", percent(familyTwrDecimal));
-            model.addAttribute("cumulativeNetInflow", money(viewCurrency, lastDecomposition == null ? BigDecimal.ZERO : lastDecomposition.cumulativeNetInflow()));
+            model.addAttribute("cumulativeNetInflow", money(viewCurrency, cumNetInflow));
             model.addAttribute("cumulativePnl", money(viewCurrency, lastDecomposition == null ? BigDecimal.ZERO : lastDecomposition.cumulativePnl()));
         } else {
             model.addAttribute("familyXirr", "—");
@@ -566,7 +578,7 @@ public class ReportsController {
         model.addAttribute("m2Averages", macroBenchmarkService.m2Averages());
         model.addAttribute("macroLatest", macroBenchmarkService.latest());
         // 人赚/钱赚原始 BigDecimal(给水位分解诊断用 · 复用 FR-84 修复后的口径)
-        model.addAttribute("netInflowRaw", lastDecomposition == null ? BigDecimal.ZERO : lastDecomposition.cumulativeNetInflow());
+        model.addAttribute("netInflowRaw", cumNetInflow);
         model.addAttribute("pnlRaw", lastDecomposition == null ? BigDecimal.ZERO : lastDecomposition.cumulativePnl());
 
         // v0.4 FR-60b · 砍 waterfall / sankey 数据(不再注入)
@@ -680,23 +692,23 @@ public class ReportsController {
              * 只给公式不给数,用户还是得自己去别处凑数字对账 —— 那正是他会算错的时候。 */
             if (wf.available()) {
                 model.addAttribute("expCaliberCalc",
-                        "锚期 " + wf.toLabel() + " 日常开支 " + money(requestedCurrency, wf.toTotal())
+                        "锚期 " + wf.toLabel() + " 日常开支 " + money(family.getBaseCurrency(), wf.toTotal())
                         + " · 与下面第二层的合计是同一个数");
                 model.addAttribute("expDeltaCalc",
-                        wf.fromLabel() + " " + money(requestedCurrency, wf.fromTotal())
-                        + " → " + wf.toLabel() + " " + money(requestedCurrency, wf.toTotal())
-                        + " = " + money(requestedCurrency, wf.delta()));
+                        wf.fromLabel() + " " + money(family.getBaseCurrency(), wf.fromTotal())
+                        + " → " + wf.toLabel() + " " + money(family.getBaseCurrency(), wf.toTotal())
+                        + " = " + money(family.getBaseCurrency(), wf.delta()));
             }
             normalOpt.ifPresent(n -> {
                 int k = n.periodIds().size();
                 model.addAttribute("expAvgCalc",
                         k + " 个已定稿账期的支出总额 ÷ " + k + " = "
-                        + money(requestedCurrency, n.averageBase()));
+                        + money(family.getBaseCurrency(), n.averageBase()));
                 model.addAttribute("expNormalCalc",
                         "同样 " + k + " 期 · 剔掉 " + n.oneOffCount() + " 笔一次性("
-                        + money(requestedCurrency, n.oneOffTotalBase()) + ")后 ÷ " + k + " = "
-                        + money(requestedCurrency, n.normalBase())
-                        + " · 与月均支出的差 " + money(requestedCurrency, n.expectedGap()));
+                        + money(family.getBaseCurrency(), n.oneOffTotalBase()) + ")后 ÷ " + k + " = "
+                        + money(family.getBaseCurrency(), n.normalBase())
+                        + " · 与月均支出的差 " + money(family.getBaseCurrency(), n.expectedGap()));
                 normalExpenseService.split(me.getFamilyId(), n.periodIds()).ifPresent(sp -> {
                     java.math.BigDecimal rigid = java.math.BigDecimal.ZERO;
                     for (var part : sp.parts()) {
@@ -705,8 +717,8 @@ public class ReportsController {
                         }
                     }
                     model.addAttribute("expRigidCalc",
-                            "刚性 " + money(requestedCurrency, rigid) + " ÷ 日常开支合计 "
-                            + money(requestedCurrency, sp.totalBase()) + " = " + sp.rigidPct() + "%");
+                            "刚性 " + money(family.getBaseCurrency(), rigid) + " ÷ 日常开支合计 "
+                            + money(family.getBaseCurrency(), sp.totalBase()) + " = " + sp.rigidPct() + "%");
                 });
             });
         }
@@ -742,17 +754,17 @@ public class ReportsController {
         model.addAttribute("debtValues", debtTrend.stream().map(TrendPoint::value).toList());
 
         // v0.2 FR-40e · 风险等级分布(用于 reports 风险敞口环形图)
-        FamilyDiagnose familyDiagnose = familyDiagnoseService.diagnose(me.getFamilyId());
-        model.addAttribute("riskDistribution", familyDiagnose.riskDistribution());
-        model.addAttribute("riskLabels", familyDiagnose.riskDistribution().stream()
+        var riskDistribution = familyDiagnoseService.riskDistribution(me.getFamilyId(), slice);
+        model.addAttribute("riskDistribution", riskDistribution);
+        model.addAttribute("riskLabels", riskDistribution.stream()
                 .map(FamilyDiagnose.RiskBucket::label).toList());
         // 2026-09-24 · 颜色按等级取,不按下标取:原来第 i 个扇区拿第 i 个颜色,
         //   只有 1/5/6 级时,5 级会被涂成 2 级的浅绿。与体检页同一套「等级 → 颜色」。
-        model.addAttribute("riskLevels", familyDiagnose.riskDistribution().stream()
+        model.addAttribute("riskLevels", riskDistribution.stream()
                 .map(FamilyDiagnose.RiskBucket::level).toList());
-        model.addAttribute("riskValues", familyDiagnose.riskDistribution().stream()
+        model.addAttribute("riskValues", riskDistribution.stream()
                 .map(FamilyDiagnose.RiskBucket::amount).toList());
-        model.addAttribute("riskRatios", familyDiagnose.riskDistribution().stream()
+        model.addAttribute("riskRatios", riskDistribution.stream()
                 .map(b -> b.ratio() == null ? BigDecimal.ZERO
                         : b.ratio().multiply(new BigDecimal("100")).setScale(1, RoundingMode.HALF_EVEN))
                 .toList());
@@ -854,20 +866,9 @@ public class ReportsController {
         BigDecimal lastNW = nwTrend.isEmpty() ? null : nwTrend.get(nwTrend.size() - 1).value();
         String firstLabel = nwTrend.isEmpty() ? null : nwTrend.get(0).label();
         String lastLabel = nwTrend.isEmpty() ? null : nwTrend.get(nwTrend.size() - 1).label();
-        // v1.6.30 · lastNW 已改成「最后一个已关账期」,这里的被减项必须取同一期,
-        //   否则拿"末期净资产 − 另一期的剔基线净资产"相减,累计开账基线会算错一期的量。
-        BigDecimal lastExOpening = trend.stream()
-                .filter(tp -> retIds.contains(tp.periodId()))
-                .map(TrendPoint::value)
-                .reduce((a, b) -> b)
-                .orElse(null);
-        BigDecimal cumOpeningBaseline = (lastNW == null || lastExOpening == null)
-                ? BigDecimal.ZERO
-                : lastNW.subtract(lastExOpening);
         BigDecimal bmTotalBal = bmInputs.stream()
                 .map(BenchmarkAggregator.BenchmarkInput::balanceBase)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal cumNetInflow = lastDecomposition == null ? BigDecimal.ZERO : lastDecomposition.cumulativeNetInflow();
         BigDecimal cumPnl = lastDecomposition == null ? BigDecimal.ZERO : lastDecomposition.cumulativePnl();
         var reportsInputs = new com.family.finance.service.explain.MetricExplainService.ReportsMetricInputs(
                 viewCurrency, family.getBaseCurrency(),

@@ -2374,4 +2374,10 @@ Docker 化部署 + systemd/macOS 存量零丢迁移。**真机冒烟(docker buil
 | v1371-SAVINGS-SINGLE-SNAPSHOT | 报表不再分别调用无观察月份的最近储蓄率、均值、中位数和序列入口；统一取同一家庭本位币切片。 |
 | v1371-SAVINGS-PERIOD-VISIBLE | 储蓄率和说明面板都显示实际账期；时间范围标签跟随所选范围。 |
 | ReportSavingsTest | 合成旧月份与新逐笔并存时取所选月；历史观察期不读未来；缺失月份留空且不稀释均值、中位数；零收入不给旧比率；明确零值和退款保留；无定稿期不查询空 IN。 |
+| ReportRiskDistributionTest | 使用传入月份的已换币余额，不回查当前余额；排除负债，尊重账户筛选和空范围。 |
+| BenchmarkAggregatorTest | 两张月末快照只有一个收益间隔，六张只有五个；一张不比较，满十二张仍按年化。跑赢阈值同窗口。 |
+| MetricExplainServiceTest | 人赚、钱赚、中途纳入本金完整闭合；零本金时不生成多余扣减项。 |
+| ReportExpenseContextTest | 三个月的逐笔抽屉沿用历史观察期和日历范围，未来观察期不能引入进行期。 |
+| v1371-REPORT-FACTS / v1371-BENCHMARK-INTERVALS | 历史风险图、净流入卡片和基准窗口不能绕过同一期事实。 |
+| v1371-EXPENSE-CONTEXT / e2e 57 | 合成历史三个月及后续月份，从顶栏进入报告，验证储蓄率、均值、中位数、人赚、支出汇总和抽屉，切换维度及美元，电脑和手机截图；清理全部样本，不关账、不调用真实 AI。 |
 

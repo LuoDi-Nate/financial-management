@@ -192,7 +192,7 @@ public class MetricExplainService {
         m.put("familyXirr",
                 "资金流序列:期初净资产 −" + money(v, in.firstNetWorth())
                         + (in.firstLabel() != null ? "(" + in.firstLabel() + ")" : "")
-                        + " → 各期外部净流入(工资等 · 与「人赚」同口径"
+                        + " → 各期外部净流入(收入减支出"
                         + (in.cumulativeOpeningBaseline() != null && in.cumulativeOpeningBaseline().signum() != 0
                            ? ",含中途纳入的存量账户本金 " + money(v, in.cumulativeOpeningBaseline()) : "")
                         + ") → 期末净资产 +" + money(v, in.lastNetWorth())
@@ -216,10 +216,12 @@ public class MetricExplainService {
                         + "之后逐期(收入 − 支出)累加 = " + signedMoney(v, in.cumulativeNetInflow())
                         + " · 共 " + in.decompCount() + " 期计入(起始期为基准、不重复计)");
 
-        // 钱赚 · 投资 PnL = ΔNetWorth − 净流入
+        // 钱赚 · 投资 PnL = ΔNetWorth − 人赚 − 中途纳入的本金
         m.put("pnl",
                 "(期末净资产 " + money(v, in.lastNetWorth()) + " − 起始净资产 " + money(v, in.firstNetWorth())
                         + ") − 净流入 " + signedMoney(v, in.cumulativeNetInflow())
+                        + (in.cumulativeOpeningBaseline() != null && in.cumulativeOpeningBaseline().signum() != 0
+                           ? " − 中途纳入本金 " + signedMoney(v, in.cumulativeOpeningBaseline()) : "")
                         + " = " + signedMoney(v, in.cumulativePnl()));
 
         // ---- 储蓄区(本位币 ¥)----

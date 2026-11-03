@@ -12006,6 +12006,23 @@ QA1371_E="$RD/src/main/java/com/family/finance/service/explain/MetricExplainServ
   && log_ok "v1371-SAVINGS-PERIOD-VISIBLE(储蓄率及说明面板点名账期 · 范围标签动态)" \
   || log_bad "v1371-SAVINGS-PERIOD-VISIBLE 储蓄区账期或窗口标签丢失" "see reports/_savings.html / MetricExplainService"
 
+{ grep -qF 'riskDistribution(me.getFamilyId(), slice)' "$QA1371_R" \
+  && grep -qF '.map(com.family.finance.factview.PeriodFlow::netInflow)' "$QA1371_R" \
+  && ! java_code_only "$QA1371_R" | grep -qF 'familyDiagnoseService.diagnose('; } \
+  && log_ok "v1371-REPORT-FACTS(风险沿用报表切片 · 人赚不借本金曲线)" \
+  || log_bad "v1371-REPORT-FACTS 风险或人赚绕过报表事实" "see ReportsController periodFlows / riskDistribution"
+QA1371_B="$RD/src/main/java/com/family/finance/calc/BenchmarkAggregator.java"
+{ [ "$(grep -cF 'months - 1)' "$QA1371_B")" -eq 2 ] \
+  && grep -qF 'sixMonthEndSnapshotsHaveFiveReturnIntervals' "$RD/src/test/java/com/family/finance/calc/BenchmarkAggregatorTest.java"; } \
+  && log_ok "v1371-BENCHMARK-INTERVALS(累计收益与跑赢阈值都按相邻快照间隔比较)" \
+  || log_bad "v1371-BENCHMARK-INTERVALS 基准又比收益多算一个月" "see BenchmarkAggregator"
+QA1371_X="$RD/src/main/resources/templates/reports/_expense-section.html"
+{ [ "$(grep -cF 'expensePeriods(me.getFamilyId(), anchor, range, mixWin)' "$QA1371_R")" -eq 2 ] \
+  && grep -qF 'range=${range},asof=${asof}' "$QA1371_X" \
+  && [ -f "$RD/scripts/e2e/flows/57-report-metrics.cjs" ]; } \
+  && log_ok "v1371-EXPENSE-CONTEXT(构成与抽屉共用观察账期/范围 · flow 57 验证真实点击)" \
+  || log_bad "v1371-EXPENSE-CONTEXT 支出构成或明细丢失观察上下文" "see expensePeriods / flow 57"
+
 echo
 echo "═══════════════════════════════════════"
 echo " 总结: PASS=$PASS  FAIL=$FAIL  SKIP=$SKIP"

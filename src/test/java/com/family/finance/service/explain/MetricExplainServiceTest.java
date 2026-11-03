@@ -121,14 +121,14 @@ class MetricExplainServiceTest {
 
     @Test
     void reports_pnl_satisfies_identity_and_savings_uses_base() {
-        // 期末 80000 − 起始 50000 − 净流入 18000 = PnL 12000
+        // 期末 80000 − 起始 50000 − 人赚 18000 − 中途纳入本金 4000 = PnL 8000
         var in = new MetricExplainService.ReportsMetricInputs(
                 "CNY", "CNY",
                 bd("50000"), bd("80000"), "2025-06", "2026-05",
                 12, 11,
                 bd("0.072"), bd("0.055"),
-                bd("18000"), bd("12000"),
-                bd("84477"),                       // v1.6.29 · 累计开账基线(单列进 tooltip)
+                bd("18000"), bd("8000"),
+                bd("4000"),
                 bd("5.4"), 6, bd("100000"),
                 true, 8, 12,
                 bd("280000"), bd("144000"), bd("35000"), bd("18000"),
@@ -137,13 +137,12 @@ class MetricExplainServiceTest {
         Map<String, String> m = svc.reports(in);
 
         assertThat(m.get("pnl"))
-                .isEqualTo("(期末净资产 ¥80,000 − 起始净资产 ¥50,000) − 净流入 +¥18,000 = +¥12,000");
+                .isEqualTo("(期末净资产 ¥80,000 − 起始净资产 ¥50,000) − 净流入 +¥18,000 − 中途纳入本金 +¥4,000 = +¥8,000");
         assertThat(m.get("netInflow")).contains("+¥18,000", "共 11 期计入");
         // v1.6.29 · 端点必须是**真实净资产**(此前取的是剔除开账基线的趋势,首点恒为 0);
         //   开账基线单列;并标明是年化还是累计口径。
         assertThat(m.get("familyXirr"))
-                .contains("−¥50,000", "+¥80,000", "= +7.20%", "含中途纳入的存量账户本金 ¥84,477", "(年化)")
-                .contains("与「人赚」同口径");
+                .contains("−¥50,000", "+¥80,000", "= +7.20%", "含中途纳入的存量账户本金 ¥4,000", "(年化)");
         assertThat(m.get("benchmark")).contains("6 个账户", "5.4%");
         assertThat(m.get("avgIncome")).isEqualTo("近 12 月有填 8 个月 · 收入合计 ¥280,000 ÷ 8 = ¥35,000");
         assertThat(m.get("savingsRate")).contains("2026-05 账期", "收入 ¥36,000", "支出 ¥17,000", "= 52.8%");
@@ -172,5 +171,6 @@ class MetricExplainServiceTest {
         Map<String, String> m = svc.reports(in);
         assertThat(m).containsKeys("familyXirr", "benchmark", "familyTwr", "netInflow", "pnl");
         assertThat(m).doesNotContainKeys("avgIncome", "avgExpense", "savingsRate", "savingsMedian", "filledMonths");
+        assertThat(m.get("pnl")).doesNotContain("中途纳入本金");
     }
 }

@@ -14,6 +14,7 @@
     <h2 class="font-display text-3xl font-medium tracking-tight">月度收支 + 反推目标月供</h2>
     <p class="font-serif text-sm text-ink-soft mt-2 max-w-2xl">
       数据来自<a th:href="@{/entry}" class="text-brass-deep hover:underline">填报页</a> ·
+      <span th:text="'收支按家庭本位币 ' + ${baseCurrency} + ' 统计。'">收支按家庭本位币统计。</span>
       没填的月份显灰柱,不参与中位计算。
       <span th:if="${mixEnabled}">支出走<b>逐笔</b>口径(你已切到逐笔录入),构成见下一段。</span>
       <span th:unless="${mixEnabled}">支出走<b>总额</b>口径(每人每月一个数)。</span>

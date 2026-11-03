@@ -109,9 +109,22 @@ class BenchmarkAggregatorTest {
     @Test
     void displayedDiff_cumulativeWhenShortWindow_benchmarkScaled() {
         // <12 期:显示的 xirr 是累计回报。1 月累计 2% vs 年化基准 8%(缩到 1 月≈0.64%)→ ≈+1.36pp → 跑赢
-        BigDecimal diff = BenchmarkAggregator.displayedDiffPercentPoints(new BigDecimal("0.02"), new BigDecimal("8.0"), 1);
+        BigDecimal diff = BenchmarkAggregator.displayedDiffPercentPoints(new BigDecimal("0.02"), new BigDecimal("8.0"), 2);
         assertThat(diff.doubleValue()).isBetween(1.30, 1.40);
-        assertThat(BenchmarkAggregator.beatStatusDisplayed(diff, 1)).isEqualTo(BeatStatus.BEAT);
+        assertThat(BenchmarkAggregator.beatStatusDisplayed(diff, 2)).isEqualTo(BeatStatus.BEAT);
+    }
+
+    @Test
+    void sixMonthEndSnapshotsHaveFiveReturnIntervals() {
+        BigDecimal annual = new BigDecimal("8.0");
+        BigDecimal expected = BenchmarkAggregator.expectedOverWindowPct(annual, 5);
+        BigDecimal displayed = expected.movePointLeft(2);
+        assertThat(BenchmarkAggregator.displayedDiffPercentPoints(displayed, annual, 6))
+                .isEqualByComparingTo("0.00");
+        assertThat(BenchmarkAggregator.displayedDiffPercentPoints(displayed, annual, 1)).isNull();
+        assertThat(BenchmarkAggregator.beatStatusDisplayed(BigDecimal.ONE, 1)).isEqualTo(BeatStatus.NA);
+        // 2 个快照只有一个月,阈值也应缩到同一个月。
+        assertThat(BenchmarkAggregator.beatStatusDisplayed(new BigDecimal("0.2"), 2)).isEqualTo(BeatStatus.BEAT);
     }
 
     @Test

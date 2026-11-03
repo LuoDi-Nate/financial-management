@@ -62,7 +62,7 @@
           <span class="kpi-eyebrow">净资产名义增长</span>
           <div class="font-display text-2xl mt-1" th:classappend="${waterLevel.nominalGrowthPct != null and waterLevel.nominalGrowthPct.signum() >= 0} ? ' num-pos' : ' num-neg'"
                th:text="${(waterLevel.nominalGrowthPct != null and waterLevel.nominalGrowthPct.signum() >= 0 ? '+' : '') + (waterLevel.nominalGrowthPct != null ? #numbers.formatDecimal(waterLevel.nominalGrowthPct,1,1) : '—') + '%'}">+10.6%</div>
-          <div class="font-mono text-[10px] text-ink-soft mt-1">这段时间净资产名义增长(未扣通胀;与 CPI 购买力线对比见上图)</div>
+          <div class="font-mono text-[10px] text-ink-soft mt-1">剔除中途纳入本金的净资产增长(未扣通胀)</div>
         </div>
         <div class="kpi-card">
           <span class="kpi-eyebrow">相对社会 · 剔 M2</span>
@@ -72,13 +72,13 @@
         </div>
         <div class="kpi-card" style="background:rgba(79,107,71,.06)">
           <span class="kpi-eyebrow">人赚的 · 净流入</span>
-          <div class="font-display text-2xl mt-1 num-pos" data-priv th:text="${netInflowRaw != null ? '+¥' + #numbers.formatInteger(netInflowRaw,1,'COMMA') : '—'}">+¥31万</div>
-          <div class="font-mono text-[10px] text-ink-soft mt-1">工资攒下来的钱 · PMC 源</div>
+          <div class="font-display text-2xl mt-1" data-priv th:text="${(netInflowRaw != null and netInflowRaw.signum() > 0 ? '+' : '') + T(com.family.finance.service.MoneyFormat).format(currency, netInflowRaw)}">+¥31万</div>
+          <div class="font-mono text-[10px] text-ink-soft mt-1">收入减支出 · 不含补录本金</div>
         </div>
         <div class="kpi-card" style="background:rgba(156,74,42,.05)">
           <span class="kpi-eyebrow">钱赚的 · 投资 PnL</span>
-          <div class="font-display text-2xl mt-1" data-priv th:text="${pnlRaw != null ? (pnlRaw.signum()>=0?'+':'') + '¥' + #numbers.formatInteger(pnlRaw,1,'COMMA') : '—'}">+¥5万</div>
-          <div class="font-mono text-[10px] text-ink-soft mt-1">纯资产升值 · ΔNW − 净流入</div>
+          <div class="font-display text-2xl mt-1" data-priv th:text="${(pnlRaw != null and pnlRaw.signum() > 0 ? '+' : '') + T(com.family.finance.service.MoneyFormat).format(currency, pnlRaw)}">+¥5万</div>
+          <div class="font-mono text-[10px] text-ink-soft mt-1">净资产变化减净流入、补录本金</div>
         </div>
       </div>
 
@@ -94,8 +94,8 @@
       <div class="mt-5 pt-5 border-t border-rule" th:if="${netInflowRaw != null and pnlRaw != null}">
         <div class="eyebrow mb-2" style="color:var(--rust)">人 · 赚 · vs · 钱 · 赚</div>
         <p class="text-sm text-ink-soft leading-relaxed">
-          净资产增长拆解:<b class="num-pos" th:text="'人赚 ¥' + ${#numbers.formatInteger(netInflowRaw,1,'COMMA')}">人赚 ¥31万</b>(工资储蓄)
-          + <b th:text="(${pnlRaw.signum()>=0}?'钱赚 +¥':'钱赚 −¥') + ${#numbers.formatInteger(pnlRaw.abs(),1,'COMMA')}">钱赚 ¥5万</b>(投资)。
+          剔除中途纳入本金后的增长:<b th:text="'人赚 ' + ${T(com.family.finance.service.MoneyFormat).format(currency, netInflowRaw)}">人赚 ¥31万</b>(收入减支出)
+          + <b th:text="'钱赚 ' + ${(pnlRaw.signum() > 0 ? '+' : '') + T(com.family.finance.service.MoneyFormat).format(currency, pnlRaw)}">钱赚 ¥5万</b>(投资)。
           <span th:if="${pnlRaw.signum() < netInflowRaw.signum() or (netInflowRaw.signum()>0 and pnlRaw.compareTo(netInflowRaw) < 0)}" class="text-rust">
             水位主要靠人赚(收入)硬撑 —— 一旦收入中断,会快速逼近基准线下方。</span>
         </p>
@@ -136,7 +136,8 @@
   const nominal = /*[[${waterLevel.nominal}]]*/ [];
   const cpiLine = /*[[${waterLevel.cpiLine}]]*/ [];
   const m2Line = /*[[${waterLevel.m2Line}]]*/ [];
-  const wan = (v) => '¥' + (Number(v)/10000).toFixed(0) + '万';
+  const symbol = /*[[${currencySymbol}]]*/ '¥';
+  const wan = (v) => symbol + (Number(v)/10000).toFixed(0) + '万';
   const el = document.getElementById('waterLevelChart');
   if (!el || typeof Chart === 'undefined') return;
   new Chart(el.getContext('2d'), {

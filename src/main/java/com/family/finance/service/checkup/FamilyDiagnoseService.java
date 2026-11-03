@@ -62,7 +62,7 @@ public class FamilyDiagnoseService {
                         .orElseThrow(() -> new IllegalStateException("尚未创建周期")));
     }
 
-    /** 按「全部资产」诊断(v1.26 行为)—— 报表风险环图等不跟随范围的调用方用 */
+    /** 按「全部资产」诊断(v1.26 行为)。历史报表应调用 riskDistribution 传入观察账期切片。 */
     public FamilyDiagnose diagnose(long familyId) {
         return diagnose(familyId, slice -> com.family.finance.service.analysis.AnalysisScope.all(), false);
     }
@@ -119,52 +119,7 @@ public class FamilyDiagnoseService {
         BigDecimal familyXirr = factViewService.familyXirr(slice);
         BigDecimal familyTwr = factViewService.familyTwr(slice);
 
-        // 风险分布:用最后一期账户余额 × fxToBase + product_category.risk_level
-        Map<String, ProductCategory> categoriesByCode = productCategoryService.listAll().stream()
-                .collect(java.util.stream.Collectors.toMap(ProductCategory::getCode, java.util.function.Function.identity()));
-
-        List<AccountPeriodFact> lastRows = scoped.rows().stream()
-                .filter(r -> Objects.equals(r.periodId(), scoped.lastPeriodId()))
-                .filter(r -> r.accountClass() == AccountClass.ASSET)
-                .filter(r -> r.endBalanceBase() != null)
-                .toList();
-
-        // 2026-09-24 · 风险等级改读账户自己的(手工改过的 → 产品类目 → 按类型的默认类目),
-        //   原来这里是按账户类型写死的兜底表,加密 / 贵金属 / 保险全落进 default 成了「无风险」,
-        //   没有任何类型到 5 级 → FAM-RISK-1 从来触发不了。详见 RiskLevels 类注释。
-        Map<Long, com.family.finance.domain.account.Account> accountById = new java.util.HashMap<>();
-        for (var a : accountMapper.findAllByFamily(familyId)) accountById.put(a.getId(), a);
-        java.util.function.Function<String, Integer> riskOfCategory = code -> {
-            ProductCategory c = categoriesByCode.get(code);
-            return c == null ? null : c.getRiskLevel();
-        };
-
-        Map<Integer, BigDecimal> riskAmountByLevel = new java.util.TreeMap<>();
-        BigDecimal totalAssetBase = BigDecimal.ZERO;
-        java.util.Set<Long> estimatedAccounts = new java.util.HashSet<>();
-        for (AccountPeriodFact row : lastRows) {
-            BigDecimal v = row.endBalanceBase();
-            if (v == null) continue;
-            totalAssetBase = totalAssetBase.add(v);
-            var acc = accountById.get(row.accountId());
-            RiskLevels.Resolved r = RiskLevels.resolve(
-                    acc == null ? null : acc.getRiskLevelOverride(),
-                    acc == null ? null : acc.getProductCategoryCode(),
-                    row.accountType(), riskOfCategory);
-            if (r.estimated() && v.signum() != 0) estimatedAccounts.add(row.accountId());
-            riskAmountByLevel.merge(r.level(), v, BigDecimal::add);
-        }
-
-        List<FamilyDiagnose.RiskBucket> riskDist = new ArrayList<>();
-        for (Map.Entry<Integer, BigDecimal> e : riskAmountByLevel.entrySet()) {
-            BigDecimal amt = e.getValue().setScale(2, RoundingMode.HALF_EVEN);
-            // 余额为 0 的账户也会在它那一档记一笔 0 —— 原来它们都挤在「无风险」里看不出来,
-            //   分档读类目之后就会冒出一个「中低 0.00%」的空扇区。整档为 0 的不画。
-            if (amt.signum() == 0) continue;
-            BigDecimal ratio = totalAssetBase.signum() == 0 ? BigDecimal.ZERO :
-                    amt.divide(totalAssetBase, 6, RoundingMode.HALF_EVEN);
-            riskDist.add(new FamilyDiagnose.RiskBucket(e.getKey(), riskLabel(e.getKey()), amt, ratio));
-        }
+        var risk = riskSummary(familyId, scoped);
 
         BigDecimal liquidAssets = slice.rows().stream()
                 .filter(r -> Objects.equals(r.periodId(), slice.lastPeriodId()))
@@ -191,7 +146,7 @@ public class FamilyDiagnoseService {
         return new FamilyDiagnose(
                 kpi,
                 allocation,
-                riskDist,
+                risk.buckets(),
                 liquidAssets,
                 kpi.emergencyFundMonths(),
                 familyXirr,
@@ -199,11 +154,51 @@ public class FamilyDiagnoseService {
                 cumulativeYtdPnl,
                 accountCount,
                 0,  // pending TODO 接入 SnapshotTodoMapper(此值仅 banner 用,现阶段不阻塞)
-                estimatedAccounts.size(),
+                risk.estimatedCount(),
                 scope,
                 withOptions ? scopeService.options(familyId, slice) : List.of()
         );
     }
+
+    /** 使用调用方的账期、账户范围与视图币种,不重新加载「现在」的余额。 */
+    public List<FamilyDiagnose.RiskBucket> riskDistribution(long familyId, FactSlice slice) {
+        return riskSummary(familyId, slice).buckets();
+    }
+
+    private RiskSummary riskSummary(long familyId, FactSlice slice) {
+        Map<String, ProductCategory> categories = productCategoryService.listAll().stream()
+                .collect(java.util.stream.Collectors.toMap(ProductCategory::getCode, java.util.function.Function.identity()));
+        Map<Long, com.family.finance.domain.account.Account> accounts = new java.util.HashMap<>();
+        for (var account : accountMapper.findAllByFamily(familyId)) accounts.put(account.getId(), account);
+        java.util.function.Function<String, Integer> riskOfCategory = code -> {
+            var category = categories.get(code);
+            return category == null ? null : category.getRiskLevel();
+        };
+        Map<Integer, BigDecimal> amounts = new java.util.TreeMap<>();
+        java.util.Set<Long> estimated = new java.util.HashSet<>();
+        BigDecimal total = BigDecimal.ZERO;
+        for (var row : slice.rows()) {
+            if (!Objects.equals(row.periodId(), slice.lastPeriodId())
+                    || row.accountClass() != AccountClass.ASSET || row.endBalanceBase() == null) continue;
+            BigDecimal value = row.endBalanceBase();
+            var account = accounts.get(row.accountId());
+            var risk = RiskLevels.resolve(account == null ? null : account.getRiskLevelOverride(),
+                    account == null ? null : account.getProductCategoryCode(), row.accountType(), riskOfCategory);
+            if (risk.estimated() && value.signum() != 0) estimated.add(row.accountId());
+            amounts.merge(risk.level(), value, BigDecimal::add);
+            total = total.add(value);
+        }
+        List<FamilyDiagnose.RiskBucket> buckets = new ArrayList<>();
+        for (var entry : amounts.entrySet()) {
+            BigDecimal value = entry.getValue().setScale(2, RoundingMode.HALF_EVEN);
+            if (value.signum() == 0) continue;
+            BigDecimal ratio = total.signum() == 0 ? BigDecimal.ZERO : value.divide(total, 6, RoundingMode.HALF_EVEN);
+            buckets.add(new FamilyDiagnose.RiskBucket(entry.getKey(), riskLabel(entry.getKey()), value, ratio));
+        }
+        return new RiskSummary(buckets, estimated.size());
+    }
+
+    private record RiskSummary(List<FamilyDiagnose.RiskBucket> buckets, int estimatedCount) {}
 
     private static String riskLabel(int level) {
         return switch (level) {

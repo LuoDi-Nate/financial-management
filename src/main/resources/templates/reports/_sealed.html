@@ -68,7 +68,7 @@
           · 余额逐个账户填,这里不按分组折叠
         </span>
         <span class="pill whitespace-nowrap" th:if="${cp.fxDate() != null}"
-              th:text="'汇率日期 ' + ${#temporals.format(cp.fxDate(),'yyyy-MM-dd')}">汇率</span>
+              th:text="'汇率账期 ' + ${#temporals.format(cp.fxDate(),'yyyy-MM')}">汇率</span>
       </div>
     </div>
 

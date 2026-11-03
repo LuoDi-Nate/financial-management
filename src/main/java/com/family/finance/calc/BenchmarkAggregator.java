@@ -100,20 +100,20 @@ public final class BenchmarkAggregator {
      * diff(pp)= 显示的 xirr% − 同基基准%。
      * @param displayedXirr 卡片/列显示的那个 xirr(小数 · 0.083=8.3%)· null → null
      * @param annualBenchmarkPct 年化基准 %(4.61 = 4.61%)· null → null
-     * @param months 期数;≥12 用年化基准,<12 缩放到窗口;≤0 → null
+     * @param months 期末快照数;≥12 用年化基准,<12 的收益跨 months−1 个间隔;≤1 → null
      */
     public static BigDecimal displayedDiffPercentPoints(BigDecimal displayedXirr, BigDecimal annualBenchmarkPct, int months) {
-        if (displayedXirr == null || annualBenchmarkPct == null || months <= 0) return null;
+        if (displayedXirr == null || annualBenchmarkPct == null || months <= 1) return null;
         BigDecimal actualPct = displayedXirr.multiply(new BigDecimal("100"));
-        BigDecimal expected = months >= 12 ? annualBenchmarkPct : expectedOverWindowPct(annualBenchmarkPct, months);
+        BigDecimal expected = months >= 12 ? annualBenchmarkPct : expectedOverWindowPct(annualBenchmarkPct, months - 1);
         if (expected == null) return null;
         return actualPct.subtract(expected).setScale(2, RoundingMode.HALF_EVEN);
     }
 
     /** 跑赢/输判定 · 阈值同基:满 12 期 ±2pp(年化),不足 12 期 ±2% 缩放到窗口;diff/月数无效 → NA。 */
     public static BeatStatus beatStatusDisplayed(BigDecimal diffPct, int months) {
-        if (diffPct == null || months <= 0) return BeatStatus.NA;
-        BigDecimal thr = months >= 12 ? BEAT_THRESHOLD : expectedOverWindowPct(BEAT_THRESHOLD, months);
+        if (diffPct == null || months <= 1) return BeatStatus.NA;
+        BigDecimal thr = months >= 12 ? BEAT_THRESHOLD : expectedOverWindowPct(BEAT_THRESHOLD, months - 1);
         if (thr == null) return BeatStatus.NA;
         if (diffPct.compareTo(thr) > 0) return BeatStatus.BEAT;
         if (diffPct.compareTo(thr.negate()) < 0) return BeatStatus.MISS;
