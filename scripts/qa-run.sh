@@ -12019,6 +12019,8 @@ QA1371_B="$RD/src/main/java/com/family/finance/calc/BenchmarkAggregator.java"
 QA1371_X="$RD/src/main/resources/templates/reports/_expense-section.html"
 { [ "$(grep -cF 'expensePeriods(me.getFamilyId(), anchor, range, mixWin)' "$QA1371_R")" -eq 2 ] \
   && grep -qF 'range=${range},asof=${asof}' "$QA1371_X" \
+  && grep -qF 'id="reports-main"' "$RD/src/main/resources/templates/reports/index.html" \
+  && grep -qF 'hx-target="#reports-main"' "$RD/src/main/resources/templates/reports/_region.html" \
   && [ -f "$RD/scripts/e2e/flows/57-report-metrics.cjs" ]; } \
   && log_ok "v1371-EXPENSE-CONTEXT(构成与抽屉共用观察账期/范围 · flow 57 验证真实点击)" \
   || log_bad "v1371-EXPENSE-CONTEXT 支出构成或明细丢失观察上下文" "see expensePeriods / flow 57"

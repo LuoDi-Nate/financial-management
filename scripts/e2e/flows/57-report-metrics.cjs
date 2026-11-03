@@ -80,15 +80,14 @@ module.exports = {
     await ui.assert(new URL(ui.page.url()).searchParams.get('asof') === ASOF &&
       new URL(ui.page.url()).searchParams.get('range') === '3M', '维度切换保留账期和范围');
     await ui.click('#sec-expense-mix [hx-get*="expense-mix/detail"] >> nth=0', '展开逐笔明细');
-    const drawer = await ui.page.locator('#modal').innerText();
+    const drawer = await ui.page.locator(`#mix-detail-${cash}`).innerText();
     await ui.assert(drawer.includes('5,000') && drawer.includes('4,000') && !drawer.includes('9,999'), '抽屉和汇总属于同一组三个月', drawer);
-    await ui.page.keyboard.press('Escape');
-    await ui.page.locator('#modal').evaluate(el => el.innerHTML = '');
 
     const filter = ui.page.locator('#reports-region details').first();
     await filter.evaluate(el => el.open = true);
     await ui.click('#reports-region a[hx-get*="currency=USD"] >> nth=0', '显示币种切到美元');
     await ui.page.waitForTimeout(700);
+    await ui.visible('#reports-main #sec-savings', '整页刷新后仍有完整报告');
     const values = await ui.page.locator('#sec-wealth [data-priv]').allTextContents();
     await ui.assert(values.length === 2 && values.every(t => t.includes('$') && !t.includes('¥')),
       '币种切换同步更新财富水位金额', values.join(' | '));
@@ -104,6 +103,16 @@ module.exports = {
       await phone.assert(!overflow, '手机页面无横向溢出');
       await phone.page.locator('#sec-savings').screenshot({ path: '/tmp/e2e-57-savings-phone.png' });
     });
+
+    db.raw(`UPDATE cash_flow SET amount=0 WHERE period_id=${mar} AND kind='INCOME'`);
+    await selectMonth(ui);
+    const zero = await savingsValues(ui);
+    await ui.assert(zero[2].includes('—') && !zero[2].includes('95%'), '零收入显示无法计算,不借用旧比率', zero[2]);
+    db.raw(`UPDATE cash_flow SET amount=10000 WHERE period_id=${mar} AND kind='INCOME'`);
+    db.raw(`UPDATE cash_flow SET amount=-4000 WHERE period_id=${mar} AND kind='EXPENSE'`);
+    await selectMonth(ui);
+    const refund = await savingsValues(ui);
+    await ui.assert(refund[2].includes('140%') && refund[1].includes('667'), '退款保留符号并参与储蓄计算', refund.join(' | '));
   },
   async cleanup(ui, report) {
     if (state.periods.length) {

@@ -41,7 +41,7 @@
           <a th:each="c : ${currencies}"
              th:href="@{/reports(range=${range},currency=${c},accounts=${accountsCsv},asof=${asof})}"
              th:hx-get="@{/reports(range=${range},currency=${c},accounts=${accountsCsv},asof=${asof})}"
-             hx-select="main" hx-target="main" hx-swap="outerHTML"
+             hx-select="#reports-main" hx-target="#reports-main" hx-swap="outerHTML"
              class="font-mono text-[11px] px-3 py-1.5 tracking-wider no-underline border-l border-rule first:border-l-0"
              th:classappend="${currency == c ? ' bg-ink text-paper' : ' text-ink-soft hover:bg-card-soft'}"
              th:text="${c == 'CNY' ? '¥ CNY' : (c == 'USD' ? '$ USD' : 'HK$ HKD')}">¥ CNY</a>

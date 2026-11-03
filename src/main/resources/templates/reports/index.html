@@ -7,7 +7,7 @@
 <script th:src="@{/vendor/echarts.min.js(v=${buildVersion})}"></script>
 <div class="fixed top-0 left-0 right-0 h-1 bg-ink z-40"></div>
 <header th:replace="~{fragments/nav :: nav('reports', ${me}, ${nav})}"></header>
-<main class="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10 py-5 sm:py-10 relative z-10"
+<main id="reports-main" class="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10 py-5 sm:py-10 relative z-10"
       th:with="tocItems=${ { {label:'本期封板',href:'#sec-sealed'}, {label:'结构与风险',href:'#sec-structure'}, {label:'趋势',href:'#sec-trend'}, {label:'收益概览',href:'#reports-region',sub:true}, {label:'本金 vs 投资损益',href:'#sec-decompose',sub:true}, {label:'负债 / 风险分布',href:'#sec-risk',sub:true}, {label:'资产配置对照',href:'#allocation-diff',sub:true}, {label:'调仓建议与计划',href:'#ai-rebalance',sub:true}, {label:'账户级收益 · vs 基准',href:'#sec-accounts',sub:true}, {label:'财富水位',href:'#sec-wealth',sub:true}, {label:'储蓄能力',href:'#sec-savings',sub:true}, {label:'支出分析',href:'#sec-expense-mix',sub:true} } }">
   <div class="toc-cols">
     <!--/* v1.22.4 · 目录放在 DOM 【最前】。
