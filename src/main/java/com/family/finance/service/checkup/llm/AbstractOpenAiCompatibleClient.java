@@ -47,8 +47,15 @@ public abstract class AbstractOpenAiCompatibleClient implements LlmClient {
     protected AbstractOpenAiCompatibleClient(FamilyConfigService configService, RestTemplateBuilder builder) {
         this.configService = configService;
         this.restTemplate = builder
-                .setConnectTimeout(Duration.ofSeconds(5))
-                .setReadTimeout(Duration.ofSeconds(25))
+                .requestFactory(() -> new org.springframework.http.client.SimpleClientHttpRequestFactory() {
+                    @Override
+                    protected void prepareConnection(java.net.HttpURLConnection connection, String method)
+                            throws java.io.IOException {
+                        super.prepareConnection(connection, method);
+                        connection.setConnectTimeout(5_000);
+                        connection.setReadTimeout(LlmRouter.timeoutSeconds(configService, FAMILY_ID) * 1000);
+                    }
+                })
                 .build();
     }
 
@@ -81,6 +88,9 @@ public abstract class AbstractOpenAiCompatibleClient implements LlmClient {
     public boolean available() {
         return !currentApiKey().isBlank() && !breakerOpen();
     }
+
+    @Override public synchronized void recordExternalSuccess() { consecutiveFailures = 0; }
+    @Override public void recordExternalFailure() { recordFailure(); }
 
     // ========== 子类可覆写的差异点 ==========
 
@@ -200,7 +210,7 @@ public abstract class AbstractOpenAiCompatibleClient implements LlmClient {
         return content;
     }
 
-    private void recordFailure() {
+    private synchronized void recordFailure() {
         consecutiveFailures++;
         if (consecutiveFailures >= FAIL_THRESHOLD) {
             breakerOpenedAt = Instant.now();

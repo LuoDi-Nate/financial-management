@@ -398,9 +398,12 @@ public class GoalController {
      */
     @PostMapping("/goals/{id}/report/generate")
     public String generateReport(@AuthenticationPrincipal MemberPrincipal me,
-                                 @PathVariable long id) {
+                                 @PathVariable long id,
+                                 org.springframework.web.servlet.mvc.support.RedirectAttributes ra) {
         goalService.require(me.getFamilyId(), id); // 权限校验
-        goalReportService.generateNow(me.getFamilyId(), id);
+        var result = goalReportService.generateNowResult(me.getFamilyId(), id);
+        ra.addFlashAttribute(result.ok() ? "reportNote" : "reportError", result.ok()
+                ? "目标月报已更新。" : result.error());
         return "redirect:/goals/" + id;
     }
 

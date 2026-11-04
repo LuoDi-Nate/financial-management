@@ -88,7 +88,9 @@ public class AiAccessController {
         // 远端模板是否过期 —— 发新版本不会更新百炼上的 Agent,必须有人点「更新」。
         // 2026-09-23:生产的模板停在 09-04,工具一个都没启用,挂了近三周没人知道。
         if ("managed".equals(configService.getString(fam, K_ASK_RUNTIME, "managed"))) {
-            model.addAttribute("askTemplateDrift", managedAgentRuntime.templateDrift());
+            var status = managedAgentRuntime.templateStatus();
+            model.addAttribute("askTemplateStatus", status);
+            model.addAttribute("askTemplateDrift", status.drift());
         }
 
         List<AskAccessToken> tokens = tokenService.list(fam);
@@ -199,6 +201,13 @@ public class AiAccessController {
                 blocked == null ? "已保存。现在任何一页右下角都能点开「超级 Agent」了。"
                                 : "已保存,但还用不了:" + blocked);
         return "redirect:/admin/ai-access";
+    }
+
+    @GetMapping("/admin/ai-access/template-status")
+    public String templateStatus(@AuthenticationPrincipal MemberPrincipal me, Model model) {
+        managedAgentRuntime.templateDrift();
+        model.addAttribute("askTemplateStatus", managedAgentRuntime.templateStatus());
+        return "admin/_template-status :: status";
     }
 
     /** v1.28 FR-914 · 「看 AI 收到了什么」开关 · 只管显不显示图标,记录照写(再打开时不用先刷新) */

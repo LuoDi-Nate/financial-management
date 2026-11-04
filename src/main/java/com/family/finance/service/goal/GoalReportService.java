@@ -69,6 +69,10 @@ public class GoalReportService {
      * @return true 生成成功 · false LLM 不可用或失败
      */
     public boolean generateNow(long familyId, long goalId) {
+        return generateNowResult(familyId, goalId).ok();
+    }
+
+    public GoalLlmService.AiResult<String> generateNowResult(long familyId, long goalId) {
         try {
             Goal g = goalService.require(familyId, goalId);
             var progress = progressService.compute(familyId, g);
@@ -84,14 +88,14 @@ public class GoalReportService {
                     .build();
                 reportMapper.upsertOwned(familyId, report);
                 log.info("goal={} monthly report generated on-demand", goalId);
-                return true;
+                return r;
             } else {
                 log.info("goal={} monthly report unavailable · {}", goalId, r.error());
-                return false;
+                return r;
             }
         } catch (Exception e) {
             log.warn("goal={} monthly report on-demand failed: {}", goalId, e.toString());
-            return false;
+            return GoalLlmService.AiResult.unavailable("月报生成失败,原报告已保留,请稍后重试。");
         }
     }
 

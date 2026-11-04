@@ -73,6 +73,9 @@
          th:text="'距离最后一次成功调用已经 ' + ${llmSinceOkHours} + ' 小时'">距离最后一次成功调用已经 N 小时</p>
     </div>
 
+    <th:block th:if="${askRuntime == 'managed'}">
+      <div th:replace="~{admin/_template-status :: status}"></div>
+    </th:block>
     <!--/* v1.24.4 · 百炼上的 Agent 模板过期
            2026-09-23 生产实测:模板停在 09-04,那之后 v1.20.2 修了「只声明服务器、不启用工具」,
            但【发新版本不会更新百炼上的 Agent】—— 生产那个 Agent 的 tools 一直是空数组,

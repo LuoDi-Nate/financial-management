@@ -160,7 +160,7 @@ public class RebalanceAdvisorService {
                     + blocksSuffix(c, mapping, codes);
             PromptTrace trace = PromptTrace.of(PromptSurface.REBALANCE).legend(legend).settings(c.settingsNote());
             String raw = llmRouter.invoke(familyId, trace, system, user).map(LlmRouter.Outcome::text).orElse(null);
-            if (raw == null) return AdviceResult.unavailable("LLM 全部失败").withRecord(trace.recordId());
+            if (raw == null) return AdviceResult.unavailable(trace.failureMessage()).withRecord(trace.recordId());
             raw = PromptBuilder.reverseMapping(raw, legend);
 
             // 3. 校验 + 解析
@@ -251,7 +251,7 @@ public class RebalanceAdvisorService {
             return new AdviceResult(true, narrative, sanitized, LocalDateTime.now(), false, null, trace.recordId());
         } catch (Exception e) {
             log.warn("rebalance advise failed family={}: {}", familyId, e.toString());
-            return AdviceResult.unavailable("内部错误: " + e.getMessage());
+            return AdviceResult.unavailable("调仓建议暂时无法生成,请稍后重试。");
         }
     }
 

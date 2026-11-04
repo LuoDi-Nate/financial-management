@@ -122,6 +122,37 @@ public class LlmRouter {
         return !plan(familyId).isEmpty();
     }
 
+    public static int timeoutSeconds(FamilyConfigService config, long familyId) {
+        return Math.max(5, Math.min(120, config.getInt(familyId, FamilyConfigService.K_LLM_TIMEOUT_SECS, 25)));
+    }
+
+    public String unavailableReason(long familyId) {
+        if (available(familyId)) return null;
+        boolean keyPresent = false, resolvable = false;
+        for (LlmInvocation inv : LlmSettings.load(configService, familyId).chain()) {
+            var p = inv.platformDef();
+            if (p.isEmpty()) continue;
+            String key = configService.getString(familyId, p.get().keyName(), "");
+            if (key == null || key.isBlank()) continue;
+            keyPresent = true;
+            if (inv.resolvable()) resolvable = true;
+        }
+        if (!keyPresent) return "还没有配置可用的大模型密钥,请到「AI 接入」配置主选或备选。";
+        if (!resolvable) return "模型配置不完整,请到「AI 接入」补齐平台、系列和型号。";
+        return "已配置的模型正在故障或额度冷却中,请稍后重试或到「AI 接入」检查。";
+    }
+
+    public void externalSuccess(LlmInvocation inv) {
+        clientFor(inv.platform()).ifPresent(LlmClient::recordExternalSuccess);
+        healthTracker.recordOk(inv.platform());
+    }
+
+    public void externalFailure(LlmInvocation inv, Exception failure) {
+        clientFor(inv.platform()).ifPresent(LlmClient::recordExternalFailure);
+        healthTracker.recordFail(inv.platform(), false, "工具对话调用失败");
+        log.warn("本地 Agent 候选 {} 调用失败 · {}", inv.label(), failure.getClass().getSimpleName());
+    }
+
     /** 取某平台的客户端(管理页「测试连接」用;业务调用一律走 invoke) */
     public Optional<LlmClient> clientFor(String platform) {
         if (platform == null) return Optional.empty();
@@ -160,8 +191,11 @@ public class LlmRouter {
      * 全部调用失败 = FAILED(原因是最后一个候选的上游原话,不改写)。<b>没有可用候选 = 什么都没发,不记</b>。</p>
      */
     public <T> T invoke(long familyId, PromptTrace trace, String systemPrompt, String userPrompt, Handler<T> handler) {
-        if (trace == null || promptRecorder == null) return invoke(familyId, systemPrompt, userPrompt, handler);
-        if (plan(familyId).isEmpty()) return null;
+        if (trace == null) return invoke(familyId, systemPrompt, userPrompt, handler);
+        if (plan(familyId).isEmpty()) {
+            trace.failed(unavailableReason(familyId));
+            return null;
+        }
         String[] vendor = {null};
         String[] lastError = {null};
         boolean[] gotOutput = {false};
@@ -184,7 +218,9 @@ public class LlmRouter {
         String note = result != null ? null
                 : gotOutput[0] ? (trace.rejectReason() == null ? "回答没通过校验" : trace.rejectReason())
                 : lastError[0];
-        promptRecorder.save(familyId, trace, systemPrompt, userPrompt, vendor[0], outcome, note);
+        if (result == null) trace.failed(gotOutput[0] ? "AI 回答未通过校验,请重试。"
+                : "已尝试可用模型,本次调用失败。请稍后重试或到「AI 接入」检查连接与额度。");
+        if (promptRecorder != null) promptRecorder.save(familyId, trace, systemPrompt, userPrompt, vendor[0], outcome, note);
         return result;
     }
 
@@ -196,7 +232,7 @@ public class LlmRouter {
     public <T> T invoke(long familyId, String systemPrompt, String userPrompt, Handler<T> handler) {
         for (LlmInvocation inv : plan(familyId)) {
             LlmClient client = clientFor(inv.platform()).orElse(null);
-            if (client == null) continue;      // plan() 已过滤,兜底
+            if (client == null || !client.available()) continue;
             long start = System.currentTimeMillis();
             try {
                 String raw = client.chat(inv, systemPrompt, userPrompt);

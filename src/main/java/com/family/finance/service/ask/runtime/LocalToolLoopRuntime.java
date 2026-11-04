@@ -6,7 +6,7 @@ import com.family.finance.service.ask.AskToolRegistry;
 import com.family.finance.service.ask.AskToolResult;
 import com.family.finance.service.checkup.llm.LlmCatalog;
 import com.family.finance.service.checkup.llm.LlmInvocation;
-import com.family.finance.service.checkup.llm.LlmSettings;
+import com.family.finance.service.checkup.llm.LlmRouter;
 import com.family.finance.service.config.FamilyConfigService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -16,9 +16,6 @@ import org.springframework.stereotype.Component;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -53,19 +50,11 @@ public class LocalToolLoopRuntime implements AgentRuntime {
 
     /** 工具调用轮数上限 —— 成本测算定的值,改之前先看 tech-design §六.4 */
     public static final int MAX_ROUNDS = 5;
-    /** 单次请求读超时:带工具的回答会思考较久,比普通问答宽松 */
-    private static final Duration READ_TIMEOUT = Duration.ofSeconds(120);
-
-    private static final long FAMILY_ID = 1L;
-
     private final FamilyConfigService configService;
     private final AskToolRegistry registry;
     private final AskToolDispatcher dispatcher;
+    private final LlmRouter router;
     private final ObjectMapper json = new ObjectMapper();
-
-    private final HttpClient http = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(10))
-            .build();
 
     @Override public String code() { return CODE; }
 
@@ -73,28 +62,20 @@ public class LocalToolLoopRuntime implements AgentRuntime {
 
     @Override
     public boolean available(long familyId) {
-        return !apiKey(familyId).isBlank() && invocation(familyId).resolvable();
+        return router.available(familyId);
     }
 
     @Override
     public String unavailableReason(long familyId) {
-        if (apiKey(familyId).isBlank()) {
-            return "还没有配大模型密钥。去「AI 接入」页填一个,就能开始问了。";
-        }
-        if (!invocation(familyId).resolvable()) {
-            return "「AI 接入」里选的模型没填型号 —— 这个平台的型号要从它的控制台复制过来。";
-        }
-        return null;
+        return router.unavailableReason(familyId);
     }
 
     // ──────────────────────── 主循环 ────────────────────────
 
     @Override
-    public void run(AskTurn turn, AskSink sink) {
-        String key = apiKey(turn.familyId());
-        LlmInvocation inv = invocation(turn.familyId());
-        LlmCatalog.Platform platform = inv.platformDef().orElse(null);
-        if (key.isBlank() || platform == null || !inv.resolvable()) {
+    public void run(AskTurn turn, AskSink target) {
+        TrackingSink sink = new TrackingSink(target);
+        if (!available(turn.familyId())) {
             sink.failed(unavailableReason(turn.familyId()));
             return;
         }
@@ -112,21 +93,12 @@ public class LocalToolLoopRuntime implements AgentRuntime {
             messages.add(Map.of("role", m.role(), "content", m.content()));
         }
         messages.add(Map.of("role", "user", "content", turn.question()));
-        // v1.28 FR-919 · 出网前回报这一问真正发出去的内容(系统提示词已含分析上下文)
-        if (turn.onPromptSent() != null) {
-            try {
-                turn.onPromptSent().sent(system, turn.question(), inv.badge(), false);
-            } catch (Exception e) {
-                log.debug("记录这一问发出去的内容失败(不影响回答):{}", e.toString());
-            }
-        }
-
         List<Map<String, Object>> tools = registry.openAiToolList();
         int citeSeq = 0;
 
         try {
             for (int round = 1; round <= MAX_ROUNDS; round++) {
-                Completion c = streamOnce(platform, key, inv.resolvedModel(), messages, tools, sink);
+                Completion c = routedStream(turn, system, messages, tools, sink);
 
                 if (sink.cancelled()) { sink.stopped(); return; }
 
@@ -177,8 +149,7 @@ public class LocalToolLoopRuntime implements AgentRuntime {
                     messages.add(Map.of("role", "user", "content",
                             "已经查了 " + MAX_ROUNDS + " 轮,不要再调工具了。"
                           + "用现在手上的数据回答;确实没查到的部分,如实说没查到。"));
-                    Completion last = streamOnce(platform, key, inv.resolvedModel(), messages,
-                            List.of(), sink);
+                    Completion last = routedStream(turn, system, messages, List.of(), sink);
                     if (sink.cancelled()) { sink.stopped(); return; }
                     if (last.text.isBlank()) sink.textDelta("这个问题我查了几轮还是没凑齐材料,换个问法试试?");
                     sink.done();
@@ -187,8 +158,56 @@ public class LocalToolLoopRuntime implements AgentRuntime {
             }
         } catch (Exception e) {
             log.warn("超级 Agent · 本地循环失败:{}", e.toString());
-            sink.failed(humanError(e));
+            if (sink.cancelled()) sink.stopped();
+            else sink.failed(humanError(e));
         }
+    }
+
+    private Completion routedStream(AskTurn turn, String system, List<Map<String, Object>> messages,
+                                    List<Map<String, Object>> tools, TrackingSink sink) throws Exception {
+        Exception last = null;
+        for (LlmInvocation inv : router.plan(turn.familyId())) {
+            if (sink.cancelled()) return new Completion();
+            if (router.clientFor(inv.platform()).filter(c -> c.available()).isEmpty()) continue;
+            LlmCatalog.Platform platform = inv.platformDef().orElseThrow();
+            String key = configService.getString(turn.familyId(), platform.keyName(), "");
+            try {
+                if (turn.onPromptSent() != null)
+                    turn.onPromptSent().sent(system, turn.question(), inv.badge(), false);
+            } catch (Exception e) {
+                log.debug("记录 Agent 提示词失败:{}", e.getClass().getSimpleName());
+            }
+            try {
+                Completion result = streamOnce(platform, key, inv.resolvedModel(), messages, tools, sink,
+                        LlmRouter.timeoutSeconds(configService, turn.familyId()));
+                if (!sink.cancelled()) router.externalSuccess(inv);
+                return result;
+            } catch (Exception e) {
+                if (sink.cancelled()) throw e;
+                router.externalFailure(inv, e);
+                if (sink.delivered) throw e;
+                last = e;
+            }
+        }
+        if (last != null) throw last;
+        throw new IllegalStateException("没有可用的模型候选");
+    }
+
+    /** 只要这轮对话已有用户可见产出就不重放,工具结果同样算产出。 */
+    private static final class TrackingSink implements AskSink {
+        private final AskSink target;
+        private boolean delivered;
+        TrackingSink(AskSink target) { this.target = target; }
+        public void status(String text) { target.status(text); }
+        public void toolStart(String name, String label, String args) { delivered = true; target.toolStart(name, label, args); }
+        public void toolDone(String name, String label, int ms, boolean ok, String summary,
+                             Map<String, AskToolResult.Cite> cites) { delivered = true; target.toolDone(name, label, ms, ok, summary, cites); }
+        public void textDelta(String text) { if (!text.isEmpty()) delivered = true; target.textDelta(text); }
+        public void rollback(String text) { target.rollback(text); }
+        public boolean cancelled() { return target.cancelled(); }
+        public void done() { target.done(); }
+        public void stopped() { target.stopped(); }
+        public void failed(String message) { target.failed(message); }
     }
 
     // ──────────────────────── 单次流式请求 ────────────────────────
@@ -205,7 +224,7 @@ public class LocalToolLoopRuntime implements AgentRuntime {
 
     private Completion streamOnce(LlmCatalog.Platform platform, String key, String model,
                                   List<Map<String, Object>> messages,
-                                  List<Map<String, Object>> tools, AskSink sink) throws Exception {
+                                  List<Map<String, Object>> tools, AskSink sink, int timeoutSeconds) throws Exception {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("model", model);
         body.put("messages", messages);
@@ -216,28 +235,33 @@ public class LocalToolLoopRuntime implements AgentRuntime {
             body.put("tool_choice", "auto");
         }
 
-        HttpRequest req = HttpRequest.newBuilder(URI.create(platform.chatEndpoint()))
-                .timeout(READ_TIMEOUT)
-                .header("Content-Type", "application/json")
-                .header("Authorization", "Bearer " + key)
-                .header("Accept", "text/event-stream")
-                .POST(HttpRequest.BodyPublishers.ofString(
-                        json.writeValueAsString(body), StandardCharsets.UTF_8))
-                .build();
-
-        HttpResponse<java.io.InputStream> resp =
-                http.send(req, HttpResponse.BodyHandlers.ofInputStream());
-        if (resp.statusCode() >= 400) {
-            String detail = new String(resp.body().readAllBytes(), StandardCharsets.UTF_8);
-            throw new UpstreamException(resp.statusCode(), detail);
-        }
-
+        var connection = (java.net.HttpURLConnection) URI.create(endpoint(platform)).toURL().openConnection();
+        connection.setConnectTimeout(5_000);
+        connection.setReadTimeout(timeoutSeconds * 1000);
+        connection.setRequestMethod("POST");
+        connection.setRequestProperty("Content-Type", "application/json");
+        connection.setRequestProperty("Authorization", "Bearer " + key);
+        connection.setRequestProperty("Accept", "text/event-stream");
+        connection.setDoOutput(true);
         Completion c = new Completion();
         // 累积中的 tool_call:流式协议按 index 分片送达,name 和 arguments 分开来
         Map<Integer, String[]> pending = new LinkedHashMap<>();   // index → [id, name, argsBuf]
 
-        try (BufferedReader r = new BufferedReader(
-                new InputStreamReader(resp.body(), StandardCharsets.UTF_8))) {
+        boolean complete = false;
+        try {
+            try (var output = connection.getOutputStream()) {
+                output.write(json.writeValueAsBytes(body));
+            }
+            int status = connection.getResponseCode();
+            if (status >= 400) {
+                String detail = "";
+                if (connection.getErrorStream() != null) try (var error = connection.getErrorStream()) {
+                    detail = new String(error.readNBytes(16_384), StandardCharsets.UTF_8);
+                }
+                throw new UpstreamException(status, detail);
+            }
+            try (BufferedReader r = new BufferedReader(
+                    new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
             String line;
             while ((line = r.readLine()) != null) {
                 // 每一行都问一次:按下停止到真的停下,最多差一个 token 的时间。
@@ -245,11 +269,14 @@ public class LocalToolLoopRuntime implements AgentRuntime {
                 if (sink.cancelled()) break;
                 if (!line.startsWith("data:")) continue;
                 String payload = line.substring(5).trim();
-                if (payload.isEmpty() || "[DONE]".equals(payload)) continue;
+                if (payload.isEmpty()) continue;
+                if ("[DONE]".equals(payload)) { complete = true; break; }
 
                 var node = json.readTree(payload);
+                if (node.has("error")) throw new UpstreamException(502, "流式回答返回错误");
                 var choices = node.path("choices");
                 if (!choices.isArray() || choices.isEmpty()) continue;
+                if (choices.get(0).hasNonNull("finish_reason")) complete = true;
                 var delta = choices.get(0).path("delta");
 
                 String piece = delta.path("content").asText("");
@@ -270,7 +297,12 @@ public class LocalToolLoopRuntime implements AgentRuntime {
                     }
                 }
             }
+            }
+        } finally {
+            connection.disconnect();
         }
+        if (!sink.cancelled() && (!complete || (c.textBuf.isEmpty() && pending.isEmpty())))
+            throw new java.io.IOException("模型回答未完整结束");
 
         c.text = c.textBuf.toString();
         for (var e : pending.entrySet()) {
@@ -352,15 +384,7 @@ public class LocalToolLoopRuntime implements AgentRuntime {
         }
     }
 
-    private String apiKey(long familyId) {
-        LlmCatalog.Platform p = invocation(familyId).platformDef().orElse(null);
-        if (p == null) return "";
-        return configService.getString(FAMILY_ID, p.keyName(), "");
-    }
-
-    private LlmInvocation invocation(long familyId) {
-        return LlmSettings.load(configService, FAMILY_ID).primary();
-    }
+    protected String endpoint(LlmCatalog.Platform platform) { return platform.chatEndpoint(); }
 
     /** 上游错误翻成人话 —— 直接展示给用户,不能是一串状态码 */
     private String humanError(Exception e) {

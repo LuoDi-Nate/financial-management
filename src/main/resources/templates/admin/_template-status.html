@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org"><body>
+<div th:fragment="status" id="template-status" class="mb-6 border-b border-rule pb-4">
+  <div class="flex items-center justify-between gap-3 flex-wrap">
+    <h2 class="font-display text-lg">百炼模板状态</h2>
+    <button type="button" class="btn-paper text-xs" hx-get="/admin/ai-access/template-status"
+            hx-target="#template-status" hx-swap="outerHTML" hx-disabled-elt="this">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2 6M20 4v7h-7"/></svg>检查模板
+    </button>
+  </div>
+  <p class="text-sm text-ink-soft mt-2" th:if="${askTemplateStatus == null or askTemplateStatus.drift() == null}">尚未检查。</p>
+  <th:block th:if="${askTemplateStatus != null and askTemplateStatus.drift() != null}">
+    <p class="text-sm mt-2" th:text="${askTemplateStatus.drift().error() != null ? askTemplateStatus.drift().error() : (askTemplateStatus.drift().stale() ? '模板缺少当前需要的工具,请更新百炼上的 Agent 模板。' : '上次检查:工具配置齐全。')}"></p>
+    <p class="text-xs text-ink-soft mt-1"><span th:text="${askTemplateStatus.checkedAt()}"></span><span th:if="${askTemplateStatus.expired()}"> · 读数已过期</span></p>
+  </th:block>
+</div>
+</body></html>

@@ -93,7 +93,7 @@ public class GoalLlmService {
             String user = buildRecommendPrompt(type, kpis, members, mapping) + preferenceSuffix(familyId, mapping);
             PromptTrace trace = trace(PromptSurface.GOAL_PARAMS, familyId, mapping);
             String raw = invokeWithFailover(familyId, trace, system, user);
-            if (raw == null) return AiResult.<GoalParams>unavailable("LLM 全部失败").withRecord(trace.recordId());
+            if (raw == null) return AiResult.<GoalParams>unavailable(trace.failureMessage()).withRecord(trace.recordId());
 
             GoalParams params = parseRecommendation(type, raw);
             if (params == null) {
@@ -103,7 +103,7 @@ public class GoalLlmService {
             return AiResult.ok(params, extractRationale(raw)).withRecord(trace.recordId());
         } catch (Exception e) {
             log.warn("recommendParams failed · type={} family={}: {}", type, familyId, e.toString());
-            return AiResult.unavailable("内部错误: " + e.getMessage());
+            return AiResult.unavailable("目标参数暂时无法生成,请稍后重试。");
         }
     }
 
@@ -127,7 +127,7 @@ public class GoalLlmService {
             String user = buildMonthlyReportPrompt(goal, progress) + preferenceSuffix(familyId, mapping);
             PromptTrace trace = trace(PromptSurface.GOAL_REPORT, familyId, mapping);
             String raw = invokeWithFailover(familyId, trace, system, user);
-            if (raw == null) return AiResult.<String>unavailable("LLM 全部失败").withRecord(trace.recordId());
+            if (raw == null) return AiResult.<String>unavailable(trace.failureMessage()).withRecord(trace.recordId());
 
             // 先在 raw(仍是代号)上过校验:不会因真名误判泄露
             OutputValidator.Result valid = OutputValidator.check(raw, mapping.realToCodename().keySet());
@@ -141,7 +141,7 @@ public class GoalLlmService {
             return AiResult.ok(mapped, null).withRecord(trace.recordId());
         } catch (Exception e) {
             log.warn("generateMonthlyReport failed: {}", e.toString());
-            return AiResult.unavailable("内部错误: " + e.getMessage());
+            return AiResult.unavailable("目标月报生成失败,原报告已保留,请稍后重试。");
         }
     }
 
@@ -163,7 +163,7 @@ public class GoalLlmService {
             String user = buildAlertPrompt(goal, progress, alertReason) + preferenceSuffix(familyId, mapping);
             PromptTrace trace = trace(PromptSurface.GOAL_ALERT, familyId, mapping);
             String raw = invokeWithFailover(familyId, trace, system, user);
-            if (raw == null) return AiResult.<String>unavailable("LLM 全部失败").withRecord(trace.recordId());
+            if (raw == null) return AiResult.<String>unavailable(trace.failureMessage()).withRecord(trace.recordId());
 
             OutputValidator.Result valid = OutputValidator.check(raw, mapping.realToCodename().keySet());
             if (!valid.accepted()) {
@@ -175,7 +175,7 @@ public class GoalLlmService {
             return AiResult.ok(mapped, null).withRecord(trace.recordId());
         } catch (Exception e) {
             log.warn("generateAlertAdvice failed: {}", e.toString());
-            return AiResult.unavailable("内部错误: " + e.getMessage());
+            return AiResult.unavailable("目标预警暂时无法生成,请稍后重试。");
         }
     }
 

@@ -1,20 +1,13 @@
 package com.family.finance.service.expense.imports;
 
-import com.family.finance.service.checkup.llm.LlmCatalog;
-import com.family.finance.service.checkup.llm.LlmInvocation;
-import com.family.finance.service.checkup.llm.LlmSettings;
-import com.family.finance.service.config.FamilyConfigService;
+import com.family.finance.service.checkup.llm.LlmRouter;
+import com.family.finance.service.llmtrace.PromptSurface;
+import com.family.finance.service.llmtrace.PromptTrace;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.web.client.RestTemplateBuilder;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.RestTemplate;
 
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -67,22 +60,13 @@ public class MerchantAiClassifier {
             + "绝不计算、求和、推导任何数值 —— 你看不到金额,也不需要金额。"
             + "拿不准就返回 null,不要硬猜。输出严格 JSON,不要 markdown 围栏。";
 
-    private final FamilyConfigService config;
-    private final RestTemplate rt;
+    private final LlmRouter router;
     private static final ObjectMapper JSON = new ObjectMapper();
 
-    public MerchantAiClassifier(FamilyConfigService config, RestTemplateBuilder builder) {
-        this.config = config;
-        this.rt = builder.setConnectTimeout(Duration.ofSeconds(10))
-                         .setReadTimeout(Duration.ofSeconds(60)).build();
-    }
+    public MerchantAiClassifier(LlmRouter router) { this.router = router; }
 
     public boolean available() {
-        LlmSettings s = LlmSettings.load(config, FAMILY_ID);
-        LlmInvocation inv = s.primary();
-        return inv != null && inv.platformDef().isPresent()
-                && inv.resolvedModel() != null
-                && !apiKey(inv).isBlank();
+        return router.available(FAMILY_ID);
     }
 
     /**
@@ -112,15 +96,7 @@ public class MerchantAiClassifier {
         return out;
     }
 
-    @SuppressWarnings("unchecked")
     private Map<String, String> callOnce(List<String> merchants, List<String> catNames) {
-        LlmSettings s = LlmSettings.load(config, FAMILY_ID);
-        LlmInvocation inv = s.primary();
-        LlmCatalog.Platform p = inv.platformDef()
-                .orElseThrow(() -> new IllegalStateException("AI 平台配置无效"));
-        String model = inv.resolvedModel();
-        String key = apiKey(inv);
-
         StringBuilder prompt = new StringBuilder();
         prompt.append("分类清单(只能从这里面挑):\n");
         for (String c : catNames) prompt.append("- ").append(c).append('\n');
@@ -132,24 +108,17 @@ public class MerchantAiClassifier {
               .append("{\"merchant\":\"原样的商户名\",\"category\":\"清单里的分类名,拿不准填 null\"}。")
               .append("不要输出金额、不要计算、不要解释,只输出 JSON 数组本身。");
 
-        HttpHeaders h = new HttpHeaders();
-        h.setContentType(MediaType.APPLICATION_JSON);
-        h.setBearerAuth(key);
-        Map<String, Object> body = Map.of(
-                "model", model,
-                "messages", List.of(
-                        Map.of("role", "system", "content", SYS),
-                        Map.of("role", "user", "content", prompt.toString())),
-                "temperature", 0.1,
-                "max_tokens", 2000);
-        Map<String, Object> resp = rt.postForObject(p.chatEndpoint(), new HttpEntity<>(body, h), Map.class);
-        if (resp == null) throw new RuntimeException("AI 返回空");
-        List<Map<String, Object>> choices = (List<Map<String, Object>>) resp.get("choices");
-        if (choices == null || choices.isEmpty()) throw new RuntimeException("AI 无结果");
-        Map<String, Object> msg = (Map<String, Object>) choices.get(0).get("message");
-        Object c = msg == null ? null : msg.get("content");
-        if (c == null) throw new RuntimeException("AI 空内容");
-        return parse(c.toString(), catNames);
+        var trace = PromptTrace.of(PromptSurface.MERCHANT_CLASSIFY);
+        Map<String, String> result = router.invoke(FAMILY_ID, trace, SYS, prompt.toString(), (inv, raw, ms) -> {
+            Map<String, String> parsed = parse(raw, catNames);
+            parsed.keySet().retainAll(merchants);
+            if (parsed.isEmpty() && !raw.trim().matches("(?s).*\\[\\s*].*")) {
+                trace.rejected("分类回答无法解析或不在允许清单中");
+                return null;
+            }
+            return parsed;
+        });
+        return result == null ? Map.of() : result;
     }
 
     /** 解析。模型给的分类名<b>必须在清单里</b>,否则丢弃 —— 它偶尔会自己发明一个类目名。 */
@@ -187,8 +156,4 @@ public class MerchantAiClassifier {
         return v.isEmpty() || "null".equalsIgnoreCase(v) ? null : v;
     }
 
-    /** key 存在管理页配置里(DB > env > 默认三层),与视觉通道同一套取法 */
-    private String apiKey(LlmInvocation inv) {
-        return inv.platformDef().map(p -> config.getString(FAMILY_ID, p.keyName(), "")).orElse("");
-    }
 }

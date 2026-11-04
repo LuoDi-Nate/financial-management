@@ -7,6 +7,8 @@
 <header th:replace="~{fragments/nav :: nav('goals', ${me}, ${nav})}"></header>
 
 <main class="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10 py-5 sm:py-10 relative z-10">
+  <p th:if="${reportNote != null}" role="status" class="mb-4 text-forest" th:text="${reportNote}"></p>
+  <p th:if="${reportError != null}" role="alert" class="mb-4 text-rust" th:text="${reportError}"></p>
 
   <!-- 面包屑 + 操作 -->
   <div class="flex items-center justify-between mb-4">

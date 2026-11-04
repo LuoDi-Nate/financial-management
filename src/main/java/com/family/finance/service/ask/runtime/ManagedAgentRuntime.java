@@ -474,16 +474,19 @@ public class ManagedAgentRuntime implements AgentRuntime {
      * <p>这个 GET 是百炼的管理接口,不调模型、不花钱。</p>
      */
     public TemplateDrift templateDrift() {
+        String cacheKey = driftKey();
+        TemplateDrift result;
         if (agentId().isBlank() || mcpServerId().isBlank()) {
-            return new TemplateDrift(false, false, List.of(), "还没创建 Agent");
-        }
-        try {
+            result = new TemplateDrift(false, false, List.of(), "还没创建 Agent");
+        } else try {
             JsonNode a = get(agentBase() + "/agents/" + agentId());
-            return driftOf(a, mcpServerId(), registry.all().stream()
+            result = driftOf(a, mcpServerId(), registry.all().stream()
                     .map(com.family.finance.service.ask.AskTool::name).toList());
         } catch (Exception e) {
-            return new TemplateDrift(false, false, List.of(), humanError(e));
+            result = new TemplateDrift(false, false, List.of(), "模板检查失败,请稍后重试。");
         }
+        driftSnapshot = new DriftSnapshot(cacheKey, result, java.time.Instant.now());
+        return result;
     }
 
     /** 纯函数:给一份百炼回读的 Agent 定义,判它启用了我们哪些工具(见 ManagedAgentTemplateDriftTest) */
@@ -502,21 +505,33 @@ public class ManagedAgentRuntime implements AgentRuntime {
     }
 
     /** 每次提问都去查一次太浪费;5 分钟一查,更新模板后立即作废 */
-    private volatile TemplateDrift driftCache;
-    private volatile long driftAt;
+    private record DriftSnapshot(String key, TemplateDrift result, java.time.Instant checkedAt) { }
+    private volatile DriftSnapshot driftSnapshot;
     private static final long DRIFT_TTL_MS = 5 * 60_000L;
 
-    private TemplateDrift cachedDrift() {
-        TemplateDrift d = driftCache;
-        if (d == null || System.currentTimeMillis() - driftAt > DRIFT_TTL_MS) {
-            d = templateDrift();
-            driftCache = d;
-            driftAt = System.currentTimeMillis();
-        }
-        return d;
+    public record TemplateStatus(TemplateDrift drift, java.time.Instant checkedAt, boolean expired) { }
+
+    /** 设置页只看最近读数,没有缓存也不发网络请求。 */
+    public TemplateStatus templateStatus() {
+        DriftSnapshot snapshot = driftSnapshot;
+        if (snapshot == null || !snapshot.key().equals(driftKey()))
+            return new TemplateStatus(null, null, false);
+        return new TemplateStatus(snapshot.result(), snapshot.checkedAt(),
+                java.time.Duration.between(snapshot.checkedAt(), java.time.Instant.now()).toMillis() > DRIFT_TTL_MS);
     }
 
-    private void invalidateDrift() { driftCache = null; }
+    private String driftKey() {
+        return com.family.finance.service.llmtrace.PromptRecorder.sha256(
+                agentBase() + "|" + agentId() + "|" + mcpServerId() + "|"
+                + configService.getString(FAMILY_ID, FamilyConfigService.K_LLM_QWEN_KEY, ""));
+    }
+
+    private synchronized TemplateDrift cachedDrift() {
+        TemplateStatus status = templateStatus();
+        return status.drift() == null || status.expired() ? templateDrift() : status.drift();
+    }
+
+    private void invalidateDrift() { driftSnapshot = null; }
 
     public void updateAgent(String systemPrompt, String model) throws Exception {
         assertAgentIsOurs();

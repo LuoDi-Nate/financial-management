@@ -166,7 +166,7 @@ public class LlmDiagnoseService {
                             .settings(ctx == null ? null : ctx.settingsNote()));
         } catch (Exception e) {
             log.warn("全家综合诊断失败 familyId={}: {}", familyId, e.getMessage());
-            return DiagnoseResult.unavailable("内部错误: " + e.getMessage());
+            return DiagnoseResult.unavailable("诊断准备失败,请稍后重试。");
         }
     }
 
@@ -246,7 +246,7 @@ public class LlmDiagnoseService {
         } catch (Exception e) {
             log.warn("账户综合诊断失败 familyId={} accountId={}: {}",
                     familyId, accountDiagnose.account().getId(), e.getMessage());
-            return DiagnoseResult.unavailable("内部错误: " + e.getMessage());
+            return DiagnoseResult.unavailable("诊断准备失败,请稍后重试。");
         }
     }
 
@@ -298,7 +298,7 @@ public class LlmDiagnoseService {
                             .settings(ctx == null ? null : ctx.settingsNote()));
         } catch (Exception e) {
             log.warn("资产洞察综合诊断失败 familyId={}: {}", familyId, e.getMessage());
-            return DiagnoseResult.unavailable("内部错误: " + e.getMessage());
+            return DiagnoseResult.unavailable("洞察准备失败,请稍后重试。");
         }
     }
 
@@ -385,7 +385,7 @@ public class LlmDiagnoseService {
         } catch (Exception ignore) {
             // audit 失败不阻塞主流程
         }
-        return DiagnoseResult.unavailable("AI 暂时不可用").withRecord(trace.recordId());
+        return DiagnoseResult.unavailable(trace.failureMessage()).withRecord(trace.recordId());
     }
 
     /** v1.28 · 代号 → 真名:成员 + 账户(反映射与面板对照共用一份;长的代号先换,「账户AB」不会被当成「账户A」) */
@@ -613,7 +613,8 @@ public class LlmDiagnoseService {
 
         public static DiagnoseResult unavailable(String reason) {
             return new DiagnoseResult(false,
-                    "AI 综合诊断暂时不可用。以上为系统规则引擎给出的硬数据便签卡,可作为本次体检的核心参考。如需 AI 视角,请稍后刷新重试。",
+                    (reason == null || reason.isBlank() ? "AI 综合诊断暂时不可用。" : reason)
+                            + "\n以上系统规则与数字仍然可用。",
                     "fallback", false, Instant.now(), null, false);
         }
 

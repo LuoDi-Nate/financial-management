@@ -17,6 +17,7 @@ public final class PromptTrace {
     private String settingsNote;
     private Long recordId;
     private String rejectReason;
+    private String failureMessage;
 
     private PromptTrace(PromptSurface surface) {
         this.surface = surface;
@@ -56,4 +57,11 @@ public final class PromptTrace {
     }
 
     public String rejectReason() { return rejectReason; }
+
+    public void failed(String safeMessage) { this.failureMessage = safeMessage; }
+
+    /** 请求局部的安全提示,不存原始异常/密钥,不共享到下一次请求。 */
+    public String failureMessage() {
+        return failureMessage == null ? "AI 调用未成功,请稍后重试或到「AI 接入」检查配置。" : failureMessage;
+    }
 }
