@@ -94,7 +94,7 @@
 
 ## 近期更新 · Releases
 
-**开发分支 v1.39 · 退休生活账与 AI 可用性修复(beta 验证中,未发布)**
+**开发分支 v1.39 · 退休生活账与 AI 可用性修复(beta 待验收,未发布)**
 退休目标公开资金桥、实际回报和月度预测,联动家庭余额与定稿收支;老目标比较后采用,可退出恢复原参数。修复商户分类/本地 Agent 主备路由、失败提示、模板状态阻塞设置页及超时热改。见 [PRD](prd/v1.39.md)、[技术设计](tech-design/v1.39.md)与[原节目调研](docs/research/retirement-xiaolin-2026-11.md)。
 
 > 完整发布记录与截图见 [Releases](https://github.com/LuoDi-Nate/financial-management/releases)(本段每版只留 2–4 行,细节不搬过来)。
@@ -387,7 +387,7 @@ bash scripts/regression-data.sh # 数据层/口径回归(原 e2e.sh · curl 端�
 
 | 版本 | 文档 |
 |---|---|
-| `v1.39` | [PRD](prd/v1.39.md)(beta 验证中)· [技术设计](tech-design/v1.39.md) · [预览](preview/v1.39/retirement.html) · [原节目与算法调研](docs/research/retirement-xiaolin-2026-11.md) |
+| `v1.39` | [PRD](prd/v1.39.md)(beta 待验收)· [技术设计](tech-design/v1.39.md) · [预览](preview/v1.39/retirement.html) · [原节目与算法调研](docs/research/retirement-xiaolin-2026-11.md) |
 | `v1.37` | [PRD](prd/v1.37.md)(已实施)· [技术设计](tech-design/v1.37.md) · [预览](preview/v1.37/side-rail.html) · [Duo 官方规范调研](docs/research/iphone-duo-hig-2026-10.md) |
 | `v1.36` | [PRD](prd/v1.36.md)(已实施)· [技术设计](tech-design/v1.36.md) · [实测对比图](preview/v1.36/shots/) |
 | `v1.35` | [PRD](prd/v1.35.md)(已实施)· [技术设计](tech-design/v1.35.md) · [预览](preview/v1.35/) · [UI 调研](docs/research/ui-frameworks-2026-10.md) |
