@@ -53,6 +53,8 @@ public class CsvExportService {
     private final com.family.finance.repository.PrincipalAdjustmentMapper principalAdjustmentMapper;
     /** v1.32 · 固定收支的设置 + 每期结果(家庭数据,导出要带上 · PRD v1.32 §8) */
     private final com.family.finance.repository.FixedFlowMapper fixedFlowMapper;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.family.finance.repository.RetirementPlanMapper retirementPlanMapper;
 
     public void writeZip(long familyId, OutputStream out) throws IOException {
         try (ZipOutputStream zip = new ZipOutputStream(out)) {
@@ -198,11 +200,17 @@ public class CsvExportService {
                 }
             });
 
+            writeEntry(zip, "retirement_plans.csv", writer -> {
+                line(writer, "goal_id", "family_id", "active", "created_for_plan", "plan_json", "updated_at");
+                if (retirementPlanMapper != null) for (var plan : retirementPlanMapper.findAll(familyId))
+                    line(writer, s(plan.goalId()), s(plan.familyId()), s(plan.active()), s(plan.createdForPlan()), e(plan.planJson()), ts(plan.updatedAt()));
+            });
+
             writeEntry(zip, "README.txt", writer -> {
                 writer.write("家庭账房 v0.1 数据导出\n");
                 writer.write("导出时间: " + STAMP.format(LocalDateTime.now()) + "\n");
                 writer.write("家庭: " + family.getName() + " (id=" + family.getId() + ")\n\n");
-                writer.write("11 张 CSV 表格使用 UTF-8 编码,带 BOM,Excel 可直接打开。\n");
+                writer.write("12 张 CSV 表格使用 UTF-8 编码,带 BOM,Excel 可直接打开。\n");
                 writer.write("文件清单:\n");
                 writer.write("  families.csv     家庭基础信息\n");
                 writer.write("  members.csv      成员(不含密码哈希)\n");
@@ -215,6 +223,7 @@ public class CsvExportService {
                 writer.write("  principal_adjustments.csv  补录本金(以前就有、某期才补录的钱 · 算本金不算收益)\n");
                 writer.write("  fixed_flows.csv            固定收支的设置(含停用的)\n");
                 writer.write("  fixed_flow_occurrences.csv 固定收支每期的结果(确认 / 这期没有 / 关联)· 钱在 cash_flows / transfers / snapshots 里\n");
+                writer.write("  retirement_plans.csv       退休计划:币种、购买力基准日、全部输入与启用状态\n");
                 // v1.33 PRD §8 · 回收站不进导出包(删掉的账户在各表里本来就没有了),写明
                 writer.write("\n删除到「回收站」的账户不在这份导出里;要导出它,先在 管理 → 回收站 里恢复。\n");
             });

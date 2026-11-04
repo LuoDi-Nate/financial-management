@@ -45,6 +45,7 @@ public class GoalReportService {
                             .content(r.value())
                             .validatorStatus("PASS")
                             .promptRecordId(r.promptRecordId())
+                            .contextFingerprint(progress.retirement() == null ? null : progress.retirement().fingerprint())
                             .build();
                         reportMapper.upsertOwned(familyId, report);
                         log.info("goal={} monthly report generated · period={}", g.getId(), periodId);
@@ -85,6 +86,7 @@ public class GoalReportService {
                     .content(r.value())
                     .validatorStatus("PASS")
                     .promptRecordId(r.promptRecordId())
+                    .contextFingerprint(progress.retirement() == null ? null : progress.retirement().fingerprint())
                     .build();
                 reportMapper.upsertOwned(familyId, report);
                 log.info("goal={} monthly report generated on-demand", goalId);
@@ -130,6 +132,7 @@ public class GoalReportService {
                             .content(r.value())
                             .validatorStatus("PASS")
                             .promptRecordId(r.promptRecordId())
+                            .contextFingerprint(progress.retirement() == null ? null : progress.retirement().fingerprint())
                             .build();
                         reportMapper.upsertOwned(familyId, report);
                         log.info("goal={} alert generated · reason={}", g.getId(), reason);

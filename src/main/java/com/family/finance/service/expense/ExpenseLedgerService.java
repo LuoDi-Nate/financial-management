@@ -83,6 +83,9 @@ public class ExpenseLedgerService {
     private final FamilyMapper familyMapper;
     /** v1.8 · 只用来取「进行中账期」,判定近 N 期的上边界 —— 见 latestRecordableStart */
     private final com.family.finance.repository.PeriodMapper periodMapper;
+    /** 只在新的退休参考视图使用;性质仍经全站唯一判据,无反向依赖。 */
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private ExpenseNatureService retirementExpenseNature;
 
     /**
      * 一期支出的口径结果。source 让页面能说清「用的是哪一种」,itemCount 供文案显示「逐笔 · N 笔」。
@@ -154,6 +157,44 @@ public class ExpenseLedgerService {
 
     public PeriodExpense byPeriod(long familyId, long periodId) {
         return byPeriods(familyId, List.of(periodId)).getOrDefault(periodId, PeriodExpense.none(periodId));
+    }
+
+    /** 退休预算只是在既有支出来源上筛选消费,不改变任何全家庭指标。 */
+    public record RetirementBudget(BigDecimal amount, BigDecimal removed, String source, boolean totalOnly) { }
+
+    public Map<Long, RetirementBudget> retirementBudget(long familyId, Collection<Long> ids,
+                                                       java.util.Set<Long> excludedCategories, boolean excludeOneOff,
+                                                       java.util.Set<Long> explicitTotals) {
+        Map<Long, RetirementBudget> out = new LinkedHashMap<>();
+        if (ids.isEmpty()) return out;
+        var ledger = byPeriods(familyId, ids);
+        var grouped = cashFlowMapper.sumExpenseByPeriodCategoryOneOff(familyId, ids).stream()
+                .collect(java.util.stream.Collectors.groupingBy(CashFlowMapper.CatOneOffSum::periodId));
+        var natureMap = excludeOneOff ? retirementExpenseNature.natureMap(familyId) : java.util.Map.<Long, com.family.finance.domain.expense.ExpenseNature>of();
+        var excluded = excludedCategories.isEmpty() ? excludedCategories : retirementExpenseNature.expandCategories(familyId, excludedCategories);
+        for (Long id : ids) {
+            PeriodExpense source = ledger.get(id);
+            boolean total = source.source() == PeriodExpense.Source.TOTAL
+                    || (source.source() == PeriodExpense.Source.NONE && explicitTotals.contains(id));
+            if (total) {
+                out.put(id, new RetirementBudget(source.amountBase(), BigDecimal.ZERO, "历史家庭总额(无法拆消费/还款)", true));
+                continue;
+            }
+            var rows = grouped.getOrDefault(id, List.of());
+            if (rows.isEmpty()) continue;
+            BigDecimal amount = BigDecimal.ZERO, removed = BigDecimal.ZERO;
+            for (var row : rows) {
+                if (!"consumption".equals(row.categoryCode())) continue;
+                BigDecimal value = row.amountBase() == null ? BigDecimal.ZERO : row.amountBase();
+                if ((excludeOneOff && retirementExpenseNature.natureOf(row.oneOff(), row.expenseCategoryId(), natureMap)
+                        == com.family.finance.domain.expense.ExpenseNature.ONE_OFF)
+                        || (row.expenseCategoryId() != null && excluded.contains(row.expenseCategoryId())))
+                    removed = removed.add(value);
+                else amount = amount.add(value);
+            }
+            out.put(id, new RetirementBudget(amount, removed, "逐笔消费(不含还款等资金性质)", false));
+        }
+        return out;
     }
 
     /**

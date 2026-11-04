@@ -57,6 +57,13 @@ public class ExpenseNatureService {
         return out;
     }
 
+    public java.util.Set<Long> expandCategories(long familyId, java.util.Set<Long> selected) {
+        var result = new java.util.HashSet<>(selected);
+        for (var category : categoryMapper.findByFamily(familyId))
+            if (category.getParentId() != null && selected.contains(category.getParentId())) result.add(category.getId());
+        return result;
+    }
+
     /**
      * 单个类目的性质:本级 → 父级 → 弹性。
      *

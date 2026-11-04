@@ -9,6 +9,10 @@
 <main class="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10 py-5 sm:py-10 relative z-10">
   <p th:if="${reportNote != null}" role="status" class="mb-4 text-forest" th:text="${reportNote}"></p>
   <p th:if="${reportError != null}" role="alert" class="mb-4 text-rust" th:text="${reportError}"></p>
+  <div th:if="${goal.goalType.name() == 'RETIREMENT'}" class="mb-6 border-b border-rule pb-4">
+    <p class="text-sm text-ink-soft">此目标保留旧算法,不会自动迁移。</p>
+    <a th:href="@{|/goals/${goal.id}/retirement|}" class="btn-paper text-xs mt-2">查看新算法</a>
+  </div>
 
   <!-- 面包屑 + 操作 -->
   <div class="flex items-center justify-between mb-4">

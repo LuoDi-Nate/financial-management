@@ -46,6 +46,8 @@ public class GoalService {
      * 所以本类(原本只依赖 mapper 层)注入它不会引入循环依赖。
      */
     private final com.family.finance.service.expense.ExpenseLedgerService expenseLedger; // v0.16 · 自定义目标绑定账户
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.family.finance.repository.RetirementPlanMapper retirementPlanMapper;
 
     // ---------- v0.5 FR-82 · FIRE 月支出自动派生 ----------
 
@@ -66,6 +68,8 @@ public class GoalService {
         }
         for (Goal g : goals) {
             try {
+                if (retirementPlanMapper != null && retirementPlanMapper.find(familyId, g.getId())
+                        .filter(com.family.finance.repository.RetirementPlanMapper.Row::active).isPresent()) continue;
                 GoalParams p = parseParams(g);
                 if (!"AUTO_MONTHLY".equalsIgnoreCase(p.getExpenseMode())) continue;
                 int window = p.getExpenseWindowMonths() != null && p.getExpenseWindowMonths() > 0
@@ -184,6 +188,9 @@ public class GoalService {
     @Transactional
     public Goal update(long familyId, long goalId, String name, GoalParams params) {
         Goal goal = require(familyId, goalId);
+        if (retirementPlanMapper != null && retirementPlanMapper.find(familyId, goalId)
+                .filter(com.family.finance.repository.RetirementPlanMapper.Row::active).isPresent())
+            throw new IllegalArgumentException("此目标已采用退休生活账,请从调整计划修改");
         validateParams(goal.getGoalType(), params);
         goal.setName(name == null || name.isBlank() ? defaultName(goal.getGoalType()) : name.trim());
         goal.setParamsJson(serialize(params));

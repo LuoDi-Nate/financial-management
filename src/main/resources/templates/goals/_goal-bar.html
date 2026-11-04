@@ -9,12 +9,12 @@
 <a th:fragment="bar(gp)" th:href="@{|/goals/${gp.goal.id}|}"
    th:with="st=${gp.paceStatus},
             col=${gp.targetReached()} ? 'var(--forest)' : (${st == 'BEHIND'} ? 'var(--rust)' : (${st == 'AHEAD'} ? 'var(--forest)' : 'var(--brass-deep)')),
-            pctCap=${gp.progressPct > 100 ? 100 : gp.progressPct}"
+            pctCap=${gp.progressPct > 100 ? 100 : (gp.progressPct < 0 ? 0 : gp.progressPct)}"
    class="paper-card no-underline block px-3 py-2.5 mb-1.5 hover:bg-card-soft transition">
   <div class="flex items-center gap-2">
     <span th:style="'width:8px;height:8px;border-radius:50%;flex-shrink:0;display:inline-block;background:' + ${col}"></span>
     <b class="text-sm flex-1 text-ink" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" th:text="${gp.goal.name}">目标名</b>
-    <span class="font-mono text-sm tnum" th:style="'color:' + ${col}" th:text="${#numbers.formatDecimal(gp.progressPct, 1, 1)} + '%'">75.0%</span>
+    <span class="font-mono text-xs tnum" style="max-width:50%;text-align:right" th:style="'color:' + ${col}" th:text="${gp.progressLabel()}">75.0%</span>
   </div>
   <div class="w-full bg-rule-soft rounded-full overflow-hidden mt-1.5" style="height:6px">
     <div class="rounded-full" th:style="'height:6px;background:' + ${col} + ';width:' + ${pctCap} + '%'"></div>
@@ -22,7 +22,9 @@
   <div class="font-mono text-[10px] text-ink-subtle mt-1 flex items-center gap-2 flex-wrap">
     <span th:if="${gp.isCustom() and gp.daysLeft != null}" th:text="'还剩 ' + ${gp.daysLeft} + ' 天'">还剩 145 天</span>
     <span th:if="${gp.isCustom()}" th:text="${gp.metric != null} ? ${gp.metric.label()} : '金额合计'">金额合计</span>
-    <span th:unless="${gp.isCustom()}" th:text="${gp.neutralDate != null} ? ('中性达成 · ' + ${#temporals.format(gp.neutralDate, 'yyyy')}) : '长期'">长期</span>
+    <span th:unless="${gp.isCustom()}" th:text="${gp.neutralDate != null} ? ('中性首次达到 · ' + ${#temporals.format(gp.neutralDate, 'yyyy-MM')}) : '长期'">长期</span>
+    <span th:if="${gp.isNewRetirement()}">· 退休生活账 v1 · 当前计划</span>
+    <span th:if="${!gp.isNewRetirement() and gp.goal.goalType.name() == 'RETIREMENT'}">· 旧算法</span>
     <span th:if="${st == 'BEHIND'}" style="color:var(--rust)">· 落后</span>
     <span th:if="${st == 'AHEAD'}" style="color:var(--forest)">· 良好</span>
   </div>

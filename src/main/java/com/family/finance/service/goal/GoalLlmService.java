@@ -114,6 +114,8 @@ public class GoalLlmService {
      */
     public AiResult<String> generateMonthlyReport(long familyId, Goal goal,
                                                   GoalProgressService.GoalProgress progress) {
+        if (progress.isNewRetirement() && !progress.retirement().result().ready())
+            return AiResult.unavailable("退休计划尚待补齐或没有有限门槛,请先核对计划,不调用 AI 补算。");
         try {
             List<Member> members = memberDirectory.listAll(familyId);
             PromptBuilder.NameMapping mapping = PromptBuilder.buildNameMapping(members);
@@ -236,6 +238,8 @@ public class GoalLlmService {
     }
 
     private String buildMonthlyReportPrompt(Goal goal, GoalProgressService.GoalProgress p) {
+        if (p.isNewRetirement()) return p.retirement().result().aiSummary()
+                + "\n金额币种=" + p.retirement().plan().getBaseCurrency() + "。仅解释系统结果,不计算、不补全参数,不承诺退休安全。";
         // v0.16 · 自定义追踪目标:按指标 / 当前·目标 / 达标率 / 倒计时 / pace 组 prompt(预设仍走下方)
         if (goal.getGoalType() == GoalType.CUSTOM) {
             String unit = p.isRate() ? "%" : "元";
@@ -276,6 +280,8 @@ public class GoalLlmService {
     }
 
     private String buildAlertPrompt(Goal goal, GoalProgressService.GoalProgress p, String reason) {
+        if (p.isNewRetirement()) return p.retirement().result().aiSummary() + "\n预警原因:" + reason
+                + "。仅解释系统结果,不重算、不补全,不承诺退休安全。";
         return """
             目标:%s(类型 %s)· 当前进度 %.0f%%
             预警原因:%s

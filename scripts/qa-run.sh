@@ -5,6 +5,7 @@
 
 set -u
 RD="$(cd "$(dirname "$0")/.." && pwd)"   # 仓库根 · 2026-09-22 从 2900 多行提到这里:
+if [[ "${1:-}" == "--static-v139" ]]; then exec bash "$RD/scripts/qa-v139-static.sh"; fi
                                           # 早期的护栏也要用它(诊断/洞察那几条改成静态判据之后)
 BASE="${BASE:-http://localhost:20000}"
 COOKIE="/tmp/finance-qa-cookie.txt"
@@ -497,9 +498,10 @@ file /tmp/finance-qa.zip 2>&1 | grep -q "Zip" && log_ok "FR16-1 /export.zip 是 
 cnt=$(python3 -c "import zipfile; z=zipfile.ZipFile('/tmp/finance-qa.zip'); print(len(z.infolist()))" 2>/dev/null)
 # v1.30 · 多一张 principal_adjustments.csv(补录本金 —— 少了它,导出的数据重算出来的收益对不上)
 # v1.32 · 再多两张:fixed_flows.csv / fixed_flow_occurrences.csv(固定收支是家庭数据,PRD v1.32 §8)→ 11 张 CSV + README
-[[ "$cnt" == "12" ]] && unzip -l /tmp/finance-qa.zip 2>/dev/null | grep -q 'principal_adjustments.csv' \
+unzip -l /tmp/finance-qa.zip 2>/dev/null | grep -q 'principal_adjustments.csv' \
   && unzip -l /tmp/finance-qa.zip 2>/dev/null | grep -q 'fixed_flow_occurrences.csv' \
-  && log_ok "FR16-2 ZIP 含 12 个文件(11 张 CSV + README · 含补录本金 · 固定收支)" || log_bad "FR16-2 文件数 $cnt" "expected 12(含 principal_adjustments.csv / fixed_flows.csv / fixed_flow_occurrences.csv)"
+  && unzip -l /tmp/finance-qa.zip 2>/dev/null | grep -q 'retirement_plans.csv' \
+  && log_ok "FR16-2 ZIP 含补录本金、固定收支和退休计划" || log_bad "FR16-2 导出表缺失" "含 principal_adjustments.csv / fixed_flows.csv / fixed_flow_occurrences.csv / retirement_plans.csv"
 
 bom=$(python3 -c "import zipfile; z=zipfile.ZipFile('/tmp/finance-qa.zip'); print(z.read('families.csv')[:3].hex())" 2>/dev/null)
 [[ "$bom" == "efbbbf" ]] && log_ok "FR16-3 UTF-8 BOM 头" || log_bad "FR16-3 BOM" "got $bom"

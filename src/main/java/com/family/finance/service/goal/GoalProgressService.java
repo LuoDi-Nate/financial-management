@@ -52,10 +52,25 @@ public class GoalProgressService {
     private final GoalAccountMapper goalAccountMapper;   // v0.16 · 绑定账户
     /** v1.8 · 家庭支出唯一口径入口(逐笔 > 总额)· 见 ExpenseLedgerService 类注释 */
     private final com.family.finance.service.expense.ExpenseLedgerService expenseLedger;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private RetirementPlanService retirementPlans;
 
     public GoalProgress compute(long familyId, Goal goal) {
         // v0.16 · 自定义追踪目标走通用 evaluator + pace;预设三类保持既有口径 + 三情景
         if (goal.getGoalType() == GoalType.CUSTOM) return computeCustom(familyId, goal);
+        if (retirementPlans != null && goal.getGoalType() == GoalType.RETIREMENT) {
+            var retirement = retirementPlans.active(familyId, goal);
+            if (retirement.isPresent()) {
+                var view = retirement.get(); var r = view.result();
+                Goal displayed = new Goal();
+                org.springframework.beans.BeanUtils.copyProperties(goal, displayed);
+                displayed.setName(view.plan().getName()); displayed.setTargetDate(r.retirementDate());
+                return new GoalProgress(displayed, goalService.parseParams(goal), r.principal(), r.target(),
+                        r.coverage() == null ? BigDecimal.ZERO : r.coverage(), r.monthlyContribution(), null,
+                        goal.metricOrDefault(), goal.comparatorOrDefault(), goal.timeModeOrDefault(), null,
+                        view.plan().getAccountIds().size(), view);
+            }
+        }
 
         GoalParams params = goalService.parseParams(goal);
         BigDecimal pv = computePv(familyId, goal.getGoalType());
@@ -161,8 +176,14 @@ public class GoalProgressService {
         GoalComparator comparator,
         TimeMode timeMode,
         GoalPaceCalculator.Pace pace,
-        int accountCount
+        int accountCount,
+        RetirementPlanService.View retirement
     ) {
+        public GoalProgress(Goal goal, GoalParams params, BigDecimal pv, BigDecimal target, BigDecimal progress,
+                            BigDecimal monthlyContribution, GoalProjector.ScenarioResult scenarios, GoalMetric metric,
+                            GoalComparator comparator, TimeMode timeMode, GoalPaceCalculator.Pace pace, int accountCount) {
+            this(goal, params, pv, target, progress, monthlyContribution, scenarios, metric, comparator, timeMode, pace, accountCount, null);
+        }
         /** 向后兼容 7 参构造器(v0.3 老调用/测试继续用;新字段按 goal 默认回填)。 */
         public GoalProgress(Goal goal, GoalParams params, BigDecimal pv, BigDecimal target, BigDecimal progress,
                             BigDecimal monthlyContribution, GoalProjector.ScenarioResult scenarios) {
@@ -186,6 +207,7 @@ public class GoalProgressService {
         }
 
         public boolean targetReached() {
+            if (retirement != null) return retirement.result().reached();
             if (pace != null) return pace.status() == GoalPaceCalculator.Status.ACHIEVED;
             return target != null && pv != null && target.signum() > 0 && pv.compareTo(target) >= 0;
         }
@@ -195,10 +217,17 @@ public class GoalProgressService {
                 .movePointRight(2).setScale(2, java.math.RoundingMode.HALF_EVEN);
         }
         public LocalDate neutralDate() {
+            if (retirement != null) return retirement.result().neutralDate();
             return scenarios == null ? null : scenarios.neutralDate();
         }
         // ── v0.16 视图辅助 ──
         public boolean isCustom() { return goal.getGoalType() == GoalType.CUSTOM; }
+        public boolean isNewRetirement() { return retirement != null; }
+        public String progressLabel() {
+            if (retirement != null && (!retirement.result().ready() || retirement.result().coverage() == null))
+                return retirement.result().message();
+            return progressPct().setScale(1, java.math.RoundingMode.HALF_EVEN).toPlainString() + "%";
+        }
         public boolean isRate() { return metric != null && metric.isRate(); }
         public Long daysLeft() { return pace == null ? null : pace.daysLeft(); }
         public String paceStatus() { return pace == null ? "NONE" : pace.status().name(); }

@@ -97,6 +97,7 @@ public class GoalController {
                               @PathVariable String type,
                               Model model) {
         GoalType goalType = parseType(type);
+        if (goalType == GoalType.RETIREMENT) return "redirect:/goals/retirement/new";
         model.addAttribute("nav", navService.load(me));
         model.addAttribute("goalType", goalType);
         model.addAttribute("currentYear", java.time.Year.now().getValue());
@@ -224,6 +225,7 @@ public class GoalController {
                          Model model) {
         Goal goal = goalService.require(me.getFamilyId(), id);
         GoalProgress progress = progressService.compute(me.getFamilyId(), goal);
+        if (progress.isNewRetirement()) return "redirect:/goals/" + id + "/retirement";
         model.addAttribute("nav", navService.load(me));
         model.addAttribute("goal", goal);
         model.addAttribute("progress", progress);
@@ -287,6 +289,8 @@ public class GoalController {
                            @PathVariable long id,
                            Model model) {
         Goal goal = goalService.require(me.getFamilyId(), id);
+        if (goal.getGoalType() == GoalType.RETIREMENT && progressService.compute(me.getFamilyId(), goal).isNewRetirement())
+            return "redirect:/goals/" + id + "/retirement?tab=plan";
         if (goal.getGoalType() == GoalType.CUSTOM) {
             model.addAttribute("nav", navService.load(me));
             model.addAttribute("goal", goal);
@@ -365,6 +369,8 @@ public class GoalController {
     public ResponseEntity<Map<String, Object>> adviseParams(@AuthenticationPrincipal MemberPrincipal me,
                                                             @PathVariable String type) {
         GoalType goalType = parseType(type);
+        if (goalType == GoalType.RETIREMENT)
+            return ResponseEntity.ok(Map.of("ok", false, "error", "退休计划的预算、预留和回报假设由家庭确认,不交给 AI 代填。"));
         GoalLlmService.AiResult<com.family.finance.domain.goal.GoalParams> r =
             llmService.recommendParams(me.getFamilyId(), goalType);
         if (!r.ok()) {

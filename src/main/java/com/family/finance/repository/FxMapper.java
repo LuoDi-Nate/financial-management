@@ -14,6 +14,14 @@ import java.util.Optional;
 public interface FxMapper {
 
     @Select("""
+            SELECT fx.id,fx.family_id,fx.base_currency,fx.quote_currency,fx.period_id,fx.rate,fx.source,fx.fetched_at,p.period_start
+              FROM fx_rate fx JOIN period p ON p.id=fx.period_id AND p.family_id=fx.family_id
+             WHERE fx.family_id=#{familyId} AND p.period_start <= #{asOf}
+             ORDER BY p.period_start DESC,fx.fetched_at DESC
+            """)
+    List<FxRate> findRatesAsOf(@Param("familyId") long familyId, @Param("asOf") java.time.LocalDate asOf);
+
+    @Select("""
             SELECT id, family_id, base_currency, quote_currency, period_id, rate, source, fetched_at
               FROM fx_rate
              WHERE family_id = #{familyId}

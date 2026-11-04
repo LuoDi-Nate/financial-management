@@ -675,6 +675,10 @@ public class LlmDiagnoseService {
             if (progresses.isEmpty()) return null;
             StringBuilder sb = new StringBuilder("家庭已设定的目标(基于目标的相对视角):\n");
             for (var p : progresses) {
+                if (p.isNewRetirement()) {
+                    sb.append("  - ").append(p.retirement().result().aiSummary()).append('\n');
+                    continue;
+                }
                 String name = p.goal().getName();
                 String type = p.goal().getGoalType().name();
                 int pct = p.progressPct().intValue();

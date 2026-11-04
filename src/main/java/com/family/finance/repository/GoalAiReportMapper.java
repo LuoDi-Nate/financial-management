@@ -18,7 +18,7 @@ import java.util.Optional;
 public interface GoalAiReportMapper {
 
     String COLS = " r.id, r.goal_id, r.period_id, r.report_type, r.content,"
-            + " r.validator_status, r.generated_at, r.dismissed_at, r.prompt_record_id ";
+            + " r.validator_status, r.generated_at, r.dismissed_at, r.prompt_record_id, r.context_fingerprint ";
 
     /** 归属链:goal_ai_report → family_goal.family_id */
     String OWNED = " JOIN family_goal g ON g.id = r.goal_id";
@@ -49,14 +49,15 @@ public interface GoalAiReportMapper {
     int countRecentAlerts(@Param("familyId") long familyId, @Param("goalId") long goalId);
 
     @Insert("""
-            INSERT INTO goal_ai_report (goal_id, period_id, report_type, content, validator_status, prompt_record_id)
-            SELECT #{r.goalId}, #{r.periodId}, #{r.reportType}, #{r.content}, #{r.validatorStatus}, #{r.promptRecordId}
+            INSERT INTO goal_ai_report (goal_id, period_id, report_type, content, validator_status, prompt_record_id, context_fingerprint)
+            SELECT #{r.goalId}, #{r.periodId}, #{r.reportType}, #{r.content}, #{r.validatorStatus}, #{r.promptRecordId}, #{r.contextFingerprint}
               FROM family_goal g
              WHERE g.id = #{r.goalId} AND g.family_id = #{familyId}
             ON DUPLICATE KEY UPDATE
                 content = VALUES(content),
                 validator_status = VALUES(validator_status),
                 prompt_record_id = VALUES(prompt_record_id),
+                context_fingerprint = VALUES(context_fingerprint),
                 generated_at = CURRENT_TIMESTAMP,
                 dismissed_at = NULL
             """)

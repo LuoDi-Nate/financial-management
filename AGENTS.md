@@ -146,7 +146,7 @@ worktree 的工作目录里没有 `.githooks/`(那是 master 上的文件),hook 
 | 填报 | `/entry` | 每月录入:账户余额快照 + 收支 + 划转;**收入侧结构化**(现金/股票·联动持仓);**「本月收支」下面一行固定收支**(v1.32:到日子的一键确认 · 贷款趋势建议也在这里 · 标题行「固定收支」进管理页);退休目标折叠于此 | `entry/index.html` + `_row.html` + `_income-stock.html` + `_fixed-flows.html` · `EntryController`/`EntryService` · `FixedFlowEntryController` |
 | 账户 | `/accounts` | **10 类**账户簿(现金/股票/理财/基金/加密/贵金属/房产/负债/保险/其他) · 按成员归集 · 划转/体检/账本/导出(时间线含「# 持仓数量」)· **删除账户**(v1.33:⋯ 菜单 / 编辑页「危险操作」/ 手机行内 → `/accounts/{id}/delete` 终端面板 · 先备份 · 进回收站) · **调整顺序**(v1.34 · 拖拽:账户簿顶上 → `/accounts/order`,按成员分组组内拖;持仓列表头上 → `/accounts/{id}/holdings/order`;两页共用 `static/js/sort-board.js`)/ 持仓卡片「改名」· 能挂持仓的账户 → 持仓管理(v1.30「添加持仓 · 场外基金」→ `/accounts/{id}/holdings/new-fund`;手填基金「改为按净值自动估值」→ `/to-nav`) | `accounts/*`(`delete.html` · `order.html`)· `stock/holdings.html` · `stock/holding-order.html` · `stock/fund-new.html` + `_fund-parts.html` · `StockHoldingController` · `FundHoldingController` · `AccountDeleteController` |
 | 报表 | `/reports` | **月度封板快照**(v1.10 三区):一区 本期封板(资产负债表/资金流瀑布/环比同比/归因)· 二区 结构与风险(集中度/流动性分层)· 三区 趋势(**range 只作用于此**)· 账期筛选 + 长文目录 TOC | `reports/*` · `_toc` |
-| 目标 | `/goals` | FIRE 退休 / 教育 / 应急金 · 三情景预测 | `goals/*` |
+| 目标 | `/goals` | FIRE 退休 / 教育 / 应急金 · 三情景预测;v1.39 退休生活账 `/goals/{id}/retirement`(生活账/调整/原理),新建 `/goals/retirement/new`;老目标逐个比较后采用,可退出回原算法 | `goals/*` · `RetirementController` · `RetirementPlanService` |
 | 资产体检 | `/checkup` | 4 维诊断(配置/风险/流动性/收益)+ AI 调仓 · **长文目录 TOC** · v1.27 分析范围切换(`?scope=`)+ AI 模板选择行(`?tpl=`)+ AI 页脚「换模板 / 定制这个模板」 | `checkup/*` · `_toc` · `_analysis-footer` |
 | 管理 | `/admin` | **所有运营参数热改**(品牌/成员/周期/提醒/汇率/数据源/券商/AI/阈值/aksk/key)· 改即生效不重启 · 按「用户要完成的事」分入口:数据源接入 = 系统拉的公共数据(行情/汇率/贵金属/宏观)· 券商同步 = 自己的券商凭据(`/admin/broker`,v1.26)· AI 接入 = 大模型与超级 Agent · **分析设置 = 怎么分析我家**(`/admin/analysis`,v1.27:默认范围 / 模板 / 不参与的账户 / 配置锚含自定义 / 分析偏好;模板定制页 `/admin/analysis/template/new?from=&back=`,存完回来处重跑)· **侧栏条目只有一份清单**(`admin/_sidebar.html` 的 groups,四组与总览页一致;PC 是分组侧栏,手机是一行「管理 › 当前页 · 切换」+ 底部抽屉,v1.31)—— 加设置页:总览页加卡片 + 清单里加一项 + 页面 include 侧栏,护栏 `v131-ADMIN-NAV` 盯着 · **回收站**(`/admin/trash`,v1.33:删掉的账户 · 恢复 / 彻底清除)| `admin/*` · `TrashController` |
 | 公开 | `/`(landing) `/login` `/onboarding` | 落地页(含工程数字带)/ 登录 / 首次引导 | `landing.html`(`data-stat`)· `auth/*` · `onboarding/*` |
@@ -211,8 +211,12 @@ worktree 的工作目录里没有 `.githooks/`(那是 master 上的文件),hook 
 
 ## 7. 联动不变量登记表(改 X → 必须同步 Y,否则下游静默错)
 
+v1.39 退休计划是独立 `retirement_plan` 中的确定性假设,不是账户事实:资金 A 按用户选择,全部负债 D 与剩余预留 B 各扣一次;P=A−D−B,T=12×max(X−J,0)/r。旧目标未采用仍走旧算法,采用/退出不覆盖旧 params。原生新目标在回滚到 v1.39 之前由回滚 SQL 暂时归档,重新升级可恢复。未选账户、缺失、零、负本金和无有限门槛均有不同语义。`analysis_excluded` 不替代退休资金选择。
+
 | # | 触发 | 必须同步 | 守护 |
 |---|---|---|---|
+| L34 · 退休计划(v1.39) | 改退休金额/来源/计划版本/预测 | 所有消费者只读 GoalProgress.retirement;预算与投入锚已定稿同窗,本金锚当前余额,不以旧 PMC 决定月份;自动预算只跟定稿事实,固定预算不被余额刷新覆盖。比率/达成月跨币种不变;旧报告校验计划结果指纹;JSON 中选中账户失效要显式报出,空选择不能回全家。预留/负债各扣一次,不写流水 | RetirementCalculatorTest · RetirementDataServiceTest · RetirementPlanServiceTest · `qa-run.sh --static-v139` · e2e 58 |
+| L35 · AI 出口(v1.39) | 新增文本或本地 Agent 调用/改超时与状态 | 分类走 LlmRouter,工具流用同一候选及平台冷却;已有可见产出不重放。超时逐请求读配置;失败原因是请求局部安全文案,不透传异常正文。设置页只读模板缓存,显式检查才查远端,缓存按配置指纹隔离 | LlmAvailabilityV139Test · LocalToolLoopRoutingTest · ManagedTemplateStatusTest · `qa-run.sh --static-v139` |
 | L1 · 收支口径 | 改收入/支出**来源口径**(PMC↔`cash_flow`)、`is_adjustment` 语义 | `FactViewServiceImpl`(`netInflowIncome/Expense`/`cashflowBreakdown`/`familyXirr` 外部流入)· `HouseholdCashflowService`(`incomeBlend`/月均/储蓄率)· **dashboard `CashflowSplitView.empty()`**(空态别只看 PMC filledMembers)· `reports/_savings` 空态 · 收入列表展示/合计 | `v12-INCOME-KOUJING/EMPTY` · `CashflowSplitEmptyTest` · `CashflowBreakdownTest` |
 | L2 · 账户币种 vs 本位币 | 任何**展示/汇总** `cash_flow.amount` / `period_snapshot.end_balance` | 存的是**账户币种**;单账户展示用账户币种符号(`MoneyFormat`);**家庭/跨账户聚合必须 ×`fxToBase`**,不裸加 ¥;缺直接汇率反向取倒数兜底(`EntryController.toBaseAmount`/`AccountValuationService.resolveFxRate`) | `v12-INCOME-FX` |
 | L3 · 比值类 KPI 币种不变性 | 新增/改**比例类**指标 | 三视图币种下**比值完全相等**、金额按 fx 缩放;两比值相比用**相减(pp)**非相除 | `v05-CCY-INV-1` · `v08-CCY-INV-3` · `CurrencyInvarianceTest` |

@@ -25,7 +25,7 @@ ask_unmet_need audit_log backup_log expense_account_rule expense_category expens
 expense_merchant_rule family_goal family_notify_config family_runtime_config fx_rate holding_import
 lens_board member metrics_recompute_log period period_member_cashflow rebalance_advice_cache
 rebalance_plan report_reminder_log review_ai_cache stock_valuation_event holding_share_event principal_adjustment account_trash
-fixed_flow fixed_flow_occurrence""".split())
+fixed_flow fixed_flow_occurrence retirement_plan""".split())
 
 INDIRECT = set("""account_group_member account_insurance_policy broker_link cash_flow goal_account
 goal_ai_report holding_allocation holding_import_item period_account_attr period_account_group

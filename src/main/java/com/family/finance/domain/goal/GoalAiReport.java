@@ -27,4 +27,6 @@ public class GoalAiReport {
     private LocalDateTime dismissedAt;
     /** v1.28 · 生成这份报告的那次调用(llm_prompt_record.id)· 空 = 本版之前生成的老报告 */
     private Long promptRecordId;
+    /** 新退休计划的参数与系统结果指纹;空的老报告仅供历史参考。 */
+    private String contextFingerprint;
 }

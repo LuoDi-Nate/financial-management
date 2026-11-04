@@ -21,4 +21,10 @@ public class FxRate {
     private BigDecimal rate;
     private String source;
     private LocalDateTime fetchedAt;
+    private java.time.LocalDate periodStart;
+
+    public FxRate(Long id, Long familyId, String baseCurrency, String quoteCurrency, Long periodId,
+                  BigDecimal rate, String source, LocalDateTime fetchedAt) {
+        this(id, familyId, baseCurrency, quoteCurrency, periodId, rate, source, fetchedAt, null);
+    }
 }
