@@ -94,4 +94,11 @@ class RetirementDataServiceTest {
         assertThat(RetirementDataService.eligible(AccountType.CASH)).isTrue(); assertThat(RetirementDataService.eligible(AccountType.FUND)).isTrue();
         assertThat(RetirementDataService.eligible(AccountType.PROPERTY)).isFalse(); assertThat(RetirementDataService.eligible(AccountType.INSURANCE)).isFalse();
     }
+    @Test void weeklyPeriodCannotBeSilentlyTreatedAsMonthlyContribution() {
+        var p = setup(7L,8L,9L); month(7,"1000","100",0,1); month(8,"1000","100",0,1); month(9,"1000","100",0,1);
+        when(families.findById(1)).thenReturn(Optional.of(Family.builder().id(1L).baseCurrency("CNY").periodType(PeriodType.WEEKLY).build()));
+        var result = service.load(1,p,today);
+        assertThat(result.suggestedExpense()).isNull(); assertThat(result.suggestedContribution()).isNull();
+        assertThat(result.budgetNotes()).anyMatch(s -> s.contains("周账期"));
+    }
 }

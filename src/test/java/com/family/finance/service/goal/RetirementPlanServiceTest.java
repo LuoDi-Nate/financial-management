@@ -73,4 +73,16 @@ class RetirementPlanServiceTest {
         assertThat(service.active(1,Goal.builder().id(8L).goalType(GoalType.EDUCATION).build())).isEmpty();
         verifyNoInteractions(mapper,data);
     }
+    @Test void planLookupIsBatchedWithinOneRequestAndRefreshedNextRequest() {
+        var goal = Goal.builder().id(9L).goalType(GoalType.RETIREMENT).build();
+        try {
+            org.springframework.web.context.request.RequestContextHolder.setRequestAttributes(
+                    new org.springframework.web.context.request.ServletRequestAttributes(new org.springframework.mock.web.MockHttpServletRequest()));
+            service.active(1,goal); service.active(1,goal);
+            verify(mapper,times(1)).findAll(1);
+            org.springframework.web.context.request.RequestContextHolder.setRequestAttributes(
+                    new org.springframework.web.context.request.ServletRequestAttributes(new org.springframework.mock.web.MockHttpServletRequest()));
+            service.active(1,goal); verify(mapper,times(2)).findAll(1);
+        } finally { org.springframework.web.context.request.RequestContextHolder.resetRequestAttributes(); }
+    }
 }

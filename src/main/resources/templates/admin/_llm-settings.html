@@ -304,7 +304,7 @@
           <div>
             <label class="field-label">超时秒 · timeout</label>
             <input class="field-input" type="number" name="timeoutSeconds" th:value="${llmTimeoutSeconds}" min="5" max="120"/>
-            <p class="font-mono text-[10px] text-ink-subtle mt-1 tracking-wider">默认 25 · 改动需重启</p>
+            <p class="text-[10px] text-ink-subtle mt-1">默认 25 秒 · 下一次请求生效。流式回答指等待下一段内容的上限,不是整轮工具对话的总时长。</p>
           </div>
         </div>
       </div>

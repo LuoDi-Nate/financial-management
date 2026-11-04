@@ -46,7 +46,7 @@ public class RetirementController {
         return page(me, null, plans.draft(me.getFamilyId(), null), "plan", "CNY", model);
     }
 
-    @GetMapping("/goals/{id}/retirement")
+    @GetMapping("/goals/{id:[0-9]+}/retirement")
     String detail(@AuthenticationPrincipal MemberPrincipal me, @PathVariable long id,
                   @RequestParam(defaultValue = "overview") String tab,
                   @RequestParam(required = false) String ccy, Model model) {
@@ -54,7 +54,7 @@ public class RetirementController {
         return page(me, goal, plans.draft(me.getFamilyId(), goal), tab, ccy, model);
     }
 
-    @PostMapping({"/goals/retirement/new/preview", "/goals/{id}/retirement/preview"})
+    @PostMapping({"/goals/retirement/new/preview", "/goals/{id:[0-9]+}/retirement/preview"})
     String preview(@AuthenticationPrincipal MemberPrincipal me, @PathVariable(required = false) Long id,
                    @ModelAttribute("plan") RetirementPlan plan, org.springframework.validation.BindingResult binding,
                    @RequestParam(required = false) String ccy, Model model) {
@@ -68,7 +68,7 @@ public class RetirementController {
         return page(me, goal, plan, "overview", ccy, model);
     }
 
-    @PostMapping({"/goals/retirement/new", "/goals/{id}/retirement"})
+    @PostMapping({"/goals/retirement/new", "/goals/{id:[0-9]+}/retirement"})
     String save(@AuthenticationPrincipal MemberPrincipal me, @PathVariable(required = false) Long id,
                 @ModelAttribute("plan") RetirementPlan plan, org.springframework.validation.BindingResult binding,
                 @RequestParam(defaultValue = "false") boolean adoptionConfirmed, Model model, RedirectAttributes ra) {
@@ -85,14 +85,14 @@ public class RetirementController {
         }
     }
 
-    @PostMapping("/goals/{id}/retirement/revert")
+    @PostMapping("/goals/{id:[0-9]+}/retirement/revert")
     String revert(@AuthenticationPrincipal MemberPrincipal me, @PathVariable long id, RedirectAttributes ra) {
         plans.revert(me.getFamilyId(), id, me.getMemberId());
         ra.addFlashAttribute("reportNote", "已恢复原来的退休算法与参数,新方案草稿仍保留。");
         return "redirect:/goals/" + id;
     }
 
-    @GetMapping("/goals/{id}/retirement/export")
+    @GetMapping("/goals/{id:[0-9]+}/retirement/export")
     @ResponseBody
     ResponseEntity<String> export(@AuthenticationPrincipal MemberPrincipal me, @PathVariable long id) {
         var goal = retirementGoal(me, id);
