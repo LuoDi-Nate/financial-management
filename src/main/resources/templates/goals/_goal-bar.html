@@ -14,7 +14,7 @@
   <div class="flex items-center gap-2">
     <span th:style="'width:8px;height:8px;border-radius:50%;flex-shrink:0;display:inline-block;background:' + ${col}"></span>
     <b class="text-sm flex-1 text-ink" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" th:text="${gp.goal.name}">目标名</b>
-    <span class="font-mono text-xs tnum" style="max-width:50%;text-align:right" th:style="'color:' + ${col}" th:text="${gp.progressLabel()}">75.0%</span>
+    <span class="font-mono text-xs tnum" th:style="'max-width:50%;text-align:right;overflow-wrap:anywhere;color:' + ${col}" th:text="${gp.progressLabel()}">75.0%</span>
   </div>
   <div class="w-full bg-rule-soft rounded-full overflow-hidden mt-1.5" style="height:6px">
     <div class="rounded-full" th:style="'height:6px;background:' + ${col} + ';width:' + ${pctCap} + '%'"></div>

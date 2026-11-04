@@ -181,6 +181,7 @@
 
   <section id="retire-principle" role="tabpanel" data-retire-panel="principle">
     <h2 class="font-display text-2xl mb-5">每一步都能复算</h2>
+    <p class="text-sm text-ink-soft mb-4">原计划金额基准日 <span th:text="${view.plan().priceDate}"></span>;本次按计划通胀折到 <span th:text="${r.asOf()}"></span>,每项金额先按分取整后进入计算。</p>
     <div class="retire-formulas"><p>r = (1 + R) ÷ (1 + π) − 1</p>
       <p>本次 r = <b th:text="${r.realRate() == null ? '待填' : #numbers.formatDecimal(r.realRate()*100,1,6) + '%'}"></b><span th:if="${plan.directRealRate}"> · 直接输入,不再扣通胀</span></p>
       <p>P = A − D − B = <b data-priv th:text="${money.amount(r.assets())} + ' − ' + ${money.amount(r.debt())} + ' − ' + ${money.amount(r.reserves())} + ' = ' + ${money.amount(r.principal())}"></b></p>

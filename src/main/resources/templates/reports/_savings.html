@@ -185,6 +185,9 @@
   })();
   /*]]>*/
 </script>
+  <th:block th:if="${goalsProgress != null and !#lists.isEmpty(goalsProgress)}">
+    <div th:replace="~{goals/_progress-strip :: strip(${goalsProgress})}"></div>
+  </th:block>
 </section>
 </body>
 </html>

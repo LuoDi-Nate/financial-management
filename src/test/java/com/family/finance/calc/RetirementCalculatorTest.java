@@ -124,6 +124,7 @@ class RetirementCalculatorTest {
         var r = RetirementCalculator.calculate(plan(), today, n("6000000"), BigDecimal.ZERO, null, List.of("汇率缺失"));
         assertThat(r.ready()).isFalse(); assertThat(r.scenarios()).isEmpty();
         assertThat(r.problems()).contains("汇率缺失");
+        assertThat(r.coverage()).isNull(); assertThat(r.gap()).isNull(); assertThat(r.supportedExpense()).isNull();
     }
     @Test void originalMoneyIsRebasedWhenPriceDateChanges() {
         var p = plan(); p.setPriceDate(today.minusYears(1));

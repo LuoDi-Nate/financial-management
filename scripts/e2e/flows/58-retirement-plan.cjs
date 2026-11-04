@@ -111,6 +111,7 @@ module.exports = {
     await screenshot(ui,'desktop-overview');
     for (const page of ['/dashboard','/reports']) {
       await ui.goto(page);
+      await ui.visible(`a[href="/goals/${state.native}"]`,page+':实际渲染目标入口');
       await ui.assert((await ui.page.locator(`a[href="/goals/${state.native}"]`).first().innerText()).includes('100.0%'),page+':目标条沿用同一退休结果');
     }
     await ui.goto(`/goals/${state.native}/retirement`);
@@ -186,6 +187,11 @@ module.exports = {
         .every(el=>el.scrollWidth<=el.clientWidth+2)),'手机:展开来源后日期与金额不挤出单元格');
       await mobile.click('[data-retire-tab="principle"]','手机查看原理');
       await screenshot(mobile,'mobile-principle');
+      await mobile.click('[data-retire-tab="plan"]','手机核对无有限门槛状态'); await mobile.fillByName('realReturnPct','0','#retirement-form');
+      await mobile.click('[data-retire-save]','手机保存零回报'); await mobile.goto('/goals');
+      await mobile.assert(await mobile.page.locator(`a[href="/goals/${state.native}"]`).evaluate(el=>el.scrollWidth<=el.clientWidth+2),'手机:目标列表的长状态不溢出');
+      await mobile.goto(`/goals/${state.native}/retirement?tab=plan`); await mobile.fillByName('realReturnPct','2.5','#retirement-form');
+      await mobile.click('[data-retire-save]','手机恢复正回报');
     });
     await ui.goto('/admin/ai-access'); await ui.rendered('AI 接入页');
     await ui.visible('#template-status','模板状态不阻塞主页面');

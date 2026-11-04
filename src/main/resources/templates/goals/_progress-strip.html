@@ -17,9 +17,9 @@
              目标进度 = 家庭净资产 ÷ 目标值,而目标值是【以本位币存的绝对金额】、目标本身是【全家庭】的,
              所以它既不随视图币种走、也不随账户筛选走,而且是【此刻】而非某个历史账期。
              这个口径本来就和上面的 KPI 不同 —— 与其悄悄不一致,不如公开地不一致。 -->
-        <span class="text-xs text-ink-subtle">全家庭 · 本位币 · 此刻</span>
+        <span class="text-xs text-ink-subtle">当前计划 · 本位币 · 此刻</span>
         <span th:if="${goalsViewIndependent}" class="font-mono text-[10px] text-brass-deep"
-              title="目标值是以本位币存的绝对金额、目标是全家庭的,所以这一条不跟随上面的币种/账户/账期筛选">
+              title="金额以本位币保存、范围按各自目标计划,这一条不随上方币种/账户/账期筛选变化">
           · 不随上方筛选变化</span>
       </div>
       <a th:href="@{/goals}" class="font-mono text-[10px] tracking-[0.18em] uppercase text-brass-deep hover:text-ink no-underline">→ 完整看板</a>

@@ -47,6 +47,9 @@ class RetirementPlanServiceTest {
         assertThat(g.getTargetDate()).isEqualTo(LocalDate.of(2040,1,1));
         assertThat(g.getTargetValue()).isEqualByComparingTo("123456");
         verify(goalMapper,never()).update(any());
+        when(mapper.find(1,9)).thenReturn(Optional.of(new RetirementPlanMapper.Row(9,1,service.encode(p),true,false,null)));
+        p.setBaseCurrency("USD");
+        assertThatThrownBy(() -> service.save(1,9L,p,true)).hasMessageContaining("不能将旧金额直接当作新币种");
     }
     @Test void revertOnlyDeactivatesPlanWithoutReconstructingLegacyParameters() {
         legacy(); when(mapper.find(1,9)).thenReturn(Optional.of(new RetirementPlanMapper.Row(9,1,"{}",true,false,null)));

@@ -84,7 +84,10 @@ public final class RetirementCalculator {
                 : income.add(principal.multiply(real).divide(TWELVE, MC));
         State state;
         String message;
-        if (!problems.isEmpty()) { state = State.MISSING; message = "待补齐 / 核对"; }
+        if (!problems.isEmpty()) {
+            state = State.MISSING; message = "待补齐 / 核对";
+            coverage = null; gap = null; supported = null;
+        }
         else if (principal.signum() < 0) { state = State.RESERVES_SHORT; message = "单独预留仍有缺口"; }
         else if (target == null) { state = State.NO_FINITE_TARGET; message = "这组假设没有有限的永久本金门槛"; }
         else if (need.signum() == 0) { state = State.INCOME_COVERS; message = "计划退休起的收入覆盖生活费,仍需保留预留"; }

@@ -53,7 +53,8 @@ public class RetirementPlanService {
         var data = dataService.load(familyId, p, today);
         List<String> problems = new ArrayList<>(data.problems());
         if (p.isAutoExpense() && data.suggestedExpense() == null) problems.add("账上预算建议不足3期或包含需核对的退款/总额月份,可改为手填预算");
-        var result = RetirementCalculator.calculate(p, today, data.selectedAssets(), data.debt(), data.suggestedExpense(), problems);
+        var result = RetirementCalculator.calculate(p, today, data.problems().isEmpty() ? data.selectedAssets() : null,
+                data.problems().isEmpty() ? data.debt() : null, data.suggestedExpense(), problems);
         String fingerprint = com.family.finance.service.llmtrace.PromptRecorder.sha256(encode(p) + "|" + result.aiSummary());
         return new View(p, result, data, updatedAt, created, active, fingerprint);
     }
@@ -104,6 +105,8 @@ public class RetirementPlanService {
         Goal goal = goalId == null ? null : goalService.require(familyId, goalId);
         if (goal != null && goal.getArchivedAt() != null) throw new IllegalArgumentException("请先恢复目标再修改计划");
         var existing = goal == null ? Optional.<RetirementPlanMapper.Row>empty() : mapper.find(familyId, goalId);
+        if (existing.isPresent() && !Objects.equals(parse(existing.get().planJson()).getBaseCurrency(), p.getBaseCurrency()))
+            throw new IllegalArgumentException("家庭本位币已改变,不能将旧金额直接当作新币种;请按新币种新建退休计划,此目标保留作历史参考");
         if (goal != null && existing.filter(RetirementPlanMapper.Row::active).isEmpty() && !adoptionConfirmed)
             throw new IllegalArgumentException("请先比较旧新算法,并确认采用新方案");
         validate(p);

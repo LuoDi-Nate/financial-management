@@ -827,6 +827,7 @@ public class ReportsController {
             model.addAttribute("savingsTotalMonths", savings.totalPeriods());
             model.addAttribute("savingsAvailable", savings.filledPeriods() > 0);
             model.addAttribute("goalsProgress", goalProgressService.computeAll(me.getFamilyId()));
+            model.addAttribute("goalsViewIndependent", true);
             // stash for tooltip
             savAvail = savings.filledPeriods() > 0;
             savFilled = savings.filledPeriods();
