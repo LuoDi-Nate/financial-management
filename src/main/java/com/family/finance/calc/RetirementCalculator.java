@@ -57,12 +57,13 @@ public final class RetirementCalculator {
                 : p.getNominalReturnPct() == null || inflation == null ? null
                 : BigDecimal.ONE.add(fraction(p.getNominalReturnPct())).divide(BigDecimal.ONE.add(inflation), MC).subtract(BigDecimal.ONE);
         BigDecimal factor = p.getPriceDate() == null || inflation == null ? null : priceFactor(p.getPriceDate(), today, inflation);
-        BigDecimal expense = p.isAutoExpense() ? autoExpenseToday : scale(p.getMonthlyExpense(), factor);
-        BigDecimal income = scale(p.getMonthlyIncome(), factor);
-        BigDecimal reserves = p.getChildReserve() == null || p.getMedicalReserve() == null
+        BigDecimal expense = p.isAutoExpense() ? autoExpenseToday : money(scale(p.getMonthlyExpense(), factor));
+        BigDecimal income = money(scale(p.getMonthlyIncome(), factor));
+        BigDecimal reserves = factor == null || p.getChildReserve() == null || p.getMedicalReserve() == null
                 || p.getHousingReserve() == null || p.getOtherReserve() == null ? null
-                : scale(p.getChildReserve().add(p.getMedicalReserve()).add(p.getHousingReserve()).add(p.getOtherReserve()), factor);
-        BigDecimal contribution = p.isContributionFollowsInflation() ? scale(p.getMonthlyContribution(), factor) : p.getMonthlyContribution();
+                : money(scale(p.getChildReserve(), factor)).add(money(scale(p.getMedicalReserve(), factor)))
+                    .add(money(scale(p.getHousingReserve(), factor))).add(money(scale(p.getOtherReserve(), factor)));
+        BigDecimal contribution = p.isContributionFollowsInflation() ? money(scale(p.getMonthlyContribution(), factor)) : p.getMonthlyContribution();
         if (expense == null) problems.add("生活预算缺失或账上建议不足");
         if (income == null) problems.add("退休月收入缺失");
         if (reserves == null) problems.add("预留金额未填,无需预留也应明确填零");

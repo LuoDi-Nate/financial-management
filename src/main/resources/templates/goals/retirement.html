@@ -70,8 +70,9 @@
       <h2 class="font-display text-2xl mb-3">钱从哪里来</h2>
       <p class="text-sm text-ink-soft mb-4">账户级余额 · <span th:text="${view.data().baseCurrency()}"></span> · 自住房和保单默认不作生活本金;借款、信用卡负债均预留一次。</p>
       <table class="w-full m-cards text-sm"><thead><tr><th>账户</th><th>金额</th><th>录入时间</th><th>处理方式</th></tr></thead>
-        <tbody><tr th:each="a : ${view.data().assets()}"><td class="m-title" th:text="${a.name()}"></td><td data-label="金额" data-priv th:text="${money.amount(a.amount())}"></td>
-          <td data-label="录入时间" th:text="${a.recordedAt() ?: '余额未填'}"></td><td data-label="处理方式" th:text="${a.liability() ? '全部负债预留' : (a.selected() ? '已纳入' : '未纳入')} + ' · ' + ${a.note()}"></td></tr></tbody>
+        <tbody><tr th:each="a : ${view.data().assets()}"><td class="m-title" th:text="${a.name()}"></td><td data-label="金额" data-priv><span th:text="${money.amount(a.amount())}"></span>
+          <small th:if="${a.currency() != plan.baseCurrency}" class="block text-ink-soft" th:text="${a.currency() + ' ' + a.original() + ' × ' + a.fx() + ' → ' + plan.baseCurrency}"></small></td>
+          <td class="m-full" data-label="录入时间" th:text="${a.recordedAt() == null ? '余额未填' : #temporals.format(a.recordedAt(),'yyyy-MM-dd HH:mm')}"></td><td class="m-full" data-label="处理方式" th:text="${a.liability() ? '全部负债预留' : (a.selected() ? '已纳入' : '未纳入')} + ' · ' + ${a.note()}"></td></tr></tbody>
       </table>
     </section>
     <section th:if="${activePlan}" id="ai-report" class="retire-source-section">
@@ -114,9 +115,9 @@
         <details class="mt-4"><summary>查看月份、来源及剔除额</summary>
           <table class="w-full m-cards text-sm mt-3"><thead><tr><th>账期</th><th>收入 / 支出</th><th>预算参考 / 剔除</th><th>来源</th></tr></thead><tbody>
             <tr th:each="m : ${view.data().months()}"><td class="m-title" th:text="${#temporals.format(m.start(),'yyyy-MM-dd')}"></td>
-              <td data-label="收入 / 支出" data-priv th:text="${T(com.family.finance.service.MoneyFormat).format2(plan.baseCurrency,m.income())} + ' / ' + ${T(com.family.finance.service.MoneyFormat).format2(plan.baseCurrency,m.expense())}"></td>
-              <td data-label="预算 / 剔除" data-priv th:text="${T(com.family.finance.service.MoneyFormat).format2(plan.baseCurrency,m.consumption())} + ' / ' + ${T(com.family.finance.service.MoneyFormat).format2(plan.baseCurrency,m.removed())}"></td>
-              <td data-label="来源" th:text="${m.source()} + (${m.complete()} ? ' · 收支来源齐全' : ' · 收支来源未齐')"></td></tr>
+              <td class="m-full" data-label="收入 / 支出" data-priv th:text="${T(com.family.finance.service.MoneyFormat).format2(plan.baseCurrency,m.income())} + ' / ' + ${T(com.family.finance.service.MoneyFormat).format2(plan.baseCurrency,m.expense())}"></td>
+              <td class="m-full" data-label="预算 / 剔除" data-priv th:text="${T(com.family.finance.service.MoneyFormat).format2(plan.baseCurrency,m.consumption())} + ' / ' + ${T(com.family.finance.service.MoneyFormat).format2(plan.baseCurrency,m.removed())}"></td>
+              <td class="m-full" data-label="来源" th:text="${m.source()} + (${m.complete()} ? ' · 收支来源齐全' : ' · 收支来源未齐')"></td></tr>
           </tbody></table>
         </details>
       </fieldset>
@@ -203,6 +204,7 @@
   <script th:inline="javascript">
     window.retirementChartData = { scenarios: /*[[${r.scenarios()}]]*/ [], target: /*[[${r.target()}]]*/ null,
       date: /*[[${r.asOf().toString()}]]*/ '', retirementDate: /*[[${r.retirementDate() == null ? '' : r.retirementDate().toString()}]]*/ '',
+      neutralDate: /*[[${r.neutralDate() == null ? '' : r.neutralDate().toString()}]]*/ '',
       factor: /*[[${money.factor()}]]*/ 1, currency: /*[[${money.currency()}]]*/ 'CNY' };
   </script>
 </main>

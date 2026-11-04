@@ -156,6 +156,7 @@ public class RetirementPlanService {
         nonnegative(p.getChildReserve(), "育儿预留"); nonnegative(p.getMedicalReserve(), "医疗预留");
         nonnegative(p.getHousingReserve(), "住房预留"); nonnegative(p.getOtherReserve(), "应急及其他预留");
         range(p.getMonthlyContribution(), new BigDecimal("-1000000000"), new BigDecimal("1000000000"), "计划月投入");
+        cents(p.getMonthlyContribution(), "计划月投入");
         range(p.getInflationPct(), BigDecimal.ZERO, new BigDecimal("15"), "通胀率");
         for (BigDecimal rate : Arrays.asList(p.getNominalReturnPct(), p.getRealReturnPct(), p.getLowReturnPct(), p.getMiddleReturnPct(), p.getHighReturnPct()))
             range(rate, new BigDecimal("-99"), new BigDecimal("100"), "回报率");
@@ -171,7 +172,12 @@ public class RetirementPlanService {
             throw new IllegalArgumentException("账户和分类选择无效");
         p.getRealizableAmounts().forEach((id, v) -> { if (p.getAccountIds().contains(id) && v != null) nonnegative(v, "可变现金额"); });
     }
-    private void nonnegative(BigDecimal value, String name) { range(value, BigDecimal.ZERO, new BigDecimal("1000000000000"), name); }
+    private void nonnegative(BigDecimal value, String name) {
+        range(value, BigDecimal.ZERO, new BigDecimal("1000000000000"), name); cents(value, name);
+    }
+    private void cents(BigDecimal value, String name) {
+        if (value.stripTrailingZeros().scale() > 2) throw new IllegalArgumentException(name + "最多保留到分");
+    }
     private void range(BigDecimal value, BigDecimal min, BigDecimal max, String name) {
         if (value == null || value.compareTo(min) < 0 || value.compareTo(max) > 0 || value.scale() > 12)
             throw new IllegalArgumentException(name + "未填或超出允许范围");

@@ -11,8 +11,8 @@ public interface RetirementSourceMapper {
     @Select("""
         <script>
         SELECT p.id AS periodId,
-          (SELECT COUNT(*) FROM period_member_cashflow m WHERE m.period_id=p.id AND m.total_income_input IS NOT NULL) AS incomeFields,
-          (SELECT COUNT(*) FROM period_member_cashflow m WHERE m.period_id=p.id AND m.total_expense_input IS NOT NULL) AS expenseFields,
+          (SELECT COUNT(*) FROM period_member_cashflow m WHERE m.period_id=p.id AND m.family_id=p.family_id AND m.total_income_input IS NOT NULL) AS incomeFields,
+          (SELECT COUNT(*) FROM period_member_cashflow m WHERE m.period_id=p.id AND m.family_id=p.family_id AND m.total_expense_input IS NOT NULL) AS expenseFields,
           (SELECT COUNT(*) FROM cash_flow c JOIN account a ON a.id=c.account_id
             WHERE c.period_id=p.id AND a.family_id=p.family_id AND c.kind='INCOME' AND c.deleted_at IS NULL AND c.is_adjustment=0) AS incomeRows,
           (SELECT COUNT(*) FROM period_member_completion c WHERE c.period_id=p.id) AS completedMembers,

@@ -128,6 +128,7 @@ public class RetirementController {
             p = plans.draft(familyId, goal); view = plans.evaluate(familyId, p, null, goal == null, false); tab = "plan";
         }
         var active = goal == null ? java.util.Optional.<RetirementPlanService.View>empty() : plans.active(familyId, goal);
+        if (!Boolean.TRUE.equals(model.getAttribute("previewing")) && active.isPresent()) view = active.get();
         model.addAttribute("adopting", goal != null && active.isEmpty());
         model.addAttribute("activePlan", active.isPresent());
         model.addAttribute("nativePlan", active.map(RetirementPlanService.View::createdForPlan).orElse(goal == null));
@@ -151,7 +152,7 @@ public class RetirementController {
                 model.addAttribute("reportPeekSrc", promptPeek.of(familyId, report.getPromptRecordId(),
                         com.family.finance.service.llmtrace.PromptSurface.GOAL_REPORT, report.getGeneratedAt(), null));
             });
-            model.addAttribute("budgetChanged", p.getBudgetFingerprint() != null && !p.getBudgetFingerprint().equals(view.data().budgetFingerprint()));
+            model.addAttribute("budgetChanged", p.getBudgetFingerprint() != null && !p.getBudgetFingerprint().equals(snapshot.data().budgetFingerprint()));
         }
         return "goals/retirement";
     }

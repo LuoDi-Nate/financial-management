@@ -51,4 +51,10 @@ class RetirementBudgetSourceTest {
         setup(); var r = ledger.retirementBudget(1,List.of(1L),Set.of(),false,Set.of(1L)).get(1L);
         assertThat(r.amount()).isZero(); assertThat(r.totalOnly()).isTrue();
     }
+    @Test void itemizedRefundsRemainVisibleAlongsideAnOldZeroTotal() {
+        setup(); when(cash.sumExpenseByPeriodCategoryOneOff(eq(1L),any())).thenReturn(List.of(
+                new CashFlowMapper.CatOneOffSum(1L,"consumption",null,false,new BigDecimal("-50"),1)));
+        var r = ledger.retirementBudget(1,List.of(1L),Set.of(),false,Set.of(1L)).get(1L);
+        assertThat(r.amount()).isEqualByComparingTo("-50"); assertThat(r.totalOnly()).isFalse();
+    }
 }

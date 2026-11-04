@@ -22,6 +22,8 @@ async function form(ui, name) {
     monthlyContribution:'0',childReserve:'400000',medicalReserve:'300000',housingReserve:'0',otherReserve:'500000',inflationPct:'0',realReturnPct:'2.5'}))
     await ui.fillByName(key,value,'#retirement-form');
   await ui.page.check('[name="directRealRate"]');
+  for (const checkbox of await ui.page.locator('input[name="accountIds"]').all()) await checkbox.uncheck();
+  await ui.page.check(`input[name="accountIds"][value="${state.cash}"]`);
   for (const key of ['budgetConfirmed','reservesConfirmed','noOverlapConfirmed','assetsConfirmed','incomeConfirmed','contributionConfirmed','afterDebtConfirmed'])
     await ui.page.check(`[name="${key}"]`);
 }
@@ -38,6 +40,8 @@ async function dimensions(ui, label) {
     });
     await ui.assert(clear,label + ':页签中心可点击');
   }
+  await ui.assert(await ui.page.locator('.m-cards td').evaluateAll(cells => cells.filter(el=>el.getClientRects().length)
+    .every(el=>el.scrollWidth<=el.clientWidth+2)),label + ':表格长文本在单元格内换行');
 }
 
 module.exports = {
@@ -52,15 +56,15 @@ module.exports = {
     state.member=db.num(`SELECT id FROM member WHERE username=${q(state.username)}`);
     if (!state.member) throw new Error('隔离家庭的登录样本未创建');
     const current=db.one('SELECT DATE_FORMAT(CURDATE(),\'%Y-%m-01\')');
-    for (const [name,type] of [['cash','CASH'],['debt','LOAN'],['home','PROPERTY']])
-      db.raw(`INSERT INTO account(family_id,display_name,type,currency) VALUES(${state.family},${q(state.prefix+'-'+name)},'${type}','CNY')`);
-    state.cash=db.num(`SELECT id FROM account WHERE family_id=${state.family} AND type='CASH'`);
+    for (const [name,type] of [['cash','CASH'],['debt','LOAN'],['home','PROPERTY'],['fx','CASH']])
+      db.raw(`INSERT INTO account(family_id,display_name,type,currency) VALUES(${state.family},${q(state.prefix+'-'+name)},'${type}','${name==='fx'?'USD':'CNY'}')`);
+    state.cash=db.num(`SELECT id FROM account WHERE family_id=${state.family} AND display_name=${q(state.prefix+'-cash')}`);
     for (let back=3;back>=0;back--) {
       db.raw(`INSERT INTO period(family_id,period_type,period_start,period_end,status)
         VALUES(${state.family},'MONTHLY',DATE_SUB('${current}',INTERVAL ${back} MONTH),LAST_DAY(DATE_SUB('${current}',INTERVAL ${back} MONTH)),'${back?'CLOSED':'OPEN'}')`);
       const pid=db.num(`SELECT id FROM period WHERE family_id=${state.family} AND period_start=DATE_SUB('${current}',INTERVAL ${back} MONTH)`);
       db.raw(`INSERT INTO period_snapshot(period_id,account_id,end_balance,submitted_by,source_tag)
-        SELECT ${pid},id,CASE type WHEN 'CASH' THEN 6100000 WHEN 'LOAN' THEN 100000 ELSE 10000000 END,${state.member},'MANUAL'
+        SELECT ${pid},id,CASE WHEN currency='USD' THEN 100000 WHEN type='CASH' THEN 6100000 WHEN type='LOAN' THEN 100000 ELSE 10000000 END,${state.member},'MANUAL'
         FROM account WHERE family_id=${state.family}`);
       db.raw(`INSERT INTO fx_rate(family_id,period_id,base_currency,quote_currency,rate,source) VALUES
         (${state.family},${pid},'CNY','USD',0.125,'MANUAL'),(${state.family},${pid},'CNY','HKD',1.1,'MANUAL')`);
@@ -105,6 +109,11 @@ module.exports = {
       let count=0;for(let i=3;i<pixels.length;i+=4)if(pixels[i])count++;return count>1000;
     }),'三情景画布有实际像素');
     await screenshot(ui,'desktop-overview');
+    for (const page of ['/dashboard','/reports']) {
+      await ui.goto(page);
+      await ui.assert((await ui.page.locator(`a[href="/goals/${state.native}"]`).first().innerText()).includes('100.0%'),page+':目标条沿用同一退休结果');
+    }
+    await ui.goto(`/goals/${state.native}/retirement`);
     for (const [ccy,target] of [['USD','$600,000.00'],['HKD','HK$5,280,000.00']]) {
       await ui.click(`.retire-currencies a[href*="ccy=${ccy}"]`,'切换显示币种 '+ccy);
       await ui.assert((await ui.page.locator('[data-retire-value="target"]').innerText()).includes(target),'本金门槛按汇率换算');
@@ -114,6 +123,38 @@ module.exports = {
     await ui.visible('a[href="https://www.bilibili.com/video/BV1yUHP6rEYD/"]','原视频直达链接');
     await ui.assert(await ui.page.locator('a[href*="BV1yUHP6rEYD"]').getAttribute('referrerpolicy')==='no-referrer','来源外链不带家庭来源数据');
     await screenshot(ui,'desktop-principle');
+    const foreign=db.num(`SELECT id FROM account WHERE family_id=${state.family} AND currency='USD'`);
+    await ui.click('[data-retire-tab="plan"]','纳入外币账户');
+    await ui.page.check(`input[name="accountIds"][value="${foreign}"]`); await ui.click('[data-retire-save]','保存外币资金范围');
+    await ui.assert((await ui.page.locator('[data-retire-value="principal"]').innerText()).includes('5,600,000.00'),'10万美元按当期汇率折为80万本金');
+    await ui.click('[data-retire-tab="plan"]','恢复仅现金账户'); await ui.page.uncheck(`input[name="accountIds"][value="${foreign}"]`);
+    await ui.click('[data-retire-save]','恢复基准资金范围');
+    await ui.click('[data-retire-tab="plan"]','核对精确名义回报模式');
+    await ui.page.uncheck('[name="directRealRate"]'); await ui.fillByName('inflationPct','2','#retirement-form');
+    await ui.click('[data-retire-save]','保存名义4.5%和通胀2%');
+    await ui.assert((await ui.page.locator('[data-retire-value="target"]').innerText()).includes('4,896,000.00'),'精确实际回报得到489.6倍,不是近似480倍');
+    await ui.click('[data-retire-tab="plan"]','恢复直接实际回报');
+    await ui.page.check('[name="directRealRate"]'); await ui.fillByName('inflationPct','0','#retirement-form');
+    await ui.page.check('[name="autoExpense"]'); await ui.click('[data-retire-save]','授权跟随定稿预算');
+    db.raw(`UPDATE cash_flow c JOIN period p ON p.id=c.period_id SET c.amount=20000
+      WHERE p.family_id=${state.family} AND c.kind='EXPENSE' AND p.period_start=(SELECT MIN(pp.period_start) FROM period pp WHERE pp.family_id=${state.family})`);
+    await ui.goto(`/goals/${state.native}/retirement`);
+    await ui.assert((await ui.page.locator('[data-retire-value="target"]').innerText()).includes('6,399,998.40'),'已授权自动预算跟随定稿纠正,月均精确到分');
+    await ui.click('[data-retire-tab="plan"]','切回固定生活预算'); await ui.page.uncheck('[name="autoExpense"]');
+    await ui.click('[data-retire-save]','保存固定预算');
+    db.raw(`UPDATE cash_flow c JOIN period p ON p.id=c.period_id SET c.amount=10000
+      WHERE p.family_id=${state.family} AND c.kind='EXPENSE' AND p.period_start=(SELECT MIN(pp.period_start) FROM period pp WHERE pp.family_id=${state.family})`);
+    await ui.goto(`/goals/${state.native}/retirement`);
+    await ui.assert((await ui.page.locator('[data-retire-value="target"]').innerText()).includes('4,800,000.00'),'未授权跟随时固定预算不被新账上建议覆盖');
+    db.raw(`INSERT INTO goal_ai_report(goal_id,period_id,report_type,content,validator_status) VALUES(${state.native},0,'MONTHLY','合成历史目标报告','PASS')`);
+    await ui.goto(`/goals/${state.native}/retirement`);
+    await ui.seesText('旧计划或旧资金状态的历史解读','旧报告不冒充新算法结论');
+    const downloadEvent=ui.page.waitForEvent('download');
+    await ui.click('.retire-heading a[href$="/export"]','导出本次测算');
+    const download=await downloadEvent, stream=await download.createReadStream(), chunks=[];
+    for await (const chunk of stream) chunks.push(chunk);
+    const exported=Buffer.concat(chunks).toString('utf8');
+    await ui.assert(exported.includes('计划币种:CNY') && exported.includes('计划金额基准日:') && exported.includes('BV1yUHP6rEYD'),'导出含币种、购买力基准日与原视频来源');
     await ui.click('[data-retire-tab="plan"]','检查零回报边界');
     await ui.fillByName('realReturnPct','0','#retirement-form'); await ui.click('[data-retire-save]','保存零实际回报');
     await ui.seesText('没有有限的永久本金门槛','零回报不显示0元门槛');
@@ -140,6 +181,9 @@ module.exports = {
       await mobile.click('[data-retire-tab="plan"]','手机调整计划');
       await mobile.assert(await mobile.page.locator('[data-retire-save]').count()===1,'手机仅一份表单与保存入口');
       await screenshot(mobile,'mobile-plan');
+      await mobile.page.locator('summary').filter({hasText:'查看月份、来源及剔除额'}).click();
+      await mobile.assert(await mobile.page.locator('#retire-plan .m-cards td').evaluateAll(cells => cells.filter(el=>el.getClientRects().length)
+        .every(el=>el.scrollWidth<=el.clientWidth+2)),'手机:展开来源后日期与金额不挤出单元格');
       await mobile.click('[data-retire-tab="principle"]','手机查看原理');
       await screenshot(mobile,'mobile-principle');
     });

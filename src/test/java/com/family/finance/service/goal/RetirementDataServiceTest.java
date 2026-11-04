@@ -101,4 +101,11 @@ class RetirementDataServiceTest {
         assertThat(result.suggestedExpense()).isNull(); assertThat(result.suggestedContribution()).isNull();
         assertThat(result.budgetNotes()).anyMatch(s -> s.contains("周账期"));
     }
+    @Test void unsplitTotalContainingPotentialRepaymentsCannotBecomeAutomaticLivingBudget() {
+        var p = setup(7L,8L,9L); month(7,"1000","100",1,0); month(8,"1000","100",0,1); month(9,"1000","100",0,1);
+        budgets.put(7L,new ExpenseLedgerService.RetirementBudget(new BigDecimal("100"),BigDecimal.ZERO,"家庭总额",true));
+        var result = service.load(1,p,today);
+        assertThat(result.suggestedExpense()).isNull(); assertThat(result.budgetNotes()).anyMatch(s -> s.contains("还款与消费"));
+        assertThat(result.suggestedContribution()).isEqualByComparingTo("900");
+    }
 }

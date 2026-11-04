@@ -94,6 +94,9 @@
 
 ## 近期更新 · Releases
 
+**开发分支 v1.39 · 退休生活账与 AI 可用性修复(beta 验证中,未发布)**
+退休目标公开资金桥、实际回报和月度预测,联动家庭余额与定稿收支;老目标比较后采用,可退出恢复原参数。修复商户分类/本地 Agent 主备路由、失败提示、模板状态阻塞设置页及超时热改。见 [PRD](prd/v1.39.md)、[技术设计](tech-design/v1.39.md)与[原节目调研](docs/research/retirement-xiaolin-2026-11.md)。
+
 > 完整发布记录与截图见 [Releases](https://github.com/LuoDi-Nate/financial-management/releases)(本段每版只留 2–4 行,细节不搬过来)。
 
 **[v1.37.1](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.37.1) · 封板报告的储蓄率与观察账期一致**
@@ -133,7 +136,7 @@
 | 前端 | Thymeleaf + HTMX 1.9 + Chart.js 4 + ECharts(无 SPA、无构建管线) |
 | 认证 | Spring Security + bcrypt + Session Cookie |
 | 部署 | **Docker compose 一键(v0.7,推荐)** · 或 Linux systemd + nginx 反代 :80 → :20000 · macOS launchd(可选)直连 :20000 |
-| 测试 | JUnit 5 · **1287 单元** / 1800+ e2e 断言(38 条浏览器主线,真浏览器 + 真 DB)/ **1038 黑盒回归**护栏 —— 每条护栏守的是哪个坑,见 [QA case 库](docs/qa-cases.md) |
+| 测试 | JUnit 5 · **1338 单元** / 1800+ e2e 断言(39 条浏览器主线,真浏览器 + 真 DB)/ **1061 黑盒回归**护栏(含 v1.39 的23项只读静态守护) —— 每条护栏守的是哪个坑,见 [QA case 库](docs/qa-cases.md) |
 
 ## 快速开始(自托管部署)
 
@@ -341,8 +344,9 @@ mvn spring-boot:run
 测试:
 
 ```bash
-mvn test                       # JUnit 单元测试(1266)
+mvn test                       # JUnit 单元测试(1338)
 bash scripts/qa-run.sh         # 黑盒 endpoint + 模板渲染(见 README 上方测试行的黑盒回归数)
+bash scripts/qa-run.sh --static-v139 # v1.39 只读守护,不写数据库、不调模型
 node scripts/e2e/run.cjs       # 真 e2e:Playwright 开浏览器按用户路径点(失败自动截图)
 bash scripts/regression-data.sh # 数据层/口径回归(原 e2e.sh · curl 端点 + DB 真值 · 快照还原不清库)
 ```
@@ -379,10 +383,11 @@ bash scripts/regression-data.sh # 数据层/口径回归(原 e2e.sh · curl 端�
 每版做了什么、为什么那么做,都写在各自的文档里;这里只放入口,不复述。
 
 <details>
-<summary><b>展开全部 54 个版本</b>(v0.1 → v1.37)</summary>
+<summary><b>展开全部 55 个版本</b>(v0.1 → v1.39)</summary>
 
 | 版本 | 文档 |
 |---|---|
+| `v1.39` | [PRD](prd/v1.39.md)(beta 验证中)· [技术设计](tech-design/v1.39.md) · [预览](preview/v1.39/retirement.html) · [原节目与算法调研](docs/research/retirement-xiaolin-2026-11.md) |
 | `v1.37` | [PRD](prd/v1.37.md)(已实施)· [技术设计](tech-design/v1.37.md) · [预览](preview/v1.37/side-rail.html) · [Duo 官方规范调研](docs/research/iphone-duo-hig-2026-10.md) |
 | `v1.36` | [PRD](prd/v1.36.md)(已实施)· [技术设计](tech-design/v1.36.md) · [实测对比图](preview/v1.36/shots/) |
 | `v1.35` | [PRD](prd/v1.35.md)(已实施)· [技术设计](tech-design/v1.35.md) · [预览](preview/v1.35/) · [UI 调研](docs/research/ui-frameworks-2026-10.md) |

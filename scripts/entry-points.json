@@ -19,6 +19,15 @@
   },
   "entries": [
     {
+      "id": "retirement-plan",
+      "name": "退休生活账(资金、预算与透明公式)",
+      "page": "/goals/new",
+      "hrefContains": "/goals/new/retirement",
+      "level": "obvious",
+      "viewports": ["pc", "mobile"],
+      "note": "沿原退休入口进入新方案,旧目标详情显式比较后采用;不藏入更多菜单。"
+    },
+    {
       "id": "broker-sync",
       "name": "券商只读同步(富途 / 老虎 / 盈透)· 账户颗粒度",
       "page": "/accounts",

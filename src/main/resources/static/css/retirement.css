@@ -41,4 +41,5 @@
   .retire-category-list { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .retire-chart { height:260px; }
   .retire-heading h1 { font-size:28px; overflow-wrap:anywhere; }
+  .retirement-page table.m-cards > tbody > tr > td { white-space:normal; overflow-wrap:anywhere; }
 }

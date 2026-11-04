@@ -172,15 +172,16 @@ public class ExpenseLedgerService {
                 .collect(java.util.stream.Collectors.groupingBy(CashFlowMapper.CatOneOffSum::periodId));
         var natureMap = excludeOneOff ? retirementExpenseNature.natureMap(familyId) : java.util.Map.<Long, com.family.finance.domain.expense.ExpenseNature>of();
         var excluded = excludedCategories.isEmpty() ? excludedCategories : retirementExpenseNature.expandCategories(familyId, excludedCategories);
+        boolean itemizedMode = modeOf(familyId) == ExpenseEntryMode.ITEMIZED;
         for (Long id : ids) {
             PeriodExpense source = ledger.get(id);
+            var rows = grouped.getOrDefault(id, List.of());
             boolean total = source.source() == PeriodExpense.Source.TOTAL
-                    || (source.source() == PeriodExpense.Source.NONE && explicitTotals.contains(id));
+                    || (source.source() == PeriodExpense.Source.NONE && explicitTotals.contains(id) && (!itemizedMode || rows.isEmpty()));
             if (total) {
                 out.put(id, new RetirementBudget(source.amountBase(), BigDecimal.ZERO, "历史家庭总额(无法拆消费/还款)", true));
                 continue;
             }
-            var rows = grouped.getOrDefault(id, List.of());
             if (rows.isEmpty()) continue;
             BigDecimal amount = BigDecimal.ZERO, removed = BigDecimal.ZERO;
             for (var row : rows) {

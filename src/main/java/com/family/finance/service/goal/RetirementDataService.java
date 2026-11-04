@@ -76,7 +76,8 @@ public class RetirementDataService {
                 amount = plan.getRealizableAmounts().get(account.getId());
                 if (amount == null || amount.signum() < 0) problems.add(account.getDisplayName() + ":需确认可变现金额(本位币)");
                 else amount = amount.multiply(RetirementCalculator.priceFactor(plan.getPriceDate() == null ? today : plan.getPriceDate(),
-                        today, RetirementCalculator.fraction(plan.getInflationPct() == null ? BigDecimal.ZERO : plan.getInflationPct())));
+                        today, RetirementCalculator.fraction(plan.getInflationPct() == null ? BigDecimal.ZERO : plan.getInflationPct())))
+                        .setScale(2, RoundingMode.HALF_EVEN);
                 note = "按人工确认的可变现金额,不按保额";
             }
             if (liability && amount != null) d = d.add(amount.abs());
@@ -112,8 +113,8 @@ public class RetirementDataService {
             BigDecimal consumption = budget != null ? budget.amount() : explicitlyComplete ? BigDecimal.ZERO : null;
             if (missingFx) consumption = null;
             String source = budget == null ? explicitlyComplete ? "已确认填完的零支出" : "支出缺失" : budget.source();
-            if (budget != null && budget.totalOnly() && (plan.isExcludeOneOff() || !plan.getExcludedCategoryIds().isEmpty()))
-                budgetNotes.add(slice.periodStartOf(id) + ":只有总额,不能识别需要排除的分类/一次性支出");
+            if (budget != null && budget.totalOnly() && budget.amount().signum() != 0)
+                budgetNotes.add(slice.periodStartOf(id) + ":只有家庭支出总额,无法拆出还款与消费;请手填修订生活预算,不自动把总额当长期生活费");
             if (consumption != null && consumption.signum() < 0) budgetNotes.add(slice.periodStartOf(id) + ":退款多于消费,请确认长期预算");
             if (consumption != null) {
                 BigDecimal pi = RetirementCalculator.fraction(plan.getInflationPct() == null ? BigDecimal.ZERO : plan.getInflationPct());

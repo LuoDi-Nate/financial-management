@@ -85,4 +85,16 @@ class RetirementPlanServiceTest {
             service.active(1,goal); verify(mapper,times(2)).findAll(1);
         } finally { org.springframework.web.context.request.RequestContextHolder.resetRequestAttributes(); }
     }
+    @Test void rebasedEditInputsProduceExactlyTheSamePublishedResult() {
+        var p = plan(); p.setPriceDate(LocalDate.now().minusYears(1)); p.setMonthlyExpense(new BigDecimal("10000.37"));
+        p.setMonthlyIncome(new BigDecimal("123.45")); p.setChildReserve(new BigDecimal("400000.37"));
+        p.setMedicalReserve(new BigDecimal("30000.42")); p.setHousingReserve(new BigDecimal("3.22"));
+        p.setOtherReserve(new BigDecimal("1000.61"));
+        var before = com.family.finance.calc.RetirementCalculator.calculate(p,LocalDate.now(),new BigDecimal("6000000"),BigDecimal.ZERO,null,List.of());
+        service.rebase(p,LocalDate.now());
+        var after = com.family.finance.calc.RetirementCalculator.calculate(p,LocalDate.now(),new BigDecimal("6000000"),BigDecimal.ZERO,null,List.of());
+        assertThat(after.target()).isEqualByComparingTo(before.target());
+        assertThat(after.principal()).isEqualByComparingTo(before.principal());
+        assertThat(after.coverage()).isEqualByComparingTo(before.coverage());
+    }
 }
