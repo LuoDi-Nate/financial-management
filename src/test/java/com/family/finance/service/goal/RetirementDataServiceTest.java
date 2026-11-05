@@ -123,4 +123,15 @@ class RetirementDataServiceTest {
         var result=service.load(1,p,today);assertThat(result.suggestedExpense()).isEqualByComparingTo("50");
         assertThat(result.sources().budgetPeriods()).containsExactly(7L,8L,9L);assertThat(result.months().getLast().consumption()).isNull();
     }
+    @Test void householdRuleIncludesNewFinancialAccountWhileCustomEmptyStaysEmpty() {
+        var p=setup();p.setVersion(2);p.setScopeMode("FAMILY_FINANCIAL");
+        var cash=Account.builder().id(99L).familyId(1L).displayName("新增现金").type(AccountType.CASH).currency("CNY").build();
+        when(accounts.findActiveByFamily(1)).thenReturn(List.of(cash));
+        var row=mock(AccountPeriodFact.class);when(row.periodId()).thenReturn(11L);when(row.accountId()).thenReturn(99L);
+        when(row.endBalanceOrig()).thenReturn(new BigDecimal("500"));when(row.endBalanceBase()).thenReturn(new BigDecimal("500"));when(row.fxToBase()).thenReturn(BigDecimal.ONE);
+        when(facts.load(null).rows()).thenReturn(List.of(row));
+        assertThat(service.load(1,p,today).selectedAssets()).isEqualByComparingTo("500");
+        assertThat(p.getAccountIds()).isEmpty();p.setScopeMode("CUSTOM");
+        assertThat(service.load(1,p,today).selectedAssets()).isZero();
+    }
 }

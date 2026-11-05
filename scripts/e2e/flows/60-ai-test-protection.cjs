@@ -24,6 +24,10 @@ module.exports={
       await ui.assert(db.num("SELECT COUNT(*) FROM llm_prompt_record WHERE family_id=1 AND outcome='BLOCKED'")>rowBefore,'提示词以未发送的独立状态保存');
       await ui.goto('/admin/ai-access');
       await ui.seesText('模型连接自检','入口计数使用可读名称');
+      await ui.click('[data-llm-prepared] > summary','查看本家庭准备记录');
+      await ui.click('[data-llm-prepared] [data-peek-btn] >> nth=0','打开本次准备的原文');
+      await ui.visible('[data-peek-state="BLOCKED"]','终端面板保留未调用状态');
+      await ui.assert((await ui.page.locator('[data-peek-state="BLOCKED"]').innerText()).includes('没有发给大模型'),'准备记录不冒充实际发送');
       await ui.click('form[action="/admin/ai-access/test-mode"] button[type="submit"]','重复保存已开启状态');
       const saved=await guard.state(BASE);
       await ui.assert(saved.epoch===epoch && saved.blocked>=after.blocked,'重复保存不清空已发生的拦截记录');

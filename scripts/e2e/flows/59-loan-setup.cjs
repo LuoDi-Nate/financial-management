@@ -28,9 +28,11 @@ module.exports={
     if(await summary.count() && !await summary.evaluate(el=>el.open)) await ui.click('[data-ff-box] > summary','展开固定收支');
     await ui.visible(`[data-loan-setup="${submitted}"]`,'人工已填本期余额仍显示未设固定还款');
     await ui.visible(`[data-loan-setup="${carried}"]`,'系统延续余额也显示配置提醒');
+    ui.page.once('dialog',dialog=>dialog.accept());
     await ui.click(`[data-loan-setup="${carried}"] button[type="submit"]`,'选择每月自己填');
     await ui.assert(db.num(`SELECT loan_manual_repayment FROM account WHERE id=${carried}`)===1,'手填偏好持久化');
-    await ui.goto('/entry');await ui.notVisible(`[data-loan-setup="${carried}"]`,'下次进入也不重复提醒');
+    await ui.goto('/entry');if(!await ui.page.locator('[data-ff-box]').evaluate(el=>el.open)) await ui.click('[data-ff-box] > summary','展开固定收支');
+    await ui.notVisible(`[data-loan-setup="${carried}"]`,'下次进入也不重复提醒');
     await ui.assert(balance()===before,'修改提醒偏好不改任何余额');
     await ui.goto('/admin/fixed-flows');await ui.visible(`[data-loan-id="${carried}"][data-loan-state="MANUAL"]`,'管理页明确手填状态');
     await ui.click(`[data-loan-id="${carried}"] [data-loan-restore]`,'恢复配置提醒');
@@ -42,7 +44,7 @@ module.exports={
       await ui.choose('accountId',cash,'[data-ff-edit-form] [data-ffe-for="REPAY"]');
       if(id===carried) await ui.fill('[data-ffe-amount]','100','填写约定月供');
       await ui.click('[data-ff-edit-form] button[type="submit"]','保存固定还款');
-      await ui.assert(db.one(`SELECT DATE_FORMAT(start_month,'%Y-%m') FROM fixed_flow WHERE family_id=${f} AND target_account_id=${id} AND active=1`)===month,id===carried?'系统延续余额从本期开始':'本期人工提交过则从下期开始');
+      await ui.assert(db.one(`SELECT DATE_FORMAT(start_month,'%Y-%m') FROM fixed_flow WHERE family_id=${f} AND target_account_id=${id} AND disabled_at IS NULL`)===month,id===carried?'系统延续余额从本期开始':'本期人工提交过则从下期开始');
     }
     await ui.assert(balance()===before,'设置还款本身不记账');
     await ui.goto('/admin/fixed-flows');await ui.visible(`[data-loan-id="${carried}"][data-loan-state="SET"]`,'配置后状态明确');

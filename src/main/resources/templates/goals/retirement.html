@@ -113,7 +113,7 @@
 </p>
 <p>全家净资产 <b data-priv th:text="${money.amount(view.data().sources().householdNetWorth())}">
 </b> · 净资金 A − D <b data-priv th:text="${money.amount(r.netFunds())}">
-</b> · 总需求 T + B <b data-priv th:text="${money.amount(r.totalNeed())}">
+</b> · 资产总需求 T + B + D <b data-priv th:text="${money.amount(r.totalAssetNeed())}">
 </b>
 </p>
 <p th:if="${view.plan().version == 1}">升级前方案仍保留持续月收入 J <b data-priv th:text="${money.amount(r.monthlyIncome())}">
@@ -176,6 +176,15 @@
 </b> · 希望退休月 <b th:text="${plan.targetMonth}">
 </b>
 </p>
+<details class="retire-details"><summary>查看最近6个月的净流入来源</summary>
+  <table class="w-full m-cards text-sm"><thead><tr><th>账期</th><th>收入</th><th>支出</th><th>是否采用</th></tr></thead><tbody>
+    <tr th:each="m,st : ${view.data().months()}" th:if="${st.index >= #lists.size(view.data().months())-6}">
+      <td class="m-title" th:text="${#temporals.format(m.start(),'yyyy-MM')}"></td>
+      <td data-label="收入" data-priv th:text="${money.amount(m.income())}"></td><td data-label="支出" data-priv th:text="${money.amount(m.expense())}"></td>
+      <td data-label="是否采用" th:text="${m.complete()?'收入减支出,参与中位数':'收支未齐,不当零'}"></td>
+    </tr>
+  </tbody></table>
+</details>
 <p th:if="${r.scenarios().isEmpty()}" class="retire-field-hint">尚未计算:先补齐基础计划;没有可用结余时可手填。未开启时不推算达到年份。</p>
 <th:block th:if="${!r.scenarios().isEmpty()}">
 <div class="retire-chart">
@@ -195,7 +204,7 @@
 <tr th:each="s : ${r.scenarios()}">
 <td class="m-title" th:text="${s.label()+' · '+s.returnPct()+'%'}">
 </td>
-<td data-label="首次达到" th:text="${s.firstReached()==null?'50年内未达到':#temporals.format(s.firstReached(),'yyyy-MM')}">
+<td data-label="首次达到" th:text="${s.firstReached()==null?'50年内未达到':(s.firstReached()==r.asOf()?'当前':#temporals.format(s.firstReached(),'yyyy-MM'))}">
 </td>
 <td data-label="目标月本金" data-priv th:text="${money.amount(s.atTargetMonth())}">
 </td>
@@ -270,6 +279,8 @@
 <b data-priv th:text="${T(com.family.finance.service.MoneyFormat).format2(plan.baseCurrency,r.assets())}">
 </b>
 </div>
+<ul th:if="${!view.data().problems().isEmpty()}" class="retire-field-hint text-rust"><li th:each="problem : ${view.data().problems()}" th:text="${problem}"></li></ul>
+<a th:if="${!view.data().problems().isEmpty()}" th:href="@{/entry}" class="retire-text-link text-xs">去填报核对余额与汇率</a>
 <p class="retire-field-hint">全家净资产 <b data-priv th:text="${T(com.family.finance.service.MoneyFormat).format2(plan.baseCurrency,view.data().sources().householdNetWorth())}">
 </b> · 全家庭负债 <b data-priv th:text="${T(com.family.finance.service.MoneyFormat).format2(plan.baseCurrency,view.data().debt())}">
 </b>

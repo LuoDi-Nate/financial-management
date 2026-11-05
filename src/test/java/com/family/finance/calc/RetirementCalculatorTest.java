@@ -30,6 +30,7 @@ class RetirementCalculatorTest {
         assertThat(r.coverage()).isEqualByComparingTo("1");
         assertThat(r.reached()).isTrue();
         assertThat(r.netFunds().subtract(r.totalNeed())).isEqualByComparingTo(r.principal().subtract(r.target()));
+        assertThat(r.assets().subtract(r.totalAssetNeed())).isEqualByComparingTo(r.principal().subtract(r.target()));
     }
     @Test void exactRealReturnDiffersFromSubtractingInflation() {
         var p = plan(); p.setDirectRealRate(false);

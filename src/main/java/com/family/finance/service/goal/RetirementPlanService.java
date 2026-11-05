@@ -77,7 +77,8 @@ public class RetirementPlanService {
         p.setMonthlyIncome(BigDecimal.ZERO);
         if ("CITY".equals(p.getReserveMode())) {
             if(p.getCityTier()==null || p.getDependentCount()==null || p.getChildPlanningYears()==null
-                    || p.getChildPlanningYears().size()!=p.getDependentCount() || p.getHousingPlan()==null
+                    || p.getDependentCount()<0 || p.getDependentCount()>8
+                    || p.getChildPlanningYears().size()!=p.getDependentCount() || !Arrays.asList("SETTLED","RENT","CHANGE").contains(p.getHousingPlan())
                     || p.getChildPlanningYears().stream().anyMatch(y->y==null || y<0 || y>30)) {
                 problems.add("请明确选择城市、子女人数与剩余规划年数、住房安排");
                 p.setChildReserve(null); p.setMedicalReserve(null); p.setOtherReserve(null); p.setHousingReserve(null);

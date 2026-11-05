@@ -88,8 +88,8 @@
   function draw() {
     const el = document.getElementById('retirement-path');
     const data = chartData;
+    if (chart) { chart.destroy(); chart = null; }
     if (!el || !data || !data.scenarios.length || typeof Chart === 'undefined') return;
-    if (chart) chart.destroy();
     const targetParts = String(data.retirementDate).split('-').map(Number);
     const startDate = new Date(data.date + 'T12:00:00');
     const targetIndex = Math.max(0,(targetParts[0]-startDate.getFullYear())*12+targetParts[1]-startDate.getMonth()-1);

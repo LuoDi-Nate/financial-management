@@ -30,6 +30,7 @@ public final class RetirementCalculator {
         public boolean reached() { return ready() && principal != null && principal.signum() >= 0
                 && target != null && principal.compareTo(target) >= 0; }
         public BigDecimal totalNeed() { return target == null || reserves == null ? null : target.add(reserves); }
+        public BigDecimal totalAssetNeed() { return totalNeed()==null || debt==null?null:totalNeed().add(debt); }
         public BigDecimal netFunds() { return assets == null || debt == null ? null : assets.subtract(debt); }
         public BigDecimal coveragePct() { return coverage == null ? null : coverage.movePointRight(2).setScale(2, RoundingMode.HALF_EVEN); }
         public LocalDate neutralDate() { return scenarios.size()==1?scenarios.getFirst().firstReached():scenarios.size()==3?scenarios.get(1).firstReached():null; }

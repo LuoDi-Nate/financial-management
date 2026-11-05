@@ -103,6 +103,20 @@ class LlmTestGateTest {
         ReflectionTestUtils.setField(client,"testGate",gate);
         assertThatThrownBy(()->client.chat(null,"rules","data")).isInstanceOf(LlmTestGate.Blocked.class);
     }
+    @Test void transportSeesZeroRequestsWhileProtectedAndOnlyLocalMockWhenOff() {
+        var client=new DashScopeLlmClient(config,new RestTemplateBuilder());ReflectionTestUtils.setField(client,"testGate",gate);
+        var wire=org.springframework.test.web.client.MockRestServiceServer.createServer(client.restTemplate);
+        var invocation=new LlmInvocation("dashscope","qwen","local-test-model");
+        when(config.getString(1L,LlmCatalog.DASHSCOPE.keyName(),"")).thenReturn("local-test-key");
+        gate.setEnabled(true);
+        assertThatThrownBy(()->client.chat(invocation,"rules","data")).isInstanceOf(LlmTestGate.Blocked.class);
+        wire.verify();
+        gate.setEnabled(false);
+        wire.expect(org.springframework.test.web.client.match.MockRestRequestMatchers.anything()).andRespond(
+                org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess(
+                        "{\"choices\":[{\"message\":{\"content\":\"local-only\"},\"finish_reason\":\"stop\"}]}",org.springframework.http.MediaType.APPLICATION_JSON));
+        assertThat(client.chat(invocation,"rules","data")).isEqualTo("local-only");wire.verify();
+    }
     @Test void blockedVisionDoesNotProduceEmptyRecognizedHoldings() {
         gate.setEnabled(true);var vision=new VisionLlmClient(config,new RestTemplateBuilder());ReflectionTestUtils.setField(vision,"testGate",gate);
         assertThat(vision.available()).isTrue();

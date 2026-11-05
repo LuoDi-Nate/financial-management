@@ -188,7 +188,7 @@ public class RetirementDataService {
             }
             boolean completeNet=active.stream().allMatch(acc->{var row=balances.get(acc.getId());return row!=null && row.endBalanceBase()!=null
                     && factor(acc.getCurrency(),currency,rates)!=null;});
-            BigDecimal net=completeNet?balances.values().stream().map(AccountPeriodFact::endBalanceBase).filter(Objects::nonNull).reduce(BigDecimal.ZERO,BigDecimal::add):null;
+            BigDecimal net=completeNet?active.stream().map(acc->balances.get(acc.getId()).endBalanceBase()).reduce(BigDecimal.ZERO,BigDecimal::add):null;
             traced=new Sources(net,Set.copyOf(selected),factor("CNY",currency,rates),originalAverage,includedAverage,nonConsumption,removedAverage,
                     List.copyOf(budgetIds),investment,RetirementRateSources.cpi(macroRows,today));
         }

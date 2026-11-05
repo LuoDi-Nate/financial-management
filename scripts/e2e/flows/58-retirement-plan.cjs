@@ -43,7 +43,7 @@ async function form(ui, name) {
 }
 async function screenshot(ui, suffix) {
   const dir = '/tmp/finance-v139-review'; fs.mkdirSync(dir,{recursive:true});
-  await ui.page.evaluate(()=>window.scrollTo(0,0));
+  await ui.page.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));
   await ui.page.waitForTimeout(200);
   await ui.page.screenshot({path:path.join(dir,suffix + '.png'),fullPage:true});
 }
@@ -166,6 +166,21 @@ module.exports = {
     await ui.goto('/goals/new/retirement');
     await settings(ui,'新建计划',reference);
     await screenshot(ui,'desktop-settings');
+    await ui.assert(!await ui.page.locator('#retire-scope').evaluate(el=>el.open),'默认资金范围折叠');
+    await ui.assert(await ui.page.locator('[name="monthlyIncome"],[name="budgetConfirmed"],[name="assetsConfirmed"]').count()===0,'标准配置移除持续收入和重复确认');
+    await ui.assert(!await ui.page.isChecked('[name="simulateFuture"]'),'未来积累默认关闭');
+    await ui.page.check('[name="cityTier"][value="SECOND"]');await ui.choose('dependentCount','1');
+    await ui.choose('childPlanningYears[0]','12');await ui.choose('housingPlan','SETTLED');
+    await ui.click('[data-retire-example]','主动采用节目假设');
+    await ui.page.waitForFunction(()=>document.querySelector('[data-retire-live="reserves"]').textContent.includes('172,800.00'));
+    await ui.assert((await ui.page.locator('[data-retire-live="reserves"]').innerText()).includes('200,000.00'),'二线方案:教育172800、医疗200000由真实服务端计算');
+    await ui.page.check('[name="cityTier"][value="FIRST"]');
+    await ui.page.waitForFunction(()=>document.querySelector('[data-retire-live="reserves"]').textContent.includes('288,000.00'));
+    await ui.assert((await ui.page.locator('[data-retire-live="reserves"]').innerText()).includes('300,000.00'),'一线切换实际重算教育、医疗与应急');
+    await ui.assert(db.num(`SELECT COUNT(*) FROM retirement_plan WHERE family_id=${state.family}`)===0,'城市切换与自动演算不保存计划');
+    await ui.choose('returnSource','AUTO');
+    await ui.page.waitForFunction(()=>document.querySelector('[data-retire-live="rates"]').textContent.includes('本次名义年回报 待补齐'));
+    await ui.assert((await ui.page.locator('[data-retire-live="rates"]').innerText()).includes('至少需要12个'),'短历史明确缺失,不回退节目示例');
     await ui.assert(await ui.page.inputValue('[name="monthlyContribution"]') === '20000.00' ||
       Number(await ui.page.inputValue('[name="monthlyContribution"]'))===20000,'月投入建议包含旧总额和新账户收入,未停留在旧月份');
     await ui.assert(!(await ui.page.isChecked('[name="accountIds"][value="'+db.num(`SELECT id FROM account WHERE family_id=${state.family} AND type='PROPERTY'`)+'"]')),'自住房默认未纳入');
