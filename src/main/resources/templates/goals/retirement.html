@@ -213,8 +213,8 @@
                 th:text="${money.amount(view.data().sources().householdNetWorth())}"
               >
               </b>
-              · 净资金 A − D
-              <b data-priv th:text="${money.amount(r.netFunds())}"> </b> ·
+              · 可支用资产 A
+              <b data-priv th:text="${money.amount(r.assets())}"> </b> ·
               资产总需求 T + B + D
               <b data-priv th:text="${money.amount(r.totalAssetNeed())}"> </b>
             </p>

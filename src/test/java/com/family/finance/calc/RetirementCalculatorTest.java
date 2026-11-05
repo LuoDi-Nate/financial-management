@@ -43,6 +43,7 @@ class RetirementCalculatorTest {
         assertThat(r.principal()).isEqualByComparingTo("4600000");
         assertThat(r.gap()).isEqualByComparingTo("200000");
         assertThat(r.netFunds().subtract(r.totalNeed())).isEqualByComparingTo("-200000");
+        assertThat(r.assets().subtract(r.totalAssetNeed())).isEqualByComparingTo("-200000");
     }
     @Test void negativePrincipalStopsProjection() {
         var r = calculate(plan(), "100000", "0");
