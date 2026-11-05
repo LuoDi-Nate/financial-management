@@ -11,6 +11,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /** v1.28 · 终端面板:切段、四种说实话的状态、代号对照(PRD §3.2 ~ §3.4) */
 class PromptPeekViewTest {
+    @Test void blockedContentNeverClaimsItWasSentOrToolsWereExecuted() {
+        var v=PromptPeekView.of(row(PromptRecorder.BLOCKED,"test","prepared"),Map.of("账户A","样本账户"));
+        assertThat(v.warnLines()).anyMatch(s->s.contains("没有发给大模型"));
+        assertThat(v.tailNotes()).allMatch(s->!s.contains("原样发的"));
+        assertThat(v.legendLines()).anyMatch(s->s.contains("没有发送"));
+        assertThat(v.rawData()).isEqualTo("prepared");
+    }
 
     private static PromptRecordMapper.Row row(String outcome, String note, String user) {
         PromptRecordMapper.Row r = new PromptRecordMapper.Row();

@@ -43,6 +43,7 @@ public class LlmTestGate {
             if (mode.enabled() && (mode.epoch() == null || mode.openedAt() == null
                     || !UUID.fromString(mode.epoch()).toString().equals(mode.epoch())))
                 throw new IllegalArgumentException();
+            if(mode.openedAt()!=null) LocalDateTime.parse(mode.openedAt());
             return mode;
         } catch (Exception e) {
             throw new IllegalStateException("无法确认测试环境开关,已停止模型请求");

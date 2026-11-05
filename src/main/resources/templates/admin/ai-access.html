@@ -29,8 +29,8 @@
             onsubmit="if(this.elements.enabled.checked &amp;&amp; this.dataset.wasOn!=='true'){if(!confirm('这台是测试环境吗?打开后这台机器不再调用大模型。'))return false;this.elements.confirmed.value='true';}">
         <input type="hidden" name="confirmed" value="false">
         <div class="flex items-center justify-between gap-4 flex-wrap">
-          <label class="inline-flex items-center gap-3 min-h-11 text-sm"><input type="checkbox" name="enabled" value="true" th:checked="${llmTestStatus.enabled()}">大模型调用保护</label>
-          <button type="submit" class="btn-ink text-sm"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>保存开关</button>
+          <label class="inline-flex items-center gap-3 min-h-11 text-sm"><input type="checkbox" name="enabled" value="true" th:disabled="${me.familyId != 1}" th:checked="${llmTestStatus.enabled()}">大模型调用保护</label>
+          <button type="submit" class="btn-ink text-sm" th:disabled="${me.familyId != 1}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>保存开关</button>
         </div>
       </form>
       <p class="text-xs text-ink-soft mt-3 leading-loose">打开后,文字分析、截图识别、超级 Agent和关账后的模型任务均显示“测试环境 · 未调用”。规则结果与历史报告仍可查看。</p>
@@ -43,6 +43,13 @@
         <thead><tr><th>入口</th><th>拦下</th><th>发出</th><th>最近拦截</th></tr></thead>
         <tbody><tr th:each="row : ${llmTestStatus.entries()}"><td class="m-title" th:text="${row.label()}"></td><td data-label="拦下" th:text="${row.blocked()}"></td><td data-label="发出" th:text="${row.sent()}"></td><td class="m-full" data-label="最近拦截" th:text="${row.lastBlockedAt()}"></td></tr></tbody>
       </table>
+      <details class="mt-4 border-t border-rule pt-3" th:if="${llmPrepared != null and !#lists.isEmpty(llmPrepared)}" data-llm-prepared>
+        <summary class="text-sm text-brass-deep cursor-pointer">本家庭最近准备的内容</summary>
+        <div th:each="record : ${llmPrepared}" class="flex items-center justify-between gap-3 flex-wrap py-2 border-b border-rule-soft text-xs" data-peek-host>
+          <span th:text="${T(com.family.finance.service.llmtrace.PromptSurface).parse(record.surface).label+' · '+#temporals.format(record.createdAt,'yyyy-MM-dd HH:mm:ss')}"></span>
+          <th:block th:replace="~{fragments/_prompt-peek :: btn(${@promptPeek.of(me.familyId,record.id)})}"></th:block>
+        </div>
+      </details>
     </section>
 
     <!--/* v1.28 · 看 AI 收到了什么(PRD FR-914):只管显不显示图标;记录照写 */-->

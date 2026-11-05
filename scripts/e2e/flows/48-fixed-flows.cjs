@@ -209,18 +209,15 @@ module.exports = {
       '真值层:本期确认记录 LINKED → 指向刚记的那笔(来源仍是手动)', `${o2.join('|')} · ${c2.join('|')}`);
     await ui.notVisible(`[data-ff-box] > [data-ff-item][data-ff-flow="${state.f2}"]`, '它不会再作为「待确认」出现一次');
 
-    // ── 6 · 没设固定还款的贷款:建议 + 接受(= 原来那个方法)───────────────
-    report.section('6 · 没设固定还款的贷款 → 摘要里一条「建议 · 按上两月差值」,贷款行只剩一行指路;「接受」= 原来的结果');
+    // The reminder persists independently of whether this month's balance was filled.
+    report.section('6 · 未配置贷款常驻提醒,不再直接接受预测或生成草稿');
     await toEntry(ui);
     await openSummary(ui);
-    await ui.visible(`[data-ff-item][data-ff-loan="${LOAN}"][data-ff-state="SUGGEST"]`, '摘要里有这笔贷款的建议');
-    await ui.visible(`#entry-block-${LOAN} [data-ff-loan-hint]`, '贷款行里只剩「本期还款 · 待确认 ↑」');
+    await ui.visible(`[data-loan-setup="${LOAN}"]`, '摘要里有这笔贷款的配置提醒');
     await ui.assert(await ui.page.locator(`#entry-block-${LOAN} form[hx-post*="accept-loan-prediction"]`).count() === 0,
       '贷款行内不再有「接受」表单(挪进了摘要,FR-1117)');
-    await ui.submit(`[data-ff-item][data-ff-loan="${LOAN}"] [data-ff-accept] button`, '点「接受」');
-    const accepted = bal(state.cur, LOAN);
-    await ui.assert(Math.abs(accepted - state.expectLoan) < 0.005, '真值层:贷款本期余额 = 上月 + (上月 − 上上月)(与旧版「接受」同一个函数)',
-      `${accepted} vs ${state.expectLoan}`);
+    await ui.assert(await ui.page.locator('[data-ff-accept],form[hx-post*="accept-loan-prediction"]').count()===0,'旧预测写入口完全移除');
+    await ui.assert(Math.abs(bal(state.cur,LOAN)-state.loanPrevSet)<0.005,'显示提醒不改余额');
     // 还原成「没人动过」,下面用固定还款再走一次
     db.raw(`UPDATE period_snapshot SET end_balance=${state.loanPrevSet}, source_tag='CARRIED_FORWARD' WHERE period_id=${state.cur} AND account_id=${LOAN}`);
     db.raw(`UPDATE snapshot_todo SET status='PENDING', done_by_member_id=NULL WHERE period_id=${state.cur} AND account_id=${LOAN}`);

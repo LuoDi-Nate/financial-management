@@ -52,6 +52,8 @@ import static com.family.finance.service.config.FamilyConfigService.*;
 public class AiAccessController {
     @org.springframework.beans.factory.annotation.Autowired
     private com.family.finance.service.checkup.llm.LlmTestGate llmTestGate;
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.family.finance.repository.PromptRecordMapper promptRecords;
 
     private static final int AUDIT_LIMIT = 50;
 
@@ -77,7 +79,10 @@ public class AiAccessController {
     @GetMapping("/admin/ai-access")
     public String page(@AuthenticationPrincipal MemberPrincipal me, HttpServletRequest req, Model model) {
         long fam = me.getFamilyId();
-        model.addAttribute("llmTestStatus", llmTestGate.status());
+        var testStatus=llmTestGate.status();
+        model.addAttribute("llmTestStatus", testStatus);
+        model.addAttribute("llmPrepared",testStatus.openedAt()==null || promptRecords==null?List.of()
+                :promptRecords.recentPrepared(fam,LocalDateTime.parse(testStatus.openedAt())));
         model.addAttribute("me", me);
         model.addAttribute("nav", navService.load(me));
         // v1.28 FR-914 · 「看 AI 收到了什么」开关(缺省 = 开)
@@ -424,6 +429,10 @@ public class AiAccessController {
     public String testMode(@AuthenticationPrincipal MemberPrincipal me,
                            @RequestParam(defaultValue = "false") boolean enabled,
                            @RequestParam(defaultValue = "false") boolean confirmed, RedirectAttributes ra) {
+        if(me.getFamilyId()!=com.family.finance.service.checkup.llm.LlmTestGate.OWNER_FAMILY_ID) {
+            ra.addFlashAttribute("flashError","只有本机主家庭可修改全站测试保护。");
+            return "redirect:/admin/ai-access#test-mode";
+        }
         if (enabled && !llmTestGate.enabled() && !confirmed) {
             ra.addFlashAttribute("flashError", "请先确认这台是测试环境,再打开模型调用保护。");
             return "redirect:/admin/ai-access#test-mode";

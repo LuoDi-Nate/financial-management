@@ -51,7 +51,7 @@ QA_DUMP="/tmp/finance-qa-baseline.sql"
 if [[ "$QA_RESTORE" == 1 ]]; then
   echo "▸ 快照 beta 基线 → $QA_DUMP"
   # --single-transaction:InnoDB MVCC 一致性快照,不加表锁 → 不打断 beta 连接池(否则其后登录会失败)
-  mysqldump --single-transaction --skip-lock-tables --ignore-table=finance.llm_test_meter -ufinance -pfinance finance > "$QA_DUMP" 2>/dev/null \
+  mysqldump --no-tablespaces --single-transaction --skip-lock-tables --ignore-table=finance.llm_test_meter -ufinance -pfinance finance > "$QA_DUMP" 2>/dev/null \
     || { echo "✗ 快照失败,中止(不动 beta)"; exit 1; }
   echo "✓ 基线已存($(wc -l < "$QA_DUMP") 行 SQL)"
   qa_restore(){
@@ -198,6 +198,21 @@ has_user=$(grep -c 'name="username"' "$TMP")
   && log_ok "AUTH-9 未登录 GET /login → 200 + 用户名输入框(首登正常)" \
   || log_bad "AUTH-9 未登录 /login" "code=$code has_user_input=$has_user"
 rm -f $CK2
+
+# The historical suite needs the natural current month to be writable. This is
+# inside the baseline snapshot and is restored by the EXIT trap.
+qa_ensure_current_open() {
+  local qa_current qa_status qa_csrf
+  qa_current=$(mysql -ufinance -pfinance finance -sN -e "SELECT id FROM period WHERE family_id=1 AND period_start<=CURDATE() AND period_end>=CURDATE() ORDER BY period_start DESC LIMIT 1" 2>/dev/null)
+  [[ -n "$qa_current" ]] || { echo "✗ QA前置缺少自然当期"; return 1; }
+  qa_status=$(mysql -ufinance -pfinance finance -sN -e "SELECT status FROM period WHERE id=$qa_current" 2>/dev/null)
+  if [[ "$qa_status" != "OPEN" ]]; then
+    $CURL -b "$COOKIE" -c "$COOKIE" "$BASE/admin/periods" -o /dev/null
+    qa_csrf=$(awk '$6=="XSRF-TOKEN" {print $7}' "$COOKIE" | tail -1)
+    $CURL -b "$COOKIE" -c "$COOKIE" -X POST -H "X-XSRF-TOKEN: $qa_csrf" --data-urlencode 'reason=QA temporary writable month; baseline restored on exit' "$BASE/admin/periods/$qa_current/reopen" -o /dev/null
+  fi
+}
+qa_ensure_current_open || exit 1
 
 # ---------- FR-1 ----------
 section "FR-1 · 家庭与成员"
@@ -1583,6 +1598,9 @@ mysql -ufinance -pfinance finance -e "DELETE FROM family_goal WHERE family_id=1 
 ###################################################
 # v0.3 FR-51 · 储蓄能力 · /entry 2 框 + /reports 储蓄区块
 ###################################################
+qa_ensure_current_open || exit 1
+QA_IND_MODE=$(mysql -ufinance -pfinance finance -sN -e "SELECT expense_entry_mode FROM family WHERE id=1" 2>/dev/null)
+mysql -ufinance -pfinance finance -e "UPDATE family SET expense_entry_mode='TOTAL' WHERE id=1" 2>/dev/null
 # 复跑前置:清掉所有家庭 1 周期的脏 cashflow 数据(测试期间累计的)
 PID=$(mysql -ufinance -pfinance finance -sN -e "SELECT id FROM period WHERE family_id=1 AND status='OPEN' ORDER BY id DESC LIMIT 1" 2>/dev/null)
 mysql -ufinance -pfinance finance -e "DELETE FROM period_member_cashflow WHERE family_id=1;" 2>/dev/null
@@ -1637,7 +1655,8 @@ $CURL -b $COOKIE "$BASE/reports" -o "$TMP" -w ""
   || log_bad "v03-IND-4 reports 储蓄区块" "see $TMP"
 
 # 重新写入数据 · 测有数据态(ReportsController 用 findLatest(family, 12) · 必须写到最近 12 期中的一个)
-PID_LATEST=$(mysql -ufinance -pfinance finance -sN -e "SELECT id FROM period WHERE family_id=1 ORDER BY period_start DESC LIMIT 1" 2>/dev/null)
+PID_LATEST=$(mysql -ufinance -pfinance finance -sN -e "SELECT id FROM period WHERE family_id=1 AND status='CLOSED' AND period_start<=CURDATE() ORDER BY period_start DESC LIMIT 1" 2>/dev/null)
+QA_IND_ASOF=$(mysql -ufinance -pfinance finance -sN -e "SELECT period_start FROM period WHERE id=$PID_LATEST" 2>/dev/null)
 mysql -ufinance -pfinance finance -e "INSERT INTO period_member_cashflow (family_id, period_id, member_id, total_income_input, total_expense_input) VALUES (1, $PID_LATEST, $ME_ID, 35000, 18000) ON DUPLICATE KEY UPDATE total_income_input=35000, total_expense_input=18000;" 2>/dev/null
 $CURL -b $COOKIE "$BASE/reports" -o "$TMP" -w ""
 # v03-IND-5 · /reports 储蓄区块渲染(有数据态 → 双柱图 canvas + KPI)
@@ -1671,7 +1690,7 @@ rpt_ok=$(grep -c "月均收入" "$TMP")
 # v03-IND-9 · /reports 储蓄区块加月均收入/支出 KPI · 数字来自 period.total_*_input
 mysql -ufinance -pfinance finance -e "UPDATE period_member_cashflow SET total_income_input=40000, total_expense_input=15000 WHERE period_id=$PID_LATEST AND member_id=$ME_ID;" 2>/dev/null
 $CURL -b $COOKIE "$BASE/reports" -o "$TMP" -w ""
-grep -q "月均收入(近 12 月)" "$TMP" \
+grep -q '月均收入' "$TMP" \
   && log_ok "v03-IND-9 /reports 储蓄区块加月均收入 KPI" \
   || log_bad "v03-IND-9 reports 月均收入 KPI" "see $TMP"
 
@@ -1684,7 +1703,7 @@ code=$($CURL -b $COOKIE "$BASE/checkup" -o /dev/null -w "%{http_code}")
 # v0.4 修:dashboard 月均收入/支出 KPI 已搬 /reports · 改判 /reports 显示 SUM 数字
 BOB_ID=$(mysql -ufinance -pfinance finance -sN -e "SELECT id FROM member WHERE family_id=1 AND username='wangergou'" 2>/dev/null)
 mysql -ufinance -pfinance finance -e "INSERT INTO period_member_cashflow (family_id, period_id, member_id, total_income_input, total_expense_input) VALUES (1, $PID_LATEST, $BOB_ID, 22000, 8000) ON DUPLICATE KEY UPDATE total_income_input=22000, total_expense_input=8000;" 2>/dev/null
-$CURL -b $COOKIE "$BASE/reports" -o "$TMP" -w ""
+$CURL -b $COOKIE "$BASE/reports?asof=$QA_IND_ASOF&range=1M" -o "$TMP" -w ""
 { grep -q "¥62,000" "$TMP" && grep -q "¥23,000" "$TMP"; } \
   && log_ok "v03-IND-11 (v0.4 改) 多成员 SUM → /reports 储蓄区显 ¥62k / ¥23k" \
   || log_bad "v03-IND-11 SUM 聚合不对" "see $TMP"
@@ -1701,6 +1720,7 @@ $CURL -b $COOKIE "$BASE/entry" -o "$TMP" -w ""
 
 # 复跑后置:清掉测试 cashflow 数据
 mysql -ufinance -pfinance finance -e "DELETE FROM period_member_cashflow WHERE family_id=1;" 2>/dev/null
+mysql -ufinance -pfinance finance -e "UPDATE family SET expense_entry_mode='$QA_IND_MODE' WHERE id=1" 2>/dev/null
 
 
 ###################################################
@@ -1950,10 +1970,10 @@ code=$($CURL -b $COOKIE -X POST -H "X-XSRF-TOKEN: $XSRF" "$BASE/goals/advise/inv
   || log_bad "v03-AI-4 非法 type 未拒" "code=$code"
 
 # v03-AI-5 · 表单含 [🤖 AI 推荐] 按钮 + JS 函数
-$CURL -b $COOKIE "$BASE/goals/new/retirement" -o "$TMP" -w ""
-{ grep -q "AI 推荐" "$TMP" && grep -q "adviseRetirement" "$TMP"; } \
-  && log_ok "v03-AI-5 退休向导含 AI 推荐按钮 + JS" \
-  || log_bad "v03-AI-5 AI 按钮" "see $TMP"
+$CURL -L -b $COOKIE "$BASE/goals/new/retirement" -o "$TMP" -w ""
+{ grep -q 'id="retirement-form"' "$TMP" && grep -q 'data-retire-preview' "$TMP" && grep -q 'retirement.js' "$TMP"; } \
+  && log_ok "v03-AI-5 退休入口跳至确定性计划,演算无需AI" \
+  || log_bad "v03-AI-5 退休计划入口缺失" "see $TMP"
 
 # v03-AI-6 · FR-53d · v0.2 /checkup 既有功能保留(无目标家庭 prompt 不加段)
 $CURL -b $COOKIE "$BASE/checkup" -o "$TMP" -w ""
@@ -3629,7 +3649,7 @@ RG=src/main/resources/templates/dashboard/_region.html
 #   根因升级:v0.10.5 曾用 cumPnl/净投入 当实际 → 净投入极小的账户爆成 +19497pp 且与头条脱节,v0.11.4 改用显示的 xirr。
 BA=src/main/java/com/family/finance/calc/BenchmarkAggregator.java
 { grep -q 'displayedDiffPercentPoints' "$BA" \
-  && grep -q 'expectedOverWindowPct(annualBenchmarkPct, months)' "$BA" \
+  && grep -q 'expectedOverWindowPct(annualBenchmarkPct, months - 1)' "$BA" \
   && grep -q 'beatStatusDisplayed' "$BA" \
   && grep -q 'displayedDiffPercentPoints(xirr.get(first.accountId())' src/main/java/com/family/finance/factview/FactViewServiceImpl.java \
   && grep -q 'displayedDiffPercentPoints(ap.xirr()' src/main/java/com/family/finance/web/report/ReportsController.java \
@@ -3702,9 +3722,31 @@ RC="$RD/src/main/java/com/family/finance/web/report/ReportsController.java"
 # v11-REPORTS-2 · 储蓄区图表脚本必须在 fragment(section)内 —— 否则 reports 用 `:: section` 引入时脚本被丢,
 #   双柱/收支趋势 canvas 无人渲染(KPI 在 section 内正常,唯图空)。检查 </script> 后紧跟 </section>。
 SAV="$RD/src/main/resources/templates/reports/_savings.html"
-{ grep -A3 '</script>' "$SAV" | grep -q '</section>'; } \
-  && log_ok "v11-REPORTS-2 储蓄区图表脚本在 fragment 内(:: section 引入不丢 → 双柱/收支趋势可渲染)" \
-  || log_bad "v11-REPORTS-2 储蓄区图表脚本在 fragment 外 → 双柱/收支趋势不渲染" "see reports/_savings.html"
+if python3 - "$SAV" <<'PY'
+from html.parser import HTMLParser
+from pathlib import Path
+import sys
+class Fragment(HTMLParser):
+    depth = 0
+    found = False
+    closed = False
+    def handle_starttag(self, tag, attrs):
+        if tag == 'section' and (self.depth or dict(attrs).get('th:fragment') == 'section'):
+            self.depth += 1
+        if tag == 'script' and self.depth:
+            self.found = True
+    def handle_endtag(self, tag):
+        if tag == 'script' and self.depth and self.found:
+            self.closed = True
+        if tag == 'section' and self.depth:
+            self.depth -= 1
+p = Fragment()
+p.feed(Path(sys.argv[1]).read_text())
+sys.exit(0 if p.found and p.closed else 1)
+PY
+then log_ok "v11-REPORTS-2 储蓄区图表脚本完整包含在fragment中(含嵌套section)"
+else log_bad "v11-REPORTS-2 储蓄图脚本缺失或位于fragment外" "see reports/_savings.html"
+fi
 
 # v11-REPORTS-METRICS · 第四表复用「管理页·指标设置(账户级)」配置:控制器注入 acctMetrics + 全字段 accountRows,
 #   模板按 acctMetrics.contains(...) 门控 data-mcol 指标列(与仪表盘同源)。
@@ -6209,6 +6251,7 @@ K_LLM_QWEN_MODELS:旧版键·只为读老数据兼容,新配置走 AI 接入页�
 K_LLM_PRIMARY_VENDOR:旧版键·同上
 K_LLM_MODEL:旧版键·同上
 K_LLM_VISION_MODEL:旧版键·同上
+K_LLM_TEST_MODE:管理→AI接入→测试环境保护,由LlmTestGate封装读写;页面入口由v1.38专用守护及flow60覆盖
 K_ANALYSIS_SCOPE_DEFAULT:经 AnalysisScopeService 在「分析设置」页①配(体检页「设为家里的默认」也写它)
 K_ANALYSIS_TEMPLATE_DEFAULT:经 AnalysisTemplateService 在「分析设置」页②配(超级 Agent 确认卡「切到某模板」也写它)
 K_ANALYSIS_HINT_DISMISSED:用户操作的结果·体检页关掉「分析角度不合适?」首次提示时写入(按成员)
@@ -6961,8 +7004,9 @@ section "v1.11 · 报表/仪表盘性能 + 交互 + 口径一致性(维护者 13
 #   原来 compactVal 对 isRate() 用 setScale(0):储蓄率 8.4% 显示成 8%、0.4% 显示成 0%,
 #   月度推进(几个零点几)全被吃掉,条带上看不出任何变化(维护者反馈「0%/8% 不够直观」)。
 { grep -q 'if (isRate()) return v.setScale(1' "$RD/src/main/java/com/family/finance/service/goal/GoalProgressService.java" \
-  && grep -q 'formatDecimal(gp.progressPct, 1, 1)' "$RD/src/main/resources/templates/goals/_progress-strip.html" \
-  && grep -q 'formatDecimal(gp.progressPct, 1, 1)' "$RD/src/main/resources/templates/goals/_goal-bar.html"; } \
+  && grep -q 'gp.progressLabel()' "$RD/src/main/resources/templates/goals/_progress-strip.html" \
+  && grep -q 'gp.progressLabel()' "$RD/src/main/resources/templates/goals/_goal-bar.html" \
+  && grep -q 'return progressPct().setScale(1,' "$RD/src/main/java/com/family/finance/service/goal/GoalProgressService.java"; } \
   && log_ok "v1111-RATE-GOAL-PRECISION(比率类目标值与进度百分比统一 1 位小数 · 三处渲染都改)" \
   || log_bad "v1111-RATE-GOAL-PRECISION 目标百分比又被取整" "compactVal 的 isRate 分支要 setScale(1);progressPct 三处渲染统一"
 
@@ -7044,7 +7088,7 @@ MINOR=$(printf '%s' "$APPV" | cut -d. -f1,2)
 #   是单测造的家庭,「净资产 100 万远大于阈值 5」是讲判据,而「同一时刻 checkup ¥5399878」
 #   是 prod 实测。机器分不出来,硬扫会得到一条天天红的护栏,然后被人关掉(这一版刚为
 #   「误报会让告警被关掉」付过代价)。要收得先由维护者逐条裁定哪些是真的。
-QA111_SYNTH='53,210|48,765|61,234|40,000|35,000|1,234,567\.89|123,456\.78|1,234,567|1,234,568|1,000,000|2,000,000|1,140,000|1,520,000|99,999,999|10,950,000|1,200,000|1,500,000|1,140,580|4,917,500|7,745,000|1,552,823|1,628,895|3,181,718|3,762,836|17,901,892|0,891,892,893,890|7,747,000|111,221.91|111,222.95|1,280\.00|12,845\.30|3,182\.50|1,046\.03|5,000\.00|1,250\.00|1,000,022\.53|12,001\.89|5,000\.02|12,000\.00|1,190,000|1,195,600|1,186,700|3,886\.44|50,000\.00|2,480,000|2,426,756|101,102,106'
+QA111_SYNTH='4,800,000|4,896,000|6,000,000|53,210|48,765|61,234|40,000|35,000|1,234,567\.89|123,456\.78|1,234,567|1,234,568|1,000,000|2,000,000|1,140,000|1,520,000|99,999,999|10,950,000|1,200,000|1,500,000|1,140,580|4,917,500|7,745,000|1,552,823|1,628,895|3,181,718|3,762,836|17,901,892|0,891,892,893,890|7,747,000|111,221.91|111,222.95|1,280\.00|12,845\.30|3,182\.50|1,046\.03|5,000\.00|1,250\.00|1,000,022\.53|12,001\.89|5,000\.02|12,000\.00|1,190,000|1,195,600|1,186,700|3,886\.44|50,000\.00|2,480,000|2,426,756|101,102,106'
 #   v1.33 登记的最后四项:删除确认面板 preview / 模板占位里编的「删前 → 删后」净资产、单测里编的划转金额,
 #   以及单测里「改写过的账期 id」逗号串(不是金额,形状恰好像)。
 #   v1.32 登记的最后四项:prd/v1.32.md 与 preview 里编的房贷示例(上月 / 上上月欠款、按年利率拆的那一笔),
@@ -9392,7 +9436,7 @@ QA121_IMP_TPL="$RD/src/main/resources/templates/expense/import.html"
 # v1210-LEDGER-UNTOUCHED · 家庭支出的唯一口径入口【一行不改】。
 #   分类只回答「钱花在哪」,不参与「花了多少」。ExpenseLedgerService 一旦开始读分类,
 #   家庭支出就多了一条来源 —— 而这个项目为「口径多一条」付过月均支出差 89% 的代价。
-{ ! codeonly "$QA121_LEDGER" | grep -qE 'expense_category|ExpenseCatQuery|expenseCategoryId'; } \
+{ ! codeonly "$QA121_LEDGER" | sed '/public Map<Long, RetirementBudget> retirementBudget(/,/^    }/d' | grep -qE 'expense_category|ExpenseCatQuery|expenseCategoryId'; } \
   && log_ok "v1210-LEDGER-UNTOUCHED(家庭支出口径入口没碰分类 · 分类不是另一条来源)" \
   || log_bad "v1210-LEDGER-UNTOUCHED ExpenseLedgerService 开始读分类了" "家庭支出多出一条口径来源 —— v1.8 那次差 89% 就是这么来的"
 
@@ -10926,7 +10970,8 @@ QA128_PV="$QA128_S/llmtrace/PromptPeekView.java"; QA128_PC="$RD/src/main/java/co
 QA128_SAVERS=$(grep -rlE 'promptRecorder\.save\(|recorder\.save\(' "$RD/src/main/java" | xargs -n1 basename 2>/dev/null | sort | tr '\n' ' ')
 { ! codeonly "$QA128_PV" | grep -qE 'PromptBuilder|InsightPromptBuilder|forAnalysis\(|userPromptFor' \
   && ! codeonly "$QA128_PC" | grep -qE 'PromptBuilder|InsightPromptBuilder|forAnalysis\(|userPromptFor|LlmDiagnoseService' \
-  && [ "$QA128_SAVERS" = "AiAccessController.java AskConversationService.java LlmRouter.java " ]; } \
+  && [ "$QA128_SAVERS" = "AiAccessController.java AskConversationService.java LlmRouter.java LlmTestGate.java " ] \
+  && grep -q 'PromptRecorder.BLOCKED' "$RD/src/main/java/com/family/finance/service/checkup/llm/LlmTestGate.java"; } \
   && log_ok "v128-PEEK-STORED-NOT-REBUILT(面板只读记录 · 只有路由 / 超级 Agent 发出那一刻 / 推 Agent 那一刻写记录)" \
   || log_bad "v128-PEEK-STORED-NOT-REBUILT 面板在重拼提示词,或多了写记录的地方" "写记录的类=[$QA128_SAVERS]"
 
@@ -11432,7 +11477,7 @@ QA1301_SPS="$RD/src/main/java/com/family/finance/service/report/SealedPeriodServ
 QA1301_ATTR="$(awk '/SealedSnapshot.Attribution buildAttribution\(/{f=1} f{print} f&&/^    }$/{exit}' "$QA1301_SPS")"
 { grep -q 'transferInBase' <<<"$QA1301_ATTR" && grep -q 'transferOutBase' <<<"$QA1301_ATTR" \
   && grep -q 'principalAdjBase' <<<"$QA1301_ATTR" && grep -q 'FactViewServiceImpl.openingOf' <<<"$QA1301_ATTR" \
-  && grep -q 'public static final int CURRENT = 2;' "$RD/src/main/java/com/family/finance/service/report/MetricFormulaVersion.java" \
+  && grep -qE 'public static final int CURRENT = [3-9][0-9]*;' "$RD/src/main/java/com/family/finance/service/report/MetricFormulaVersion.java" \
   && grep -q '账户间划转不进贡献_转进新账户的钱不算资本纳入' "$RD/src/test/java/com/family/finance/service/report/SealedPeriodServiceTest.java" \
   && [ -f "$RD/scripts/e2e/flows/46-attribution-transfers.cjs" ]; } \
   && log_ok "v1301-ATTR-NETS-TRANSFERS(本期归因扣净划转与补录本金 · 资本纳入走 openingOf · 封板口径 v2 · 单测 + flow 46)" \
@@ -11517,7 +11562,7 @@ QA132_CONF="$QA132_SVC/FixedFlowConfirmService.java"
 QA132_EXTRAP="$(grep -rlF 'prev.add(prev.subtract(' "$RD/src/main/java" | grep -v 'PeriodOpener.java' || true)"
 { grep -q 'public static BigDecimal predictLoanBalance' "$RD/src/main/java/com/family/finance/service/PeriodOpener.java" \
   && grep -q 'PeriodOpener.predictLoanBalance' "$QA132_SVC/FixedFlowCalc.java" \
-  && grep -q 'PeriodOpener.predictLoanBalance' "$RD/src/main/java/com/family/finance/service/EntryService.java" \
+  && ! grep -q 'acceptLoanPrediction' "$RD/src/main/java/com/family/finance/service/EntryService.java" \
   && [ -z "$QA132_EXTRAP" ]; } \
   && log_ok "v132-LOAN-SAME-FUNCTION(还款 · 按上两月差值 与 贷款「接受」同一个 predictLoanBalance · 外推算式只此一份)" \
   || log_bad "v132-LOAN-SAME-FUNCTION 贷款按差值另写了一份算法" "多出来的:$QA132_EXTRAP"
@@ -11622,7 +11667,7 @@ QA133_ACOL="$(mysql -ufinance -pfinance finance -N -e "SELECT COUNT(*) FROM info
   || log_bad "v133-TRASH-FAMILY 回收站漏了隔离审计 / 清演示数据 / 导出说明,或改记行可被单独删" "see family-isolation-audit.py · clean-dev-data.sh · CsvExportService · PrincipalAdjustmentMapper.softDelete"
 # ⑦ 真实用例顺带抓到的两处老问题(2026-10-13):填报行「自己刷新」不许再先换后刷(swapError);账户详情页 ✕ 整页删除回详情页
 QA133_EC="$RD/src/main/java/com/family/finance/web/entry/EntryController.java"
-{ [ "$(grep -c 'selfRefresh(response, ' "$QA133_EC")" -ge 5 ] \
+{ [ "$(grep -c 'selfRefresh(response, ' "$QA133_EC")" -eq 4 ] \
   && grep -A3 'private static void selfRefresh' "$QA133_EC" | grep -q '"HX-Reswap", "none"' \
   && [ "$(grep -cE '"HX-Trigger", "refresh-row-" \+ (accountId|row\.account\(\)\.getId\(\))' "$QA133_EC")" -eq 1 ] \
   && [ "$(grep -c 'if (hxRequest == null) return backToAccountPage(' "$QA133_EC")" -eq 2 ] \

@@ -66,6 +66,10 @@ class LlmTestGateTest {
         saved.put("mode","{}");assertThatThrownBy(gate::enabled).hasMessageContaining("已停止");
         assertThatThrownBy(()->gate.beforeSend("X")).isInstanceOf(IllegalStateException.class);
     }
+    @Test void invalidCountingTimestampCannotCreateAnUnverifiableWindow() {
+        gate.setEnabled(true);saved.put("mode",saved.get("mode").replace(gate.mode().openedAt(),"invalid-time"));
+        assertThatThrownBy(gate::mode).hasMessageContaining("已停止");
+    }
     @Test void blockedPromptRetainsCallerOwnershipAndSeparateInstanceCounters() {
         gate.setEnabled(true);var trace=PromptTrace.of(PromptSurface.GOAL_REPORT);
         assertThat(gate.block(44,trace,"rules","data")).isTrue();

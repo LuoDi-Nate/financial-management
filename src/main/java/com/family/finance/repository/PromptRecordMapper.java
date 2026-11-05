@@ -53,6 +53,14 @@ public interface PromptRecordMapper {
             """)
     Row find(@Param("familyId") long familyId, @Param("id") long id);
 
+    @Select("""
+            SELECT id, family_id AS familyId, surface, created_at AS createdAt
+              FROM llm_prompt_record
+             WHERE family_id=#{familyId} AND outcome='BLOCKED' AND created_at>=#{since}
+             ORDER BY id DESC LIMIT 20
+            """)
+    List<Row> recentPrepared(@Param("familyId") long familyId,@Param("since") LocalDateTime since);
+
     @Update("UPDATE llm_prompt_record SET outcome = #{outcome}, outcome_note = #{note} WHERE id = #{id} AND family_id = #{familyId}")
     int updateOutcome(@Param("familyId") long familyId, @Param("id") long id,
                       @Param("outcome") String outcome, @Param("note") String note);

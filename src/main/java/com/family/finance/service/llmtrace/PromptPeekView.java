@@ -82,7 +82,7 @@ public record PromptPeekView(
         int mine = (int) (segs.stream().filter(Seg::mine).count() + sysSegs.stream().filter(Seg::mine).count());
         List<String> legendLines = new ArrayList<>();
         if (legend != null && !legend.isEmpty()) {
-            legendLines.add("# 发出去之前,成员名和账户名换成了代号(这张表只在这里显示,没发给 AI):");
+            legendLines.add(PromptRecorder.BLOCKED.equals(state)?"# 准备内容中的成员名和账户名已换代号;没有发送:":"# 发出去之前,成员名和账户名换成了代号(这张表只在这里显示,没发给 AI):");
             StringBuilder line = new StringBuilder("#  ");
             for (Map.Entry<String, String> e : legend.entrySet()) {
                 String item = " " + e.getKey() + " = " + e.getValue();
@@ -96,7 +96,9 @@ public record PromptPeekView(
             legendLines.add(last.endsWith(" ·") ? last.substring(0, last.length() - 2) : last);
         }
         List<String> tail = new ArrayList<>();
-        if (s == PromptSurface.ASK_TURN) {
+        if(PromptRecorder.BLOCKED.equals(state)) {
+            tail.add("# 本次仅保存准备内容,没有发出请求,也没有执行模型工具调用。");
+        } else if (s == PromptSurface.ASK_TURN) {
             tail.add("# 前面几轮对话也一起发了 · 工具查到的数据见这条回答上方的「思考过程」。");
             tail.add("# 工具返回里带账户名(超级 Agent 要按名字回答你的问题)。");
         } else {

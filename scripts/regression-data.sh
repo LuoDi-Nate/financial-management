@@ -81,7 +81,7 @@ trap restore EXIT
 # ── 快照基线 ──
 echo "▸ 快照 beta 基线 → $DUMP"
 # --single-transaction:InnoDB MVCC 一致性快照,不加表锁 → 不打断正在运行的 beta 连接池(否则其后登录会失败)
-mysqldump --single-transaction --skip-lock-tables --ignore-table="$DBN.llm_test_meter" -u"$DBU" -p"$DBP" "$DBN" > "$DUMP" 2>/dev/null || { echo "✗ 快照失败,中止(不动 beta)"; exit 1; }
+mysqldump --no-tablespaces --single-transaction --skip-lock-tables --ignore-table="$DBN.llm_test_meter" -u"$DBU" -p"$DBP" "$DBN" > "$DUMP" 2>/dev/null || { echo "✗ 快照失败,中止(不动 beta)"; exit 1; }
 echo "✓ 基线已存($(wc -l < "$DUMP") 行 SQL)"
 
 # ── 登录 + CSRF ──

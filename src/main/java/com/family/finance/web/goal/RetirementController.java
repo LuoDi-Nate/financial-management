@@ -45,7 +45,7 @@ public class RetirementController {
 
     @GetMapping("/goals/retirement/new")
     String createForm(@AuthenticationPrincipal MemberPrincipal me, Model model) {
-        return page(me, null, plans.draft(me.getFamilyId(), null), "plan", "CNY", model);
+        return page(me, null, plans.draft(me.getFamilyId(), null), "plan", null, model);
     }
 
     @GetMapping("/goals/{id:[0-9]+}/retirement")

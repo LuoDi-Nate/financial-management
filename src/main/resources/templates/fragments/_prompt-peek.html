@@ -37,7 +37,7 @@
       <span class="ln ok" th:if="${pv.state() == 'OK'}"># 这份结果就是用下面这段生成的 · 逐字</span>
       <span class="ln ok" th:if="${pv.state() == 'SENT'}"># 这一问发出去的就是下面这段 · 逐字</span>
       <span class="ln kv" th:if="${pv.vendor() != null}"><span class="k">模型</span><span th:text="${pv.vendor()}">deepseek</span></span>
-      <span class="ln kv" th:if="${pv.sentAt() != null}"><span class="k">发出</span><span th:text="${pv.sentAt()}">2026-09-29 14:02:31</span></span>
+      <span class="ln kv" th:if="${pv.sentAt() != null}"><span class="k" th:text="${pv.state()=='BLOCKED'?'准备':'发出'}">发出</span><span th:text="${pv.sentAt()}">2026-09-29 14:02:31</span></span>
       <span class="ln kv" th:if="${pv.settingsNote() != null}"><span class="k">你的设置</span><span th:text="${pv.settingsNote()}">模板</span></span>
       <span class="ln kv"><span class="k">长度</span><span
             th:text="'规矩 ' + ${#numbers.formatInteger(pv.systemChars(), 1, 'COMMA')} + ' 字 · 你家的数据 ' + ${#numbers.formatInteger(pv.userChars(), 1, 'COMMA')} + ' 字'">规矩</span></span>

@@ -16,16 +16,30 @@ async function login(page, username) {
   await page.click('button[type="submit"]');
   await page.waitForLoadState('networkidle');
 }
+async function directMode(ui,on) {
+  const section=ui.page.locator('#retire-returns details[data-retire-when="manual-return"]');
+  if(!await section.evaluate(el=>el.open)) await ui.click('#retire-returns details[data-retire-when="manual-return"] > summary','展开实际回报选项');
+  await ui.page.setChecked('[name="directRealRate"]',on);
+}
 async function form(ui, name) {
   await ui.click('[data-retire-tab="plan"]', '调整退休计划');
-  for (const [key,value] of Object.entries({name,targetMonth:'2036-11',monthlyExpense:'10000',monthlyIncome:'0',
-    monthlyContribution:'0',childReserve:'400000',medicalReserve:'300000',housingReserve:'0',otherReserve:'500000',inflationPct:'0',realReturnPct:'2.5'}))
+  await ui.page.check('[name="autoExpense"][value="false"]');
+  await ui.choose('reserveMode','CUSTOM');await ui.choose('returnSource','MANUAL');await ui.choose('inflationSource','MANUAL');
+  if(!await ui.page.locator('#retire-scope').evaluate(el=>el.open)) await ui.click('#retire-scope > summary','展开资金范围');
+  await ui.choose('scopeMode','CUSTOM');
+  if(!await ui.page.locator('#retire-returns details[data-retire-when="manual-return"]').evaluate(el=>el.open)) await ui.click('#retire-returns details[data-retire-when="manual-return"] > summary','展开直接实际回报');
+  for (const [key,value] of Object.entries({name,targetMonth:'2036-11',monthlyExpense:'10000',
+    childReserve:'400000',medicalReserve:'300000',housingReserve:'0',otherReserve:'500000',inflationPct:'0',realReturnPct:'2.5'}))
     await ui.fillByName(key,value,'#retirement-form');
   await ui.page.check('[name="directRealRate"]');
   for (const checkbox of await ui.page.locator('input[name="accountIds"]').all()) await checkbox.uncheck();
   await ui.page.check(`input[name="accountIds"][value="${state.cash}"]`);
-  for (const key of ['budgetConfirmed','reservesConfirmed','noOverlapConfirmed','assetsConfirmed','incomeConfirmed','contributionConfirmed','afterDebtConfirmed'])
-    await ui.page.check(`[name="${key}"]`);
+  await ui.page.check('[name="noOverlapConfirmed"]');
+  await ui.click('[data-retire-tab="overview"]','查看可选未来积累');
+  if(!await ui.page.locator('.retire-future').evaluate(el=>el.open)) await ui.click('.retire-future > summary','展开未来积累');
+  await ui.page.check('[name="simulateFuture"]');await ui.choose('contributionSource','MANUAL');
+  await ui.fillByName('monthlyContribution','0');
+  await ui.click('[data-retire-tab="plan"]','返回计划');
 }
 async function screenshot(ui, suffix) {
   const dir = '/tmp/finance-v139-review'; fs.mkdirSync(dir,{recursive:true});
@@ -47,19 +61,19 @@ async function dimensions(ui, label) {
 }
 
 async function settings(ui, label, reference) {
-  const fields = await ui.page.locator('#retirement-form input:not([type=hidden]):not([type=checkbox]), #retirement-form select').evaluateAll(inputs => inputs.map(el => {
+  const fields = await ui.page.locator('#retirement-form input:not([type=hidden]):not([type=checkbox]):not([type=radio]), #retirement-form select').evaluateAll(inputs => inputs.map(el => {
     const css=getComputedStyle(el), r=el.getBoundingClientRect();
     return {name:el.name, type:el.type, shown:!!el.getClientRects().length, labelled:!!el.labels?.length,
       border:[css.borderTopWidth,css.borderRightWidth,css.borderBottomWidth,css.borderLeftWidth],
       background:css.backgroundColor, font:css.fontFamily, size:parseFloat(css.fontSize), align:css.textAlign,
-      unit:!!el.labels?.[0]?.querySelector('.retire-unit'), fits:r.right<=innerWidth+1 && r.left>=0};
+      unit:!!el.labels?.[0]?.querySelector('.retire-unit') || /CNY|USD|HKD|%/.test(el.labels?.[0]?.textContent || ''), fits:r.right<=innerWidth+1 && r.left>=0};
   }));
   const visible=fields.filter(f=>f.shown);
   await ui.assert(visible.every(f=>f.border.join(',')==='0px,0px,1px,0px' && f.background==='rgba(0, 0, 0, 0)'),label+':登记字段沿用账册下划线与透明底');
   await ui.assert(fields.every(f=>f.labelled),label+':每个字段都有可读标签');
   await ui.assert(visible.every(f=>f.size>=16 && f.fits),label+':输入字号不触发手机缩放且控件不出屏');
   await ui.assert(visible.filter(f=>f.type==='number').every(f=>f.align==='right' && f.unit),label+':所有数值右对齐并标明金额或百分比单位');
-  if(reference) await ui.assert(visible.find(f=>f.name==='monthlyExpense').font===reference.font && visible.find(f=>f.name==='monthlyExpense').size===reference.size,label+':金额字体及字号与现有账户登记表一致');
+  if(reference && visible.some(f=>f.name==='monthlyExpense')) await ui.assert(visible.find(f=>f.name==='monthlyExpense').font===reference.font && visible.find(f=>f.name==='monthlyExpense').size===reference.size,label+':金额字体及字号与现有账户登记表一致');
   await ui.assert(await ui.page.locator('#retirement-form .field-label').evaluateAll(labels=>labels.every(el=>parseFloat(getComputedStyle(el).fontSize)>=12)),label+':中文字段名不小于12px');
   await ui.assert(await ui.page.locator('#retirement-form').evaluate(el=>el.getBoundingClientRect().width<=800),label+':表单限制填写宽度');
   if(await ui.page.locator('#float-dock').isVisible()) {
@@ -79,14 +93,14 @@ async function settings(ui, label, reference) {
     await ui.click('#priv-float','恢复显示金额');
   }
   const expense=await ui.page.inputValue('[name="monthlyExpense"]');
-  await ui.click('.retire-details > summary:has-text("查看月份、来源及剔除额")','展开消费来源');
+  await ui.click('.retire-details > summary:has-text("查看月份与支出口径")','展开消费来源');
   await ui.assert(await ui.page.inputValue('[name="monthlyExpense"]')===expense,label+':查看来源保留当前输入');
-  await ui.click('.retire-details > summary:has-text("查看月份、来源及剔除额")','收起消费来源');
+  await ui.click('.retire-details > summary:has-text("查看月份与支出口径")','收起消费来源');
   await ui.click('.retire-settings-nav a[href="#retire-returns"]','按章节跳到回报设置');
   await ui.assert(await ui.page.locator('#retire-returns').evaluate(el=>{
     const r=el.getBoundingClientRect();return r.top>=64 && r.top<innerHeight-40;
   }),label+':章节定位避开顶栏');
-  await ui.click('[data-retire-goto="principle"]','从设置打开公式来源');
+  await ui.click('[data-retire-tab="principle"]','从设置打开公式来源');
   await ui.visible('#retire-principle','原理视图实际打开');
   await ui.click('[data-retire-tab="plan"]','回到计划保留输入');
   await ui.assert(await ui.page.inputValue('[name="monthlyExpense"]')===expense,label+':切换原理再回来保留输入');
@@ -202,17 +216,17 @@ module.exports = {
     await ui.click('[data-retire-tab="plan"]','恢复仅现金账户'); await ui.page.uncheck(`input[name="accountIds"][value="${foreign}"]`);
     await ui.click('[data-retire-save]','恢复基准资金范围');
     await ui.click('[data-retire-tab="plan"]','核对精确名义回报模式');
-    await ui.page.uncheck('[name="directRealRate"]'); await ui.fillByName('inflationPct','2','#retirement-form');
+    await directMode(ui,false); await ui.fillByName('inflationPct','2','#retirement-form');
     await ui.click('[data-retire-save]','保存名义4.5%和通胀2%');
     await ui.assert((await ui.page.locator('[data-retire-value="target"]').innerText()).includes('4,896,000.00'),'精确实际回报得到489.6倍,不是近似480倍');
     await ui.click('[data-retire-tab="plan"]','恢复直接实际回报');
-    await ui.page.check('[name="directRealRate"]'); await ui.fillByName('inflationPct','0','#retirement-form');
-    await ui.page.check('[name="autoExpense"]'); await ui.click('[data-retire-save]','授权跟随定稿预算');
+    await directMode(ui,true); await ui.fillByName('inflationPct','0','#retirement-form');
+    await ui.page.check('[name="autoExpense"][value="true"]'); await ui.click('[data-retire-save]','授权跟随定稿预算');
     db.raw(`UPDATE cash_flow c JOIN period p ON p.id=c.period_id SET c.amount=20000
       WHERE p.family_id=${state.family} AND c.kind='EXPENSE' AND p.period_start=(SELECT MIN(pp.period_start) FROM period pp WHERE pp.family_id=${state.family})`);
     await ui.goto(`/goals/${state.native}/retirement`);
     await ui.assert((await ui.page.locator('[data-retire-value="target"]').innerText()).includes('6,399,998.40'),'已授权自动预算跟随定稿纠正,月均精确到分');
-    await ui.click('[data-retire-tab="plan"]','切回固定生活预算'); await ui.page.uncheck('[name="autoExpense"]');
+    await ui.click('[data-retire-tab="plan"]','切回固定生活预算'); await ui.page.check('[name="autoExpense"][value="false"]');
     await ui.click('[data-retire-save]','保存固定预算');
     db.raw(`UPDATE cash_flow c JOIN period p ON p.id=c.period_id SET c.amount=10000
       WHERE p.family_id=${state.family} AND c.kind='EXPENSE' AND p.period_start=(SELECT MIN(pp.period_start) FROM period pp WHERE pp.family_id=${state.family})`);
@@ -272,9 +286,9 @@ module.exports = {
       await mobile.click(menu,'收起手机字号菜单');
       await mobile.page.setViewportSize({width:390,height:844}); await mobile.page.waitForTimeout(350);
       await screenshot(mobile,'mobile-plan');
-      for(const id of ['retire-life','retire-assets','retire-reserves','retire-returns','retire-contribution','retire-save'])
+      for(const id of ['retire-life','retire-assets','retire-reserves','retire-returns','retire-save'])
         await mobile.page.locator('#'+id).screenshot({path:'/tmp/finance-v139-review/mobile-'+id+'.png'});
-      await mobile.page.locator('summary').filter({hasText:'查看月份、来源及剔除额'}).click();
+      await mobile.page.locator('summary').filter({hasText:'查看月份与支出口径'}).click();
       await mobile.assert(await mobile.page.locator('#retire-plan .m-cards td').evaluateAll(cells => cells.filter(el=>el.getClientRects().length)
         .every(el=>el.scrollWidth<=el.clientWidth+2)),'手机:展开来源后日期与金额不挤出单元格');
       await mobile.click('[data-retire-tab="principle"]','手机查看原理');

@@ -81,7 +81,7 @@ public class RetirementDataService {
             BigDecimal factor = factor(account.getCurrency(), currency, rates);
             BigDecimal original = row == null ? null : row.endBalanceOrig();
             BigDecimal amount = row == null ? null : row.endBalanceBase();
-            boolean liability = account.getType() == AccountType.LOAN;
+            boolean liability = account.getType().isLiability();
             boolean eligible = eligible(account.getType());
             boolean selected = !liability && (revision2 && "FAMILY_FINANCIAL".equals(plan.getScopeMode())
                     ? eligible : plan.getAccountIds().contains(account.getId()));
@@ -197,8 +197,8 @@ public class RetirementDataService {
     }
 
     public static boolean eligible(AccountType type) {
-        return type == AccountType.CASH || type == AccountType.STOCK || type == AccountType.FUND
-                || type == AccountType.WEALTH || type == AccountType.CRYPTO || type == AccountType.METAL;
+        return java.util.EnumSet.of(AccountType.CASH,AccountType.STOCK,AccountType.FUND,
+                AccountType.WEALTH,AccountType.CRYPTO,AccountType.METAL).contains(type);
     }
 
     /** 只用数据库已有的、截止日期前的汇率;无来源返回 null,不会出网或写入。 */
