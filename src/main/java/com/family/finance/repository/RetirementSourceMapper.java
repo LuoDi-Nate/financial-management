@@ -7,6 +7,17 @@ import java.util.List;
 /** 这里只查有无来源,金额仍经事实/支出服务,不产生另一套金额聚合。 */
 @Mapper
 public interface RetirementSourceMapper {
+    record SnapshotPoint(Long periodId,Long accountId) { }
+    @Select("""
+        <script>
+        SELECT s.period_id AS periodId,s.account_id AS accountId
+          FROM period_snapshot s JOIN period p ON p.id=s.period_id
+          JOIN account a ON a.id=s.account_id AND a.family_id=p.family_id
+         WHERE p.family_id=#{familyId} AND s.end_balance IS NOT NULL AND s.period_id IN
+           <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+        </script>
+        """)
+    List<SnapshotPoint> snapshots(@Param("familyId") long familyId,@Param("ids") Collection<Long> ids);
     record Presence(Long periodId, int incomeFields, int expenseFields, int incomeRows, int completedMembers, int requiredMembers) { }
     @Select("""
         <script>

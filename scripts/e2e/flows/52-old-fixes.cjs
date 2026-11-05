@@ -103,8 +103,9 @@ module.exports = {
     ui.flow = this.name;
     ui.page.on('dialog', d => d.accept().catch(() => {}));   // 删流水的浏览器确认框
     await ui.page.route(AI_STUB, r => r.fulfill({ status: 200, contentType: 'text/html', body: '<div></div>' }));
-    const fd = fs.openSync(DUMP, 'w');
-    execFileSync('mysqldump', ['--single-transaction', '--skip-lock-tables', ...MYSQL_ARGS], { stdio: ['ignore', fd, 'ignore'] });
+    const fd = fs.openSync(DUMP, 'w', 0o600);fs.chmodSync(DUMP,0o600);
+    execFileSync('mysqldump', ['--no-tablespaces','--single-transaction', '--skip-lock-tables',
+      '--ignore-table='+MYSQL_ARGS.at(-1)+'.llm_test_meter',...MYSQL_ARGS], { stdio: ['ignore', fd, 'ignore'] });
     fs.closeSync(fd);
     state.dumped = true;
     report.info(`整库快照 → ${DUMP}(cleanup 用它还原)`);

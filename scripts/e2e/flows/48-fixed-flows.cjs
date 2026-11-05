@@ -236,8 +236,10 @@ module.exports = {
       repay: document.querySelector('[data-ffe-repay]:checked')?.value,
       mode: document.querySelector('[data-ffe-mode]:checked')?.value,
       method: document.querySelector('[data-ffe-method]')?.value }));
-    await ui.assert(pre.kind === 'REPAY' && pre.repay === 'LOAN' && pre.mode === 'AUTO' && pre.method === 'LOAN_DIFF',
-      '预填:还款 · 贷款月供 · 自动 · 按上月和上上月的差值(就是原来贷款那套)', JSON.stringify(pre));
+    const defaultMethod=db.num(`SELECT COALESCE(annual_rate_pct,0)>0 FROM account WHERE id=${LOAN}`)?'LOAN_RATE':'LOAN_DIFF';
+    await ui.assert(pre.kind === 'REPAY' && pre.repay === 'LOAN' && pre.mode === 'AUTO' && pre.method === defaultMethod,
+      '预填:有利率优先按利率拆,其余按上两期差值', JSON.stringify(pre));
+    await ui.selectByName('autoMethod','LOAN_DIFF','[data-ff-edit-form]');
     await ui.selectByName('accountId', CASH, '[data-ff-edit-form] [data-ffe-for="REPAY"]');
     await ui.fill('#ffe-day', '1', '几号填 1');
     await ui.submit('[data-ffe-save]', '保存');
@@ -251,20 +253,24 @@ module.exports = {
     const cash1 = bal(state.cur, CASH);
     await confirmItem(ui, state.f3, '房贷那一行点「确认」');
     const o3 = String(occ(state.f3, state.cur) || '').split('|');
-    await ui.assert(Math.abs(bal(state.cur, LOAN) - accepted) < 0.005, '真值层:贷款余额与上面「接受」逐分相同', `${bal(state.cur, LOAN)} vs ${accepted}`);
+    await ui.assert(Math.abs(bal(state.cur, LOAN) - state.expectLoan) < 0.005, '真值层:贷款余额与统一差值公式逐分相同', `${bal(state.cur, LOAN)} vs ${state.expectLoan}`);
     const c3 = String(cf(o3[3]) || '').split('|');
     await ui.assert(Number(c3[1]) === CASH && c3[3] === 'loan_payment' && Number(c3[4]) === 5540 && c3[5] === 'FIXED_FLOW' && o3[4] === '',
       '真值层:工商银行一笔「还贷」5,540(本金)· 方式 ① 不记利息', c3.join('|'));
     await ui.assert(Math.abs(bal(state.cur, CASH) - (cash1 - 5540)) < 0.005, '真值层:工商银行余额 −5,540');
-    await ui.assert(Number(o3[6]) === state.loanPrevSet && Math.abs(Number(o3[7]) - accepted) < 0.005,
+    await ui.assert(Number(o3[6]) === state.loanPrevSet && Math.abs(Number(o3[7]) - state.expectLoan) < 0.005,
       '真值层:确认记录存下贷款余额写前 / 写后(撤销时按它还原)', o3.join('|'));
 
     // ── 8 · 信用卡账单 / 交保费 → 只记划转 ─────────────────────────────────
     report.section('8 · 信用卡账单(全额还上期)只有一笔划转、没有支出;保险详情「设成固定交保费」→ 划转');
+    const cardPrev = Number(db.one(`SELECT end_balance FROM period_snapshot WHERE period_id=${state.sep} AND account_id=${CARD}`));
+    // This scenario is an unpaid, automatically carried balance. A human-filled
+    // balance correctly starts a new repayment setting next month in v1.38.
+    db.raw(`UPDATE period_snapshot SET end_balance=${cardPrev},source_tag='CARRIED_FORWARD' WHERE period_id=${state.cur} AND account_id=${CARD}`);
+    db.raw(`UPDATE snapshot_todo SET done_by_member_id=NULL WHERE period_id=${state.cur} AND account_id=${CARD}`);
     await ui.click('[data-ff-manage]', '摘要行点「管理」');
     await addFlow(ui, { kind: 'REPAY', name: `${TAG}还信用卡`, target: CARD, account: CASH, repayKind: 'CARD', method: 'CARD_FULL', day: 1 });
     state.f4 = flowId(`${TAG}还信用卡`);
-    const cardPrev = Number(db.one(`SELECT end_balance FROM period_snapshot WHERE period_id=${state.sep} AND account_id=${CARD}`));
     const card0 = bal(state.cur, CARD);
     await confirmItem(ui, state.f4, '信用卡那一行点「确认」');
     const o4 = String(occ(state.f4, state.cur) || '').split('|');

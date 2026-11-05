@@ -179,7 +179,7 @@ module.exports = {
     await ui.assert((await ui.page.locator('[data-retire-live="reserves"]').innerText()).includes('300,000.00'),'一线切换实际重算教育、医疗与应急');
     await ui.assert(db.num(`SELECT COUNT(*) FROM retirement_plan WHERE family_id=${state.family}`)===0,'城市切换与自动演算不保存计划');
     await ui.choose('returnSource','AUTO');
-    await ui.page.waitForFunction(()=>document.querySelector('[data-retire-live="rates"]').textContent.includes('本次名义年回报 待补齐'));
+    await ui.page.waitForFunction(()=>/本次名义年回报\s*待补齐/.test(document.querySelector('[data-retire-live="rates"]').textContent));
     await ui.assert((await ui.page.locator('[data-retire-live="rates"]').innerText()).includes('至少需要12个'),'短历史明确缺失,不回退节目示例');
     await ui.assert(await ui.page.inputValue('[name="monthlyContribution"]') === '20000.00' ||
       Number(await ui.page.inputValue('[name="monthlyContribution"]'))===20000,'月投入建议包含旧总额和新账户收入,未停留在旧月份');
@@ -262,6 +262,51 @@ module.exports = {
     await ui.goto('/goals'); await ui.seesText('没有有限的永久本金门槛','目标列表与详情同一状态');
     await ui.goto(`/goals/${state.native}/retirement?tab=plan`); await ui.fillByName('realReturnPct','2.5','#retirement-form');
     await ui.click('[data-retire-save]','恢复正实际回报');
+
+    for(let back=13;back>=4;back--) {
+      db.raw(`INSERT INTO period(family_id,period_type,period_start,period_end,status) VALUES(${state.family},'MONTHLY',
+        DATE_SUB('${current}',INTERVAL ${back} MONTH),LAST_DAY(DATE_SUB('${current}',INTERVAL ${back} MONTH)),'CLOSED')`);
+      const pid=db.num(`SELECT id FROM period WHERE family_id=${state.family} AND period_start=DATE_SUB('${current}',INTERVAL ${back} MONTH)`);
+      db.raw(`INSERT INTO period_snapshot(period_id,account_id,end_balance,submitted_by,source_tag) SELECT ${pid},id,
+        CASE WHEN currency='USD' THEN 100000 WHEN type='CASH' THEN 6100000 WHEN type='LOAN' THEN 100000 ELSE 10000000 END,${state.member},'MANUAL' FROM account WHERE family_id=${state.family}`);
+      db.raw(`INSERT INTO fx_rate(family_id,period_id,base_currency,quote_currency,rate,source) VALUES(${state.family},${pid},'CNY','USD',0.2,'MANUAL')`);
+    }
+    await ui.goto(`/goals/${state.native}/retirement?tab=plan`);
+    if(!await ui.page.locator('#retire-scope').evaluate(el=>el.open)) await ui.click('#retire-scope > summary','展开参与账户');
+    await ui.page.uncheck(`input[name="accountIds"][value="${state.cash}"]`);await ui.page.check(`input[name="accountIds"][value="${foreign}"]`);
+    await ui.choose('returnSource','AUTO');
+    await ui.page.waitForFunction(()=>/本次名义年回报\s*60/.test(document.querySelector('[data-retire-live="rates"]').textContent));
+    await ui.click('[data-retire-live="rates"] summary','查看真实月度投资来源');
+    await ui.assert((await ui.page.locator('[data-retire-live="rates"]').innerText()).includes('12 个完整月度间隔'),'13张实际月末快照给出12个收益间隔');
+    await ui.assert((await ui.page.locator('[data-retire-live="rates"]').innerText()).includes('300000.00'),'同为10万美元,历史汇率5到8的30万折算变化进入投资收益');
+    const gap=db.num(`SELECT id FROM period WHERE family_id=${state.family} AND period_start=DATE_SUB('${current}',INTERVAL 6 MONTH)`);
+    db.raw(`DELETE FROM period_snapshot WHERE period_id=${gap} AND account_id=${foreign}`);
+    await ui.choose('returnSource','MANUAL');await ui.choose('returnSource','AUTO');
+    await ui.page.waitForFunction(()=>document.querySelector('[data-retire-live="rates"]').textContent.includes('实际月末快照'));
+    await ui.assert((await ui.page.locator('[data-retire-live="rates"]').innerText()).includes('实际月末快照'),'缺一张快照后拒绝用延续余额凑满一年');
+    db.raw(`INSERT INTO period_snapshot(period_id,account_id,end_balance,submitted_by,source_tag) VALUES(${gap},${foreign},100000,${state.member},'MANUAL')`);
+    await ui.goto(`/goals/${state.native}/retirement`);
+
+    db.raw(`UPDATE retirement_plan SET plan_json=JSON_MERGE_PATCH(plan_json,
+      '{"version":1,"monthlyIncome":3000,"budgetConfirmed":true,"reservesConfirmed":true,"assetsConfirmed":true,"incomeConfirmed":true,"contributionConfirmed":true,"afterDebtConfirmed":true}')
+      WHERE goal_id=${state.native} AND family_id=${state.family}`);
+    const revisionOne=db.one(`SELECT plan_json FROM retirement_plan WHERE goal_id=${state.native}`);
+    await ui.goto(`/goals/${state.native}/retirement`);
+    await ui.assert((await ui.page.locator('[data-retire-value="target"]').innerText()).includes('3,360,000.00'),'升级前继续使用含3000月收入的原门槛');
+    await ui.click('[data-retire-tab="plan"]','比较修订一与修订二');
+    await ui.assert((await ui.page.locator('[data-retire-upgrade-compare]').innerText()).includes('3,360,000.00') &&
+      (await ui.page.locator('[data-retire-upgrade-compare]').innerText()).includes('4,800,000.00'),'旧新门槛并排展示,移除J的影响可复核');
+    await screenshot(ui,'desktop-upgrade');
+    await ui.click('[data-retire-save]','未确认升级不能移除原收入');
+    await ui.seesText('请确认升级修订二','服务端独立拦截未确认升级');
+    await ui.assert(db.one(`SELECT plan_json FROM retirement_plan WHERE goal_id=${state.native}`)===revisionOne,'未确认时原JSON完整未变');
+    await ui.page.check('[name="revisionConfirmed"]');await ui.click('[data-retire-save]','确认升级修订二');
+    await ui.assert(db.one(`SELECT JSON_UNQUOTE(JSON_EXTRACT(plan_json,'$.previousRevisionJson')) FROM retirement_plan WHERE goal_id=${state.native}`)===revisionOne,'升级保留完整原JSON,含非零J');
+    await ui.click('[data-retire-tab="plan"]','进入升级后设置');
+    await ui.click('form[action$="/restore-previous"] button','恢复升级前方案');
+    await ui.assert(db.one(`SELECT plan_json FROM retirement_plan WHERE goal_id=${state.native}`)===revisionOne,'真实恢复入口还原完整旧方案');
+    await ui.click('[data-retire-tab="plan"]','再次明确升级');
+    await ui.page.check('[name="revisionConfirmed"]');await ui.click('[data-retire-save]','回到修订二继续验收');
 
     await ui.goto(`/goals/${state.legacy}`);
     await ui.click(`a[href="/goals/${state.legacy}/retirement"]`,'老目标显式比较新算法');

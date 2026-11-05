@@ -28,7 +28,7 @@ module.exports={
     if(await summary.count() && !await summary.evaluate(el=>el.open)) await ui.click('[data-ff-box] > summary','展开固定收支');
     await ui.visible(`[data-loan-setup="${submitted}"]`,'人工已填本期余额仍显示未设固定还款');
     await ui.visible(`[data-loan-setup="${carried}"]`,'系统延续余额也显示配置提醒');
-    ui.page.once('dialog',dialog=>dialog.accept());
+    ui.page.once('dialog',dialog=>dialog.accept().catch(()=>{}));
     await ui.click(`[data-loan-setup="${carried}"] button[type="submit"]`,'选择每月自己填');
     await ui.assert(db.num(`SELECT loan_manual_repayment FROM account WHERE id=${carried}`)===1,'手填偏好持久化');
     await ui.goto('/entry');if(!await ui.page.locator('[data-ff-box]').evaluate(el=>el.open)) await ui.click('[data-ff-box] > summary','展开固定收支');

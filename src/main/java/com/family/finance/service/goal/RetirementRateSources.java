@@ -35,6 +35,24 @@ public final class RetirementRateSources {
         public boolean available() { return percent!=null; }
     }
 
+    /** The shared fact view uses a fixed currency lens. Retirement performance
+     * needs month-specific rates, with each original amount converted once. */
+    public static FactSlice historicalSlice(FactSlice slice,Function<AccountPeriodFact,BigDecimal> rateFor) {
+        List<AccountPeriodFact> rows=slice.rows().stream().map(r->{
+            BigDecimal fx=rateFor.apply(r);
+            return new AccountPeriodFact(r.accountId(),r.accountName(),r.accountType(),r.accountClass(),r.accountLiquidity(),
+                    r.accountCurrency(),r.ownerId(),r.displayOrder(),r.periodId(),r.periodStart(),r.periodEnd(),
+                    r.previousEndBalanceOrig(),r.endBalanceOrig(),converted(r.previousEndBalanceOrig(),fx),converted(r.endBalanceOrig(),fx),
+                    r.incomeOrig(),converted(r.incomeOrig(),fx),r.expenseOrig(),converted(r.expenseOrig(),fx),
+                    r.transferInOrig(),converted(r.transferInOrig(),fx),r.transferOutOrig(),converted(r.transferOutOrig(),fx),
+                    r.periodPnlOrig(),converted(r.periodPnlOrig(),fx),fx,r.principalAdjOrig(),converted(r.principalAdjOrig(),fx));
+        }).toList();
+        return new FactSlice(slice.filter(),rows,slice.periodIds(),slice.lastPeriodId(),slice.closedPeriodIds());
+    }
+    private static BigDecimal converted(BigDecimal amount,BigDecimal fx) {
+        return amount==null || fx==null?null:com.family.finance.calc.PnlCalculator.toBase(amount,fx);
+    }
+
     public static Rate cpi(List<MacroBenchmark> values,LocalDate today) {
         Map<Integer,MacroBenchmark> known=values.stream().filter(b->b.getYear()!=null && b.getYear()<today.getYear()
                         && b.getVerifiedAt()!=null && b.getCpiHeadline()!=null && b.getCpiHeadline().compareTo(new BigDecimal("-100"))>0
@@ -80,7 +98,8 @@ public final class RetirementRateSources {
             boolean bad=false;
             for(Long account:selected) {
                 AccountPeriodFact row=currentRows.get(account),prev=before.get(account);
-                if((row==null || row.endBalanceBase()==null) && (prev==null || prev.endBalanceBase()==null))continue;
+                if((row==null || row.endBalanceBase()==null && row.endBalanceOrig()==null)
+                        && (prev==null || prev.endBalanceBase()==null && prev.endBalanceOrig()==null))continue;
                 if(row==null || row.endBalanceBase()==null || !knownFx.test(row)) {bad=true;break;}
                 end=end.add(row.endBalanceBase());
                 if(prev==null || prev.endBalanceBase()==null) {
@@ -92,7 +111,7 @@ public final class RetirementRateSources {
                 capital=capital.add(prev.endBalanceBase());
                 profit=profit.add(row.periodPnlBase()).add(row.previousEndBalanceBase().subtract(prev.endBalanceBase()));
             }
-            if(bad || capital.signum()<=0) {stopped="收益来源缺余额/汇率或期初本金非正";break;}
+            if(bad || capital.signum()<=0) {stopped="收益来源缺少实际月末快照/汇率或期初本金非正";break;}
             BigDecimal periodReturn=profit.divide(capital,12,RoundingMode.HALF_EVEN);
             if(BigDecimal.ONE.add(periodReturn).signum()<=0) {stopped="该月投资本金已耗尽,不能按有效复利年化";break;}
             BigDecimal external=end.subtract(capital).subtract(profit);

@@ -13,6 +13,8 @@ check rg -q 'retirementPlans.active\(' "$java/service/goal/GoalProgressService.j
 check rg -q 'retirement.result\(\).reached\(' "$java/service/goal/GoalProgressService.java"
 check rg -q 'facts.cashflowBreakdown\(slice, id\)' "$java/service/goal/RetirementDataService.java"
 check rg -q 'closedPeriodIds\(' "$java/service/goal/RetirementDataService.java"
+check rg -q 'RetirementRateSources.historicalSlice' "$java/service/goal/RetirementDataService.java"
+check rg -q 'actualSnapshots.contains' "$java/service/goal/RetirementDataService.java"
 if code "$java/service/goal/RetirementPlanService.java" | rg -q '\.setParamsJson\('; then echo 'FAIL: 退休计划覆盖旧参数' >&2; exit 1; fi
 qa139_pass=$((qa139_pass+1))
 check rg -q 'retirementExpenseNature.natureOf\(' "$java/service/expense/ExpenseLedgerService.java"
@@ -40,6 +42,9 @@ check rg -q 'data-retire-live' src/main/resources/templates/goals/retirement.htm
 if rg -q 'name="monthlyIncome"|field="\*\{monthlyIncome\}"' src/main/resources/templates/goals/retirement.html; then echo 'FAIL: 标准表单仍收集持续收入' >&2; exit 1; fi
 qa139_pass=$((qa139_pass+1))
 check rg -q 'testStart = await guard.begin' scripts/e2e/lib/browser.cjs
+for qa139_file in scripts/e2e/flows/50-account-delete-real-case.cjs scripts/e2e/flows/52-old-fixes.cjs scripts/e2e/flows/55-iphone-duo.cjs; do
+  check rg -q 'ignore-table=.*llm_test_meter' "$qa139_file"
+done
 check rg -q 'beforeSend\(' "$java/service/checkup/llm/AbstractOpenAiCompatibleClient.java"
 check rg -q 'llmTestGate.block|testGate.block' "$java/service/checkup/llm/LlmRouter.java"
 check python3 scripts/family-isolation-audit.py

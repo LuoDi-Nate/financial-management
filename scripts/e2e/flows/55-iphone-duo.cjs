@@ -143,8 +143,9 @@ module.exports = {
 
   async run(ui, report) {
     ui.flow = this.name;
-    const fd = fs.openSync(DUMP, 'w');
-    execFileSync('mysqldump', ['--single-transaction', '--skip-lock-tables', ...MYSQL_ARGS], { stdio: ['ignore', fd, 'ignore'] });
+    const fd = fs.openSync(DUMP, 'w', 0o600);fs.chmodSync(DUMP,0o600);
+    execFileSync('mysqldump', ['--no-tablespaces','--single-transaction', '--skip-lock-tables',
+      '--ignore-table='+MYSQL_ARGS.at(-1)+'.llm_test_meter',...MYSQL_ARGS], { stdio: ['ignore', fd, 'ignore'] });
     fs.closeSync(fd);
     state.dumped = true;
     report.info(`整库快照 → ${DUMP}(cleanup 用它还原)`);

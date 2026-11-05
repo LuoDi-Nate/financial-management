@@ -60,10 +60,12 @@ if [[ "$QA_RESTORE" == 1 ]]; then
     echo; echo "▸ 还原 beta 基线(策略 A)..."
     # 不要写成 `mysql ... | grep -v ...` —— 那样退出码变成 grep 的,正常还原时(只有一条
     # password warning、被过滤后无输出)grep 返回 1,会把成功报成失败。先跑、再判。
-    local err; err="$(mysql -ufinance -pfinance finance < "$QA_DUMP" 2>&1 | grep -v "Using a password" || true)"
-    if [[ -z "$err" ]]; then
-      sudo -n /bin/systemctl restart finance 2>/dev/null && sleep 8
-      echo "✓ 已还原 + 重启"
+    local err restore_ok=0
+    if err="$(mysql -ufinance -pfinance finance < "$QA_DUMP" 2>&1)"; then restore_ok=1; fi
+    err=$(printf '%s' "$err" | sed '/Using a password/d')
+    if [[ "$restore_ok" == 1 ]]; then
+      if sudo -n /bin/systemctl restart finance 2>/dev/null; then sleep 8; echo "✓ 已还原 + 重启";
+      else echo "✗ 数据已还原,但服务重启失败"; final_rc=1; fi
     else
       echo "✗ 还原失败!$err"; echo "  请手动:mysql finance < $QA_DUMP"
       final_rc=1

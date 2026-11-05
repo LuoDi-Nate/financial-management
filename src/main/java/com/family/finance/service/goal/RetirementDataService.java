@@ -166,13 +166,14 @@ public class RetirementDataService {
         if(revision2) {
             Set<Long> selected=assetRows.stream().filter(Asset::selected).map(Asset::id).collect(Collectors.toCollection(LinkedHashSet::new));
             List<Long> budgetIds=months.stream().filter(m->m.consumption()!=null).map(Month::id).toList();
+            var history=RetirementRateSources.historicalSlice(slice,row->factor(row.accountCurrency(),currency,rates.stream()
+                    .filter(rate->rate.getPeriodStart()!=null && !rate.getPeriodStart().isAfter(row.periodStart())).toList()));
+            Set<RetirementSourceMapper.SnapshotPoint> actualSnapshots=slice.closedPeriodIds().isEmpty()?Set.of():
+                    new HashSet<>(sources.snapshots(familyId,slice.closedPeriodIds()));
             RetirementRateSources.Rate investment=!monthlyPeriods?RetirementRateSources.Rate.missing("周账期不能冒充月度投资年回报")
                     :assetRows.stream().anyMatch(v->v.selected()&&!v.eligible())?RetirementRateSources.Rate.missing("资金范围含人工确认的非金融资产,请自行核对长期回报")
-                    :RetirementRateSources.investment(slice,selected,today,id->facts.cashflowBreakdown(slice,id),row->{
-                        BigDecimal known=factor(row.accountCurrency(),currency,rates.stream().filter(rate->rate.getPeriodStart()!=null
-                                && !rate.getPeriodStart().isAfter(row.periodStart())).toList());
-                        return known!=null && row.fxToBase()!=null && known.subtract(row.fxToBase()).abs().compareTo(new BigDecimal("0.000001"))<=0;
-                    });
+                    :RetirementRateSources.investment(history,selected,today,id->facts.cashflowBreakdown(history,id),row->
+                        row.fxToBase()!=null && actualSnapshots.contains(new RetirementSourceMapper.SnapshotPoint(row.periodId(),row.accountId())));
             BigDecimal originalAverage=null,includedAverage=null,removedAverage=null,nonConsumption=null;
             if(householdCashflow!=null) {
                 var allReport=householdCashflow.reportSavings(new FactSlice(slice.filter(),slice.rows(),ids,ids.isEmpty()?null:ids.getLast(),ids),12);

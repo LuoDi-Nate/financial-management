@@ -129,9 +129,35 @@ class RetirementDataServiceTest {
         when(accounts.findActiveByFamily(1)).thenReturn(List.of(cash));
         var row=mock(AccountPeriodFact.class);when(row.periodId()).thenReturn(11L);when(row.accountId()).thenReturn(99L);
         when(row.endBalanceOrig()).thenReturn(new BigDecimal("500"));when(row.endBalanceBase()).thenReturn(new BigDecimal("500"));when(row.fxToBase()).thenReturn(BigDecimal.ONE);
-        when(facts.load(null).rows()).thenReturn(List.of(row));
-        assertThat(service.load(1,p,today).selectedAssets()).isEqualByComparingTo("500");
+        var archived=mock(AccountPeriodFact.class);when(archived.periodId()).thenReturn(11L);when(archived.accountId()).thenReturn(98L);
+        when(archived.endBalanceBase()).thenReturn(new BigDecimal("1000000"));
+        when(facts.load(null).rows()).thenReturn(List.of(row,archived));
+        var household=service.load(1,p,today);
+        assertThat(household.selectedAssets()).isEqualByComparingTo("500");
+        assertThat(household.sources().householdNetWorth()).isEqualByComparingTo("500");
         assertThat(p.getAccountIds()).isEmpty();p.setScopeMode("CUSTOM");
         assertThat(service.load(1,p,today).selectedAssets()).isZero();
+    }
+    @Test void missingActualSnapshotCannotBecomeACompleteReturnIntervalThroughCarryForward() {
+        var p=setup();p.setVersion(2);p.setScopeMode("FAMILY_FINANCIAL");
+        when(accounts.findActiveByFamily(1)).thenReturn(List.of(Account.builder().id(99L).familyId(1L)
+                .displayName("历史现金").type(AccountType.CASH).currency("CNY").build()));
+        var rows=new ArrayList<AccountPeriodFact>();var all=new ArrayList<Long>();var closed=new ArrayList<Long>();
+        var points=new ArrayList<RetirementSourceMapper.SnapshotPoint>();
+        for(int i=0;i<14;i++) {
+            long id=i+1;all.add(id);var date=today.withDayOfMonth(1).minusMonths(13-i);
+            BigDecimal zero=BigDecimal.ZERO,hundred=new BigDecimal("100");
+            rows.add(new AccountPeriodFact(99L,"历史现金",AccountType.CASH,AccountClass.ASSET,AccountLiquidity.LIQUID,"CNY",1L,0,id,
+                    date,date.withDayOfMonth(date.lengthOfMonth()),i==0?null:hundred,hundred,i==0?null:hundred,hundred,
+                    zero,zero,zero,zero,zero,zero,zero,zero,i==0?null:zero,i==0?null:zero,BigDecimal.ONE));
+            if(i<13){closed.add(id);points.add(new RetirementSourceMapper.SnapshotPoint(id,99L));}
+        }
+        var slice=new FactSlice(new FactFilter(1,PeriodType.MONTHLY,today.minusMonths(14),today,true,null,"CNY"),rows,all,14L,closed);
+        when(facts.load(any())).thenReturn(slice);when(facts.cashflowBreakdown(any(),any())).thenReturn(new CashflowBreakdown(BigDecimal.ZERO,BigDecimal.ZERO,BigDecimal.ZERO));
+        when(source.snapshots(eq(1L),any())).thenReturn(points);
+        assertThat(service.load(1,p,today).sources().investment().percent()).isZero();
+        points.remove(new RetirementSourceMapper.SnapshotPoint(12L,99L));
+        var missing=service.load(1,p,today).sources().investment();
+        assertThat(missing.percent()).isNull();assertThat(missing.problem()).contains("实际月末快照");
     }
 }

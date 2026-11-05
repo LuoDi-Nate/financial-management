@@ -18,9 +18,11 @@ class RetirementRateSourcesTest {
         for(int i=0;i<snapshots;i++) {
             long id=i+1; ids.add(id);LocalDate start=today.withDayOfMonth(1).minusMonths(snapshots-i);
             when(slice.periodStartOf(id)).thenReturn(start);
-            rows.add(row(id,1L,bd("100"),i==0?null:bd("100"),i==0?null:bd(profit)));
+            var value=row(id,1L,bd("100"),i==0?null:bd("100"),i==0?null:bd(profit));
+            when(value.periodStart()).thenReturn(start);when(value.periodEnd()).thenReturn(start.withDayOfMonth(start.lengthOfMonth()));
+            rows.add(value);
         }
-        when(slice.closedPeriodIds()).thenReturn(ids);when(slice.rows()).thenReturn(rows);return slice;
+        when(slice.closedPeriodIds()).thenReturn(ids);when(slice.periodIds()).thenReturn(ids);when(slice.rows()).thenReturn(rows);return slice;
     }
     private AccountPeriodFact row(long period,long account,BigDecimal end,BigDecimal previous,BigDecimal profit) {
         var r=mock(AccountPeriodFact.class);when(r.periodId()).thenReturn(period);when(r.accountId()).thenReturn(account);
@@ -55,6 +57,20 @@ class RetirementRateSourcesTest {
         var slice=history(13,"0");when(rows.getLast().previousEndBalanceBase()).thenReturn(bd("110"));
         when(rows.getLast().endBalanceBase()).thenReturn(bd("110"));
         assertThat(rate(slice).percent()).isEqualByComparingTo("10");
+    }
+    @Test void historicalRatesRepriceOriginalAmountsWithoutChangingSharedCurrencyLens() {
+        var original=history(13,"0");
+        for(int i=0;i<rows.size();i++) {
+            var row=rows.get(i);when(row.endBalanceOrig()).thenReturn(bd("100"));when(row.endBalanceBase()).thenReturn(bd("800"));
+            when(row.periodPnlOrig()).thenReturn(i==0?null:BigDecimal.ZERO);
+        }
+        var history=RetirementRateSources.historicalSlice(original,r->r.periodId()==13L?bd("8"):bd("7"));
+        var result=rate(history);
+        assertThat(result.count()).isEqualTo(12);
+        assertThat(result.percent().doubleValue()).isCloseTo(100d/7,within(0.00001));
+        assertThat(result.samples().getLast().startCapital()).isEqualByComparingTo("700");
+        assertThat(result.samples().getLast().profit()).isEqualByComparingTo("100");
+        assertThat(original.rows().getFirst().endBalanceBase()).isEqualByComparingTo("800");
     }
     @Test void unallocatedHouseholdCashflowCannotBeInventedForTheSelectedSubset() {
         var r=RetirementRateSources.investment(history(13,"1"),Set.of(1L),today,id->new CashflowBreakdown(bd("10"),BigDecimal.ZERO,bd("10")),f->true);

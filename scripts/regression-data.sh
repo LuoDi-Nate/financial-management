@@ -64,10 +64,12 @@ restore(){
   # 不再 2>/dev/null 吞错:还原静默失败会让下一次跑基于污染状态,表现成一堆假 bug。
   # 注意不能写成 `mysql ... | grep -v ...` —— 那样退出码变成 grep 的,正常还原时(只有一条
   # password warning、被过滤后无输出)grep 返回 1,会把成功报成失败。先跑、再判、错误另行打印。
-  RESTORE_ERR="$(mysql -u"$DBU" -p"$DBP" "$DBN" < "$DUMP" 2>&1 | grep -v "Using a password" || true)"
-  if [ -z "$RESTORE_ERR" ]; then
-    sudo -n /bin/systemctl restart finance 2>/dev/null && sleep 8
-    echo "✓ 已还原 + 重启"
+  RESTORE_OK=0
+  if RESTORE_ERR="$(mysql -u"$DBU" -p"$DBP" "$DBN" < "$DUMP" 2>&1)"; then RESTORE_OK=1; fi
+  RESTORE_ERR=$(printf '%s' "$RESTORE_ERR" | sed '/Using a password/d')
+  if [ "$RESTORE_OK" = 1 ]; then
+    if sudo -n /bin/systemctl restart finance 2>/dev/null; then sleep 8; echo "✓ 已还原 + 重启";
+    else echo "✗ 数据已还原,但服务重启失败"; final_rc=1; fi
   else
     echo "✗ 还原失败!$RESTORE_ERR"
     echo "  请手动:mysql $DBN < $DUMP"

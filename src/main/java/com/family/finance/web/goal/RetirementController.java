@@ -149,6 +149,7 @@ public class RetirementController {
         if (!"plan".equals(tab) && !Boolean.TRUE.equals(model.getAttribute("previewing")) && active.isPresent()) view = active.get();
         model.addAttribute("upgrading",active.isPresent() && active.get().plan().getVersion()==1 && p.getVersion()>=2);
         model.addAttribute("priorPlan",active.map(RetirementPlanService.View::plan).orElse(null));
+        model.addAttribute("priorResult",active.map(RetirementPlanService.View::result).orElse(null));
         model.addAttribute("presets",com.family.finance.calc.RetirementReservePresets.all());
         model.addAttribute("adopting", goal != null && active.isEmpty());
         model.addAttribute("activePlan", active.isPresent());

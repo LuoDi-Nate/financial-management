@@ -307,8 +307,9 @@ module.exports = {
     ui.page.on('pageerror', e => state.consoleErrors.push(`[${state.step}] ${ui.page.url().replace(BASE, '')} · ${String(e).slice(0, 160)}`));
     await ui.page.route(AI_STUB, r => r.fulfill({ status: 200, contentType: 'text/html', body: '<div></div>' }));
     fs.rmSync(OUT, { recursive: true, force: true });
-    const fd = fs.openSync(DUMP, 'w');
-    execFileSync('mysqldump', ['--single-transaction', '--skip-lock-tables', ...MYSQL_ARGS], { stdio: ['ignore', fd, 'ignore'] });
+    const fd = fs.openSync(DUMP, 'w', 0o600);fs.chmodSync(DUMP,0o600);
+    execFileSync('mysqldump', ['--no-tablespaces','--single-transaction', '--skip-lock-tables',
+      '--ignore-table='+MYSQL_ARGS.at(-1)+'.llm_test_meter',...MYSQL_ARGS], { stdio: ['ignore', fd, 'ignore'] });
     fs.closeSync(fd);
     state.dumped = true;
     report.info(`整库快照 → ${DUMP}(cleanup 用它还原)`);
@@ -337,7 +338,7 @@ module.exports = {
     await periodAction(ui, state.p8, 'reopen', '2026-08');
     await entryFor(ui, state.p8, '2026-08');
     const aLater0 = db.col(`SELECT CONCAT(s.period_id, ':', s.end_balance) FROM period_snapshot s JOIN period p ON p.id=s.period_id
-      WHERE p.family_id=${fx.FAM} AND s.account_id=${A} AND p.period_start > '2026-08-01' ORDER BY p.period_start`);
+      WHERE p.family_id=${fx.FAM} AND s.account_id=${A} AND p.period_start > '${state.start[state.p8]}' ORDER BY p.period_start`);
     const askedA = await transfer(ui, A, N_NAME, '删除用', 1000);
     state.step = '08 收入 200';
     await ui.fill('form[action$="/entry/income"] input[name="amount"]', 200, '收入金额 200');
@@ -351,7 +352,7 @@ module.exports = {
     await ui.assert(Number(bal(A, state.p8)) === a8before - 1000, '真值层:A 的 08 余额跟着少了 1,000(划转联动)', `${a8before} → ${bal(A, state.p8)}`);
     if (askedA) {
       const aLater1 = db.col(`SELECT CONCAT(s.period_id, ':', s.end_balance) FROM period_snapshot s JOIN period p ON p.id=s.period_id
-        WHERE p.family_id=${fx.FAM} AND s.account_id=${A} AND p.period_start > '2026-08-01' ORDER BY p.period_start`);
+        WHERE p.family_id=${fx.FAM} AND s.account_id=${A} AND p.period_start > '${state.start[state.p8]}' ORDER BY p.period_start`);
       await ui.assert(aLater0.length > 0 && aLater0.length === aLater1.length && aLater0.every((kv, i) => {
         const [p0, b0] = kv.split(':'); const [p1, b1] = aLater1[i].split(':');
         return p0 === p1 && Math.abs(Number(b1) - Number(b0) + 1000) < 0.005;
@@ -408,8 +409,9 @@ module.exports = {
     const panel = await pageText(ui);
     await save('S1', 'delete_panel', ui, panel);
     const range = (await ui.page.textContent('[data-adel-range]').catch(() => '')).replace(/\s+/g, ' ');
-    await ui.assert(range.includes('2026-08 至 2026-10 共 3 个账期') && /已关账 2 期/.test(range),
-      '面板:会改写 2026-08 至 2026-10 共 3 个账期(已关账 2 期)', range);
+    const expectedRange=state.start[state.p8].slice(0,7)+' 至 '+state.start[state.p10].slice(0,7)+' 共 3 个账期';
+    await ui.assert(range.includes(expectedRange) && /已关账 2 期/.test(range),
+      '面板:会改写实际选中的3个账期,其中2个已关账',range);
     const modes = await ui.page.evaluate(() => [...document.querySelectorAll('[data-adel-transfer]')]
       .map(e => e.getAttribute('data-mode') + '|' + e.textContent.replace(/\s+/g, ' ').trim()));
     await ui.assert(modes.length === 3
