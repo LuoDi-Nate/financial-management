@@ -1,7 +1,12 @@
 <!DOCTYPE html>
 <html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
 <body>
-<header th:fragment="nav(active, me, state)" class="sticky top-1 bg-paper/95 backdrop-blur border-b border-rule z-30">
+<th:block th:fragment="nav(active, me, state)">
+<div th:if="${me != null and llmTestMode == true}" class="llm-test-banner" data-llm-test-banner>
+  <span><b>测试环境</b> · 大模型调用已关闭,AI结果按未配置显示</span>
+  <a th:href="@{/admin/ai-access#test-mode}">管理 › AI 接入</a>
+</div>
+<header class="sticky top-1 bg-paper/95 backdrop-blur border-b border-rule z-30">
   <div class="nav-inner max-w-[1400px] mx-auto px-6 lg:px-10 flex items-center justify-between min-h-16 py-1">
     <div class="nav-lead flex items-center gap-6 lg:gap-10 min-w-0 [&_.nav-brandtext]:whitespace-nowrap">
       <!-- v1.9 · 徽记从 logo 的 <a> 里搬出来了。
@@ -185,5 +190,6 @@
     </div>
   </nav>
 </header>
+</th:block>
 </body>
 </html>

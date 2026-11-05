@@ -54,6 +54,8 @@ public class LocalToolLoopRuntime implements AgentRuntime {
     private final AskToolRegistry registry;
     private final AskToolDispatcher dispatcher;
     private final LlmRouter router;
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.family.finance.service.checkup.llm.LlmTestGate testGate;
     private final ObjectMapper json = new ObjectMapper();
 
     @Override public String code() { return CODE; }
@@ -75,6 +77,13 @@ public class LocalToolLoopRuntime implements AgentRuntime {
     @Override
     public void run(AskTurn turn, AskSink target) {
         TrackingSink sink = new TrackingSink(target);
+        if (testGate != null && testGate.block("ASK_TURN_LOCAL")) {
+            String prepared = turn.hasAnalysisContext() ? turn.systemPrompt() + "\n\n" + turn.analysisContext() : turn.systemPrompt();
+            if (turn.onPromptSent() != null) turn.onPromptSent().sent(prepared, turn.question(),
+                    com.family.finance.service.checkup.llm.LlmTestGate.MESSAGE, false);
+            sink.failed(com.family.finance.service.checkup.llm.LlmTestGate.MESSAGE);
+            return;
+        }
         if (!available(turn.familyId())) {
             sink.failed(unavailableReason(turn.familyId()));
             return;
@@ -184,6 +193,7 @@ public class LocalToolLoopRuntime implements AgentRuntime {
                 return result;
             } catch (Exception e) {
                 if (sink.cancelled()) throw e;
+                if (e instanceof com.family.finance.service.checkup.llm.LlmTestGate.Blocked) throw e;
                 router.externalFailure(inv, e);
                 if (sink.delivered) throw e;
                 last = e;
@@ -225,6 +235,7 @@ public class LocalToolLoopRuntime implements AgentRuntime {
     private Completion streamOnce(LlmCatalog.Platform platform, String key, String model,
                                   List<Map<String, Object>> messages,
                                   List<Map<String, Object>> tools, AskSink sink, int timeoutSeconds) throws Exception {
+        if (testGate != null) testGate.beforeSend("LOCAL_STREAM");
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("model", model);
         body.put("messages", messages);
@@ -249,8 +260,11 @@ public class LocalToolLoopRuntime implements AgentRuntime {
 
         boolean complete = false;
         try {
+            if (testGate != null) testGate.beforeSend("LOCAL_STREAM");
+            java.time.LocalDateTime dispatched = java.time.LocalDateTime.now();
             try (var output = connection.getOutputStream()) {
                 output.write(json.writeValueAsBytes(body));
+                if (testGate != null) testGate.observedSend("LOCAL_STREAM", dispatched);
             }
             int status = connection.getResponseCode();
             if (status >= 400) {
@@ -388,6 +402,8 @@ public class LocalToolLoopRuntime implements AgentRuntime {
 
     /** 上游错误翻成人话 —— 直接展示给用户,不能是一串状态码 */
     private String humanError(Exception e) {
+        if (e instanceof com.family.finance.service.checkup.llm.LlmTestGate.Blocked)
+            return com.family.finance.service.checkup.llm.LlmTestGate.MESSAGE;
         if (e instanceof UpstreamException u) {
             String b = u.body == null ? "" : u.body.toLowerCase(java.util.Locale.ROOT);
             if (u.status == 401 || b.contains("invalid_api_key")) {

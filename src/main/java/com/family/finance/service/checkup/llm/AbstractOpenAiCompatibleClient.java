@@ -30,6 +30,8 @@ import java.util.Map;
  */
 @Slf4j
 public abstract class AbstractOpenAiCompatibleClient implements LlmClient {
+    @org.springframework.beans.factory.annotation.Autowired
+    private LlmTestGate testGate;
 
     /** 单家庭模式 · 见 prd §22.3 类 A · 与 backup.sh FAMILY_ID=1 一致 */
     protected static final long FAMILY_ID = 1L;
@@ -124,6 +126,7 @@ public abstract class AbstractOpenAiCompatibleClient implements LlmClient {
 
     @Override
     public String chat(LlmInvocation inv, String systemPrompt, String userPrompt) {
+        if (testGate != null) testGate.beforeSend("TEXT_CLIENT");
         String label = platformDef().label();
         String key = currentApiKey();
         if (key.isBlank()) throw new IllegalStateException(label + " API key 未配置");
@@ -164,6 +167,7 @@ public abstract class AbstractOpenAiCompatibleClient implements LlmClient {
                     }
                 }
             } catch (RuntimeException e) {
+                if (e instanceof LlmTestGate.Blocked) throw e;
                 // 超时 / 解析错 / 空 content 等非 HTTP 错误
                 lastTransient = e;
                 recordFailure();
@@ -191,9 +195,14 @@ public abstract class AbstractOpenAiCompatibleClient implements LlmClient {
                 "max_tokens", currentMaxTokens()
         );
 
-        @SuppressWarnings("unchecked")
-        Map<String, Object> resp = restTemplate.postForObject(
-                platformDef().chatEndpoint(), new HttpEntity<>(body, h), Map.class);
+        if (testGate != null) testGate.beforeSend("TEXT_CLIENT");
+        java.time.LocalDateTime dispatched = java.time.LocalDateTime.now();
+        Map<String, Object> resp;
+        try {
+            resp = restTemplate.postForObject(platformDef().chatEndpoint(), new HttpEntity<>(body, h), Map.class);
+        } finally {
+            if (testGate != null) testGate.observedSend("TEXT_CLIENT", dispatched);
+        }
         if (resp == null) throw new RuntimeException(label + " 返回 null");
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> choices = (List<Map<String, Object>>) resp.get("choices");

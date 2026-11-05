@@ -376,6 +376,7 @@ public class LlmDiagnoseService {
                     }
                 });
         if (routed != null) return routed.withRecord(trace.recordId());
+        if (llmRouter.testMode()) return DiagnoseResult.unavailable(trace.failureMessage()).withRecord(trace.recordId());
 
         // 3. 全部失败
         try {

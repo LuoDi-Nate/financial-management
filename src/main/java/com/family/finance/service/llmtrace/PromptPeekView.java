@@ -59,6 +59,10 @@ public record PromptPeekView(
         List<String> warns = new ArrayList<>();
         String state = r.outcome == null ? PromptRecorder.OK : r.outcome;
         switch (state) {
+            case PromptRecorder.BLOCKED -> {
+                warns.add("# 测试环境 · 未调用");
+                warns.add("# 以下内容已准备并记录,没有发给大模型。");
+            }
             case PromptRecorder.FAILED -> {
                 warns.add("# 发出去了,AI 那边没回:");
                 warns.add("#   " + (r.outcomeNote == null ? "(没有收到任何说明)" : r.outcomeNote));

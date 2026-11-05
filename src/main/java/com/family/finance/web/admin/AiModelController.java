@@ -26,6 +26,8 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 @RequestMapping("/admin/ai-access/llm")
 @RequiredArgsConstructor
 public class AiModelController {
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.family.finance.service.checkup.llm.LlmTestGate testGate;
 
     /** 保存后回到 AI 接入页的「AI 大模型」这一节 */
     private static final String BACK = "redirect:/admin/ai-access#llm";
@@ -282,6 +284,12 @@ public class AiModelController {
                           @RequestParam("platform") String platform,
                           RedirectAttributes ra) {
         long fid = me.getFamilyId();
+        if (testGate != null && testGate.block(fid,
+                com.family.finance.service.llmtrace.PromptTrace.of(com.family.finance.service.llmtrace.PromptSurface.TEST_CONNECTION),
+                "模型连接自检", "ping")) {
+            ra.addFlashAttribute("flash", com.family.finance.service.checkup.llm.LlmTestGate.MESSAGE);
+            return BACK;
+        }
         LlmCatalog.Platform p = LlmCatalog.platform(platform).orElse(null);
         if (p == null) {
             ra.addFlashAttribute("flashError", "未知平台:" + platform);

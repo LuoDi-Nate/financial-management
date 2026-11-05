@@ -8,6 +8,8 @@ RD="$(cd "$(dirname "$0")/.." && pwd)"   # 仓库根 · 2026-09-22 从 2900 多�
 if [[ "${1:-}" == "--static-v139" ]]; then exec bash "$RD/scripts/qa-v139-static.sh"; fi
                                           # 早期的护栏也要用它(诊断/洞察那几条改成静态判据之后)
 BASE="${BASE:-http://localhost:20000}"
+source "$RD/scripts/ai-test-guard.sh"
+finance_ai_guard_begin "$BASE" || exit 1
 COOKIE="/tmp/finance-qa-cookie.txt"
 TMP="/tmp/finance-qa-resp.html"
 PASS=0; FAIL=0; SKIP=0
@@ -49,10 +51,12 @@ QA_DUMP="/tmp/finance-qa-baseline.sql"
 if [[ "$QA_RESTORE" == 1 ]]; then
   echo "▸ 快照 beta 基线 → $QA_DUMP"
   # --single-transaction:InnoDB MVCC 一致性快照,不加表锁 → 不打断 beta 连接池(否则其后登录会失败)
-  mysqldump --single-transaction --skip-lock-tables -ufinance -pfinance finance > "$QA_DUMP" 2>/dev/null \
+  mysqldump --single-transaction --skip-lock-tables --ignore-table=finance.llm_test_meter -ufinance -pfinance finance > "$QA_DUMP" 2>/dev/null \
     || { echo "✗ 快照失败,中止(不动 beta)"; exit 1; }
   echo "✓ 基线已存($(wc -l < "$QA_DUMP") 行 SQL)"
   qa_restore(){
+    local final_rc=$?
+    finance_ai_guard_end "$BASE" || final_rc=1
     echo; echo "▸ 还原 beta 基线(策略 A)..."
     # 不要写成 `mysql ... | grep -v ...` —— 那样退出码变成 grep 的,正常还原时(只有一条
     # password warning、被过滤后无输出)grep 返回 1,会把成功报成失败。先跑、再判。
@@ -62,11 +66,14 @@ if [[ "$QA_RESTORE" == 1 ]]; then
       echo "✓ 已还原 + 重启"
     else
       echo "✗ 还原失败!$err"; echo "  请手动:mysql finance < $QA_DUMP"
+      final_rc=1
     fi
+    exit "$final_rc"
   }
   trap qa_restore EXIT
 else
   echo "▸ --no-restore:跑完保留 beta 状态(排查用 · 注意会污染基线)"
+  trap 'final_rc=$?; finance_ai_guard_end "$BASE" || final_rc=1; exit "$final_rc"' EXIT
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════

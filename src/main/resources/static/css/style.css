@@ -1336,6 +1336,9 @@ body:has(.tags-savebar) main { padding-bottom: 76px; }
 .tags-todo-toggle input { width: 16px; height: 16px; accent-color: var(--brass-deep); }
 
 
+.llm-test-banner { position:relative; z-index:31; display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:6px 20px; padding:8px 16px; background:var(--brass-soft); color:var(--brass-deep); border-block:1px solid var(--rule); font-size:calc(12px * var(--fs-scale,1)); line-height:1.7; }
+.llm-test-banner a { text-decoration:underline; text-underline-offset:3px; }
+
 /* ── v1.6.17 · 系统浮钮 dock ─────────────────────────────────────────
    三个浮钮(方向 / 本页目录 / 隐藏金额)原来各写死 bottom 偏移,页面缺一个就留空洞
    (打标页没有目录钮 → 中间一个洞,用户反馈④a)。改成 flex 列:有几个排几个。

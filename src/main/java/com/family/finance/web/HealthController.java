@@ -10,6 +10,8 @@ import java.util.Map;
  */
 @RestController
 public class HealthController {
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.family.finance.service.checkup.llm.LlmTestGate llmTestGate;
 
     /** 发布语义版本 · application.yml app.version(与 nav 徽记同源)*/
     @org.springframework.beans.factory.annotation.Value("${app.version:dev}")
@@ -24,7 +26,14 @@ public class HealthController {
      * 只暴露语义版本(与 nav 徽记同源 app.version),不含构建号/主机/路径等运维细节。
      */
     @GetMapping(value = "/health", produces = "application/json")
-    public Map<String, String> health() {
-        return Map.of("status", "UP", "version", appVersion);
+    public Map<String, Object> health() {
+        var out = new java.util.LinkedHashMap<String, Object>();
+        out.put("status", "UP"); out.put("version", appVersion);
+        if (llmTestGate != null) {
+            var status = llmTestGate.status();
+            out.put("aiTest", Map.of("enabled", status.enabled(), "epoch", status.epoch() == null ? "" : status.epoch(),
+                    "blocked", status.blocked(), "sent", status.sent()));
+        }
+        return out;
     }
 }

@@ -86,6 +86,9 @@ const JUDGE = (href) => {
 };
 
 (async () => {
+  const guard = require('./ai-test-guard.cjs');
+  const live = process.env.E2E_REAL_AI === '1';
+  const testStart = await guard.begin(BASE, live);
   const chromium = loadChromium();
   const exe = findChrome();
   if (!chromium || !exe) {
@@ -180,7 +183,8 @@ const JUDGE = (href) => {
     await ctx.close();
   }
 
-  await browser.close();
+  try { await guard.finish(BASE, testStart, live); }
+  finally { await browser.close(); }
   console.log(`\n合计 ${checks} 项检查 · 失败 ${fails} 项`);
   process.exit(fails ? 1 : 0);
 })().catch(e => { console.error('FATAL ' + e.message); process.exit(2); });

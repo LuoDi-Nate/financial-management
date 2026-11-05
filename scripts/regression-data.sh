@@ -38,6 +38,8 @@
 set -u   # 不用 pipefail:curl|grep -q / |head 会提前关管道让 curl 收 SIGPIPE,pipefail 会把这类正常管道误判为失败
 
 BASE="${E2E_BASE:-http://127.0.0.1:20000}"
+source "$(dirname "${BASH_SOURCE[0]}")/ai-test-guard.sh"
+finance_ai_guard_begin "$BASE" || exit 1
 DBU="${E2E_DBU:-finance}"; DBP="${E2E_DBP:-finance}"; DBN="${E2E_DBN:-finance}"
 FAM="${E2E_FAMILY:-1}"
 USER_="${E2E_USER:-diwa}"; PASS_="${E2E_PASS:-demo1234}"
@@ -56,6 +58,8 @@ skip(){ echo -e " \033[33mSKIP\033[0m $1 :: ${2:-}"; SKIP=$((SKIP+1)); }
 section(){ echo; echo -e "\033[1;36m════ $1 ════\033[0m"; }
 
 restore(){
+  final_rc=$?
+  finance_ai_guard_end "$BASE" || final_rc=1
   echo; echo "▸ 还原 beta 基线(策略 A)..."
   # 不再 2>/dev/null 吞错:还原静默失败会让下一次跑基于污染状态,表现成一堆假 bug。
   # 注意不能写成 `mysql ... | grep -v ...` —— 那样退出码变成 grep 的,正常还原时(只有一条
@@ -67,15 +71,17 @@ restore(){
   else
     echo "✗ 还原失败!$RESTORE_ERR"
     echo "  请手动:mysql $DBN < $DUMP"
+    final_rc=1
   fi
   rm -f "$CK"
+  exit "$final_rc"
 }
 trap restore EXIT
 
 # ── 快照基线 ──
 echo "▸ 快照 beta 基线 → $DUMP"
 # --single-transaction:InnoDB MVCC 一致性快照,不加表锁 → 不打断正在运行的 beta 连接池(否则其后登录会失败)
-mysqldump --single-transaction --skip-lock-tables -u"$DBU" -p"$DBP" "$DBN" > "$DUMP" 2>/dev/null || { echo "✗ 快照失败,中止(不动 beta)"; exit 1; }
+mysqldump --single-transaction --skip-lock-tables --ignore-table="$DBN.llm_test_meter" -u"$DBU" -p"$DBP" "$DBN" > "$DUMP" 2>/dev/null || { echo "✗ 快照失败,中止(不动 beta)"; exit 1; }
 echo "✓ 基线已存($(wc -l < "$DUMP") 行 SQL)"
 
 # ── 登录 + CSRF ──

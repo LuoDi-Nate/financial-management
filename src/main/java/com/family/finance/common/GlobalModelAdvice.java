@@ -23,6 +23,13 @@ import java.time.Instant;
 @ControllerAdvice
 @RequiredArgsConstructor
 public class GlobalModelAdvice {
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.family.finance.service.checkup.llm.LlmTestGate llmTestGate;
+
+    @ModelAttribute("llmTestMode")
+    public boolean llmTestMode(@AuthenticationPrincipal MemberPrincipal me) {
+        return me != null && llmTestGate != null && llmTestGate.enabled();
+    }
 
     private final NavService navService;
     /** v1.9 · 只调 cached()(内存字段),绝不在这里查库/出网 */

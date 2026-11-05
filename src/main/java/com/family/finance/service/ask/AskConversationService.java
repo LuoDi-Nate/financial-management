@@ -321,7 +321,9 @@ public class AskConversationService {
                     .settings(analysisContextService == null ? null
                             : analysisContextService.familyDefaults(familyId).settingsNote());
             Long id = promptRecorder.save(familyId, trace, sys, input, vendor,
-                    com.family.finance.service.llmtrace.PromptRecorder.SENT, note);
+                    com.family.finance.service.checkup.llm.LlmTestGate.MESSAGE.equals(vendor)
+                            ? com.family.finance.service.llmtrace.PromptRecorder.BLOCKED
+                            : com.family.finance.service.llmtrace.PromptRecorder.SENT, note);
             if (id != null) messageMapper.updatePromptRecord(familyId, target, id);
         } catch (Exception e) {
             log.debug("记录这一问发出去的内容失败(不影响回答):{}", e.toString());

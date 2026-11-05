@@ -22,6 +22,29 @@
       </ol>
     </div>
 
+    <section id="test-mode" class="bracket-card p-5 mb-6 scroll-mt-24" th:if="${llmTestStatus != null}" data-llm-test-setting>
+      <h2 class="font-display text-xl mb-3">测试环境:不调大模型</h2>
+      <form th:action="@{/admin/ai-access/test-mode}" method="post"
+            th:attr="data-was-on=${llmTestStatus.enabled()}"
+            onsubmit="if(this.elements.enabled.checked &amp;&amp; this.dataset.wasOn!=='true'){if(!confirm('这台是测试环境吗?打开后这台机器不再调用大模型。'))return false;this.elements.confirmed.value='true';}">
+        <input type="hidden" name="confirmed" value="false">
+        <div class="flex items-center justify-between gap-4 flex-wrap">
+          <label class="inline-flex items-center gap-3 min-h-11 text-sm"><input type="checkbox" name="enabled" value="true" th:checked="${llmTestStatus.enabled()}">大模型调用保护</label>
+          <button type="submit" class="btn-ink text-sm"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>保存开关</button>
+        </div>
+      </form>
+      <p class="text-xs text-ink-soft mt-3 leading-loose">打开后,文字分析、截图识别、超级 Agent和关账后的模型任务均显示“测试环境 · 未调用”。规则结果与历史报告仍可查看。</p>
+      <div class="flex flex-wrap gap-x-6 gap-y-2 mt-4 text-sm" data-llm-test-totals>
+        <span>状态:<b th:text="${llmTestStatus.enabled()} ? '开着' : '关着'"></b></span>
+        <span>拦下 <b th:text="${llmTestStatus.blocked()}"></b> 次</span><span>发出去 <b th:text="${llmTestStatus.sent()}"></b> 次</span>
+      </div>
+      <p class="text-xs text-ink-soft mt-2" th:if="${llmTestStatus.openedAt() != null}" th:text="'本轮开始:'+${llmTestStatus.openedAt()}"></p>
+      <table class="ledger-table m-cards w-full mt-4" th:if="${!llmTestStatus.entries().isEmpty()}">
+        <thead><tr><th>入口</th><th>拦下</th><th>发出</th><th>最近拦截</th></tr></thead>
+        <tbody><tr th:each="row : ${llmTestStatus.entries()}"><td class="m-title" th:text="${row.label()}"></td><td data-label="拦下" th:text="${row.blocked()}"></td><td data-label="发出" th:text="${row.sent()}"></td><td class="m-full" data-label="最近拦截" th:text="${row.lastBlockedAt()}"></td></tr></tbody>
+      </table>
+    </section>
+
     <!--/* v1.28 · 看 AI 收到了什么(PRD FR-914):只管显不显示图标;记录照写 */-->
     <div id="peek" class="paper-card p-5 mb-6 scroll-mt-24" data-prompt-peek-setting>
       <div class="flex items-start gap-4 flex-wrap">

@@ -50,6 +50,8 @@ import static com.family.finance.service.config.FamilyConfigService.*;
 @RequiredArgsConstructor
 @Slf4j
 public class AiAccessController {
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.family.finance.service.checkup.llm.LlmTestGate llmTestGate;
 
     private static final int AUDIT_LIMIT = 50;
 
@@ -75,13 +77,14 @@ public class AiAccessController {
     @GetMapping("/admin/ai-access")
     public String page(@AuthenticationPrincipal MemberPrincipal me, HttpServletRequest req, Model model) {
         long fam = me.getFamilyId();
+        model.addAttribute("llmTestStatus", llmTestGate.status());
         model.addAttribute("me", me);
         model.addAttribute("nav", navService.load(me));
         // v1.28 FR-914 · 「看 AI 收到了什么」开关(缺省 = 开)
         model.addAttribute("promptPeekOn", configService.getBoolean(fam, FamilyConfigService.K_AI_PROMPT_PEEK, true));
         // 健康读数:每个平台最后一次调用的结果 + 「是不是全挂了」
-        model.addAttribute("llmHealth", llmHealth.snapshot());
-        model.addAttribute("llmAllDown", llmHealth.allAccountsDown());
+        model.addAttribute("llmHealth", llmTestGate.enabled() ? List.of() : llmHealth.snapshot());
+        model.addAttribute("llmAllDown", !llmTestGate.enabled() && llmHealth.allAccountsDown());
         var sinceOk = llmHealth.sinceLastOk();
         model.addAttribute("llmSinceOkHours", sinceOk == null ? null : sinceOk.toHours());
         llmSettingsView.addLlmAttributes(fam, model);
@@ -415,6 +418,22 @@ public class AiAccessController {
                 "关闭全部 AI 接入 · " + n + " 把口令立刻失效");
         ra.addFlashAttribute("askNote", "已全部关闭。接口现在对任何请求都返回「不存在」。");
         return "redirect:/admin/ai-access";
+    }
+
+    @PostMapping("/admin/ai-access/test-mode")
+    public String testMode(@AuthenticationPrincipal MemberPrincipal me,
+                           @RequestParam(defaultValue = "false") boolean enabled,
+                           @RequestParam(defaultValue = "false") boolean confirmed, RedirectAttributes ra) {
+        if (enabled && !llmTestGate.enabled() && !confirmed) {
+            ra.addFlashAttribute("flashError", "请先确认这台是测试环境,再打开模型调用保护。");
+            return "redirect:/admin/ai-access#test-mode";
+        }
+        llmTestGate.setEnabled(enabled);
+        auditLogService.record(me.getFamilyId(), me.getMemberId(),
+                com.family.finance.domain.audit.AuditLogType.FAMILY_UPDATE, "family_runtime_config", me.getFamilyId(),
+                enabled ? "打开测试环境模型调用保护" : "关闭测试环境模型调用保护");
+        ra.addFlashAttribute("flash", enabled ? "测试环境保护已打开,不会发起模型调用。" : "测试环境保护已关闭,模型调用恢复。");
+        return "redirect:/admin/ai-access#test-mode";
     }
 
     /** 猜一个对外可用的 base url 填进配置示例 —— 猜错也没关系,页面允许用户自己改 */

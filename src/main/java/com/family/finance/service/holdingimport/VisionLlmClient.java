@@ -38,6 +38,8 @@ import java.util.regex.Pattern;
 @Component
 @Slf4j
 public class VisionLlmClient {
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.family.finance.service.checkup.llm.LlmTestGate testGate;
 
     private static final long FAMILY_ID = 1L;   // 单家庭设计
 
@@ -88,6 +90,7 @@ public class VisionLlmClient {
 
     /** 视觉可用 = 开关打开 且 该平台 key 已配 且 型号能定下来(方舟没填型号 → 不可用) */
     public boolean available() {
+        if (testGate != null && testGate.enabled()) return true;
         LlmSettings s = LlmSettings.load(config, FAMILY_ID);
         if (!s.visionEnabled()) return false;
         LlmInvocation inv = s.vision();
@@ -97,6 +100,10 @@ public class VisionLlmClient {
 
     /** 一张图 → 若干持仓转写行。失败抛 RuntimeException(不泄 key)。 */
     public List<ParsedRow> extract(byte[] imageBytes, String mime) {
+        if (testGate != null && testGate.block(FAMILY_ID,
+                com.family.finance.service.llmtrace.PromptTrace.of(com.family.finance.service.llmtrace.PromptSurface.VISION_IMPORT),
+                SYS, PROMPT + "\n图片未发送"))
+            throw new com.family.finance.service.checkup.llm.LlmTestGate.Blocked();
         LlmSettings s = LlmSettings.load(config, FAMILY_ID);
         if (!s.visionEnabled()) throw new IllegalStateException("截图识别已在管理页关闭");
         LlmInvocation inv = s.vision();
@@ -117,6 +124,7 @@ public class VisionLlmClient {
 
     @SuppressWarnings("unchecked")
     private String callVision(LlmCatalog.Platform p, String key, String model, String dataUrl) {
+        if (testGate != null) testGate.beforeSend("VISION_CLIENT");
         HttpHeaders h = new HttpHeaders();
         h.setContentType(MediaType.APPLICATION_JSON);
         h.setBearerAuth(key);
@@ -130,7 +138,11 @@ public class VisionLlmClient {
                 "temperature", 0.1,
                 "max_tokens", 1800
         );
-        Map<String, Object> resp = rt.postForObject(p.chatEndpoint(), new HttpEntity<>(body, h), Map.class);
+        if (testGate != null) testGate.beforeSend("VISION_CLIENT");
+        java.time.LocalDateTime dispatched = java.time.LocalDateTime.now();
+        Map<String, Object> resp;
+        try { resp = rt.postForObject(p.chatEndpoint(), new HttpEntity<>(body, h), Map.class); }
+        finally { if (testGate != null) testGate.observedSend("VISION_CLIENT", dispatched); }
         if (resp == null) throw new RuntimeException("视觉服务返回空");
         List<Map<String, Object>> choices = (List<Map<String, Object>>) resp.get("choices");
         if (choices == null || choices.isEmpty()) throw new RuntimeException("视觉服务无结果");

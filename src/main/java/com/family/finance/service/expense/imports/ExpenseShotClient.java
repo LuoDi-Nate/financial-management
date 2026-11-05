@@ -44,6 +44,8 @@ import java.util.Map;
 @Component
 @Slf4j
 public class ExpenseShotClient {
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.family.finance.service.checkup.llm.LlmTestGate testGate;
 
     private static final long FAMILY_ID = 1L;   // 单家庭设计
 
@@ -77,6 +79,7 @@ public class ExpenseShotClient {
     }
 
     public boolean available() {
+        if (testGate != null && testGate.enabled()) return true;
         LlmSettings s = LlmSettings.load(config, FAMILY_ID);
         if (!s.visionEnabled()) return false;
         LlmInvocation inv = s.vision();
@@ -97,6 +100,10 @@ public class ExpenseShotClient {
 
     /** 转写一张图。抛异常时调用方按「这张没认出来」处理,其余图照旧。 */
     public List<ShotRow> extract(byte[] imageBytes, String mime) {
+        if (testGate != null && testGate.block(FAMILY_ID,
+                com.family.finance.service.llmtrace.PromptTrace.of(com.family.finance.service.llmtrace.PromptSurface.EXPENSE_SHOT),
+                "支出截图识别", "图片未发送"))
+            throw new com.family.finance.service.checkup.llm.LlmTestGate.Blocked();
         LlmSettings s = LlmSettings.load(config, FAMILY_ID);
         if (!s.visionEnabled()) throw new IllegalStateException("截图识别已在管理页关闭");
         LlmInvocation inv = s.vision();
@@ -127,7 +134,11 @@ public class ExpenseShotClient {
                 "temperature", 0.1,
                 "max_tokens", 1500
         );
-        Map<String, Object> resp = rt.postForObject(p.chatEndpoint(), new HttpEntity<>(body, h), Map.class);
+        if (testGate != null) testGate.beforeSend("EXPENSE_VISION_CLIENT");
+        java.time.LocalDateTime dispatched = java.time.LocalDateTime.now();
+        Map<String, Object> resp;
+        try { resp = rt.postForObject(p.chatEndpoint(), new HttpEntity<>(body, h), Map.class); }
+        finally { if (testGate != null) testGate.observedSend("EXPENSE_VISION_CLIENT", dispatched); }
         if (resp == null) throw new RuntimeException("视觉服务返回空");
         List<Map<String, Object>> choices = (List<Map<String, Object>>) resp.get("choices");
         if (choices == null || choices.isEmpty()) throw new RuntimeException("视觉服务无结果");

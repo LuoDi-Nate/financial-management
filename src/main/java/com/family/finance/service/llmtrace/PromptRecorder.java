@@ -37,6 +37,7 @@ public class PromptRecorder {
     public static final String REJECTED = "REJECTED";
     /** 超级 Agent:发出去那一刻记下,回答是流式的,结果不回写 */
     public static final String SENT = "SENT";
+    public static final String BLOCKED = "BLOCKED";
 
     static final int SHORT_DAYS = 2;
     static final int LONG_DAYS = 90;

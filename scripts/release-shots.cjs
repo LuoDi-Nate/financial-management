@@ -31,7 +31,11 @@ fs.mkdirSync(outDir, { recursive: true });
 const { chromium } = require(PW);
 
 (async () => {
+  const guard = require('./ai-test-guard.cjs');
+  const live = process.env.E2E_REAL_AI === '1';
+  const testStart = await guard.begin(BASE, live);
   const browser = await chromium.launch({ executablePath: CHROME, args: ['--no-sandbox'] });
+  try {
 
   // 隐私模式默认开启(SHOT_PRIVACY=0 关):data-priv 金额高斯模糊,截图可安全上公开 Release
   async function armPrivacy(ctx) {
@@ -130,5 +134,8 @@ const { chromium } = require(PW);
   await shoot(mob, spec.mobile || [], 'mobile');
   await mob.close();
 
-  await browser.close();
-})();
+  } finally {
+    try { await guard.finish(BASE, testStart, live); }
+    finally { await browser.close(); }
+  }
+})().catch(e=>{console.error(e.message);process.exitCode=1;});

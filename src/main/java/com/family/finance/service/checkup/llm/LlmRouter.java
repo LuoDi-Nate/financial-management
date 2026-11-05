@@ -67,6 +67,10 @@ public class LlmRouter {
      */
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private PromptRecorder promptRecorder;
+    @org.springframework.beans.factory.annotation.Autowired
+    private LlmTestGate testGate;
+
+    public boolean testMode() { return testGate != null && testGate.enabled(); }
 
     /** 单测注入用 */
     public void setPromptRecorder(PromptRecorder r) { this.promptRecorder = r; }
@@ -119,7 +123,7 @@ public class LlmRouter {
      * 按新口径直接告诉用户去管理页补配置。</p>
      */
     public boolean available(long familyId) {
-        return !plan(familyId).isEmpty();
+        return testMode() || !plan(familyId).isEmpty();
     }
 
     public static int timeoutSeconds(FamilyConfigService config, long familyId) {
@@ -127,6 +131,7 @@ public class LlmRouter {
     }
 
     public String unavailableReason(long familyId) {
+        if (testMode()) return LlmTestGate.MESSAGE;
         if (available(familyId)) return null;
         boolean keyPresent = false, resolvable = false;
         for (LlmInvocation inv : LlmSettings.load(configService, familyId).chain()) {
@@ -192,6 +197,7 @@ public class LlmRouter {
      */
     public <T> T invoke(long familyId, PromptTrace trace, String systemPrompt, String userPrompt, Handler<T> handler) {
         if (trace == null) return invoke(familyId, systemPrompt, userPrompt, handler);
+        if (testGate != null && testGate.block(familyId, trace, systemPrompt, userPrompt)) return null;
         if (plan(familyId).isEmpty()) {
             trace.failed(unavailableReason(familyId));
             return null;
@@ -230,6 +236,7 @@ public class LlmRouter {
      * @return handler 第一次接受的结果;无人接受 / 全部失败 / 无可用候选 → null
      */
     public <T> T invoke(long familyId, String systemPrompt, String userPrompt, Handler<T> handler) {
+        if (testGate != null && testGate.block(familyId, null, systemPrompt, userPrompt)) return null;
         for (LlmInvocation inv : plan(familyId)) {
             LlmClient client = clientFor(inv.platform()).orElse(null);
             if (client == null || !client.available()) continue;
@@ -246,6 +253,7 @@ public class LlmRouter {
                 if (accepted != null) return accepted;
                 log.warn("候选 {} 的输出未被接受 · 试下一个", inv.label());
             } catch (Exception e) {
+                if (e instanceof LlmTestGate.Blocked) return null;
                 long ms = System.currentTimeMillis() - start;
                 // 账户级故障(凭据/欠费/权限)不会自己好,必须有人去处理 —— 单独标出来,
                 // 好让管理页只在这一类上报警,不被偶发超时淹掉。

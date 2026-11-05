@@ -391,6 +391,8 @@ Ui.prototype.device = async function (width, height, fn, opts = {}) {
 
 /** 开浏览器 + 登录。viewport 给 PC;真手机(触屏)断言用 ui.phone(fn)。 */
 async function open(report, { width = 1440, height = 900 } = {}) {
+  const guard = require('../../ai-test-guard.cjs');
+  const testStart = await guard.begin(BASE, REAL_AI);
   const browser = await chromium.launch({ executablePath: CHROME, args: ['--no-sandbox'] });
   const ctx = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 1 });
   await stubAi(ctx);
@@ -398,7 +400,10 @@ async function open(report, { width = 1440, height = 900 } = {}) {
   const ui = new Ui(page, report);
   watchConsole(ui);
   await login(page);
-  ui._close = async () => { await ctx.close(); await browser.close(); };
+  ui._close = async () => {
+    try { await guard.finish(BASE, testStart, REAL_AI); }
+    finally { await ctx.close().catch(()=>{}); await browser.close().catch(()=>{}); }
+  };
   return ui;
 }
 

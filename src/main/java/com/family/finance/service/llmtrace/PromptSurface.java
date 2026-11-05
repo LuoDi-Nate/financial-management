@@ -17,6 +17,10 @@ public enum PromptSurface {
     GOAL_ALERT("目标 · AI 预警建议", false),
     GOAL_PARAMS("新建目标 · AI 推荐参数", true),
     MERCHANT_CLASSIFY("支出导入 · 商户分类", true),
+    VISION_IMPORT("持仓截图识别", true),
+    EXPENSE_SHOT("支出截图识别", true),
+    TEST_CONNECTION("模型连接自检", true),
+    OTHER_TEXT("其他文本调用", true),
     ASK_TURN("超级 Agent · 这一问", false),
     /** 托管模式:「更新 Agent / 创建 Agent」时推给百炼的系统提示词(不是一次问答) */
     ASK_AGENT_SYSTEM("超级 Agent · 推给百炼的规矩", false);

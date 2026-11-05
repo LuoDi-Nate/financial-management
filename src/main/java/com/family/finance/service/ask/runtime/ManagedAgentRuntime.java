@@ -61,6 +61,8 @@ public class ManagedAgentRuntime implements AgentRuntime {
     /** v1.19.15 · 自检要看的是**我们自己的**入站记录,不是问模型 —— 模型会编 */
     private final com.family.finance.repository.AskAuditMapper auditMapper;
     private final ObjectMapper json = new ObjectMapper();
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.family.finance.service.checkup.llm.LlmTestGate testGate;
 
     private final HttpClient http = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
@@ -77,6 +79,7 @@ public class ManagedAgentRuntime implements AgentRuntime {
 
     @Override
     public String unavailableReason(long familyId) {
+        if (testGate != null && testGate.enabled()) return null;
         if (apiKey().isBlank()) return "还没有配百炼的 API Key。去「AI 接入」页的「大模型」那一节填一个。";
         if (workspace().isBlank()) return "还没填百炼的业务空间 ID。在「AI 接入」页填一下。";
         String base = configService.getString(FAMILY_ID, K_ASK_PUBLIC_BASE_URL, "");
@@ -98,6 +101,13 @@ public class ManagedAgentRuntime implements AgentRuntime {
 
     @Override
     public void run(AskTurn turn, AskSink sink) {
+        if (testGate != null && testGate.block("ASK_TURN_MANAGED")) {
+            if (turn.onPromptSent() != null) turn.onPromptSent().sent(null,
+                    composeTurnInput(turn.analysisContext(), turn.question()),
+                    com.family.finance.service.checkup.llm.LlmTestGate.MESSAGE, true);
+            sink.failed(com.family.finance.service.checkup.llm.LlmTestGate.MESSAGE);
+            return;
+        }
         String reason = unavailableReason(turn.familyId());
         if (reason != null) { sink.failed(reason); return; }
 
@@ -185,6 +195,7 @@ public class ManagedAgentRuntime implements AgentRuntime {
     record Appended(String id, String echo) {}
 
     private Appended appendUserMessageEcho(String sessionId, String question) throws Exception {
+        if (testGate != null) testGate.beforeSend("MANAGED_EVENT");
         Map<String, Object> event = new LinkedHashMap<>();
         event.put("type", "message");
         event.put("role", "user");
@@ -226,6 +237,7 @@ public class ManagedAgentRuntime implements AgentRuntime {
      * 工具已经在 {@code /mcp} 那条路径上执行过,连同鉴权和审计。</p>
      */
     private void streamAfter(String sessionId, String afterEventId, AskSink sink) throws Exception {
+        if (testGate != null) testGate.beforeSend("MANAGED_STREAM");
         HttpRequest req = HttpRequest.newBuilder(URI.create(
                         agentBase() + "/sessions/" + sessionId + "/events/stream?after_id=" + afterEventId))
                 .timeout(READ_TIMEOUT)
@@ -654,6 +666,10 @@ public class ManagedAgentRuntime implements AgentRuntime {
      * @return 给用户看的一句话结论
      */
     public String testMcpLink() {
+        if (testGate != null && testGate.block(FAMILY_ID,
+                com.family.finance.service.llmtrace.PromptTrace.of(com.family.finance.service.llmtrace.PromptSurface.TEST_CONNECTION),
+                "Agent连接自检", "调用capabilities工具核对连接"))
+            return com.family.finance.service.checkup.llm.LlmTestGate.MESSAGE;
         if (agentId().isBlank()) return "还没创建 Agent,先点上面那个按钮。";
         LocalDateTime since = LocalDateTime.now().minusSeconds(5);
         StringBuilder answer = new StringBuilder();
@@ -780,6 +796,9 @@ public class ManagedAgentRuntime implements AgentRuntime {
     }
 
     private JsonNode send(String method, String url, Object body) throws Exception {
+        boolean modelEvent = url.contains("/sessions/") && url.endsWith("/events");
+        if (modelEvent && testGate != null) testGate.beforeSend("MANAGED_EVENT");
+        java.time.LocalDateTime dispatched = java.time.LocalDateTime.now();
         HttpRequest req = HttpRequest.newBuilder(URI.create(url))
                 .timeout(Duration.ofSeconds(30))
                 .header("Content-Type", "application/json")
@@ -788,6 +807,7 @@ public class ManagedAgentRuntime implements AgentRuntime {
                         json.writeValueAsString(body), StandardCharsets.UTF_8))
                 .build();
         HttpResponse<String> resp = http.send(req, HttpResponse.BodyHandlers.ofString());
+        if (modelEvent && testGate != null) testGate.observedSend("MANAGED_EVENT", dispatched);
         if (resp.statusCode() >= 400) throw new UpstreamException(resp.statusCode(), resp.body());
         return json.readTree(resp.body());
     }
@@ -830,6 +850,8 @@ public class ManagedAgentRuntime implements AgentRuntime {
     }
 
     private String humanError(Exception e) {
+        if (e instanceof com.family.finance.service.checkup.llm.LlmTestGate.Blocked)
+            return com.family.finance.service.checkup.llm.LlmTestGate.MESSAGE;
         if (e instanceof UpstreamException u) {
             // 【每一支都要带上百炼的原话】—— 2026-09-22 复发第四次,而且这次是在
             // 下面那段注释的正上方:401/403/404/429 三支各自把上游原话换成了我们的猜测。

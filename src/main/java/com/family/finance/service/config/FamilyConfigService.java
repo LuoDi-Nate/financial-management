@@ -53,6 +53,8 @@ public class FamilyConfigService {
     public static final String K_LLM_DEEPSEEK_KEY  = "llm_deepseek_api_key";
     public static final String K_LLM_MAX_TOKENS    = "llm_max_tokens";
     public static final String K_LLM_TIMEOUT_SECS  = "llm_timeout_seconds";
+    /** Instance-wide test protection, controlled from AI settings; JSON state includes its counting epoch. */
+    public static final String K_LLM_TEST_MODE = "llm_test_mode";
     /** v0.6 · Qwen 多模型兜底:逗号分隔有序模型列表(≤10)· 某模型免费额度用尽自动切下一个 */
     public static final String K_LLM_QWEN_MODELS   = "llm_qwen_models";
     /** v0.14 · 主选 LLM 供应商:qwen / deepseek(默认 qwen)· 主选故障自动切备 */
