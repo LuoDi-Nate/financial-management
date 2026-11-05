@@ -1,5 +1,7 @@
 .retirement-page { letter-spacing:0; }
 .retirement-page[data-tab=plan] { max-width:1064px; }
+/* Keep the shared tools available after the form without covering its right-aligned amounts. */
+body:has(.retirement-page[data-tab=plan]) #float-dock { position:static; flex-direction:row; flex-wrap:wrap; justify-content:flex-end; max-width:calc(100% - 32px); margin:24px 16px max(18px,env(safe-area-inset-bottom)) auto; }
 .retire-breadcrumb { display:flex; align-items:center; gap:12px; color:var(--ink-soft); font-size:calc(12px * var(--fs-scale,1)); }
 .retire-breadcrumb a:hover { color:var(--brass-text); }
 .retire-heading, .retire-section-head { display:flex; justify-content:space-between; align-items:center; gap:16px; flex-wrap:wrap; margin-bottom:24px; }

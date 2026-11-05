@@ -62,6 +62,22 @@ async function settings(ui, label, reference) {
   if(reference) await ui.assert(visible.find(f=>f.name==='monthlyExpense').font===reference.font && visible.find(f=>f.name==='monthlyExpense').size===reference.size,label+':金额字体及字号与现有账户登记表一致');
   await ui.assert(await ui.page.locator('#retirement-form .field-label').evaluateAll(labels=>labels.every(el=>parseFloat(getComputedStyle(el).fontSize)>=12)),label+':中文字段名不小于12px');
   await ui.assert(await ui.page.locator('#retirement-form').evaluate(el=>el.getBoundingClientRect().width<=800),label+':表单限制填写宽度');
+  if(await ui.page.locator('#float-dock').isVisible()) {
+    let clear=true;
+    for(const field of await ui.page.locator('#retirement-form .field-input').all()) {
+      if(!await field.isVisible()) continue;
+      await field.scrollIntoViewIfNeeded();
+      clear=clear && await field.evaluate(el=>{
+        const r=el.getBoundingClientRect(), dock=document.querySelector('#float-dock').getBoundingClientRect();
+        return r.right<=dock.left || r.left>=dock.right || r.bottom<=dock.top || r.top>=dock.bottom;
+      });
+    }
+    await ui.assert(clear,label+':系统工具与每个输入框的整个区域不重叠');
+    await ui.page.locator('#priv-float').scrollIntoViewIfNeeded();
+    await ui.click('#priv-float','表单末尾仍能切换金额隐私');
+    await ui.assert(await ui.page.locator('html').evaluate(el=>el.classList.contains('privacy')),label+':金额隐私工具仍有效');
+    await ui.click('#priv-float','恢复显示金额');
+  }
   const expense=await ui.page.inputValue('[name="monthlyExpense"]');
   await ui.click('.retire-details > summary:has-text("查看月份、来源及剔除额")','展开消费来源');
   await ui.assert(await ui.page.inputValue('[name="monthlyExpense"]')===expense,label+':查看来源保留当前输入');
@@ -235,6 +251,7 @@ module.exports = {
       await login(mobile.page,state.username);
       await mobile.goto(`/goals/${state.native}/retirement`);
       await dimensions(mobile,'手机'); await screenshot(mobile,'mobile-overview');
+      await mobile.assert(await mobile.page.locator('#float-dock').evaluate(el=>getComputedStyle(el).position==='fixed'),'手机:生活账沿用系统悬浮工具');
       await mobile.click('[data-retire-tab="plan"]','手机调整计划');
       await mobile.assert(await mobile.page.locator('[data-retire-save]').count()===1,'手机仅一份表单与保存入口');
       await settings(mobile,'手机修改计划');
