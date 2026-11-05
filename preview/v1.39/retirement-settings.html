@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>退休计划配置 · v1.39 UED 修订</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;500&family=JetBrains+Mono:wght@400;500&family=Noto+Serif+SC:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/style.css">
+  <link rel="stylesheet" href="../../src/main/resources/static/css/style.css">
+  <link rel="stylesheet" href="../../src/main/resources/static/css/retirement.css">
+  <style>
+    body { margin:0; } h1,h2,p { margin:0; letter-spacing:0; } a { color:inherit; } button,input,select { font:inherit; } button { cursor:pointer; }
+    .preview-header { border-top:4px solid var(--ink); border-bottom:1px solid var(--rule); padding:16px 24px; position:relative; z-index:2; }
+    .preview-header b { font-family:"Fraunces","Noto Serif SC",serif; font-size:calc(20px * var(--fs-scale,1)); font-weight:500; }
+    .preview-header span { margin-left:16px; color:var(--ink-soft); font-size:calc(12px * var(--fs-scale,1)); }
+    main { margin:auto; padding:32px 40px 64px; position:relative; z-index:2; }
+    h1 { font-size:calc(36px * var(--fs-scale,1)); font-weight:500; }
+    .eyebrow { margin:16px 0 8px; } .retire-heading p { margin-top:8px; font-size:calc(13px * var(--fs-scale,1)); color:var(--ink-soft); }
+    .mb-3 { margin-bottom:12px; } .mb-4 { margin-bottom:16px; } .mb-5 { margin-bottom:20px; } .mt-5 { margin-top:20px; } .mt-6 { margin-top:24px; }
+    .retire-settings-nav .eyebrow-ink { margin-bottom:12px; } .retire-form-actions a { text-decoration:none; }
+    @media(max-width:767px) { main { padding:24px 16px 48px; } .preview-header span { display:block; margin:4px 0 0; } }
+  </style>
+</head>
+<body>
+<header class="preview-header"><b>家庭账房</b><span>v1.39 配置布局修订 · 全部合成数据 · <a href="https://beta.dixi-token.top/goals">实际操作见 beta</a></span></header>
+<main class="retirement-page" data-tab="plan">
+  <nav class="retire-breadcrumb" aria-label="当前位置"><a href="retirement.html">目标</a><span>/</span><span>退休计划</span></nav>
+  <div class="retire-heading"><div><div class="eyebrow">退 · 休 · 生 · 活 · 账</div><h1>退休生活账</h1><p>新建计划 · 购买力基准 <span class="font-mono">2026-11-05</span> · 资金账期 <span class="font-mono">2026-11</span></p></div></div>
+  <div class="retire-tabs" role="tablist" aria-label="退休计划视图"><button type="button" onclick="location.href='retirement.html'">退休生活账</button><button type="button" aria-selected="true">调整计划</button><button type="button" onclick="location.href='retirement.html#principle'">怎么算的</button></div>
+  <div class="retire-settings-layout">
+    <nav class="retire-settings-nav" aria-label="计划设置章节"><div class="eyebrow-ink">计 · 划 · 设 · 置</div><a href="#retire-life"><span>01</span>生活安排</a><a href="#retire-assets"><span>02</span>退休资金</a><a href="#retire-reserves"><span>03</span>单独预留</a><a href="#retire-returns"><span>04</span>回报与通胀</a><a href="#retire-contribution"><span>05</span>继续积累</a><a href="#retire-save"><span>06</span>确认计划</a></nav>
+    <div class="retire-settings-content">
+      <div class="retire-settings-caption"><span>所有金额按今天购买力填写</span><span><b>CNY</b> · <span class="font-mono">2026-11-05</span></span></div>
+      <form class="bracket-card retire-settings-form" onsubmit="return false">
+        <fieldset id="retire-life" class="retire-fieldset"><legend><span class="retire-section-no">01</span>生活安排</legend>
+          <div class="retire-form-grid">
+            <div><label class="field-label" for="name">目标名称</label><input class="field-input" id="name" value="退休生活账"></div>
+            <div><label class="field-label" for="targetMonth">希望退休的年月</label><input class="field-input font-mono" id="targetMonth" type="month" value="2036-11"></div>
+            <div><label class="field-label" for="expense">每月生活费 <span class="retire-unit">CNY / 月</span></label><input class="field-input field-input-num" id="expense" type="number" value="10000"><p class="retire-field-hint">含房租和经常性开销;已计入的费用不再单独预留。</p></div>
+            <div><label class="field-label" for="income">退休起的持续收入 <span class="retire-unit">CNY / 月</span></label><input class="field-input field-input-num" id="income" type="number" value="0"><p class="retire-field-hint">税后、从退休日即到账且保持购买力。以后才领的养老金不提前扣,没有则填 0。</p></div>
+          </div>
+          <div class="retire-reference"><div class="retire-reference-head"><span>账上消费参考 <span class="pill pill-mute">6 / 12 个定稿期</span></span><b class="font-mono">¥10,000.00 / 月</b></div>
+            <label class="retire-check"><input type="checkbox"><span>生活费跟随账上建议<span class="retire-field-hint">不勾选时,保留上面填写的计划金额。</span></span></label>
+            <label class="retire-check"><input type="checkbox" checked><span>剔除一次性消费<span class="retire-field-hint">含设为一次性的消费分类。</span></span></label>
+            <details class="retire-details"><summary>不计入生活预算的消费分类</summary><div class="retire-category-list"><label class="retire-check"><input type="checkbox"><span>教育</span></label><label class="retire-check"><input type="checkbox"><span>医疗</span></label></div></details>
+            <details class="retire-details"><summary>查看月份、来源及剔除额</summary><p class="retire-field-hint">2026-05 至 10,消费月均 ¥12,000;剔除单独预留的育儿 ¥2,000,生活费参考 ¥10,000 / 月。</p></details>
+          </div>
+          <div class="retire-confirmations"><label class="retire-check"><input type="checkbox"><span>生活预算已核对</span></label><label class="retire-check"><input type="checkbox"><span>持续收入的起领时间和购买力已核对,没有则为 0</span></label></div>
+        </fieldset>
+        <fieldset id="retire-assets" class="retire-fieldset"><legend><span class="retire-section-no">02</span>退休资金</legend><p class="retire-field-hint mb-4">选择准备拿来支付退休生活的资产。自住房、保单和其他实物默认不纳入;选中时须确认实际可变现金额。</p>
+          <div class="retire-asset-options">
+            <div class="retire-asset-row"><label class="retire-asset-choice"><input type="checkbox" checked><span class="retire-asset-body"><span class="retire-asset-title">家庭现金</span><span class="retire-field-hint">可选择用于退休</span></span><span class="retire-asset-amount font-mono">¥1,000,000.00</span></label></div>
+            <div class="retire-asset-row"><label class="retire-asset-choice"><input type="checkbox" checked><span class="retire-asset-body"><span class="retire-asset-title">长期投资</span><span class="retire-field-hint">可选择用于退休</span></span><span class="retire-asset-amount font-mono">¥5,000,000.00</span></label></div>
+            <div class="retire-asset-row"><label class="retire-asset-choice"><input type="checkbox"><span class="retire-asset-body"><span class="retire-asset-title">自住房</span><span class="retire-field-hint">默认不作生活本金</span></span><span class="retire-asset-amount font-mono">¥4,000,000.00</span></label><div class="retire-realizable"><label class="field-label" for="home">确认可变现金额 <span class="retire-unit">CNY</span></label><input class="field-input field-input-num" id="home" type="number" placeholder="未纳入时可留空"></div></div>
+          </div>
+          <div class="retire-debt-row"><span>全家庭负债 · 一次预留</span><b class="font-mono">¥100,000.00</b></div><p class="retire-field-hint">只从选定资产中扣一次。提前结清费用填入“其他预留”。</p><div class="retire-confirmations"><label class="retire-check"><input type="checkbox"><span>资金范围和可变现金额已核对,保额没有当作现金</span></label></div>
+        </fieldset>
+        <fieldset id="retire-reserves" class="retire-fieldset"><legend><span class="retire-section-no">03</span>单独预留</legend><p class="retire-field-hint mb-5">这些钱先留出来,不用于生活费生息。只填剩余未花的金额,无需预留填 0。</p>
+          <div class="retire-form-grid"><div><label class="field-label" for="child">剩余育儿费用 <span class="retire-unit">CNY</span></label><input class="field-input field-input-num" id="child" type="number" value="400000"></div><div><label class="field-label" for="medical">医疗现金储备 <span class="retire-unit">CNY</span></label><input class="field-input field-input-num" id="medical" type="number" value="300000"></div><div><label class="field-label" for="housing">住房净新增现金需求 <span class="retire-unit">CNY</span></label><input class="field-input field-input-num" id="housing" type="number" value="0"></div><div><label class="field-label" for="other">应急及其他预留 <span class="retire-unit">CNY</span></label><input class="field-input field-input-num" id="other" type="number" value="500000"></div></div>
+          <details class="retire-details mt-5"><summary>参考已有教育目标</summary><p class="retire-field-hint">目标额可能为未来价。“已积累”是全家资产进度,不代表另存的专款;请核对币值日期和剩余未花额。</p></details><div class="retire-confirmations"><label class="retire-check"><input type="checkbox"><span>各项都是剩余未花的金额,无需预留已填 0</span></label><label class="retire-check"><input type="checkbox"><span>已计入每月生活费的开销,没有再次预留</span></label></div>
+        </fieldset>
+        <fieldset id="retire-returns" class="retire-fieldset"><legend><span class="retire-section-no">04</span>回报与通胀</legend><p class="retire-field-hint mb-5">用于退休后的长期生活本金门槛。百分数填 4.5 即 4.5%;示例假设不代表收益承诺。</p>
+          <div class="retire-form-grid"><div><label class="field-label" for="nominal">税费后名义年回报 <span class="retire-unit">%</span></label><input class="field-input field-input-num" id="nominal" type="number" value="4.5"></div><div><label class="field-label" for="inflation">长期年通胀 <span class="retire-unit">%</span></label><input class="field-input field-input-num" id="inflation" type="number" value="2"></div></div>
+          <div class="retire-direct-rate"><label class="retire-check"><input type="checkbox"><span>直接填写实际年回报<span class="retire-field-hint">勾选后使用右侧实际回报,不再由名义回报扣通胀。</span></span></label><div><label class="field-label" for="real">实际年回报 <span class="retire-unit">%</span></label><input class="field-input field-input-num" id="real" type="number" value="2.5"></div></div>
+        </fieldset>
+        <fieldset id="retire-contribution" class="retire-fieldset"><legend><span class="retire-section-no">05</span>继续积累</legend><div class="retire-reference-head mb-5"><span>近 6 个定稿期净流入中位数</span><b class="font-mono">¥20,000.00 / 月</b></div>
+          <div class="retire-form-grid"><div><label class="field-label" for="contribution">每月留给退休的钱 <span class="retire-unit">CNY / 月</span></label><input class="field-input field-input-num" id="contribution" type="number" value="20000"></div><div><label class="field-label" for="growth">投入增长方式</label><select class="field-input" id="growth"><option>名义金额固定</option><option>随通胀增长</option></select></div></div>
+          <div class="retire-scenario-inputs mt-6"><div><label class="field-label" for="low">较低回报 <span class="retire-unit">%</span></label><input class="field-input field-input-num" id="low" type="number" value="2"></div><div><label class="field-label" for="mid">中间假设 <span class="retire-unit">%</span></label><input class="field-input field-input-num" id="mid" type="number" value="4.5"></div><div><label class="field-label" for="high">较高回报 <span class="retire-unit">%</span></label><input class="field-input field-input-num" id="high" type="number" value="6"></div></div><p class="retire-field-hint">三项均为积累期名义年回报,按低到高排列。它们改变积累路径,不改变退休生活本金门槛。</p>
+          <div class="retire-confirmations"><label class="retire-check"><input type="checkbox"><span>未来实际留给退休的金额已确认</span></label><label class="retire-check"><input type="checkbox"><span>如有负债,投入已考虑一次预留偿清后的家庭现金安排</span></label></div>
+        </fieldset>
+        <div id="retire-save" class="retire-form-actions"><a href="retirement.html" class="btn-ghost">取消</a><div><button type="button" class="btn-paper" onclick="location.href='retirement.html'">演算预览</button><button type="button" class="btn-ink" disabled>保存计划</button></div></div>
+      </form>
+    </div>
+  </div>
+</main>
+</body>
+</html>

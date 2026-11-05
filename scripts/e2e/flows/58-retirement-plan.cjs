@@ -44,6 +44,45 @@ async function dimensions(ui, label) {
     .every(el=>el.scrollWidth<=el.clientWidth+2)),label + ':表格长文本在单元格内换行');
 }
 
+async function settings(ui, label, reference) {
+  const fields = await ui.page.locator('#retirement-form input:not([type=hidden]):not([type=checkbox]), #retirement-form select').evaluateAll(inputs => inputs.map(el => {
+    const css=getComputedStyle(el), r=el.getBoundingClientRect();
+    return {name:el.name, type:el.type, shown:!!el.getClientRects().length, labelled:!!el.labels?.length,
+      border:[css.borderTopWidth,css.borderRightWidth,css.borderBottomWidth,css.borderLeftWidth],
+      background:css.backgroundColor, font:css.fontFamily, size:parseFloat(css.fontSize), align:css.textAlign,
+      unit:!!el.labels?.[0]?.querySelector('.retire-unit'), fits:r.right<=innerWidth+1 && r.left>=0};
+  }));
+  const visible=fields.filter(f=>f.shown);
+  await ui.assert(visible.every(f=>f.border.join(',')==='0px,0px,1px,0px' && f.background==='rgba(0, 0, 0, 0)'),label+':登记字段沿用账册下划线与透明底');
+  await ui.assert(fields.every(f=>f.labelled),label+':每个字段都有可读标签');
+  await ui.assert(visible.every(f=>f.size>=16 && f.fits),label+':输入字号不触发手机缩放且控件不出屏');
+  await ui.assert(visible.filter(f=>f.type==='number').every(f=>f.align==='right' && f.unit),label+':所有数值右对齐并标明金额或百分比单位');
+  if(reference) await ui.assert(visible.find(f=>f.name==='monthlyExpense').font===reference.font && visible.find(f=>f.name==='monthlyExpense').size===reference.size,label+':金额字体及字号与现有账户登记表一致');
+  await ui.assert(await ui.page.locator('#retirement-form .field-label').evaluateAll(labels=>labels.every(el=>parseFloat(getComputedStyle(el).fontSize)>=12)),label+':中文字段名不小于12px');
+  await ui.assert(await ui.page.locator('#retirement-form').evaluate(el=>el.getBoundingClientRect().width<=800),label+':表单限制填写宽度');
+  const expense=await ui.page.inputValue('[name="monthlyExpense"]');
+  await ui.click('.retire-details > summary:has-text("查看月份、来源及剔除额")','展开消费来源');
+  await ui.assert(await ui.page.inputValue('[name="monthlyExpense"]')===expense,label+':查看来源保留当前输入');
+  await ui.click('.retire-details > summary:has-text("查看月份、来源及剔除额")','收起消费来源');
+  await ui.click('.retire-settings-nav a[href="#retire-returns"]','按章节跳到回报设置');
+  await ui.assert(await ui.page.locator('#retire-returns').evaluate(el=>{
+    const r=el.getBoundingClientRect();return r.top>=64 && r.top<innerHeight-40;
+  }),label+':章节定位避开顶栏');
+  await ui.click('[data-retire-goto="principle"]','从设置打开公式来源');
+  await ui.visible('#retire-principle','原理视图实际打开');
+  await ui.click('[data-retire-tab="plan"]','回到计划保留输入');
+  await ui.assert(await ui.page.inputValue('[name="monthlyExpense"]')===expense,label+':切换原理再回来保留输入');
+  for(const selector of ['[data-retire-preview]','[data-retire-save]']) {
+    await ui.page.locator(selector).scrollIntoViewIfNeeded();
+    await ui.assert(await ui.page.locator(selector).evaluate(el=>{
+      const r=el.getBoundingClientRect(), hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);
+      return !!hit && (hit===el || el.contains(hit));
+    }),label+':操作按钮中心未被浮钮遮挡');
+  }
+  await ui.sameSize('.retire-form-actions button',label+':预览与保存同宽同高');
+  await ui.page.locator('#retirement-form').scrollIntoViewIfNeeded();
+}
+
 module.exports = {
   name:'58-retirement-plan', title:'退休透明公式 · 旧新采用/退出 · 来源同窗 · 三币种 · 双端',
   async run(ui,report) {
@@ -88,6 +127,13 @@ module.exports = {
     await ui.click('a[href="/goals/new"]','从目标页新建');
     await ui.click('a[href="/goals/new/retirement"]','选择退休目标');
     await ui.visible('#retirement-form','退休计划真实入口');
+    await ui.goto(`/accounts/${state.cash}/edit`);
+    const reference=await ui.page.locator('[name="displayOrder"]').evaluate(el=>{
+      const css=getComputedStyle(el);return {font:css.fontFamily,size:parseFloat(css.fontSize)};
+    });
+    await ui.goto('/goals/new/retirement');
+    await settings(ui,'新建计划',reference);
+    await screenshot(ui,'desktop-settings');
     await ui.assert(await ui.page.inputValue('[name="monthlyContribution"]') === '20000.00' ||
       Number(await ui.page.inputValue('[name="monthlyContribution"]'))===20000,'月投入建议包含旧总额和新账户收入,未停留在旧月份');
     await ui.assert(!(await ui.page.isChecked('[name="accountIds"][value="'+db.num(`SELECT id FROM account WHERE family_id=${state.family} AND type='PROPERTY'`)+'"]')),'自住房默认未纳入');
@@ -102,6 +148,13 @@ module.exports = {
     await ui.page.waitForLoadState('networkidle');
     state.native=db.num(`SELECT goal_id FROM retirement_plan WHERE family_id=${state.family} AND created_for_plan=1`);
     await ui.assert(!!state.native && db.num(`SELECT active FROM retirement_plan WHERE goal_id=${state.native}`)===1,'新方案已持久化并启用');
+    await ui.click('[data-retire-tab="plan"]','检查已保存计划的设置');
+    await settings(ui,'修改计划',reference);
+    const standardSize=await ui.page.locator('[name="monthlyExpense"]').evaluate(el=>parseFloat(getComputedStyle(el).fontSize));
+    await ui.click('#fs-menu summary','打开字号菜单'); await ui.click('#fs-menu [data-fs-opt="xl"]','切到特大字号');
+    await ui.assert(await ui.page.locator('[name="monthlyExpense"]').evaluate(el=>parseFloat(getComputedStyle(el).fontSize))>standardSize,'设置金额随全站字号档位放大');
+    await ui.assert(await ui.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'设置特大字号无横向溢出');
+    await ui.click('#fs-menu summary','恢复字号菜单'); await ui.click('#fs-menu [data-fs-opt="std"]','恢复标准字号');
     await ui.goto(`/goals/${state.native}/retirement`);
     await dimensions(ui,'电脑');
     await ui.assert(await ui.page.locator('#retirement-path').evaluate(el => {
@@ -168,6 +221,7 @@ module.exports = {
     await form(ui,state.prefix+'-adopted');
     await ui.click('[data-retire-save]','未确认采用不能迁移');
     await ui.seesText('请先比较旧新算法','服务端拦截未经确认的采用');
+    await screenshot(ui,'desktop-adoption');
     await ui.page.check('[name="adoptionConfirmed"]'); await ui.click('[data-retire-save]','确认采用新算法');
     await ui.assert(db.one(`SELECT CONCAT(params_json,'|',target_date,'|',target_value) FROM family_goal WHERE id=${state.legacy}`)===legacyBefore,'采用不覆盖原始目标参数');
     await ui.click('[data-retire-tab="plan"]','退出新算法入口');
@@ -181,7 +235,15 @@ module.exports = {
       await dimensions(mobile,'手机'); await screenshot(mobile,'mobile-overview');
       await mobile.click('[data-retire-tab="plan"]','手机调整计划');
       await mobile.assert(await mobile.page.locator('[data-retire-save]').count()===1,'手机仅一份表单与保存入口');
+      await settings(mobile,'手机修改计划');
+      await mobile.assert(await mobile.page.locator('.retire-check, .retire-settings-nav a').evaluateAll(els=>els.filter(el=>el.getClientRects().length).every(el=>el.getBoundingClientRect().height>=44)),'手机:确认与章节入口触摸高度足够');
+      for(const width of [320,390,951,390]) {
+        await mobile.page.setViewportSize({width,height:844}); await mobile.page.waitForTimeout(350);
+        await mobile.assert(await mobile.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'设置页宽度'+width+':折叠与展开无横向溢出');
+      }
       await screenshot(mobile,'mobile-plan');
+      for(const id of ['retire-life','retire-assets','retire-reserves','retire-returns','retire-contribution','retire-save'])
+        await mobile.page.locator('#'+id).screenshot({path:'/tmp/finance-v139-review/mobile-'+id+'.png'});
       await mobile.page.locator('summary').filter({hasText:'查看月份、来源及剔除额'}).click();
       await mobile.assert(await mobile.page.locator('#retire-plan .m-cards td').evaluateAll(cells => cells.filter(el=>el.getClientRects().length)
         .every(el=>el.scrollWidth<=el.clientWidth+2)),'手机:展开来源后日期与金额不挤出单元格');

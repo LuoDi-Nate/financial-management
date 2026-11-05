@@ -4,11 +4,17 @@
   if (!root) return;
   function tab(name) {
     if (!['overview', 'plan', 'principle'].includes(name)) name = 'overview';
+    root.dataset.tab = name;
     root.querySelectorAll('[data-retire-panel]').forEach(el => { el.hidden = el.dataset.retirePanel !== name; });
     root.querySelectorAll('[data-retire-tab]').forEach(el => el.setAttribute('aria-selected', String(el.dataset.retireTab === name)));
     if (name === 'overview') draw();
   }
   root.querySelectorAll('[data-retire-tab]').forEach(el => el.addEventListener('click', () => tab(el.dataset.retireTab)));
+  root.querySelectorAll('[data-retire-goto]').forEach(el => el.addEventListener('click', () => {
+    tab(el.dataset.retireGoto);
+    root.querySelector('.retire-tabs').scrollIntoView({block:'start'});
+  }));
+  root.querySelectorAll('#retirement-form input[type=number]').forEach(el => el.addEventListener('focus', () => el.select()));
   let chart;
   function draw() {
     const el = document.getElementById('retirement-path');

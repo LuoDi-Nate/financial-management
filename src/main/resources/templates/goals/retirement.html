@@ -7,16 +7,16 @@
 <link rel="stylesheet" th:href="@{/css/retirement.css(v=${buildVersion})}">
 <header th:replace="~{fragments/nav :: nav('goals', ${me}, ${nav})}"></header>
 <main class="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10 py-5 sm:py-10 relative z-10 retirement-page" th:attr="data-tab=${tab}">
-  <a th:href="@{/goals}" class="text-sm text-ink-soft">目标</a>
+  <nav class="retire-breadcrumb" aria-label="当前位置"><a th:href="@{/goals}">目标</a><span aria-hidden="true">/</span><span>退休计划</span></nav>
   <div class="retire-heading">
-    <div><div class="eyebrow mt-4 mb-2">退 · 休 · 生 · 活 · 账</div><h1 class="font-display text-3xl" th:text="${plan.name}">退休生活账</h1>
-      <p class="text-sm text-ink-soft mt-2">当前计划 · 购买力基准 <span th:text="${r.asOf()}"></span> · 资金账期 <span th:text="${view.data().balancePeriod() ?: '尚无'}"></span></p>
+    <div><div class="eyebrow mt-4 mb-2">退 · 休 · 生 · 活 · 账</div><h1 class="font-display text-4xl font-medium" th:text="${plan.name}">退休生活账</h1>
+      <p class="text-sm text-ink-soft mt-2"><span th:text="${goal == null ? '新建计划' : (activePlan ? '当前计划' : '方案比较')}"></span> · 购买力基准 <span class="font-mono tnum" th:text="${r.asOf()}"></span> · 资金账期 <span class="font-mono tnum" th:text="${view.data().balancePeriod() ?: '尚无'}"></span></p>
     </div>
     <a th:if="${activePlan}" th:href="@{|/goals/${goal.id}/retirement/export|}" class="btn-paper text-xs">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/></svg>导出测算</a>
   </div>
   <p th:if="${note != null}" th:text="${note}" role="status" class="text-forest my-4"></p>
-  <p th:if="${error != null}" th:text="${error}" role="alert" class="text-rust my-4"></p>
+  <div th:if="${error != null}" role="alert" class="retire-problems"><b class="block mb-1">计划还没有保存</b><p th:text="${error}"></p></div>
   <p th:if="${fxNote != null}" th:text="${fxNote}" role="status" class="text-rust my-4"></p>
   <p th:if="${previewing}" role="status" class="my-4 text-brass-deep">这是尚未保存的测算。账上事实与原目标均未改变。</p>
   <p th:if="${budgetChanged == true}" class="my-4 text-brass-deep" th:text="${plan.autoExpense} ? '定稿收支或剔除范围已变化,跟随账上的预算已更新,可展开来源核对。' : '定稿收支已变化,旁边建议已更新;你的固定预算保留。'"></p>
@@ -90,93 +90,149 @@
   </section>
 
   <section id="retire-plan" role="tabpanel" data-retire-panel="plan">
-    <h2 class="font-display text-2xl mb-2">调整计划</h2>
-    <p class="text-sm text-ink-soft mb-6">所有输入金额为 <b th:text="${plan.baseCurrency}"></b>,购买力日期 <span th:text="${plan.priceDate}"></span>。百分数直接填写 4.5,表示 4.5%。</p>
-    <form th:action="${formAction}" th:object="${plan}" method="post" id="retirement-form">
-      <fieldset class="retire-fieldset"><legend>生活安排</legend><div class="retire-form-grid">
-        <label>目标名称<input type="text" th:field="*{name}" maxlength="64" required></label>
-        <label>希望退休的年月<input type="month" th:field="*{targetMonth}" required></label>
-        <label>每月生活费 X<input type="number" min="0" step="0.01" th:field="*{monthlyExpense}" required></label>
-        <label>从退休日起的持续月收入 J<input type="number" min="0" step="0.01" th:field="*{monthlyIncome}" required></label>
-      </div>
-      <p class="text-sm text-ink-soft mt-3">J 只包括从计划退休日即持续到账、税后且能保持今天购买力的收入。未来才开始领的养老金不提前扣除。租金支出归入 X,自住不重复加房价。</p>
-      <label class="retire-check"><input type="checkbox" th:field="*{budgetConfirmed}">确认生活预算</label>
-      <label class="retire-check"><input type="checkbox" th:field="*{incomeConfirmed}">确认上述收入的开始时间和持续购买力;没有则为 0</label>
-      </fieldset>
-      <fieldset class="retire-fieldset"><legend>账上的支出参考</legend>
-        <p class="text-sm">实际 <b th:text="${#lists.size(view.data().months())}"></b>/12 个定稿期 · 账上建议 <b data-priv th:text="${T(com.family.finance.service.MoneyFormat).format2(plan.baseCurrency, view.data().suggestedExpense())}"></b>/月</p>
-        <p class="text-xs text-ink-soft mt-2">历史实录按下表列出;预算建议以所填通胀折到今天购买力。零值参与均值,未填不当零;总额月份无法拆分消费与还款,必须人工核对。</p>
-        <label class="retire-check"><input type="checkbox" th:field="*{autoExpense}">跟随已定稿的账上预算建议;未选择时保留手填计划值</label>
-        <label class="retire-check"><input type="checkbox" th:field="*{excludeOneOff}">剔除一次性消费(含设为一次性的消费分类)</label>
-        <details class="mt-3"><summary class="text-sm">不计入生活预算的消费分类</summary><div class="retire-category-list mt-3">
-          <label th:each="c : ${categoryChoices}"><input type="checkbox" th:field="*{excludedCategoryIds}" th:value="${c.id}"><span th:text="${c.name}"></span></label>
-        </div></details>
-        <ul class="text-xs text-rust mt-3"><li th:each="n : ${view.data().budgetNotes()}" th:text="${n}"></li></ul>
-        <details class="mt-4"><summary>查看月份、来源及剔除额</summary>
-          <table class="w-full m-cards text-sm mt-3"><thead><tr><th>账期</th><th>收入 / 支出</th><th>预算参考 / 剔除</th><th>来源</th></tr></thead><tbody>
-            <tr th:each="m : ${view.data().months()}"><td class="m-title" th:text="${#temporals.format(m.start(),'yyyy-MM-dd')}"></td>
-              <td class="m-full" data-label="收入 / 支出" data-priv th:text="${T(com.family.finance.service.MoneyFormat).format2(plan.baseCurrency,m.income())} + ' / ' + ${T(com.family.finance.service.MoneyFormat).format2(plan.baseCurrency,m.expense())}"></td>
-              <td class="m-full" data-label="预算 / 剔除" data-priv th:text="${T(com.family.finance.service.MoneyFormat).format2(plan.baseCurrency,m.consumption())} + ' / ' + ${T(com.family.finance.service.MoneyFormat).format2(plan.baseCurrency,m.removed())}"></td>
-              <td class="m-full" data-label="来源" th:text="${m.source()} + (${m.complete()} ? ' · 收支来源齐全' : ' · 收支来源未齐')"></td></tr>
-          </tbody></table>
-        </details>
-      </fieldset>
-      <fieldset class="retire-fieldset"><legend>单独预留 B</legend>
-        <div class="retire-form-grid">
-          <label>孩子剩余育儿费用合计<input type="number" min="0" step="0.01" th:field="*{childReserve}" required></label>
-          <label>家庭医疗现金储备<input type="number" min="0" step="0.01" th:field="*{medicalReserve}" required></label>
-          <label>住房净新增现金需求<input type="number" min="0" step="0.01" th:field="*{housingReserve}" required></label>
-          <label>应急及其他不动用的预留<input type="number" min="0" step="0.01" th:field="*{otherReserve}" required></label>
-        </div>
-        <div class="mt-4"><label>育儿费用的教育目标参考<select th:field="*{educationGoalId}"><option value="">不关联</option><option th:each="g : ${educationChoices}" th:value="${g.id}" th:text="${g.name + ' · 配置目标额 ' + g.targetValue + ' · 日期 ' + g.targetDate}"></option></select></label>
-          <p class="text-xs text-ink-soft mt-2">目标额可能为未来价,原币值年可能未记录。先核对剩余未花额;教育目标“已积累”是全家资产进度,不代表一份另存的专款。</p>
-          <label class="retire-check"><input type="checkbox" th:field="*{educationConfirmed}">如关联教育目标,我已核对币值日期和剩余费用</label>
-        </div>
-        <label class="retire-check"><input type="checkbox" th:field="*{reservesConfirmed}">各项已核对为剩余未花金额;无需预留已明确填 0</label>
-        <label class="retire-check"><input type="checkbox" th:field="*{noOverlapConfirmed}">相同开销只归一处,已计入月生活费的没有再次预留</label>
-      </fieldset>
-      <fieldset class="retire-fieldset"><legend>退休资金范围 A 与负债 D</legend>
-        <div class="retire-asset-options"><label th:each="a : ${view.data().assets()}" th:unless="${a.liability()}">
-          <span class="retire-asset-title"><input type="checkbox" th:field="*{accountIds}" th:value="${a.id()}"><span th:text="${a.name()}"></span></span>
-          <span class="text-xs text-ink-soft" data-priv th:text="${T(com.family.finance.service.MoneyFormat).format2(plan.baseCurrency,a.amount())} + ' · ' + ${a.note()}"></span>
-          <input th:if="${!a.eligible()}" type="number" min="0" step="0.01" th:name="${'realizableAmounts[' + a.id() + ']'}" th:value="${plan.realizableAmounts[a.id()]}" placeholder="确认可变现金额(本位币)" aria-label="确认可变现金额">
-        </label></div>
-        <p class="text-sm mt-4">全家庭负债统一预留 <b data-priv th:text="${T(com.family.finance.service.MoneyFormat).format2(plan.baseCurrency,view.data().debt())}"></b>,只从资产扣一次。提前结清费用另填“其他预留”。</p>
-        <label class="retire-check"><input type="checkbox" th:field="*{assetsConfirmed}">确认资金范围及可变现金额,不将保额当作现金</label>
-      </fieldset>
-      <fieldset class="retire-fieldset"><legend>长期回报与通胀</legend>
-        <div class="retire-form-grid"><label>税费后名义年回报 R(%)<input type="number" min="-99" max="100" step="0.01" th:field="*{nominalReturnPct}" required></label>
-          <label>长期年通胀 π(%)<input type="number" min="0" max="15" step="0.01" th:field="*{inflationPct}" required></label></div>
-        <p class="text-xs text-ink-soft mt-2" th:text="${view.data().cpiReference()}"></p>
-        <label class="retire-check"><input type="checkbox" th:field="*{directRealRate}">直接使用下面的实际年回报(不再次扣通胀)</label>
-        <label class="retire-inline-number">实际年回报 r(%)<input type="number" min="-99" max="100" step="0.01" th:field="*{realReturnPct}" required></label>
-        <p class="text-xs text-ink-soft mt-2">默认值是示例假设,不是收益承诺。直接填 2.5% 可复现视频的 480 倍简算;名义 4.5%、通胀 2% 的精确倍数为 489.6。</p>
-      </fieldset>
-      <fieldset class="retire-fieldset"><legend>积累期的投入与三情景</legend>
-        <p class="text-sm mb-3">最近 6 个定稿期净流入中位数参考 <b data-priv th:text="${T(com.family.finance.service.MoneyFormat).format2(plan.baseCurrency,view.data().suggestedContribution())}"></b>。未齐全的月份未当作 0,未来留给退休的份额由你确认。</p>
-        <div class="retire-form-grid"><label>未来每月计划投入 C<input type="number" step="0.01" th:field="*{monthlyContribution}" required></label>
-          <label>投入增长方式<select th:field="*{contributionFollowsInflation}"><option value="false">名义金额固定</option><option value="true">随通胀增长</option></select></label></div>
-        <div class="retire-form-grid mt-4"><label>低情景名义回报(%)<input type="number" min="-99" max="100" step="0.01" th:field="*{lowReturnPct}" required></label>
-          <label>中情景名义回报(%)<input type="number" min="-99" max="100" step="0.01" th:field="*{middleReturnPct}" required></label>
-          <label>高情景名义回报(%)<input type="number" min="-99" max="100" step="0.01" th:field="*{highReturnPct}" required></label></div>
-        <label class="retire-check"><input type="checkbox" th:field="*{contributionConfirmed}">确认未来每月实际留给退休的金额,允许负数表示净流出</label>
-        <label class="retire-check"><input type="checkbox" th:field="*{afterDebtConfirmed}">如有负债,此投入已考虑一次预留偿清之后的家庭现金安排</label>
-      </fieldset>
+    <div class="retire-settings-layout">
+      <nav class="retire-settings-nav" aria-label="计划设置章节">
+        <div class="eyebrow-ink mb-3">计 · 划 · 设 · 置</div>
+        <a href="#retire-life"><span>01</span>生活安排</a>
+        <a href="#retire-assets"><span>02</span>退休资金</a>
+        <a href="#retire-reserves"><span>03</span>单独预留</a>
+        <a href="#retire-returns"><span>04</span>回报与通胀</a>
+        <a href="#retire-contribution"><span>05</span>继续积累</a>
+        <a href="#retire-save"><span>06</span>确认计划</a>
+      </nav>
+      <div class="retire-settings-content">
+        <div class="retire-settings-caption"><span>所有金额按今天购买力填写</span><span><b th:text="${plan.baseCurrency}"></b> · <span class="font-mono tnum" th:text="${plan.priceDate}"></span></span></div>
+        <form th:action="${formAction}" th:object="${plan}" method="post" id="retirement-form" class="bracket-card retire-settings-form">
+          <fieldset id="retire-life" class="retire-fieldset">
+            <legend><span class="retire-section-no">01</span>生活安排</legend>
+            <div class="retire-form-grid">
+              <div><label class="field-label" for="name">目标名称</label><input class="field-input" type="text" th:field="*{name}" maxlength="64" required></div>
+              <div><label class="field-label" for="targetMonth">希望退休的年月</label><input class="field-input font-mono tnum" type="month" th:field="*{targetMonth}" required></div>
+              <div>
+                <label class="field-label" for="monthlyExpense">每月生活费 <span class="retire-unit" th:text="${plan.baseCurrency + ' / 月'}"></span></label>
+                <input class="field-input field-input-num" inputmode="decimal" type="number" min="0" step="0.01" th:field="*{monthlyExpense}" required aria-describedby="retire-expense-hint">
+                <p class="retire-field-hint" id="retire-expense-hint">含房租和经常性开销;已计入的费用不再单独预留。</p>
+              </div>
+              <div>
+                <label class="field-label" for="monthlyIncome">退休起的持续收入 <span class="retire-unit" th:text="${plan.baseCurrency + ' / 月'}"></span></label>
+                <input class="field-input field-input-num" inputmode="decimal" type="number" min="0" step="0.01" th:field="*{monthlyIncome}" required aria-describedby="retire-income-hint">
+                <p class="retire-field-hint" id="retire-income-hint">税后、从退休日即到账且保持购买力。以后才领的养老金不提前扣,没有则填 0。</p>
+              </div>
+            </div>
+            <div class="retire-reference">
+              <div class="retire-reference-head"><span>账上消费参考 <span class="pill pill-mute" th:text="${#lists.size(view.data().months()) + ' / 12 个定稿期'}"></span></span><b class="font-mono tnum" data-priv th:text="${T(com.family.finance.service.MoneyFormat).format2(plan.baseCurrency,view.data().suggestedExpense()) + ' / 月'}"></b></div>
+              <label class="retire-check"><input type="checkbox" th:field="*{autoExpense}"><span>生活费跟随账上建议<span class="retire-field-hint">不勾选时,保留上面填写的计划金额。</span></span></label>
+              <label class="retire-check"><input type="checkbox" th:field="*{excludeOneOff}"><span>剔除一次性消费<span class="retire-field-hint">含设为一次性的消费分类。</span></span></label>
+              <details class="retire-details"><summary>不计入生活预算的消费分类</summary><div class="retire-category-list">
+                <label th:each="c : ${categoryChoices}" class="retire-check"><input type="checkbox" th:field="*{excludedCategoryIds}" th:value="${c.id}"><span th:text="${c.name}"></span></label>
+              </div></details>
+              <ul th:if="${!view.data().budgetNotes().isEmpty()}" class="retire-field-hint text-rust"><li th:each="n : ${view.data().budgetNotes()}" th:text="${n}"></li></ul>
+              <details class="retire-details"><summary>查看月份、来源及剔除额</summary>
+                <p class="retire-field-hint mb-3">建议按所填通胀折到今天购买力。零值参与均值,未填不当零;无法拆分消费与还款的总额月份需人工核对。</p>
+                <table class="ledger-table w-full m-cards text-sm"><thead><tr><th>账期</th><th>收入 / 支出</th><th>预算参考 / 剔除</th><th>来源</th></tr></thead><tbody>
+                  <tr th:each="m : ${view.data().months()}"><td class="m-title font-mono tnum" th:text="${#temporals.format(m.start(),'yyyy-MM-dd')}"></td>
+                    <td class="m-full num" data-label="收入 / 支出" data-priv th:text="${T(com.family.finance.service.MoneyFormat).format2(plan.baseCurrency,m.income())} + ' / ' + ${T(com.family.finance.service.MoneyFormat).format2(plan.baseCurrency,m.expense())}"></td>
+                    <td class="m-full num" data-label="预算 / 剔除" data-priv th:text="${T(com.family.finance.service.MoneyFormat).format2(plan.baseCurrency,m.consumption())} + ' / ' + ${T(com.family.finance.service.MoneyFormat).format2(plan.baseCurrency,m.removed())}"></td>
+                    <td class="m-full" data-label="来源" th:text="${m.source()} + (${m.complete()} ? ' · 收支来源齐全' : ' · 收支来源未齐')"></td></tr>
+                </tbody></table>
+              </details>
+            </div>
+            <div class="retire-confirmations">
+              <label class="retire-check"><input type="checkbox" th:field="*{budgetConfirmed}"><span>生活预算已核对</span></label>
+              <label class="retire-check"><input type="checkbox" th:field="*{incomeConfirmed}"><span>持续收入的起领时间和购买力已核对,没有则为 0</span></label>
+            </div>
+          </fieldset>
+          <fieldset id="retire-assets" class="retire-fieldset">
+            <legend><span class="retire-section-no">02</span>退休资金</legend>
+            <p class="retire-field-hint mb-4">选择准备拿来支付退休生活的资产。自住房、保单和其他实物默认不纳入;选中时须确认实际可变现金额。</p>
+            <div class="retire-asset-options">
+              <div class="retire-asset-row" th:each="a : ${view.data().assets()}" th:unless="${a.liability()}">
+                <label class="retire-asset-choice">
+                  <input type="checkbox" th:field="*{accountIds}" th:value="${a.id()}">
+                  <span class="retire-asset-body"><span class="retire-asset-title" th:text="${a.name()}"></span><span class="retire-field-hint" th:text="${a.note()}"></span></span>
+                  <span class="retire-asset-amount font-mono tnum" data-priv th:text="${T(com.family.finance.service.MoneyFormat).format2(plan.baseCurrency,a.amount())}"></span>
+                </label>
+                <div th:if="${!a.eligible()}" class="retire-realizable">
+                  <label class="field-label" th:for="${'realizable-' + a.id()}">确认可变现金额 <span class="retire-unit" th:text="${plan.baseCurrency}"></span></label>
+                  <input class="field-input field-input-num" type="number" inputmode="decimal" min="0" step="0.01" th:id="${'realizable-' + a.id()}" th:name="${'realizableAmounts[' + a.id() + ']'}" th:value="${plan.realizableAmounts[a.id()]}" placeholder="未纳入时可留空">
+                </div>
+              </div>
+            </div>
+            <p th:if="${view.data().assets().isEmpty()}" class="retire-field-hint py-4">还没有账户余额。<a th:href="@{/entry}" class="text-brass-deep underline">去填报余额</a></p>
+            <div class="retire-debt-row"><span>全家庭负债 · 一次预留</span><b class="font-mono tnum" data-priv th:text="${T(com.family.finance.service.MoneyFormat).format2(plan.baseCurrency,view.data().debt())}"></b></div>
+            <p class="retire-field-hint">只从选定资产中扣一次。提前结清费用填入“其他预留”。</p>
+            <div class="retire-confirmations"><label class="retire-check"><input type="checkbox" th:field="*{assetsConfirmed}"><span>资金范围和可变现金额已核对,保额没有当作现金</span></label></div>
+          </fieldset>
+          <fieldset id="retire-reserves" class="retire-fieldset">
+            <legend><span class="retire-section-no">03</span>单独预留</legend>
+            <p class="retire-field-hint mb-5">这些钱先留出来,不用于生活费生息。只填剩余未花的金额,无需预留填 0。</p>
+            <div class="retire-form-grid">
+              <div><label class="field-label" for="childReserve">剩余育儿费用 <span class="retire-unit" th:text="${plan.baseCurrency}"></span></label><input class="field-input field-input-num" inputmode="decimal" type="number" min="0" step="0.01" th:field="*{childReserve}" required></div>
+              <div><label class="field-label" for="medicalReserve">医疗现金储备 <span class="retire-unit" th:text="${plan.baseCurrency}"></span></label><input class="field-input field-input-num" inputmode="decimal" type="number" min="0" step="0.01" th:field="*{medicalReserve}" required></div>
+              <div><label class="field-label" for="housingReserve">住房净新增现金需求 <span class="retire-unit" th:text="${plan.baseCurrency}"></span></label><input class="field-input field-input-num" inputmode="decimal" type="number" min="0" step="0.01" th:field="*{housingReserve}" required></div>
+              <div><label class="field-label" for="otherReserve">应急及其他预留 <span class="retire-unit" th:text="${plan.baseCurrency}"></span></label><input class="field-input field-input-num" inputmode="decimal" type="number" min="0" step="0.01" th:field="*{otherReserve}" required></div>
+            </div>
+            <details class="retire-details mt-5" th:open="${plan.educationGoalId != null}"><summary>参考已有教育目标</summary>
+              <label class="field-label mt-3" for="educationGoalId">关联教育目标</label>
+              <select class="field-input bg-transparent" th:field="*{educationGoalId}"><option value="">不关联</option><option th:each="g : ${educationChoices}" th:value="${g.id}" th:text="${g.name + ' · 配置目标额 ' + g.targetValue + ' · 日期 ' + g.targetDate}"></option></select>
+              <p class="retire-field-hint">目标额可能为未来价。“已积累”是全家资产进度,不代表另存的专款;请核对币值日期和剩余未花额。</p>
+              <label class="retire-check"><input type="checkbox" th:field="*{educationConfirmed}"><span>关联目标的币值日期和剩余费用已核对</span></label>
+            </details>
+            <div class="retire-confirmations">
+              <label class="retire-check"><input type="checkbox" th:field="*{reservesConfirmed}"><span>各项都是剩余未花的金额,无需预留已填 0</span></label>
+              <label class="retire-check"><input type="checkbox" th:field="*{noOverlapConfirmed}"><span>已计入每月生活费的开销,没有再次预留</span></label>
+            </div>
+          </fieldset>
+          <fieldset id="retire-returns" class="retire-fieldset">
+            <legend><span class="retire-section-no">04</span>回报与通胀</legend>
+            <p class="retire-field-hint mb-5">用于退休后的长期生活本金门槛。百分数填 4.5 即 4.5%;示例假设不代表收益承诺。</p>
+            <div class="retire-form-grid">
+              <div><label class="field-label" for="nominalReturnPct">税费后名义年回报 <span class="retire-unit">%</span></label><input class="field-input field-input-num" inputmode="decimal" type="number" min="-99" max="100" step="0.01" th:field="*{nominalReturnPct}" required></div>
+              <div><label class="field-label" for="inflationPct">长期年通胀 <span class="retire-unit">%</span></label><input class="field-input field-input-num" inputmode="decimal" type="number" min="0" max="15" step="0.01" th:field="*{inflationPct}" required><p class="retire-field-hint" th:text="${view.data().cpiReference()}"></p></div>
+            </div>
+            <div class="retire-direct-rate">
+              <label class="retire-check"><input type="checkbox" th:field="*{directRealRate}"><span>直接填写实际年回报<span class="retire-field-hint">勾选后使用右侧实际回报,不再由名义回报扣通胀。</span></span></label>
+              <div><label class="field-label" for="realReturnPct">实际年回报 <span class="retire-unit">%</span></label><input class="field-input field-input-num" inputmode="decimal" type="number" min="-99" max="100" step="0.01" th:field="*{realReturnPct}" required></div>
+            </div>
+            <p class="retire-field-hint">实际回报 2.5% 对应视频的 480 倍简算;名义回报 4.5%、通胀 2% 的精确倍数为 489.6。<button type="button" class="retire-text-link" data-retire-goto="principle">看原理与原视频</button></p>
+          </fieldset>
+          <fieldset id="retire-contribution" class="retire-fieldset">
+            <legend><span class="retire-section-no">05</span>继续积累</legend>
+            <div class="retire-reference-head mb-5"><span>近 6 个定稿期净流入中位数</span><b class="font-mono tnum" data-priv th:text="${T(com.family.finance.service.MoneyFormat).format2(plan.baseCurrency,view.data().suggestedContribution()) + ' / 月'}"></b></div>
+            <div class="retire-form-grid">
+              <div><label class="field-label" for="monthlyContribution">每月留给退休的钱 <span class="retire-unit" th:text="${plan.baseCurrency + ' / 月'}"></span></label><input class="field-input field-input-num" inputmode="decimal" type="number" step="0.01" th:field="*{monthlyContribution}" required><p class="retire-field-hint">由你确认未来投入;允许负数,表示净流出。</p></div>
+              <div><label class="field-label" for="contributionFollowsInflation">投入增长方式</label><select class="field-input bg-transparent" th:field="*{contributionFollowsInflation}"><option value="false">名义金额固定</option><option value="true">随通胀增长</option></select></div>
+            </div>
+            <div class="retire-scenario-inputs mt-6">
+              <div><label class="field-label" for="lowReturnPct">较低回报 <span class="retire-unit">%</span></label><input class="field-input field-input-num" inputmode="decimal" type="number" min="-99" max="100" step="0.01" th:field="*{lowReturnPct}" required></div>
+              <div><label class="field-label" for="middleReturnPct">中间假设 <span class="retire-unit">%</span></label><input class="field-input field-input-num" inputmode="decimal" type="number" min="-99" max="100" step="0.01" th:field="*{middleReturnPct}" required></div>
+              <div><label class="field-label" for="highReturnPct">较高回报 <span class="retire-unit">%</span></label><input class="field-input field-input-num" inputmode="decimal" type="number" min="-99" max="100" step="0.01" th:field="*{highReturnPct}" required></div>
+            </div>
+            <p class="retire-field-hint">三项均为积累期名义年回报,按低到高排列。它们改变积累路径,不改变退休生活本金门槛。</p>
+            <div class="retire-confirmations">
+              <label class="retire-check"><input type="checkbox" th:field="*{contributionConfirmed}"><span>未来实际留给退休的金额已确认</span></label>
+              <label class="retire-check"><input type="checkbox" th:field="*{afterDebtConfirmed}"><span>如有负债,投入已考虑一次预留偿清后的家庭现金安排</span></label>
+            </div>
+          </fieldset>
       <section th:if="${legacy != null}" class="retire-compare">
         <h3 class="font-display text-xl mb-3">采用前:旧新算法比较</h3>
         <table class="w-full m-cards text-sm"><thead><tr><th>口径</th><th>本金 / 门槛</th><th>资金与假设</th></tr></thead><tbody>
-          <tr><td class="m-title">旧算法 · 保留原目标</td><td data-label="本金 / 门槛" data-priv th:text="${T(com.family.finance.service.MoneyFormat).format2(plan.baseCurrency,legacy.pv())} + ' / ' + ${T(com.family.finance.service.MoneyFormat).format2(plan.baseCurrency,legacy.target())}"></td><td data-label="假设">全家庭净资产、原提款率与未来价目标</td></tr>
-          <tr><td class="m-title">新方案 · 尚未采用</td><td data-label="本金 / 门槛" data-priv th:text="${T(com.family.finance.service.MoneyFormat).format2(plan.baseCurrency,r.principal())} + ' / ' + ${T(com.family.finance.service.MoneyFormat).format2(plan.baseCurrency,r.target())}"></td><td data-label="假设">选定资金减负债与预留、实际回报、今天购买力</td></tr>
+          <tr><td class="m-title">旧算法 · 保留原目标</td><td class="m-full" data-label="本金 / 门槛" data-priv th:text="${T(com.family.finance.service.MoneyFormat).format2(plan.baseCurrency,legacy.pv())} + ' / ' + ${T(com.family.finance.service.MoneyFormat).format2(plan.baseCurrency,legacy.target())}"></td><td class="m-full" data-label="假设">全家庭净资产、原提款率与未来价目标</td></tr>
+          <tr><td class="m-title">新方案 · 尚未采用</td><td class="m-full" data-label="本金 / 门槛" data-priv th:text="${T(com.family.finance.service.MoneyFormat).format2(plan.baseCurrency,r.principal())} + ' / ' + ${T(com.family.finance.service.MoneyFormat).format2(plan.baseCurrency,r.target())}"></td><td class="m-full" data-label="假设">选定资金减负债与预留、实际回报、今天购买力</td></tr>
         </tbody></table>
         <label class="retire-check"><input type="checkbox" name="adoptionConfirmed" value="true">已比较,确认采用新方案;原参数保留,以后可退出</label>
       </section>
-      <div class="retire-form-actions"><button type="submit" th:formaction="${formAction + '/preview'}" class="btn-paper" data-retire-preview>演算预览</button>
-        <button type="submit" class="btn-ink" data-retire-save th:text="${adopting} ? '确认采用新方案' : '保存计划'">保存计划</button>
-        <a th:href="${goal == null ? '/goals' : '/goals/' + goal.id}" class="btn-ghost">返回目标</a></div>
+      <div id="retire-save" class="retire-form-actions">
+        <a th:href="${goal == null ? '/goals' : '/goals/' + goal.id}" class="btn-ghost">取消</a>
+        <div><button type="submit" th:formaction="${formAction + '/preview'}" class="btn-paper" data-retire-preview><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h2m4 0h2m-8 4h2m4 0h2m-8 3h2m4 0h2"/></svg>演算预览</button>
+          <button type="submit" class="btn-ink" data-retire-save><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg><span th:text="${adopting} ? '确认采用新方案' : '保存计划'">保存计划</span></button></div>
+      </div>
     </form>
     <form th:if="${activePlan and !nativePlan}" th:action="@{|/goals/${goal.id}/retirement/revert|}" method="post" class="mt-8 border-t border-rule pt-4">
       <button type="submit" class="btn-paper text-xs" data-retire-revert>退出新算法,恢复原目标参数</button>
     </form>
+      </div>
+    </div>
   </section>
 
   <section id="retire-principle" role="tabpanel" data-retire-panel="principle">
