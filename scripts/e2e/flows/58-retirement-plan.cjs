@@ -135,7 +135,7 @@ module.exports = {
         VALUES(${state.family},'MONTHLY',DATE_SUB('${current}',INTERVAL ${back} MONTH),LAST_DAY(DATE_SUB('${current}',INTERVAL ${back} MONTH)),'${back?'CLOSED':'OPEN'}')`);
       const pid=db.num(`SELECT id FROM period WHERE family_id=${state.family} AND period_start=DATE_SUB('${current}',INTERVAL ${back} MONTH)`);
       db.raw(`INSERT INTO period_snapshot(period_id,account_id,end_balance,submitted_by,source_tag)
-        SELECT ${pid},id,CASE WHEN currency='USD' THEN 100000 WHEN type='CASH' THEN 6100000 WHEN type='LOAN' THEN 100000 ELSE 10000000 END,${state.member},'MANUAL'
+        SELECT ${pid},id,CASE WHEN currency='USD' THEN 100000 WHEN type='CASH' THEN 6100000 WHEN type='LOAN' THEN -100000 ELSE 10000000 END,${state.member},'MANUAL'
         FROM account WHERE family_id=${state.family}`);
       db.raw(`INSERT INTO fx_rate(family_id,period_id,base_currency,quote_currency,rate,source) VALUES
         (${state.family},${pid},'CNY','USD',0.125,'MANUAL'),(${state.family},${pid},'CNY','HKD',1.1,'MANUAL')`);
@@ -268,7 +268,7 @@ module.exports = {
         DATE_SUB('${current}',INTERVAL ${back} MONTH),LAST_DAY(DATE_SUB('${current}',INTERVAL ${back} MONTH)),'CLOSED')`);
       const pid=db.num(`SELECT id FROM period WHERE family_id=${state.family} AND period_start=DATE_SUB('${current}',INTERVAL ${back} MONTH)`);
       db.raw(`INSERT INTO period_snapshot(period_id,account_id,end_balance,submitted_by,source_tag) SELECT ${pid},id,
-        CASE WHEN currency='USD' THEN 100000 WHEN type='CASH' THEN 6100000 WHEN type='LOAN' THEN 100000 ELSE 10000000 END,${state.member},'MANUAL' FROM account WHERE family_id=${state.family}`);
+        CASE WHEN currency='USD' THEN 100000 WHEN type='CASH' THEN 6100000 WHEN type='LOAN' THEN -100000 ELSE 10000000 END,${state.member},'MANUAL' FROM account WHERE family_id=${state.family}`);
       db.raw(`INSERT INTO fx_rate(family_id,period_id,base_currency,quote_currency,rate,source) VALUES(${state.family},${pid},'CNY','USD',0.2,'MANUAL')`);
     }
     await ui.goto(`/goals/${state.native}/retirement?tab=plan`);

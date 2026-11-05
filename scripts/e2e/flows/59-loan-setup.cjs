@@ -17,7 +17,7 @@ module.exports={
       db.raw(`INSERT INTO period(family_id,period_type,period_start,period_end,status) VALUES(${f},'MONTHLY',DATE_SUB(DATE_FORMAT(CURDATE(),'%Y-%m-01'),INTERVAL ${back} MONTH),LAST_DAY(DATE_SUB(CURDATE(),INTERVAL ${back} MONTH)),'${back?'CLOSED':'OPEN'}')`);
       const p=db.num(`SELECT id FROM period WHERE family_id=${f} ORDER BY period_start DESC LIMIT 1`);
       if(!back) state.current=p;
-      db.raw(`INSERT INTO period_snapshot(period_id,account_id,end_balance,submitted_by,source_tag) SELECT ${p},id,CASE display_name WHEN 'cash' THEN 10000 WHEN 'settled' THEN 0 ELSE ${back===2?1000:back===1?900:800} END,${m},IF(display_name='carried' AND ${back}=0,'CARRIED_FORWARD','MANUAL') FROM account WHERE family_id=${f}`);
+      db.raw(`INSERT INTO period_snapshot(period_id,account_id,end_balance,submitted_by,source_tag) SELECT ${p},id,CASE display_name WHEN 'cash' THEN 10000 WHEN 'settled' THEN 0 ELSE -${back===2?1000:back===1?900:800} END,${m},IF(display_name='carried' AND ${back}=0,'CARRIED_FORWARD','MANUAL') FROM account WHERE family_id=${f}`);
     }
     const carried=state.carried=db.num(`SELECT id FROM account WHERE family_id=${f} AND display_name='carried'`),submitted=db.num(`SELECT id FROM account WHERE family_id=${f} AND display_name='submitted'`);
     const cash=db.num(`SELECT id FROM account WHERE family_id=${f} AND display_name='cash'`);
