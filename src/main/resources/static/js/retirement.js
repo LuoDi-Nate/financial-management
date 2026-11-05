@@ -31,6 +31,7 @@
     }
   }
   let timer, request, generation = 0;
+  const draftStatus = document.getElementById('retire-draft-status');
   async function recalculate() {
     const current = ++generation;
     if (request) request.abort();
@@ -43,7 +44,8 @@
       if (!response.ok) throw new Error('preview');
       const page = new DOMParser().parseFromString(await response.text(), 'text/html');
       const json = page.getElementById('retirement-chart-data');
-      if (!json || current !== generation) return;
+      if (current !== generation) return;
+      if (!json) throw new Error('preview result missing');
       const data = JSON.parse(json.textContent);
       root.querySelectorAll('[data-retire-live]').forEach(el => {
         const next = page.querySelector('[data-retire-live="' + el.dataset.retireLive + '"]');
@@ -54,12 +56,17 @@
       });
       chartData = data; if (root.dataset.tab === 'overview') draw();
       status.textContent = '演算已更新,尚未保存。';
+      draftStatus.hidden = false; draftStatus.textContent = '这是尚未保存的测算。';
     } catch (error) {
-      if (error.name !== 'AbortError') status.textContent = '自动演算未完成,可点击演算预览重试。';
+      if (error.name !== 'AbortError') {
+        status.textContent = '自动演算未完成,可点击演算预览重试。';
+        draftStatus.hidden = false; draftStatus.textContent = '计划调整尚未保存,演算未完成。';
+      }
     }
   }
   function changed(event) {
     if (!event.target.form || event.target.form.id !== form.id) return;
+    draftStatus.hidden = false; draftStatus.textContent = '计划调整尚未保存。';
     if (event.target.name === 'dependentCount') children();
     modes(); clearTimeout(timer); timer = setTimeout(recalculate, 450);
   }

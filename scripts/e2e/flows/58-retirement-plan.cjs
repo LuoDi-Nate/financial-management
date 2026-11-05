@@ -177,6 +177,7 @@ module.exports = {
     await ui.page.check('[name="cityTier"][value="FIRST"]');
     await ui.page.waitForFunction(()=>document.querySelector('[data-retire-live="reserves"]').textContent.includes('288,000.00'));
     await ui.assert((await ui.page.locator('[data-retire-live="reserves"]').innerText()).includes('300,000.00'),'一线切换实际重算教育、医疗与应急');
+    await ui.visible('#retire-draft-status','动态演算明确标为未保存草稿');
     await ui.assert(db.num(`SELECT COUNT(*) FROM retirement_plan WHERE family_id=${state.family}`)===0,'城市切换与自动演算不保存计划');
     await ui.choose('returnSource','AUTO');
     await ui.page.waitForFunction(()=>/本次名义年回报\s*待补齐/.test(document.querySelector('[data-retire-live="rates"]').textContent));
@@ -195,6 +196,7 @@ module.exports = {
     await ui.page.waitForLoadState('networkidle');
     state.native=db.num(`SELECT goal_id FROM retirement_plan WHERE family_id=${state.family} AND created_for_plan=1`);
     await ui.assert(!!state.native && db.num(`SELECT active FROM retirement_plan WHERE goal_id=${state.native}`)===1,'新方案已持久化并启用');
+    await ui.notVisible('#retire-draft-status','保存后回到正式计划,草稿提示消失');
     await ui.click('[data-retire-tab="plan"]','检查已保存计划的设置');
     await settings(ui,'修改计划',reference);
     const standardSize=await ui.page.locator('[name="monthlyExpense"]').evaluate(el=>parseFloat(getComputedStyle(el).fontSize));
@@ -221,6 +223,7 @@ module.exports = {
       await ui.assert((await ui.page.locator('[data-retire-value="coverage"]').innerText()).includes('100.00%'),'覆盖率不随显示币种变化');
     }
     await ui.click('[data-retire-tab="principle"]','打开原理');
+    await ui.assert((await ui.page.locator('[data-retire-live="math"]').innerText()).includes('HK$5,280,000.00'),'原理页代入同一份结果与显示币种');
     await ui.visible('a[href="https://www.bilibili.com/video/BV1yUHP6rEYD/"]','原视频直达链接');
     await ui.assert(await ui.page.locator('a[href*="BV1yUHP6rEYD"]').getAttribute('referrerpolicy')==='no-referrer','来源外链不带家庭来源数据');
     await screenshot(ui,'desktop-principle');

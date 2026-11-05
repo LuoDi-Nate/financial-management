@@ -75,7 +75,7 @@
         role="status"
         class="text-rust my-4"
       ></p>
-      <p th:if="${previewing}" role="status" class="my-4 text-brass-deep">
+      <p id="retire-draft-status" th:hidden="${!previewing}" role="status" class="my-4 text-brass-deep">
         这是尚未保存的测算。
       </p>
       <p
@@ -1351,13 +1351,29 @@
         data-retire-panel="principle"
       >
         <h2 class="font-display text-2xl mb-5">每一步都能复算</h2>
-        <div class="retire-formulas">
+        <div class="retire-formulas" data-retire-live="math">
           <p>r = (1 + R) ÷ (1 + π) − 1</p>
+          <p th:unless="${view.effective().directRealRate}">
+            本次 R = <b th:text="${view.effective().nominalReturnPct==null?'待补齐':view.effective().nominalReturnPct+'%'}"></b>,
+            π = <b th:text="${view.effective().inflationPct==null?'待补齐':view.effective().inflationPct+'%'}"></b>
+          </p>
+          <p>本次实际回报 r = <b th:text="${r.realRate()==null?'待补齐':#numbers.formatDecimal(r.realRate()*100,1,6)+'%'}"></b>
+            <span th:if="${view.effective().directRealRate}"> · 直接填写</span>
+          </p>
           <p>P = 可支用资产 A − 全家庭负债 D − 单独预留 B</p>
+          <p data-priv th:text="${'本次 P = '+money.amount(r.assets())+' − '+money.amount(r.debt())+' − '+money.amount(r.reserves())+' = '+money.amount(r.principal())}"></p>
           <p
             th:text="${view.plan().version==1?'升级前方案:T = 12 × max(X − J, 0) ÷ r':'修订二:T = 12 × 每月生活费 X ÷ r'}"
           ></p>
+          <p>本次 X = <b data-priv th:text="${money.amount(r.monthlyExpense())}"></b> / 月;
+            T = <b data-priv th:text="${r.target()==null?r.message():money.amount(r.target())}"></b>
+          </p>
+          <p th:if="${view.plan().version==1}">原持续收入 J = <b data-priv th:text="${money.amount(r.monthlyIncome())}"></b> / 月</p>
           <p>缺口 = max(T − P, 0); 覆盖率 = P ÷ T</p>
+          <p>本次缺口 <b data-priv th:text="${money.amount(r.gap())}"></b> · 覆盖率
+            <b data-priv th:text="${r.coveragePct()==null?'—':r.coveragePct().toPlainString()+'%'}"></b>
+          </p>
+          <p class="retire-field-hint">购买力日期 <span th:text="${r.asOf()}"></span> · 显示币种 <span th:text="${money.currency()}"></span>。显示率经过四舍五入,演算使用完整精度。</p>
         </div>
         <p class="text-sm text-ink-soft my-5">
           r≤0且生活费不为零时,不存在有限的永久本金门槛。零生活费仍保留负债与预留。每项金额先按分取整,缺失不当零。
