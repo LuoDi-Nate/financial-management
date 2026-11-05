@@ -29,6 +29,8 @@ async function form(ui, name) {
 }
 async function screenshot(ui, suffix) {
   const dir = '/tmp/finance-v139-review'; fs.mkdirSync(dir,{recursive:true});
+  await ui.page.evaluate(()=>window.scrollTo(0,0));
+  await ui.page.waitForTimeout(200);
   await ui.page.screenshot({path:path.join(dir,suffix + '.png'),fullPage:true});
 }
 async function dimensions(ui, label) {
@@ -241,6 +243,17 @@ module.exports = {
         await mobile.page.setViewportSize({width,height:844}); await mobile.page.waitForTimeout(350);
         await mobile.assert(await mobile.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'设置页宽度'+width+':折叠与展开无横向溢出');
       }
+      const menu='.nav-actions > details:not(#fs-menu) > summary';
+      await mobile.click(menu,'打开手机菜单');
+      await mobile.click('.nav-actions .fs-opt-m[data-fs-opt="xl"]','手机切到特大字号');
+      await mobile.click(menu,'收起手机菜单');
+      await mobile.assert(await mobile.page.locator('[name="monthlyExpense"]').evaluate(el=>parseFloat(getComputedStyle(el).fontSize))>18,'手机:金额跟随特大字号');
+      await mobile.page.setViewportSize({width:320,height:844}); await mobile.page.waitForTimeout(350);
+      await mobile.assert(await mobile.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'320窄屏特大字号:目录、单位和字段不撑宽');
+      await mobile.click(menu,'打开手机字号菜单');
+      await mobile.click('.nav-actions .fs-opt-m[data-fs-opt="std"]','手机恢复标准字号');
+      await mobile.click(menu,'收起手机字号菜单');
+      await mobile.page.setViewportSize({width:390,height:844}); await mobile.page.waitForTimeout(350);
       await screenshot(mobile,'mobile-plan');
       for(const id of ['retire-life','retire-assets','retire-reserves','retire-returns','retire-contribution','retire-save'])
         await mobile.page.locator('#'+id).screenshot({path:'/tmp/finance-v139-review/mobile-'+id+'.png'});
@@ -249,6 +262,12 @@ module.exports = {
         .every(el=>el.scrollWidth<=el.clientWidth+2)),'手机:展开来源后日期与金额不挤出单元格');
       await mobile.click('[data-retire-tab="principle"]','手机查看原理');
       await screenshot(mobile,'mobile-principle');
+      await mobile.goto(`/goals/${state.legacy}/retirement?tab=plan`);
+      await mobile.assert(await mobile.page.locator('.retire-compare td').evaluateAll(cells=>cells.every(el=>el.scrollWidth<=el.clientWidth+2)),'手机:采用对比的金额和长说明不挤出单元格');
+      await mobile.sameSize('.retire-form-actions button','手机:采用与预览按钮同宽同高');
+      await screenshot(mobile,'mobile-adoption');
+      await mobile.page.locator('.retire-compare').screenshot({path:'/tmp/finance-v139-review/mobile-adoption-comparison.png'});
+      await mobile.goto(`/goals/${state.native}/retirement`);
       await mobile.click('[data-retire-tab="plan"]','手机核对无有限门槛状态'); await mobile.fillByName('realReturnPct','0','#retirement-form');
       await mobile.click('[data-retire-save]','手机保存零回报'); await mobile.goto('/goals');
       await mobile.assert(await mobile.page.locator(`a[href="/goals/${state.native}"]`).evaluate(el=>el.scrollWidth<=el.clientWidth+2),'手机:目标列表的长状态不溢出');

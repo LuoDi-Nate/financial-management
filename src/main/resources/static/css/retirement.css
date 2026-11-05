@@ -24,12 +24,12 @@
 .retire-settings-nav a { display:flex; align-items:center; gap:12px; min-height:40px; padding:8px 12px; border-left:1px solid var(--rule); font-size:calc(13px * var(--fs-scale,1)); color:var(--ink-soft); text-decoration:none; }
 .retire-settings-nav a span { font-family:"JetBrains Mono",monospace; font-size:calc(11px * var(--fs-scale,1)); color:var(--brass-text); }
 .retire-settings-nav a:hover { background:var(--paper-soft); color:var(--ink); border-color:var(--brass); }
-.retire-settings-content { min-width:0; }
+.retire-settings-content { min-width:0; max-width:800px; }
 .retire-settings-caption { display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px 16px; margin-bottom:16px; color:var(--ink-soft); font-size:calc(12px * var(--fs-scale,1)); line-height:1.6; }
 .retire-settings-caption b { color:var(--ink); font-weight:500; }
 .retire-settings-form { padding:32px; }
 .retire-fieldset { border:0; border-top:1px solid var(--rule); margin:32px 0 0; padding:24px 0 0; min-width:0; scroll-margin-top:88px; }
-.retire-fieldset:first-child { margin-top:0; border-top:0; padding-top:0; }
+.retire-fieldset:first-of-type { margin-top:0; border-top:0; padding-top:0; }
 .retire-fieldset legend { font-family:"Fraunces","Noto Serif SC",serif; font-size:calc(20px * var(--fs-scale,1)); line-height:1.5; padding-right:16px; margin-bottom:8px; }
 .retire-section-no { display:inline-block; margin-right:12px; font-family:"JetBrains Mono",monospace; font-size:calc(12px * var(--fs-scale,1)); color:var(--brass-text); vertical-align:middle; }
 .retire-form-grid, .retire-scenario-inputs { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:24px; align-items:start; }

@@ -191,7 +191,7 @@
               <div><label class="field-label" for="inflationPct">长期年通胀 <span class="retire-unit">%</span></label><input class="field-input field-input-num" inputmode="decimal" type="number" min="0" max="15" step="0.01" th:field="*{inflationPct}" required><p class="retire-field-hint" th:text="${view.data().cpiReference()}"></p></div>
             </div>
             <div class="retire-direct-rate">
-              <label class="retire-check"><input type="checkbox" th:field="*{directRealRate}"><span>直接填写实际年回报<span class="retire-field-hint">勾选后使用右侧实际回报,不再由名义回报扣通胀。</span></span></label>
+              <label class="retire-check"><input type="checkbox" th:field="*{directRealRate}"><span>直接填写实际年回报<span class="retire-field-hint">勾选后使用所填实际回报,不再由名义回报扣通胀。</span></span></label>
               <div><label class="field-label" for="realReturnPct">实际年回报 <span class="retire-unit">%</span></label><input class="field-input field-input-num" inputmode="decimal" type="number" min="-99" max="100" step="0.01" th:field="*{realReturnPct}" required></div>
             </div>
             <p class="retire-field-hint">实际回报 2.5% 对应视频的 480 倍简算;名义回报 4.5%、通胀 2% 的精确倍数为 489.6。<button type="button" class="retire-text-link" data-retire-goto="principle">看原理与原视频</button></p>
