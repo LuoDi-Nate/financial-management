@@ -86,13 +86,13 @@ public class CsvExportService {
             writeEntry(zip, "accounts.csv", writer -> {
                 line(writer, "id", "family_id", "template_id", "display_name", "type", "currency",
                         "primary_owner_member_id", "default_payment_source_account_id",
-                        "display_order", "archived_at", "created_at");
+                        "display_order", "archived_at", "created_at", "loan_manual_repayment");
                 for (Account a : accounts) {
                     line(writer,
                             s(a.getId()), s(a.getFamilyId()), s(a.getTemplateId()),
                             e(a.getDisplayName()), s(a.getType()), e(a.getCurrency()),
                             s(a.getPrimaryOwnerMemberId()), s(a.getDefaultPaymentSourceAccountId()),
-                            s(a.getDisplayOrder()), ts(a.getArchivedAt()), ts(a.getCreatedAt()));
+                            s(a.getDisplayOrder()), ts(a.getArchivedAt()), ts(a.getCreatedAt()), s(a.isLoanManualRepayment()));
                 }
             });
 

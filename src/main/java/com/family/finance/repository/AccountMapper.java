@@ -19,7 +19,7 @@ public interface AccountMapper {
                    primary_owner_member_id, default_payment_source_account_id,
                    display_order, archived_at, created_at, updated_at,
                    product_category_code, risk_level_override, loan_kind, annual_rate_pct, expected_return_pct,
-                   asset_class, platform_tag, industry_tag, purpose_tag, analysis_excluded
+                   asset_class, platform_tag, industry_tag, purpose_tag, analysis_excluded, loan_manual_repayment
               FROM account
              WHERE family_id = #{familyId}
                AND id = #{id}
@@ -31,7 +31,7 @@ public interface AccountMapper {
                    primary_owner_member_id, default_payment_source_account_id,
                    display_order, archived_at, created_at, updated_at,
                    product_category_code, risk_level_override, loan_kind, annual_rate_pct, expected_return_pct,
-                   asset_class, platform_tag, industry_tag, purpose_tag, analysis_excluded
+                   asset_class, platform_tag, industry_tag, purpose_tag, analysis_excluded, loan_manual_repayment
               FROM account
              WHERE family_id = #{familyId}
              ORDER BY archived_at IS NOT NULL, display_order, id
@@ -43,7 +43,7 @@ public interface AccountMapper {
                    primary_owner_member_id, default_payment_source_account_id,
                    display_order, archived_at, created_at, updated_at,
                    product_category_code, risk_level_override, loan_kind, annual_rate_pct, expected_return_pct,
-                   asset_class, platform_tag, industry_tag, purpose_tag, analysis_excluded
+                   asset_class, platform_tag, industry_tag, purpose_tag, analysis_excluded, loan_manual_repayment
               FROM account
              WHERE family_id = #{familyId}
                AND archived_at IS NULL
@@ -129,6 +129,9 @@ public interface AccountMapper {
             """)
     int updateAnalysisExcluded(@Param("familyId") long familyId, @Param("id") long id,
                                @Param("excluded") boolean excluded);
+
+    @Update("UPDATE account SET loan_manual_repayment = #{manual} WHERE family_id = #{familyId} AND id = #{id} AND type = 'LOAN' AND archived_at IS NULL")
+    int updateLoanManualRepayment(@Param("familyId") long familyId, @Param("id") long id, @Param("manual") boolean manual);
 
     @Update("""
             UPDATE account

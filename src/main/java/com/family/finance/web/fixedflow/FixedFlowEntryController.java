@@ -116,37 +116,6 @@ public class FixedFlowEntryController {
         return back(periodId, mine);
     }
 
-    /**
-     * FR-1120 · 没设固定还款的贷款:「接受」= 今天贷款行那个按钮调的同一个方法,结果逐字相同。
-     */
-    @PostMapping("/entry/fixed/loan/{accountId}/accept")
-    public String acceptLoan(@AuthenticationPrincipal MemberPrincipal me, @PathVariable long accountId,
-                             @RequestParam long periodId, @RequestParam(defaultValue = "false") boolean mine,
-                             RedirectAttributes ra) {
-        try {
-            entryService.acceptLoanPrediction(me.getFamilyId(), me.getMemberId(), periodId, accountId);
-            ra.addFlashAttribute("fixedNote", "已按上两月趋势更新贷款余额");
-        } catch (IllegalArgumentException | IllegalStateException e) {
-            ra.addFlashAttribute("fixedError", e.getMessage());
-        }
-        return back(periodId, mine);
-    }
-
-    /** FR-1120 · 「保持上月」= 今天那个按钮:按上月末余额提交本期余额(同一个 submitBalance) */
-    @PostMapping("/entry/fixed/loan/{accountId}/keep")
-    public String keepLoan(@AuthenticationPrincipal MemberPrincipal me, @PathVariable long accountId,
-                           @RequestParam long periodId, @RequestParam BigDecimal newBalance,
-                           @RequestParam(defaultValue = "false") boolean mine, RedirectAttributes ra) {
-        try {
-            entryService.submitBalance(me.getFamilyId(), me.getMemberId(), periodId, accountId, newBalance,
-                    List.of(), List.of(), null);
-            ra.addFlashAttribute("fixedNote", "这笔贷款本期余额保持上月");
-        } catch (IllegalArgumentException | IllegalStateException e) {
-            ra.addFlashAttribute("fixedError", e.getMessage());
-        }
-        return back(periodId, mine);
-    }
-
     private static String back(long periodId, boolean mine) {
         return "redirect:/entry?period=" + periodId + (mine ? "&mine=true" : "") + "#fixed-flows";
     }

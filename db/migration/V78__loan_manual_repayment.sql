@@ -1,0 +1,1 @@
+ALTER TABLE account ADD COLUMN loan_manual_repayment BOOLEAN NOT NULL DEFAULT FALSE;

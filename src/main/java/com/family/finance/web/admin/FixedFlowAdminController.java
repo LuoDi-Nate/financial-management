@@ -47,6 +47,8 @@ public class FixedFlowAdminController {
     private final CashFlowCategoryMapper categoryMapper;
     private final ExpenseCategoryService expenseCategoryService;
     private final NavService navService;
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.family.finance.service.fixedflow.LoanRepaymentSetupService loanSetup;
 
     /** 分组展示用的一行 */
     public record Row(FixedFlow flow, String accountName, String targetName, String amountLabel,
@@ -72,6 +74,7 @@ public class FixedFlowAdminController {
         model.addAttribute("me", me);
         model.addAttribute("nav", navService.load(me));
         model.addAttribute("groups", groups);
+        model.addAttribute("loanSetups", loanSetup.list(fam));
         model.addAttribute("total", groups.values().stream().mapToInt(List::size).sum());
         model.addAttribute("back", safeBack(back));
         return "admin/fixed-flows";
@@ -164,6 +167,21 @@ public class FixedFlowAdminController {
 
     // ── 表单 ──────────────────────────────────────────────────────────────
 
+    @PostMapping("/loan/{accountId}/manual")
+    public String manualLoan(@AuthenticationPrincipal MemberPrincipal me, @PathVariable long accountId,
+                             @RequestParam(defaultValue="false") boolean manual,
+                             @RequestParam(required=false) String back, RedirectAttributes ra) {
+        try {
+            loanSetup.setManual(me.getFamilyId(),me.getMemberId(),accountId,manual);
+            String note=manual?"已选择每月自己填余额,不再提醒。可在固定收支管理页改回来。":"已恢复固定还款设置提醒。";
+            ra.addFlashAttribute("ffNote",note);ra.addFlashAttribute("fixedNote",note);
+        } catch(IllegalArgumentException|IllegalStateException e) {
+            ra.addFlashAttribute("ffError",e.getMessage());ra.addFlashAttribute("fixedError",e.getMessage());
+        }
+        String target=safeBack(back);
+        return "redirect:"+(target==null?"/admin/fixed-flows#loan-setup":target+(target.startsWith("/entry")?"#fixed-flows":""));
+    }
+
     private String form(MemberPrincipal me, FixedFlowService.Form form, String error, String back, Model model) {
         long fam = me.getFamilyId();
         List<Account> active = accountMapper.findActiveByFamily(fam);
@@ -171,6 +189,8 @@ public class FixedFlowAdminController {
         model.addAttribute("nav", navService.load(me));
         model.addAttribute("form", form);
         model.addAttribute("formError", error);
+        model.addAttribute("repayStartNote",form.getId()==null && FixedFlow.REPAY.equals(form.getKind())
+                ? fixedFlowService.repayStartNote(fam,form.getTargetAccountId()):null);
         model.addAttribute("back", safeBack(back));
         // 每种固定收支能选的账户(服务端 FixedFlowService.validate 还会再判一次)
         model.addAttribute("incomeAccounts", active.stream()

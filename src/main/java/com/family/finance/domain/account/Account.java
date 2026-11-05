@@ -55,6 +55,8 @@ public class Account {
      * 贷款类账户不可标(负债本来就不进配置分母)。</p>
      */
     private boolean analysisExcluded;
+    /** Explicit repayment setup preference; never changes balances or financial metrics. */
+    private boolean loanManualRepayment;
 
     public boolean isArchived() {
         return archivedAt != null;

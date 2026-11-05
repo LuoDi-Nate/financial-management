@@ -162,6 +162,6 @@ class FixedFlowServiceTest {
         when(mapper.templateCodeOf(FAM, 22L)).thenReturn(Optional.of("car_loan"));
         FixedFlowService.Form g = svc.prefillForLoan(FAM, 22L, LocalDate.of(2026, 10, 12));
         assertThat(g.getRepayKind()).isEqualTo("LOAN");
-        assertThat(g.getAutoMethod()).as("默认就是原来贷款那套").isEqualTo("LOAN_DIFF");
+        assertThat(g.getAutoMethod()).as("有年利率时预填本金/利息拆分").isEqualTo("LOAN_RATE");
     }
 }

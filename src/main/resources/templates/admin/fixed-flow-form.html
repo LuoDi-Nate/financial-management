@@ -21,6 +21,11 @@
 
     <div th:if="${formError}" data-ff-form-error class="border-l-2 border-rust bg-rust/[0.05] px-4 py-2.5 text-[13px] mb-5 max-w-2xl" th:text="${formError}">出错了</div>
 
+    <div th:if="${repayStartNote != null}" class="border-l-2 border-brass px-4 py-3 mb-5 max-w-2xl text-sm leading-loose" data-repay-start-note>
+      <p th:text="${repayStartNote}"></p>
+      <p class="text-ink-soft mt-2">确认时除了更新贷款余额,还会从付款账户记一笔还贷本金和适用的利息。如果你另行手记或从银行账单导入了这笔,以后不用再重复记。</p>
+    </div>
+
     <form th:action="@{/admin/fixed-flows/save}" method="post" class="bracket-card max-w-2xl space-y-5" data-ff-edit-form
           th:attr="data-rated=${#strings.listJoin(ratedLoanIds, ',')}">
       <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">

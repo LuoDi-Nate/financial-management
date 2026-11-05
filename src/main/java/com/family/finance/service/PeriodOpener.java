@@ -216,8 +216,7 @@ public class PeriodOpener {
      * 返回当前账户的预填余额 = 上月末值(prev)。所有账户一致 carry-forward,无历史快照返回 null(首期)。
      *
      * <p>v0.17.x · 贷款不再<b>静默</b>外推 prev+Δ(旧行为:开账即把趋势预测写进 snapshot + 起草还款转账,
-     * 用户不知情)。趋势预测改由填报页<b>贷款行内提示条</b>让用户显式「接受 / 保持上月」
-     * (见 {@link EntryService#acceptLoanPrediction} + {@link #predictLoanBalance})。
+     * 用户不知情)。趋势算法只供固定还款“按上两月差值”使用,人确认后才写余额。
      * 兼容:{@code createPeriodAndTodos} 幂等(已有 todo 则跳过),只影响将来新开账期,老账期不回改。</p>
      */
     private BigDecimal computePrefillBalance(Period period, Account account, SnapshotTodo todo, Long systemMemberId) {

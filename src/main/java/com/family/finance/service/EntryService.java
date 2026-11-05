@@ -260,61 +260,6 @@ public class EntryService {
         return row;
     }
 
-    /**
-     * v0.17.x · 接受贷款趋势预测:把该贷款本期余额设为 predicted(prev+Δ 夹≤0),并<b>复刻旧逻辑</b>
-     * 起草一笔还款转账(默认还款来源 → 贷款,金额 = 本期还款额),标 todo done。
-     * 与旧 PeriodOpener.applyLoanPrefill 做的事完全一致,只是由用户点击触发而非开账静默执行。
-     */
-    @Transactional
-    public EntryRow acceptLoanPrediction(long familyId, long memberId, long periodId, long accountId) {
-        Period period = requireOpenPeriod(familyId, periodId);
-        Account loan = requireAccount(familyId, accountId);
-        if (loan.getType() != AccountType.LOAN) {
-            throw new IllegalArgumentException("仅贷款账户支持趋势预填");
-        }
-        List<PeriodSnapshot> last2 = snapshotMapper.findLatestBefore(familyId, accountId, period.getPeriodStart(), 2);
-        if (last2.isEmpty()) {
-            throw new IllegalStateException("无历史余额,无法预测");
-        }
-        BigDecimal prev = last2.get(0).getEndBalance();
-        BigDecimal prevPrev = last2.size() >= 2 ? last2.get(1).getEndBalance() : null;
-        BigDecimal predicted = PeriodOpener.predictLoanBalance(prev, prevPrev);
-
-        snapshotMapper.upsertOwned(familyId, PeriodSnapshot.builder()
-                .periodId(periodId)
-                .accountId(accountId)
-                .endBalance(predicted)
-                .submittedBy(memberId)
-                .note("按上两月趋势预测本期还款")
-                // v1.18 · 数字是系统按趋势算的,人只点了"接受"
-                .sourceTag(com.family.finance.domain.ledger.LedgerSource.SYSTEM_ADJUST.name())
-                .build());
-
-        // 复刻旧逻辑:草稿还款转账(默认还款来源 → 贷款,金额 = predicted − prev,>0 才起草)
-        BigDecimal repay = predicted.subtract(prev);
-        if (loan.getDefaultPaymentSourceAccountId() != null && repay.signum() > 0) {
-            transferMapper.insertOwned(familyId, com.family.finance.domain.transfer.Transfer.builder()
-                    .periodId(periodId)
-                    .fromAccountId(loan.getDefaultPaymentSourceAccountId())
-                    .toAccountId(accountId)
-                    .amount(repay)
-                    .occurredAt(period.getPeriodEnd())
-                    .note("按上两月趋势预填还款")
-                    .submittedBy(memberId)
-                    // v1.18 · 金额是系统按趋势算出来的,人只是点了"接受" → 算系统联动,不算手动填报
-                    .sourceTag(com.family.finance.domain.ledger.LedgerSource.SYSTEM_ADJUST.name())
-                    .draft(true)
-                    .build());
-        }
-
-        snapshotTodoMapper.markDone(familyId, periodId, accountId, memberId);
-        auditLogService.record(familyId, memberId, AuditLogType.SYSTEM, "account", accountId,
-                "接受贷款趋势预测 " + MoneyFormat.format(loan.getCurrency(), predicted));
-        eventPublisher.publishEvent(new com.family.finance.service.lens.LensStaleEvent(familyId)); // v1.1.1 透视缓存后台换新
-
-        return rowFor(familyId, memberId, periodId, accountId);
-    }
-
     @Transactional
     public EntryRow addCashFlow(long familyId,
                                 long memberId,
@@ -1106,23 +1051,6 @@ public class EntryService {
             return b.occurredAt().compareTo(a.occurredAt());
         });
 
-        // v0.17.x · 贷款趋势预测建议(填报页行内提示条)· prev+Δ 夹≤0(逻辑 follow 旧 predictLoanBalance)
-        BigDecimal loanSuggestion = null;
-        boolean showLoanPrompt = false;
-        String loanSuggestionLabel = null;
-        String loanSuggestionDeltaLabel = null;
-        if (account.getType().isLiability() && previousBalance != null) {
-            List<PeriodSnapshot> last2 = snapshotMapper.findLatestBefore(account.getFamilyId(), account.getId(), period.getPeriodStart(), 2);
-            BigDecimal prevPrev = last2.size() >= 2 ? last2.get(1).getEndBalance() : null;
-            BigDecimal predicted = PeriodOpener.predictLoanBalance(previousBalance, prevPrev);
-            if (loanPromptVisible(predicted, previousBalance, currentBalance, confirmedByHuman(todo))) {
-                loanSuggestion = predicted;
-                loanSuggestionLabel = MoneyFormat.format(account.getCurrency(), predicted);
-                loanSuggestionDeltaLabel = MoneyFormat.formatDelta(account.getCurrency(), predicted.subtract(previousBalance));
-                showLoanPrompt = true;
-            }
-        }
-
         return new EntryRow(
                 account,
                 owner == null ? "共同" : owner.getDisplayName(),
@@ -1148,43 +1076,8 @@ public class EntryService {
                 && account.getType() != AccountType.LOAN,
                 incoming,
                 outgoing,
-                ledger,
-                loanSuggestion,
-                showLoanPrompt,
-                loanSuggestionLabel,
-                loanSuggestionDeltaLabel
+                ledger
         );
-    }
-
-    /**
-     * v0.17.x · 贷款趋势预测提示条是否显示 · 兼容闸(可测纯逻辑)。
-     * 显示 iff:有实际建议(predicted≠prev)且**没有人确认过**且当前 committed==上月值(新默认态)。
-     * committed==prev 天然屏蔽老账期(旧代码已把 committed 写成预测值≠prev),不打扰、不回改。
-     *
-     * <p>v1.16 FR-392:第四个参数从「todo 是不是 DONE」改成「是不是<b>人</b>确认的」。
-     * 开账代填从此也会把 todo 标 DONE(issue #15 的口径统一),再只看状态这条提示条就永远不出现了。</p>
-     */
-    /**
-     * v1.16 FR-392 · 这一行是不是<b>人</b>确认过的(issue #15)。
-     *
-     * <p>v1.16 起开账代填也会把 todo 标成 DONE(见 {@link PeriodOpener#createPeriodAndTodos}),
-     * 「有数字」和「已填」统一成一件事;但贷款趋势提示条要的是另一件事 ——
-     * <b>有没有人真的看过并做了选择</b>。系统代填的 DONE 其 {@code done_by_member_id} 为 NULL,
-     * 人工提交的才记名到人,靠这个把两者分开。若这里退回只看状态,
-     * 所有贷款账户在开账瞬间就"已完成",v0.17.x「贷款不静默外推」的那条规矩会被口径统一顺手删掉。</p>
-     */
-    static boolean confirmedByHuman(SnapshotTodo todo) {
-        return todo != null
-                && todo.getStatus() == TodoStatus.DONE
-                && todo.getDoneByMemberId() != null;
-    }
-
-    static boolean loanPromptVisible(BigDecimal predicted, BigDecimal prev, BigDecimal committed,
-                                     boolean confirmedByHuman) {
-        return predicted != null && prev != null
-                && predicted.compareTo(prev) != 0
-                && !confirmedByHuman
-                && committed != null && committed.compareTo(prev) == 0;
     }
 
     private void insertCashFlow(Period period, Account account, long memberId, CashFlowLine line) {
@@ -1447,10 +1340,8 @@ public class EntryService {
     /**
      * v1.32 · 系统按规则写一笔贷款本期余额(固定收支「还款 · 贷款月供」确认 / 撤销用)。
      *
-     * <p>写快照的那几行与 {@link #acceptLoanPrediction} 相同(SYSTEM_ADJUST、标填好、审计、透视换新),
-     * 多做一件 {@code acceptLoanPrediction} 没做的:补录期传导(v1.23),双开期时进行期的延续值跟着变。
-     * <b>不起草</b>那笔 {@code is_draft=1} 的还款划转 —— 它任何口径都不读,付款那边的钱由固定收支另记成「还贷」。
-     * {@code acceptLoanPrediction} 本身一行不改(PRD v1.32 FR-1120:没设固定还款的贷款,结果与今天逐字相同)。</p>
+     * <p>SYSTEM_ADJUST快照、填报标记和补录期传导一并写入。
+     * 付款侧由固定收支确认统一记本金/利息,不另起草还款划转。</p>
      */
     @Transactional
     public void setLoanBalanceBySystem(long familyId, long memberId, long periodId, long accountId,

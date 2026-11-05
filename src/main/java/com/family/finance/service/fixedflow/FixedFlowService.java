@@ -49,6 +49,8 @@ public class FixedFlowService {
     private final PeriodMapper periodMapper;
     private final ExpenseCategoryService expenseCategoryService;
     private final AuditLogService auditLogService;
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.family.finance.repository.SnapshotMapper snapshotMapper;
 
     /** 管理页 / 表单提交上来的东西(字段名与表单 name 一致) */
     @lombok.Data
@@ -85,7 +87,7 @@ public class FixedFlowService {
     public long save(long familyId, long memberId, Form form) {
         FixedFlow f = validate(familyId, form);
         if (form.getId() == null) {
-            f.setStartMonth(defaultStartMonth(familyId));
+            f.setStartMonth(newStartMonth(familyId, f));
             f.setCreatedBy(memberId);
             mapper.insertOwned(familyId, f);
             auditLogService.record(familyId, memberId, AuditLogType.SYSTEM, "fixed_flow", f.getId(),
@@ -199,11 +201,12 @@ public class FixedFlowService {
         boolean card = isCreditCard(familyId, loan);
         f.setRepayKind(card ? FixedFlow.REPAY_CARD : FixedFlow.REPAY_LOAN);
         f.setAmountMode(FixedFlow.AUTO);
-        f.setAutoMethod(card ? FixedFlow.CARD_FULL : FixedFlow.LOAN_DIFF);
+        f.setAutoMethod(card ? FixedFlow.CARD_FULL : loan.getAnnualRatePct()!=null && loan.getAnnualRatePct().signum()>0
+                ? FixedFlow.LOAN_RATE : FixedFlow.LOAN_DIFF);
         f.setAccountId(loan.getDefaultPaymentSourceAccountId());
         f.setName(loan.getDisplayName());
         f.setCycle(FixedFlowSchedule.MONTHLY);
-        f.setDayOfMonth(today.getDayOfMonth());
+        f.setDayOfMonth(1);
         f.setOwnerMemberId(loan.getPrimaryOwnerMemberId());
         return f;
     }
@@ -402,6 +405,30 @@ public class FixedFlowService {
         List<Period> open = periodMapper.findRecordableOpen(familyId);
         LocalDate d = open.isEmpty() ? LocalDate.now() : open.get(0).getPeriodStart();
         return d.withDayOfMonth(1);
+    }
+
+    public LocalDate newStartMonth(long familyId, FixedFlow flow) {
+        if (!FixedFlow.REPAY.equals(flow.getKind()) || flow.getTargetAccountId()==null || snapshotMapper==null)
+            return defaultStartMonth(familyId);
+        var period=periodMapper.findBalancePeriod(familyId).orElse(null);
+        if(period==null) return defaultStartMonth(familyId);
+        var snapshot=snapshotMapper.findByPeriodAndAccount(familyId,period.getId(),flow.getTargetAccountId()).orElse(null);
+        LocalDate start=period.getPeriodStart().withDayOfMonth(1);
+        return LoanRepaymentSetupService.submitted(snapshot)?start.plusMonths(1):start;
+    }
+
+    public LocalDate repayStarts(long familyId, Long accountId) {
+        if(accountId==null)return null;
+        return newStartMonth(familyId,FixedFlow.builder().kind(FixedFlow.REPAY).targetAccountId(accountId).build());
+    }
+
+    public String repayStartNote(long familyId,Long accountId) {
+        if(accountId==null)return null;
+        LocalDate start=repayStarts(familyId,accountId);
+        var current=periodMapper.findBalancePeriod(familyId).orElse(null);
+        return current!=null && start.isAfter(current.getPeriodStart().withDayOfMonth(1))
+                ? "这笔贷款本期余额已经填过,从 "+YearMonth.from(start)+" 开始。"
+                : "从 "+YearMonth.from(start)+" 起,到日子在填报页确认。";
     }
 
     /** 管理页金额列的一句话 */

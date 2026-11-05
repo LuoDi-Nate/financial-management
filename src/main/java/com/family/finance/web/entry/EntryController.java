@@ -601,19 +601,6 @@ public class EntryController {
         return rowFragment(me, row, periodId, model);
     }
 
-    /** v0.17.x · 贷款行「接受趋势预测」· 设 predicted 余额 + 起草还款转账 + 标 done(HTMX 换行块)*/
-    @PostMapping("/entry/{accountId}/accept-loan-prediction")
-    public String acceptLoanPrediction(@AuthenticationPrincipal MemberPrincipal me,
-                                       @PathVariable long accountId,
-                                       @RequestParam MultiValueMap<String, String> params,
-                                       HttpServletResponse response,
-                                       Model model) {
-        long periodId = longParam(params, "periodId", () -> periodService.requireCurrentOpen(me.getFamilyId()).getId());
-        EntryRow row = entryService.acceptLoanPrediction(me.getFamilyId(), me.getMemberId(), periodId, accountId);
-        selfRefresh(response, accountId);
-        return rowFragment(me, row, periodId, model);
-    }
-
     @PostMapping("/entry/{accountId}/cash-flow")
     public String addCashFlow(@AuthenticationPrincipal MemberPrincipal me,
                               @PathVariable long accountId,

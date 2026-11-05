@@ -3158,16 +3158,14 @@ POJ="$RD/src/main/java/com/family/finance/service/PeriodOpener.java"
 ESJ="$RD/src/main/java/com/family/finance/service/EntryService.java"
 FF17="$RD/src/main/resources/templates/entry/_fixed-flows.html"
 FFC17="$RD/src/main/java/com/family/finance/web/fixedflow/FixedFlowEntryController.java"
-{ ! grep -q 'applyLoanPrefill' "$POJ" \
-  && grep -q 'predictLoanBalance' "$POJ" \
-  && grep -q 'static boolean loanPromptVisible' "$ESJ" \
-  && grep -q 'acceptLoanPrediction' "$ESJ" \
-  && grep -q 'accept-loan-prediction' "$RD/src/main/java/com/family/finance/web/entry/EntryController.java" \
-  && grep -q 'isShowLoanPrompt()' "$RD/src/main/java/com/family/finance/service/fixedflow/FixedFlowSummaryService.java" \
-  && grep -q 'entryService.acceptLoanPrediction(' "$FFC17" && grep -q 'entryService.submitBalance(' "$FFC17" \
-  && grep -q '按上两月差值,本月预计还到' "$FF17" && grep -q 'data-ff-accept' "$FF17" && grep -q 'data-ff-keep' "$FF17"; } \
-  && log_ok "v17-LOAN-PROMPT 贷款不再静默外推(删 applyLoanPrefill)· 显式「接受 / 保持上月」(v1.32 起在固定收支那一行,调的仍是 acceptLoanPrediction / submitBalance)· loanPromptVisible 兼容闸" \
-  || log_bad "v17-LOAN-PROMPT 贷款显式接受缺件" "see PeriodOpener/EntryService.loanPromptVisible+acceptLoanPrediction/FixedFlowEntryController/_fixed-flows.html"
+{ ! grep -q 'applyLoanPrefill' "$POJ" && grep -q 'predictLoanBalance' "$POJ" \
+  && ! grep -q 'public EntryRow acceptLoanPrediction(' "$ESJ" \
+  && ! grep -q 'accept-loan-prediction' "$RD/src/main/java/com/family/finance/web/entry/EntryController.java" \
+  && ! grep -q '/accept\|/keep' "$FFC17" \
+  && grep -q 'LoanRepaymentSetupService' "$RD/src/main/java/com/family/finance/service/fixedflow/FixedFlowSummaryService.java" \
+  && grep -q 'data-ff-loan-setups' "$FF17" && ! grep -q 'data-ff-accept\|data-ff-keep' "$FF17"; } \
+  && log_ok "v138-LOAN-SETUP(旧接受/保持写入口退役 · 差值纯算法保留 · 统一设置提醒)" \
+  || log_bad "v138-LOAN-SETUP 旧写链未退役或缺设置提醒" "see LoanRepaymentSetupService / fixed-flows"
 
 # v11-LENS-1 资产透视底座:V45 三列+lens_board · 枚举 · 注册表(≥8维5度量)· 唯一网关 · 纯函数引擎
 V45L="$RD/db/migration/V45__asset_lens.sql"
@@ -7674,15 +7672,13 @@ QA116_MIG="$RD/db/migration/V55__align_carryforward_todo_done.sql"
   && grep -q "done_by_member_id = NULL" "$QA116_TM" \
   && grep -q "AND status = 'PENDING'" "$QA116_TM" \
   && ! grep -q 'period_snapshot' "$QA116_TM" \
-  && grep -q 'boolean confirmedByHuman(SnapshotTodo todo)' "$QA116_ES" \
-  && grep -q 'todo.getDoneByMemberId() != null' "$QA116_ES" \
-  && grep -q 'boolean confirmedByHuman)' "$QA116_ES" \
+  && grep -q 'LedgerSource.CARRIED_FORWARD' "$RD/src/main/java/com/family/finance/service/fixedflow/LoanRepaymentSetupService.java" \
   && grep -q "p.status = 'OPEN'" "$QA116_MIG" \
   && ! grep -qiE '\bend_balance\b|\bamount\b' "$QA116_MIG" \
   && [ -f "$RD/src/test/java/com/family/finance/service/PeriodOpenerTodoAlignmentTest.java" ] \
-  && grep -q 'systemCarriedDone_isNotHumanConfirmation' "$RD/src/test/java/com/family/finance/service/EntryLoanPromptTest.java"; } \
-  && log_ok "v116-TODO-DONE-SINGLE-SOURCE(开账代填即标 DONE · 计数 SQL 不碰 period_snapshot · 提示条改看 done_by_member_id)" \
-  || log_bad "v116-TODO-DONE-SINGLE-SOURCE 「已填」的定义又分裂了" "PeriodOpener 必须调 markCarriedForward;SnapshotTodoMapper 里不许出现 period_snapshot(口径别搬回读取侧);loanPromptVisible 必须走 confirmedByHuman/getDoneByMemberId;V55 只动 OPEN 账期的状态列"
+  && grep -q 'carriedSnapshotWithSystemMemberDoesNotCountAsHumanSubmission' "$RD/src/test/java/com/family/finance/service/fixedflow/LoanRepaymentSetupTest.java"; } \
+  && log_ok "v116-TODO-DONE-SINGLE-SOURCE(开账代填即标DONE · 计数不回查快照 · 代填不阻碍当期设固定还款)" \
+  || log_bad "v116-TODO-DONE-SINGLE-SOURCE 「已填」或贷款首次生效定义分裂" "see markCarriedForward / LoanRepaymentSetupService.submitted"
 
 # ============================================================
 # v1.18 · 流水来源标签 + 券商同步失败提醒

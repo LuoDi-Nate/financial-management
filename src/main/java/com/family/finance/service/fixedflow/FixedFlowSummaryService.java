@@ -56,10 +56,11 @@ public class FixedFlowSummaryService {
     private final InsurancePolicyMapper policyMapper;
     private final ExpenseLedgerService expenseLedger;
     private final FxService fxService;
+    @org.springframework.beans.factory.annotation.Autowired
+    private LoanRepaymentSetupService loanSetup;
 
     public static final String DUE = "DUE";
     public static final String LATER = "LATER";
-    public static final String SUGGEST = "SUGGEST";
     public static final String LIST = "LIST";        // 总数模式下的固定支出:只列清单(FR-1160)
     public static final String DONE = "DONE";
 
@@ -69,7 +70,6 @@ public class FixedFlowSummaryService {
     public static class Item {
         private final String state;
         private final FixedFlow flow;
-        private final Long loanAccountId;      // 贷款建议:是哪笔贷款
         private final String name;
         private final String kindLabel;
         private final String kindCss;          // in / out / loan / ins / sug
@@ -94,9 +94,6 @@ public class FixedFlowSummaryService {
         private final String occurrenceStatus;
         private final String resultText;
         private final boolean undoable;
-        private final String suggestLabel;
-        private final String suggestDeltaLabel;
-        private final BigDecimal keepBalance;
 
         public boolean isConfirmable() { return DUE.equals(state) && problem == null && amount != null; }
     }
@@ -111,7 +108,7 @@ public class FixedFlowSummaryService {
         private final List<Item> later;        // 还没到日子
         private final List<Item> done;         // 已确认 / 这期没有 / 就是导入的那笔
         private final int pendingCount;        // 待确认(不含建议、不含清单)
-        private final int suggestCount;
+        private final List<LoanRepaymentSetupService.Row> unconfiguredLoans;
         private final int confirmableCount;
         private final String pendingTotalLabel;
         private final Item nextUpcoming;
@@ -123,7 +120,8 @@ public class FixedFlowSummaryService {
         private final Set<Long> loanPendingIds;  // 贷款行里写「本期还款 · 待确认 ↑」的那几笔
 
         /** 这一行要不要出来:有设置、或有贷款建议(否则只剩「+ 设固定收支」小入口) */
-        public boolean isEmpty() { return !anyFlows && suggestCount == 0; }
+        public int getUnconfiguredLoanCount() { return unconfiguredLoans==null?0:unconfiguredLoans.size(); }
+        public boolean isEmpty() { return !anyFlows && getUnconfiguredLoanCount() == 0; }
     }
 
     // ── 提醒数(导航 / 仪表盘 / 填报页进度)────────────────────────────
@@ -155,7 +153,7 @@ public class FixedFlowSummaryService {
     // ── 填报页摘要 ───────────────────────────────────────────────────────
 
     /**
-     * @param rows     填报页这一期的账户行(贷款建议沿用 {@link EntryRow#isShowLoanPrompt} —— 今天那条提示的判据)
+     * @param rows     填报页这一期的账户行;固定还款设置提醒独立于当期填报状态
      * @param mineOnly 「仅我」视图(= 我的待办,FR-1140):只列负责人是我或共用的
      */
     public Summary build(long familyId, long memberId, Period period, List<EntryRow> rows, boolean mineOnly,
@@ -170,16 +168,12 @@ public class FixedFlowSummaryService {
         for (FixedFlowOccurrence o : mapper.findOccurrencesByPeriod(familyId, period.getId())) occ.put(o.getFixedFlowId(), o);
 
         List<Item> due = new ArrayList<>(), later = new ArrayList<>(), done = new ArrayList<>();
-        Set<Long> repayTargets = new HashSet<>();
         Set<Long> loanPending = new LinkedHashSet<>();
         BigDecimal pendingBase = BigDecimal.ZERO;
         BigDecimal totalModeExpense = BigDecimal.ZERO;
         List<String> totalModeParts = new ArrayList<>();
 
         for (FixedFlow f : all) {
-            if (f.isActive() && FixedFlow.REPAY.equals(f.getKind()) && f.getTargetAccountId() != null) {
-                repayTargets.add(f.getTargetAccountId());
-            }
             FixedFlowOccurrence o = occ.get(f.getId());
             // 停用的只在这期已经有结果时还露面(撤销得找得到它)
             if (!f.isActive() && o == null) continue;
@@ -219,27 +213,8 @@ public class FixedFlowSummaryService {
             }
         }
 
-        // 贷款建议:没被任何启用中的「还款」指着的贷款,沿用今天那条提示的判据(FR-1120 / 1121)
-        int suggest = 0;
-        if (open && rows != null) {
-            for (EntryRow r : rows) {
-                if (!r.isShowLoanPrompt() || r.getAccount() == null) continue;
-                Long id = r.getAccount().getId();
-                if (repayTargets.contains(id)) continue;
-                suggest++;
-                loanPending.add(id);
-                due.add(Item.builder()
-                        .state(SUGGEST).loanAccountId(id).name(r.getAccount().getDisplayName())
-                        .kindLabel("建议").kindCss("sug").ownerName(r.ownerName())
-                        .ccy(r.getAccount().getCurrency())
-                        .suggestLabel(r.getLoanSuggestionLabel()).suggestDeltaLabel(r.getLoanSuggestionDeltaLabel())
-                        .keepBalance(r.getPreviousSnapshot() == null ? null : r.getPreviousSnapshot().getEndBalance())
-                        .detail("按上两月差值,本月预计还到 " + r.getLoanSuggestionLabel() + "(较上月 " + r.getLoanSuggestionDeltaLabel() + ")")
-                        .build());
-            }
-        }
-
-        due.sort(Comparator.comparing((Item i) -> SUGGEST.equals(i.getState()) ? 2 : LIST.equals(i.getState()) ? 1 : 0)
+        List<LoanRepaymentSetupService.Row> unconfigured=loanSetup==null?List.of():loanSetup.list(familyId).stream().filter(LoanRepaymentSetupService.Row::needsSetup).toList();
+        due.sort(Comparator.comparing((Item i) -> LIST.equals(i.getState()) ? 1 : 0)
                 .thenComparing(i -> i.getDueDate() == null ? LocalDate.MAX : i.getDueDate()));
         later.sort(Comparator.comparing(Item::getDueDate));
         done.sort(Comparator.comparing(i -> i.getDueDate() == null ? LocalDate.MIN : i.getDueDate()));
@@ -267,7 +242,7 @@ public class FixedFlowSummaryService {
         return Summary.builder()
                 .period(period).open(open).totalMode(totalMode)
                 .due(due).later(later).done(done)
-                .pendingCount(pending).suggestCount(suggest).confirmableCount(confirmable)
+                .pendingCount(pending).unconfiguredLoans(unconfigured).confirmableCount(confirmable)
                 .pendingTotalLabel(MoneyFormat.format(baseCcy, pendingBase))
                 .nextUpcoming(next)
                 .lastPeriodMissed(missed).lastPeriodLabel(lastLabel)

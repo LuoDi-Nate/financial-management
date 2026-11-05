@@ -29,7 +29,7 @@
   </form>
 
   <details th:unless="${s.empty}" class="ff-box" data-ff-box th:open="${fixedNote != null or fixedError != null}">
-    <summary class="ff-sum" th:classappend="${s.pendingCount == 0 and s.suggestCount == 0 and #lists.isEmpty(s.later) and !#lists.isEmpty(s.done)} ? ' ff-sum-ok' : ''">
+    <summary class="ff-sum" th:classappend="${s.pendingCount == 0 and s.unconfiguredLoanCount == 0 and #lists.isEmpty(s.later) and !#lists.isEmpty(s.done)} ? ' ff-sum-ok' : ''">
       <span class="ff-chev" aria-hidden="true">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg>
       </span>
@@ -38,10 +38,9 @@
         <span class="ff-cnt" data-ff-pending th:text="${s.pendingCount} + ' 笔待确认'">3 笔待确认</span>
         <span class="ff-total" data-priv th:text="'共 ' + ${s.pendingTotalLabel}">共 ¥7,100</span>
       </th:block>
-      <span th:if="${s.pendingCount == 0 and s.suggestCount > 0}" class="ff-cnt"
-            th:text="${s.suggestCount} + ' 笔贷款还款建议'">1 笔贷款还款建议</span>
-      <span th:if="${s.pendingCount > 0 and s.suggestCount > 0}" class="ff-sub" th:text="'· ' + ${s.suggestCount} + ' 笔贷款建议'">· 1 笔贷款建议</span>
-      <th:block th:if="${s.pendingCount == 0 and s.suggestCount == 0}">
+      <span th:if="${s.unconfiguredLoanCount > 0}" class="ff-cnt" data-ff-loan-setup-count
+            th:text="'还有 ' + ${s.unconfiguredLoanCount} + ' 个贷款没设固定还款 · 设一下'">还有贷款没设固定还款</span>
+      <th:block th:if="${s.pendingCount == 0 and s.unconfiguredLoanCount == 0}">
         <span th:if="${#lists.isEmpty(s.later) and !#lists.isEmpty(s.done)}" class="ff-ok"
               th:text="'本期 ' + ${#lists.size(s.done)} + ' 笔都确认了'">本期 6 笔都确认了</span>
         <span th:if="${s.nextUpcoming != null}" class="ff-sub">
@@ -60,41 +59,27 @@
       <a th:href="@{/admin/fixed-flows(back=${'/entry?period=' + period.id})}" class="ff-link" data-ff-manage>管理</a>
     </summary>
 
-    <!-- 到了日子的:待确认 + 贷款建议 + 总数模式下的清单 -->
-    <div th:each="it : ${s.due}" class="ff-row" data-ff-item
-         th:classappend="${it.state == 'SUGGEST'} ? ' ff-row-sug' : (${it.state == 'LIST'} ? ' ff-row-list' : '')"
-         th:attr="data-ff-flow=${it.flow != null ? it.flow.id : null}, data-ff-loan=${it.loanAccountId}, data-ff-state=${it.state}">
+    <section th:if="${s.unconfiguredLoanCount > 0}" class="px-4 py-4 border-b border-rule" data-ff-loan-setups>
+      <p class="text-xs text-ink-soft leading-loose mb-3">原来的“接受 / 保持上月”换成了固定还款。设一次,以后每期确认时同时记上付款账户;也可以选择每月自己填余额。</p>
+      <div th:each="loan : ${s.unconfiguredLoans}" class="py-3 border-b border-rule-soft" th:attr="data-loan-setup=${loan.account().id}">
+        <div class="flex justify-between items-baseline gap-3 flex-wrap text-sm"><span><b th:text="${loan.account().displayName}"></b> · <span th:text="${loan.owner()}"></span></span><span data-priv th:text="${loan.balanceLabel()}"></span></div>
+        <div class="flex items-center gap-3 flex-wrap mt-3">
+          <a th:href="@{/admin/fixed-flows/new(loan=${loan.account().id},back=${'/entry?period=' + period.id})}" class="btn-paper text-xs" data-ff-make-repay>设成固定还款</a>
+          <form th:action="@{/admin/fixed-flows/loan/{id}/manual(id=${loan.account().id})}" method="post" onsubmit="return confirm('以后这笔贷款每期自己填余额,不再提醒。随时可以在管理 › 固定收支改回来。')">
+            <input type="hidden" name="manual" value="true"><input type="hidden" name="back" th:value="'/entry?period=' + ${period.id}">
+            <button class="btn-ghost text-xs" type="submit" data-loan-manual>不设,每月自己填</button>
+          </form>
+        </div>
+      </div>
+    </section>
 
-      <!-- 贷款建议:按钮还是今天那两个(结果逐字相同,FR-1120) -->
-      <th:block th:if="${it.state == 'SUGGEST'}">
-        <div class="ff-l1">
-          <span class="ff-av" th:classappend="'avatar-' + ${(ownerColorMap != null and ownerColorMap.get(it.ownerName) != null ? ownerColorMap.get(it.ownerName) : 0) % 5}"
-                th:text="${#strings.substring(it.ownerName, 0, 1)}">迪</span>
-          <span class="ff-name" th:text="${it.name}">车贷</span>
-          <span class="ff-tag ff-tag-sug">建议</span>
-          <span class="ff-amt" data-priv th:text="${it.suggestLabel}">−86,000</span>
-        </div>
-        <div class="ff-l2">按上两月差值,本月预计还到 <b data-priv th:text="${it.suggestLabel}">−86,000</b>(较上月 <span data-priv th:text="${it.suggestDeltaLabel}">−3,000</span>)· 还没设固定还款</div>
-        <div class="ff-l3" th:if="${s.open}">
-          <form th:action="@{/entry/fixed/loan/{id}/accept(id=${it.loanAccountId})}" method="post" data-ff-accept>
-            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
-            <input type="hidden" name="periodId" th:value="${period.id}">
-            <input type="hidden" name="mine" th:value="${mineOnly}">
-            <button type="submit" class="btn-ink text-xs">接受</button>
-          </form>
-          <form th:action="@{/entry/fixed/loan/{id}/keep(id=${it.loanAccountId})}" method="post" data-ff-keep>
-            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
-            <input type="hidden" name="periodId" th:value="${period.id}">
-            <input type="hidden" name="mine" th:value="${mineOnly}">
-            <input type="hidden" name="newBalance" th:value="${it.keepBalance}">
-            <button type="submit" class="btn-paper text-xs">保持上月</button>
-          </form>
-          <a th:href="@{/admin/fixed-flows/new(loan=${it.loanAccountId}, back=${'/entry?period=' + period.id})}" class="ff-link" data-ff-make-repay>设成固定还款</a>
-        </div>
-      </th:block>
+    <!-- 到了日子的:待确认 + 总数模式下的清单 -->
+    <div th:each="it : ${s.due}" class="ff-row" data-ff-item
+         th:classappend="${it.state == 'LIST'} ? ' ff-row-list' : ''"
+         th:attr="data-ff-flow=${it.flow != null ? it.flow.id : null}, data-ff-loan=${it.flow != null ? it.flow.targetAccountId : null}, data-ff-state=${it.state}">
 
       <!-- 待确认 / 清单 -->
-      <th:block th:unless="${it.state == 'SUGGEST'}">
+      <th:block>
         <form th:action="@{/entry/fixed/{id}/confirm(id=${it.flow.id})}" method="post" class="ff-form" data-ff-form
               data-backfill-check th:attr="data-account-ids=${it.flow.accountId} + (${it.flow.targetAccountId} != null ? ',' + ${it.flow.targetAccountId} : '')">
           <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">

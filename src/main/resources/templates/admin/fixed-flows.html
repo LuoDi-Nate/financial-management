@@ -32,6 +32,31 @@
     <div th:if="${ffNote}" class="border-l-2 border-forest px-4 py-2.5 text-[13px] mb-5" style="background:rgba(79,107,71,.07)" th:text="${ffNote}">已保存</div>
     <div th:if="${ffError}" class="border-l-2 border-rust bg-rust/[0.05] px-4 py-2.5 text-[13px] mb-5" th:text="${ffError}">出错了</div>
 
+    <section id="loan-setup" class="mb-8" th:if="${loanSetups != null and !#lists.isEmpty(loanSetups)}" data-loan-setup-list>
+      <h2 class="font-display text-2xl mb-3">贷款</h2>
+      <p class="text-sm text-ink-soft mb-4">每笔贷款选择固定还款或每月自己填余额。停用固定还款后会重新提醒;历史余额和已记还款不变。</p>
+      <table class="ledger-table m-cards w-full">
+        <thead><tr><th>贷款</th><th>负责人</th><th>最近上期末欠款</th><th>还款安排</th><th>操作</th></tr></thead>
+        <tbody><tr th:each="loan : ${loanSetups}" th:attr="data-loan-id=${loan.account().id},data-loan-state=${loan.state().name()}">
+          <td class="m-title"><a th:href="@{/accounts/{id}(id=${loan.account().id})}" th:text="${loan.account().displayName}"></a></td>
+          <td data-label="负责人" th:text="${loan.owner()}"></td><td data-label="上期末欠款" class="font-mono" data-priv th:text="${loan.balanceLabel()}"></td>
+          <td class="m-badge" th:text="${loan.stateLabel()}"></td>
+          <td class="m-act"><div class="flex items-center gap-3 flex-wrap">
+            <a th:if="${loan.state().name() == 'SET'}" th:href="@{/admin/fixed-flows/{id}/edit(id=${loan.flow().id})}" class="btn-paper text-xs">修改</a>
+            <th:block th:if="${loan.needsSetup()}">
+              <a th:href="@{/admin/fixed-flows/new(loan=${loan.account().id})}" class="btn-paper text-xs">设成固定还款</a>
+              <form th:action="@{/admin/fixed-flows/loan/{id}/manual(id=${loan.account().id})}" method="post" onsubmit="return confirm('以后这笔贷款每期自己填余额,不再提醒。随时可以在这里改回来。')">
+                <input type="hidden" name="manual" value="true"><button class="btn-ghost text-xs" type="submit">不设,每月自己填</button>
+              </form>
+            </th:block>
+            <form th:if="${loan.state().name() == 'MANUAL'}" th:action="@{/admin/fixed-flows/loan/{id}/manual(id=${loan.account().id})}" method="post">
+              <input type="hidden" name="manual" value="false"><button class="btn-paper text-xs" type="submit" data-loan-restore>改回来</button>
+            </form>
+          </div></td>
+        </tr></tbody>
+      </table>
+    </section>
+
     <div th:if="${total == 0}" class="paper-card p-8 text-center text-ink-soft" data-ff-empty-list>
       <p>还没有固定收支。</p>
       <p class="text-sm mt-2">从「+ 加一条」开始;或者在填报页记一笔收入 / 支出时勾「每月都有,设成固定」。贷款、保险账户的详情页也能一键设。</p>

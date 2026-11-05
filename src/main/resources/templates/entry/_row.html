@@ -120,9 +120,7 @@
             aria-label="刷新">⟳</button>
   </div>
 
-  <!--/* v1.32 FR-1117 · 贷款趋势提示条从这里挪进了「本月收支」下面的固定收支那一行(按钮与结果不变:
-         「接受」仍调 acceptLoanPrediction、「保持上月」仍按上月末提交余额)。这一行只留一句指路 ——
-         填报页变短,而且同一笔贷款不会在两个地方各出一次。 */-->
+  <!--/* Only a real fixed repayment due this period points to confirmation; setup reminders are separate. */-->
   <div th:if="${period.status.name() != 'CLOSED' and fixedSummary != null and fixedSummary.loanPendingIds != null
                  and fixedSummary.loanPendingIds.contains(row.account.id)}"
        class="mt-2 font-mono text-[11px]" data-ff-loan-hint>

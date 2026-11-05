@@ -33,22 +33,10 @@ public record EntryRow(
         /** 本期已划出到其他账户的明细 */
         List<TransferRef> outgoing,
         /** PRD FR-7/8/9:本期所有流水合并视图(snapshot/cash_flow/transfer 统一为 LedgerEntry) */
-        List<LedgerEntry> ledger,
-        /** v0.17.x · 贷款趋势预测建议值(prev+Δ,夹≤0);非贷款 / 无历史 / 无建议为 null */
-        BigDecimal loanSuggestion,
-        /** v0.17.x · 是否在该贷款行显示「接受预测 / 保持上月」提示条(committed==prev 且预测≠prev 且 todo 未确认)*/
-        boolean showLoanPrompt,
-        /** 建议值展示串(带币种符号)*/
-        String loanSuggestionLabel,
-        /** 建议值相对上月的变化串(带正负 + 币种符号)*/
-        String loanSuggestionDeltaLabel
+        List<LedgerEntry> ledger
 ) {
     /** Thymeleaf bean-style accessor 显式提供,绕过 record accessor 在某些 SpEL 上下文下解析为 null 的坑。 */
     public List<LedgerEntry> getLedger() { return ledger; }
-    public BigDecimal getLoanSuggestion() { return loanSuggestion; }
-    public boolean isShowLoanPrompt() { return showLoanPrompt; }
-    public String getLoanSuggestionLabel() { return loanSuggestionLabel; }
-    public String getLoanSuggestionDeltaLabel() { return loanSuggestionDeltaLabel; }
     public List<TransferRef> getIncoming() { return incoming; }
     public List<TransferRef> getOutgoing() { return outgoing; }
     public PeriodSnapshot getCurrentSnapshot() { return currentSnapshot; }
