@@ -33,12 +33,14 @@ public class RetirementController {
 
     @InitBinder("plan")
     void bind(WebDataBinder binder) {
-        binder.setAllowedFields("name", "targetMonth", "monthlyExpense", "monthlyIncome", "monthlyContribution",
+        binder.setAllowedFields("name", "targetMonth", "monthlyExpense", "monthlyContribution",
                 "childReserve", "medicalReserve", "housingReserve", "otherReserve", "educationGoalId", "autoExpense",
                 "excludeOneOff", "excludedCategoryIds", "accountIds", "realizableAmounts[*]", "directRealRate",
                 "nominalReturnPct", "inflationPct", "realReturnPct", "lowReturnPct", "middleReturnPct", "highReturnPct",
                 "contributionFollowsInflation", "budgetConfirmed", "reservesConfirmed", "noOverlapConfirmed", "assetsConfirmed",
-                "incomeConfirmed", "contributionConfirmed", "afterDebtConfirmed", "educationConfirmed");
+                "incomeConfirmed", "contributionConfirmed", "afterDebtConfirmed", "educationConfirmed",
+                "scopeMode", "returnSource", "inflationSource", "reserveMode", "cityTier", "dependentCount", "childPlanningYears[*]",
+                "housingPlan", "simulateFuture", "contributionSource", "advancedScenarios");
     }
 
     @GetMapping("/goals/retirement/new")
@@ -59,7 +61,7 @@ public class RetirementController {
                    @ModelAttribute("plan") RetirementPlan plan, org.springframework.validation.BindingResult binding,
                    @RequestParam(required = false) String ccy, Model model) {
         Goal goal = id == null ? null : retirementGoal(me, id);
-        trustedBasis(me, plan);
+        trustedBasis(me, goal, plan);
         if (binding.hasErrors()) {
             model.addAttribute("error", "金额或选择格式无效,请检查后重试。");
             return page(me, goal, plans.draft(me.getFamilyId(), goal), "plan", ccy, model);
@@ -71,12 +73,13 @@ public class RetirementController {
     @PostMapping({"/goals/retirement/new", "/goals/{id:[0-9]+}/retirement"})
     String save(@AuthenticationPrincipal MemberPrincipal me, @PathVariable(required = false) Long id,
                 @ModelAttribute("plan") RetirementPlan plan, org.springframework.validation.BindingResult binding,
-                @RequestParam(defaultValue = "false") boolean adoptionConfirmed, Model model, RedirectAttributes ra) {
+                @RequestParam(defaultValue = "false") boolean adoptionConfirmed,
+                @RequestParam(defaultValue = "false") boolean revisionConfirmed, Model model, RedirectAttributes ra) {
         Goal goal = id == null ? null : retirementGoal(me, id);
-        trustedBasis(me, plan);
+        trustedBasis(me, goal, plan);
         try {
             if (binding.hasErrors()) throw new IllegalArgumentException("金额或选择格式无效,请检查后重试");
-            Goal saved = plans.save(me.getFamilyId(), id, plan, adoptionConfirmed, me.getMemberId());
+            Goal saved = plans.save(me.getFamilyId(), id, plan, adoptionConfirmed, revisionConfirmed, me.getMemberId());
             ra.addFlashAttribute("note", "退休计划已保存,未修改账户、流水或旧算法参数。");
             return "redirect:/goals/" + saved.getId() + "/retirement";
         } catch (IllegalArgumentException e) {
@@ -97,14 +100,21 @@ public class RetirementController {
     ResponseEntity<String> export(@AuthenticationPrincipal MemberPrincipal me, @PathVariable long id) {
         var goal = retirementGoal(me, id);
         var view = plans.active(me.getFamilyId(), goal).orElseThrow(() -> new IllegalArgumentException("请先采用新方案"));
-        String text = "退休生活账 v1\n计划币种:" + view.plan().getBaseCurrency() + "\n计划金额基准日:" + view.plan().getPriceDate()
+        String text = "退休生活账 修订"+view.plan().getVersion()+"\n计划币种:" + view.plan().getBaseCurrency() + "\n计划金额基准日:" + view.plan().getPriceDate()
                 + "\n本次购买力日期:" + view.result().asOf() + "\n资金账期:" + view.data().balancePeriod()
                 + "\n" + view.result().aiSummary() + "\n来源月份:" + view.data().months()
-                + "\n输入参数:\n" + plans.encode(view.plan())
+                + "\n动态来源:"+view.data().sources()+"\n本次有效参数:\n"+plans.encode(view.effective())+"\n保存参数:\n" + plans.encode(view.plan())
                 + "\n原节目:https://www.bilibili.com/video/BV1yUHP6rEYD/\n480=12/2.5%;名义模式实际回报=(1+R)/(1+通胀)-1。\n";
         return ResponseEntity.ok().header("Content-Type", "text/plain; charset=UTF-8")
                 .header("Content-Disposition", "attachment; filename=retirement-" + id + ".txt")
                 .header("Cache-Control", "no-store").body(text);
+    }
+
+    @PostMapping("/goals/{id:[0-9]+}/retirement/restore-previous")
+    String restorePrevious(@AuthenticationPrincipal MemberPrincipal me,@PathVariable long id,RedirectAttributes ra) {
+        retirementGoal(me,id);plans.restorePrevious(me.getFamilyId(),id,me.getMemberId());
+        ra.addFlashAttribute("note","已恢复升级前的完整方案,含原持续收入与假设。");
+        return "redirect:/goals/"+id+"/retirement";
     }
 
     private Goal retirementGoal(MemberPrincipal me, long id) {
@@ -118,6 +128,14 @@ public class RetirementController {
         p.setPriceDate(LocalDate.now());
     }
 
+    private void trustedBasis(MemberPrincipal me, Goal goal, RetirementPlan p) {
+        trustedBasis(me,p);p.setVersion(2);p.setMonthlyIncome(BigDecimal.ZERO);
+        if(goal!=null) plans.stored(me.getFamilyId(),goal.getId()).ifPresent(old->{
+            p.setPriceInflationPct(old.getPriceInflationPct());
+            // Posted monetary inputs have already been rebased by the edit form.
+        });
+    }
+
     private String page(MemberPrincipal me, Goal goal, RetirementPlan p, String tab, String ccy, Model model) {
         long familyId = me.getFamilyId();
         if (p.getBaseCurrency() == null) trustedBasis(me, p);
@@ -128,7 +146,10 @@ public class RetirementController {
             p = plans.draft(familyId, goal); view = plans.evaluate(familyId, p, null, goal == null, false); tab = "plan";
         }
         var active = goal == null ? java.util.Optional.<RetirementPlanService.View>empty() : plans.active(familyId, goal);
-        if (!Boolean.TRUE.equals(model.getAttribute("previewing")) && active.isPresent()) view = active.get();
+        if (!"plan".equals(tab) && !Boolean.TRUE.equals(model.getAttribute("previewing")) && active.isPresent()) view = active.get();
+        model.addAttribute("upgrading",active.isPresent() && active.get().plan().getVersion()==1 && p.getVersion()>=2);
+        model.addAttribute("priorPlan",active.map(RetirementPlanService.View::plan).orElse(null));
+        model.addAttribute("presets",com.family.finance.calc.RetirementReservePresets.all());
         model.addAttribute("adopting", goal != null && active.isEmpty());
         model.addAttribute("activePlan", active.isPresent());
         model.addAttribute("nativePlan", active.map(RetirementPlanService.View::createdForPlan).orElse(goal == null));
@@ -141,6 +162,7 @@ public class RetirementController {
         BigDecimal factor = data.viewFactor(familyId, p.getBaseCurrency(), requested, LocalDate.now());
         if (factor == null) { requested = p.getBaseCurrency(); factor = BigDecimal.ONE; model.addAttribute("fxNote", "显示币种的汇率缺失,金额继续使用本位币。"); }
         model.addAttribute("money", new Money(requested, factor));
+        model.addAttribute("chartJson",plans.chartJson(view.result(),factor,requested));
         model.addAttribute("formAction", goal == null ? "/goals/retirement/new" : "/goals/" + goal.getId() + "/retirement");
         model.addAttribute("categoryChoices", categories.findByFamily(familyId));
         model.addAttribute("educationChoices", goals.findActiveByFamily(familyId).stream().filter(g -> g.getGoalType() == GoalType.EDUCATION).toList());

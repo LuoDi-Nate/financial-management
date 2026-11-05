@@ -49,4 +49,18 @@ public class RetirementPlan {
     private boolean afterDebtConfirmed;
     private boolean educationConfirmed;
     private String budgetFingerprint;
+    private String scopeMode = "CUSTOM";
+    private String returnSource = "MANUAL";
+    private String inflationSource = "MANUAL";
+    private String reserveMode = "CUSTOM";
+    private String cityTier;
+    private Integer dependentCount;
+    private java.util.List<Integer> childPlanningYears = new java.util.ArrayList<>();
+    private String housingPlan;
+    private int presetVersion = 1;
+    private boolean simulateFuture;
+    private String contributionSource = "MANUAL";
+    private boolean advancedScenarios;
+    private BigDecimal priceInflationPct;
+    private String previousRevisionJson;
 }

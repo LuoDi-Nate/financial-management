@@ -100,4 +100,39 @@ class RetirementPlanServiceTest {
         assertThat(after.principal()).isEqualByComparingTo(before.principal());
         assertThat(after.coverage()).isEqualByComparingTo(before.coverage());
     }
+    @Test void revisionTwoKeepsBasicThresholdIndependentOfOptionalContributionAndOldIncome() {
+        legacy();var p=plan();p.setVersion(2);p.setMonthlyIncome(new BigDecimal("9999"));p.setMonthlyContribution(null);
+        p.setDirectRealRate(true);p.setContributionConfirmed(false);p.setBudgetConfirmed(false);p.setReservesConfirmed(false);p.setAssetsConfirmed(false);p.setIncomeConfirmed(false);
+        var view=service.evaluate(1,p,null,false,false);
+        assertThat(view.result().target()).isEqualByComparingTo("4800000");assertThat(view.result().monthlyIncome()).isZero();assertThat(view.result().problems()).isEmpty();
+        assertThat(view.result().scenarios()).isEmpty();assertThatCode(()->service.validate(p)).doesNotThrowAnyException();
+        p.setSimulateFuture(true);p.setMonthlyContribution(new BigDecimal("10000"));
+        var projected=service.evaluate(1,p,null,false,false).result();
+        assertThat(projected.target()).isEqualByComparingTo(view.result().target());assertThat(projected.scenarios()).hasSize(1);
+    }
+    @Test void explicitUpgradePreservesCompleteRevisionOneAndRequiresSeparateConfirmation() {
+        legacy();var old=plan();old.setMonthlyIncome(new BigDecimal("3000"));String raw=service.encode(old);
+        when(mapper.find(1,9)).thenReturn(Optional.of(new RetirementPlanMapper.Row(9,1,raw,true,false,null)));
+        var revised=service.draft(1,goals.require(1,9));assertThat(revised.getVersion()).isEqualTo(2);assertThat(revised.getMonthlyIncome()).isZero();
+        assertThat(service.active(1,goals.require(1,9)).orElseThrow().result().monthlyIncome()).isEqualByComparingTo("3000");
+        assertThatThrownBy(()->service.save(1,9L,revised,true,false,null)).hasMessageContaining("确认升级");
+        service.save(1,9L,revised,true,true,null);assertThat(revised.getPreviousRevisionJson()).isEqualTo(raw);
+        when(mapper.find(1,9)).thenReturn(Optional.of(new RetirementPlanMapper.Row(9,1,service.encode(revised),true,false,null)));
+        service.restorePrevious(1,9,1L);
+        verify(mapper).save(1,9,raw,true,false);
+    }
+    @Test void automaticRatesRemainMissingRatherThanUsingDormantExampleValues() {
+        legacy();var p=plan();p.setVersion(2);p.setReturnSource("AUTO");p.setInflationSource("AUTO");
+        var view=service.evaluate(1,p,null,false,false);
+        assertThat(view.result().target()).isNull();assertThat(view.effective().getNominalReturnPct()).isNull();
+        assertThat(p.getNominalReturnPct()).isEqualByComparingTo("4.5");assertThat(p.getInflationPct()).isEqualByComparingTo("2");
+        assertThatThrownBy(()->service.save(1,9L,p,true)).hasMessageContaining("上一版固定假设");
+    }
+    @Test void cityModeRequiresExplicitChildrenAndHousingInsteadOfAssumingZero() {
+        var p=plan();p.setVersion(2);p.setReserveMode("CITY");p.setCityTier("SECOND");
+        assertThatThrownBy(()->service.validate(p)).hasMessageContaining("子女人数");
+        p.setDependentCount(0);assertThatThrownBy(()->service.validate(p)).hasMessageContaining("住房安排");
+        p.setHousingPlan("SETTLED");assertThatCode(()->service.validate(p)).doesNotThrowAnyException();
+        p.setDependentCount(1);p.setChildPlanningYears(List.of(31));assertThatThrownBy(()->service.validate(p)).hasMessageContaining("剩余规划年数");
+    }
 }

@@ -167,7 +167,11 @@
               <td class="py-0.5" th:text="${b.year}">2025</td>
               <td class="text-right tnum" th:text="${b.cpiHeadline}+'%'">0.3%</td>
               <td class="text-right tnum" th:text="${b.m2Growth}+'%'">8.0%</td>
-              <td class="text-right text-ink-subtle text-[10px]" th:text="${b.source}">seed</td>
+              <td class="text-right text-ink-subtle text-[10px]">
+                <a th:if="${b.sourceUrl != null}" th:href="${b.sourceUrl}" target="_blank" rel="noopener noreferrer" th:text="${b.source=='official-nbs'?'国家统计局':b.source}"></a>
+                <span th:unless="${b.sourceUrl != null}" th:text="${b.source=='manual'?'人工校正':b.source}"></span>
+                <small class="block" th:text="${b.verifiedAt==null?'未核验':#temporals.format(b.verifiedAt,'yyyy-MM-dd')}"></small>
+              </td>
             </tr>
           </tbody>
         </table>

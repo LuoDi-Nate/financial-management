@@ -108,4 +108,19 @@ class RetirementDataServiceTest {
         assertThat(result.suggestedExpense()).isNull(); assertThat(result.budgetNotes()).anyMatch(s -> s.contains("还款与消费"));
         assertThat(result.suggestedContribution()).isEqualByComparingTo("900");
     }
+    @Test void revisionTwoUsesActualMonthlyAmountsAndExcludesOnlyUnusableMonth() {
+        var p=setup(6L,7L,8L,9L,10L);p.setVersion(2);p.setInflationPct(new BigDecimal("15"));
+        month(6,"1000","100",1,0);month(7,"1000","100",0,1);month(8,"1000","100",0,1);month(9,"1000","100",0,1);
+        budgets.put(6L,new ExpenseLedgerService.RetirementBudget(new BigDecimal("100"),BigDecimal.ZERO,"家庭总额",true));
+        var result=service.load(1,p,today);
+        assertThat(result.suggestedExpense()).isEqualByComparingTo("100");
+        assertThat(result.sources().budgetPeriods()).containsExactly(7L,8L,9L);
+        assertThat(result.months().getFirst().consumption()).isNull();
+    }
+    @Test void revisionTwoRetainsRealRefundsInTheMeanWhileMissingMonthStaysMissing() {
+        var p=setup(7L,8L,9L,10L);p.setVersion(2);
+        month(7,"100","-50",0,1);month(8,"100","100",0,1);month(9,"100","100",0,1);
+        var result=service.load(1,p,today);assertThat(result.suggestedExpense()).isEqualByComparingTo("50");
+        assertThat(result.sources().budgetPeriods()).containsExactly(7L,8L,9L);assertThat(result.months().getLast().consumption()).isNull();
+    }
 }

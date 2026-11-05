@@ -55,6 +55,12 @@ body:has(.retirement-page[data-tab=plan]) #float-dock { position:static; flex-di
 .retire-check .retire-field-hint { margin-top:2px; }
 .retire-check input[type=checkbox], .retire-asset-choice input[type=checkbox] { width:16px; height:16px; flex-shrink:0; margin-top:3px; accent-color:var(--brass-deep); }
 .retire-confirmations { border-top:1px dashed var(--rule-soft); padding-top:8px; margin-top:16px; }
+.retire-mode-options { display:flex; flex-wrap:wrap; gap:8px 24px; margin-bottom:16px; }
+.retire-check input[type=radio] { width:16px; height:16px; flex-shrink:0; margin-top:3px; accent-color:var(--brass-deep); }
+.retire-future { margin-top:32px; padding-bottom:24px; }
+.retire-future > .retire-form-grid { max-width:800px; margin-block:20px; }
+.retire-reference-head b { white-space:normal; overflow-wrap:anywhere; }
+.retirement-page [hidden] { display:none !important; }
 .retire-details { border-top:1px solid var(--rule-soft); margin-top:8px; }
 .retire-details summary { min-height:44px; padding:12px 0; color:var(--brass-text); font-size:calc(13px * var(--fs-scale,1)); line-height:1.5; cursor:pointer; }
 .retire-category-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:0 16px; }

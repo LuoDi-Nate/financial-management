@@ -29,6 +29,8 @@ public class RetirementDataService {
     private final RetirementSourceMapper sources;
     private final ExpenseLedgerService expenses;
     private final MacroBenchmarkMapper macro;
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.family.finance.service.HouseholdCashflowService householdCashflow;
 
     public record Asset(Long id, String name, AccountType type, String currency, BigDecimal original,
                         BigDecimal amount, BigDecimal fx, LocalDateTime recordedAt, boolean eligible,
@@ -38,12 +40,28 @@ public class RetirementDataService {
     public record Data(String baseCurrency, LocalDate balancePeriod, List<Asset> assets, List<Month> months,
                        BigDecimal selectedAssets, BigDecimal debt, BigDecimal suggestedExpense,
                        BigDecimal suggestedContribution, String budgetFingerprint, List<String> problems,
-                       List<String> budgetNotes, String cpiReference) { }
+                       List<String> budgetNotes, String cpiReference, Sources sources) {
+        public Data(String baseCurrency, LocalDate balancePeriod, List<Asset> assets, List<Month> months,
+                    BigDecimal selectedAssets, BigDecimal debt, BigDecimal suggestedExpense, BigDecimal suggestedContribution,
+                    String budgetFingerprint, List<String> problems, List<String> budgetNotes, String cpiReference) {
+            this(baseCurrency,balancePeriod,assets,months,selectedAssets,debt,suggestedExpense,suggestedContribution,
+                    budgetFingerprint,problems,budgetNotes,cpiReference,Sources.empty());
+        }
+    }
+    public record Sources(BigDecimal householdNetWorth, Set<Long> accountIds, BigDecimal cnyToBase,
+                          BigDecimal originalReportAverage, BigDecimal includedReportAverage,
+                          BigDecimal nonConsumptionAverage, BigDecimal removedAverage, List<Long> budgetPeriods,
+                          RetirementRateSources.Rate investment, RetirementRateSources.Rate inflation) {
+        public static Sources empty() { return new Sources(null,Set.of(),null,null,null,null,null,List.of(),
+                RetirementRateSources.Rate.missing("上一版固定假设"),RetirementRateSources.Rate.missing("上一版固定假设")); }
+    }
 
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public Data load(long familyId, RetirementPlan plan, LocalDate today) {
         var family = families.findById(familyId).orElseThrow(() -> new IllegalArgumentException("家庭不存在"));
         String currency = family.getBaseCurrency();
-        var slice = facts.load(new FactFilter(familyId, family.getPeriodType(), today.withDayOfMonth(1).minusMonths(12),
+        boolean revision2=plan.getVersion()>=2;
+        var slice = facts.load(new FactFilter(familyId, family.getPeriodType(), today.withDayOfMonth(1).minusMonths(revision2?37:12),
                 today, true, null, currency));
         List<String> problems = new ArrayList<>(), budgetNotes = new ArrayList<>();
         boolean monthlyPeriods = family.getPeriodType() == com.family.finance.domain.period.PeriodType.MONTHLY;
@@ -65,7 +83,8 @@ public class RetirementDataService {
             BigDecimal amount = row == null ? null : row.endBalanceBase();
             boolean liability = account.getType() == AccountType.LOAN;
             boolean eligible = eligible(account.getType());
-            boolean selected = plan.getAccountIds().contains(account.getId()) && !liability;
+            boolean selected = !liability && (revision2 && "FAMILY_FINANCIAL".equals(plan.getScopeMode())
+                    ? eligible : plan.getAccountIds().contains(account.getId()));
             String note = liability ? "全家庭负债:统一预留一次" : eligible ? "可选择用于退休" : "默认不作为生活本金";
             if ((selected || liability) && original == null) problems.add(account.getDisplayName() + ":当前账期余额未填");
             if ((selected || liability) && factor == null) problems.add(account.getDisplayName() + ":缺少 " + account.getCurrency() + " 换汇来源");
@@ -76,7 +95,8 @@ public class RetirementDataService {
                 amount = plan.getRealizableAmounts().get(account.getId());
                 if (amount == null || amount.signum() < 0) problems.add(account.getDisplayName() + ":需确认可变现金额(本位币)");
                 else amount = amount.multiply(RetirementCalculator.priceFactor(plan.getPriceDate() == null ? today : plan.getPriceDate(),
-                        today, RetirementCalculator.fraction(plan.getInflationPct() == null ? BigDecimal.ZERO : plan.getInflationPct())))
+                        today, RetirementCalculator.fraction(revision2 && plan.getPriceInflationPct()!=null ? plan.getPriceInflationPct()
+                                : plan.getInflationPct() == null ? BigDecimal.ZERO : plan.getInflationPct())))
                         .setScale(2, RoundingMode.HALF_EVEN);
                 note = "按人工确认的可变现金额,不按保额";
             }
@@ -86,8 +106,12 @@ public class RetirementDataService {
             assetRows.add(new Asset(account.getId(), account.getDisplayName(), account.getType(), account.getCurrency(), original,
                     amount, factor, snapshot == null ? null : snapshot.getSubmittedAt(), eligible, selected, liability, note));
         }
-        for (Long id : plan.getAccountIds()) if (!visible.contains(id)) problems.add("选中的账户 #" + id + " 已归档或删除,请重新确认资金范围");
+        if(!revision2 || !"FAMILY_FINANCIAL".equals(plan.getScopeMode()))
+            for (Long id : plan.getAccountIds()) if (!visible.contains(id)) problems.add("选中的账户 #" + id + " 已归档或删除,请重新确认资金范围");
         List<Long> ids = slice.closedPeriodIds() == null ? List.of() : slice.closedPeriodIds();
+        if(revision2)ids=ids.stream().filter(id->slice.periodStartOf(id)!=null
+                && !slice.periodStartOf(id).isBefore(today.withDayOfMonth(1).minusMonths(12))
+                && slice.periodStartOf(id).isBefore(today.withDayOfMonth(1))).toList();
         if (ids.size() > 12) ids = ids.subList(ids.size() - 12, ids.size());
         var presence = ids.isEmpty() ? Map.<Long, RetirementSourceMapper.Presence>of()
                 : sources.presence(familyId, ids).stream().collect(Collectors.toMap(RetirementSourceMapper.Presence::periodId, r -> r));
@@ -115,28 +139,61 @@ public class RetirementDataService {
             String source = budget == null ? explicitlyComplete ? "已确认填完的零支出" : "支出缺失" : budget.source();
             if (budget != null && budget.totalOnly() && budget.amount().signum() != 0)
                 budgetNotes.add(slice.periodStartOf(id) + ":只有家庭支出总额,无法拆出还款与消费;请手填修订生活预算,不自动把总额当长期生活费");
+            if(revision2 && budget!=null && budget.totalOnly() && budget.amount().signum()!=0) consumption=null;
             if (consumption != null && consumption.signum() < 0) budgetNotes.add(slice.periodStartOf(id) + ":退款多于消费,请确认长期预算");
             if (consumption != null) {
                 BigDecimal pi = RetirementCalculator.fraction(plan.getInflationPct() == null ? BigDecimal.ZERO : plan.getInflationPct());
-                expenseValues.add(consumption.multiply(RetirementCalculator.priceFactor(slice.periodStartOf(id), today, pi)));
+                expenseValues.add(revision2?consumption:consumption.multiply(RetirementCalculator.priceFactor(slice.periodStartOf(id), today, pi)));
             }
             months.add(new Month(id, slice.periodStartOf(id), incomeKnown ? cashflow.income() : null,
                     expenseKnown ? cashflow.expense() : null, consumption,
                     budget == null ? BigDecimal.ZERO : budget.removed(), source, expenseKnown && incomeKnown));
         }
-        BigDecimal suggestedExpense = expenseValues.size() < 3 || !budgetNotes.isEmpty() ? null
+        BigDecimal suggestedExpense = expenseValues.size() < 3 || (!revision2 && !budgetNotes.isEmpty()) || !monthlyPeriods ? null
                 : expenseValues.stream().reduce(BigDecimal.ZERO, BigDecimal::add).divide(BigDecimal.valueOf(expenseValues.size()), 2, RoundingMode.HALF_EVEN);
+        if(revision2 && suggestedExpense!=null && suggestedExpense.signum()<0)suggestedExpense=null;
         List<Month> contributionWindow = months.subList(Math.max(0, months.size() - 6), months.size());
         List<BigDecimal> savings = contributionWindow.stream().filter(Month::complete).map(m -> m.income().subtract(m.expense())).sorted().toList();
         BigDecimal contribution = savings.isEmpty() ? null : savings.size() % 2 == 1 ? savings.get(savings.size() / 2)
                 : savings.get(savings.size()/2-1).add(savings.get(savings.size()/2)).divide(BigDecimal.valueOf(2), 2, RoundingMode.HALF_EVEN);
         if (!monthlyPeriods) contribution = null;
         String fingerprint = com.family.finance.service.llmtrace.PromptRecorder.sha256(months.toString());
-        String cpi = macro.findAll().stream().filter(v -> v.getYear() < today.getYear()).max(Comparator.comparing(v -> v.getYear()))
+        var macroRows=macro.findAll();
+        String cpi = macroRows.stream().filter(v -> v.getYear() < today.getYear()).max(Comparator.comparing(v -> v.getYear()))
                 .map(v -> v.getYear() + " 年 CPI " + v.getCpiHeadline() + "% (年度历史参考,不自动替换长期假设)")
                 .orElse("暂无已发布完整年度 CPI 参考,可手填长期假设");
+        Sources traced=Sources.empty();
+        if(revision2) {
+            Set<Long> selected=assetRows.stream().filter(Asset::selected).map(Asset::id).collect(Collectors.toCollection(LinkedHashSet::new));
+            List<Long> budgetIds=months.stream().filter(m->m.consumption()!=null).map(Month::id).toList();
+            RetirementRateSources.Rate investment=!monthlyPeriods?RetirementRateSources.Rate.missing("周账期不能冒充月度投资年回报")
+                    :assetRows.stream().anyMatch(v->v.selected()&&!v.eligible())?RetirementRateSources.Rate.missing("资金范围含人工确认的非金融资产,请自行核对长期回报")
+                    :RetirementRateSources.investment(slice,selected,today,id->facts.cashflowBreakdown(slice,id),row->{
+                        BigDecimal known=factor(row.accountCurrency(),currency,rates.stream().filter(rate->rate.getPeriodStart()!=null
+                                && !rate.getPeriodStart().isAfter(row.periodStart())).toList());
+                        return known!=null && row.fxToBase()!=null && known.subtract(row.fxToBase()).abs().compareTo(new BigDecimal("0.000001"))<=0;
+                    });
+            BigDecimal originalAverage=null,includedAverage=null,removedAverage=null,nonConsumption=null;
+            if(householdCashflow!=null) {
+                var allReport=householdCashflow.reportSavings(new FactSlice(slice.filter(),slice.rows(),ids,ids.isEmpty()?null:ids.getLast(),ids),12);
+                var sourceReport=householdCashflow.reportSavings(new FactSlice(slice.filter(),slice.rows(),budgetIds,budgetIds.isEmpty()?null:budgetIds.getLast(),budgetIds),12);
+                originalAverage=allReport.averageExpense();includedAverage=sourceReport.averageExpense();
+            }
+            if(!budgetIds.isEmpty()) {
+                removedAverage=months.stream().filter(m->m.consumption()!=null).map(Month::removed).reduce(BigDecimal.ZERO,BigDecimal::add)
+                        .divide(BigDecimal.valueOf(budgetIds.size()),2,RoundingMode.HALF_EVEN);
+                BigDecimal consumptionMean=expenseValues.stream().reduce(BigDecimal.ZERO,BigDecimal::add)
+                        .divide(BigDecimal.valueOf(expenseValues.size()),2,RoundingMode.HALF_EVEN);
+                nonConsumption=includedAverage==null?null:includedAverage.subtract(consumptionMean).subtract(removedAverage);
+            }
+            boolean completeNet=active.stream().allMatch(acc->{var row=balances.get(acc.getId());return row!=null && row.endBalanceBase()!=null
+                    && factor(acc.getCurrency(),currency,rates)!=null;});
+            BigDecimal net=completeNet?balances.values().stream().map(AccountPeriodFact::endBalanceBase).filter(Objects::nonNull).reduce(BigDecimal.ZERO,BigDecimal::add):null;
+            traced=new Sources(net,Set.copyOf(selected),factor("CNY",currency,rates),originalAverage,includedAverage,nonConsumption,removedAverage,
+                    List.copyOf(budgetIds),investment,RetirementRateSources.cpi(macroRows,today));
+        }
         return new Data(currency, slice.periodStartOf(slice.lastPeriodId()), List.copyOf(assetRows), List.copyOf(months), a, d,
-                suggestedExpense, contribution, fingerprint, List.copyOf(problems), List.copyOf(budgetNotes), cpi);
+                suggestedExpense, contribution, fingerprint, List.copyOf(problems), List.copyOf(budgetNotes), cpi,traced);
     }
 
     public static boolean eligible(AccountType type) {

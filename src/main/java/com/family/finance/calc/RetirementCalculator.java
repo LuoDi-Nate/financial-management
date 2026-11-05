@@ -32,9 +32,9 @@ public final class RetirementCalculator {
         public BigDecimal totalNeed() { return target == null || reserves == null ? null : target.add(reserves); }
         public BigDecimal netFunds() { return assets == null || debt == null ? null : assets.subtract(debt); }
         public BigDecimal coveragePct() { return coverage == null ? null : coverage.movePointRight(2).setScale(2, RoundingMode.HALF_EVEN); }
-        public LocalDate neutralDate() { return scenarios.size() != 3 ? null : scenarios.get(1).firstReached(); }
+        public LocalDate neutralDate() { return scenarios.size()==1?scenarios.getFirst().firstReached():scenarios.size()==3?scenarios.get(1).firstReached():null; }
         public String aiSummary() {
-            return "退休生活账 v1 · 今天购买力(" + asOf + ") · 状态=" + message
+            return "退休生活账 · 今天购买力(" + asOf + ") · 状态=" + message
                     + " · 本金=" + principal + " · 生活门槛=" + target + " · 单独预留=" + reserves
                     + " · 生活费/月=" + monthlyExpense + " · 计划投入/月=" + monthlyContribution
                     + " · 目标退休月=" + retirementDate + " · 中性首次达到=" + neutralDate()
@@ -45,20 +45,21 @@ public final class RetirementCalculator {
     public static Result calculate(RetirementPlan p, LocalDate today, BigDecimal assets, BigDecimal debt,
                                    BigDecimal autoExpenseToday, List<String> sourceProblems) {
         List<String> problems = new ArrayList<>(sourceProblems);
-        if (!p.isBudgetConfirmed()) problems.add("生活预算尚未确认");
-        if (!p.isReservesConfirmed()) problems.add("单独预留尚未确认");
+        boolean revision2=p.getVersion()>=2;
+        if (!revision2 && !p.isBudgetConfirmed()) problems.add("生活预算尚未确认");
+        if (!revision2 && !p.isReservesConfirmed()) problems.add("单独预留尚未确认");
         if (!p.isNoOverlapConfirmed()) problems.add("生活费与预留的归属尚未核对");
-        if (!p.isAssetsConfirmed()) problems.add("资金范围尚未确认");
-        if (!p.isIncomeConfirmed()) problems.add("退休收入的开始时间与购买力尚未确认");
-        if (!p.isContributionConfirmed()) problems.add("计划月投入尚未确认");
-        if (debt != null && debt.signum() > 0 && !p.isAfterDebtConfirmed()) problems.add("需确认偿清负债后的计划月投入");
+        if (!revision2 && !p.isAssetsConfirmed()) problems.add("资金范围尚未确认");
+        if (!revision2 && !p.isIncomeConfirmed()) problems.add("退休收入的开始时间与购买力尚未确认");
+        if (!revision2 && !p.isContributionConfirmed()) problems.add("计划月投入尚未确认");
+        if (!revision2 && debt != null && debt.signum() > 0 && !p.isAfterDebtConfirmed()) problems.add("需确认偿清负债后的计划月投入");
         BigDecimal inflation = fraction(p.getInflationPct());
         BigDecimal real = p.isDirectRealRate() ? fraction(p.getRealReturnPct())
                 : p.getNominalReturnPct() == null || inflation == null ? null
                 : BigDecimal.ONE.add(fraction(p.getNominalReturnPct())).divide(BigDecimal.ONE.add(inflation), MC).subtract(BigDecimal.ONE);
         BigDecimal factor = p.getPriceDate() == null || inflation == null ? null : priceFactor(p.getPriceDate(), today, inflation);
         BigDecimal expense = p.isAutoExpense() ? autoExpenseToday : money(scale(p.getMonthlyExpense(), factor));
-        BigDecimal income = money(scale(p.getMonthlyIncome(), factor));
+        BigDecimal income = revision2?BigDecimal.ZERO:money(scale(p.getMonthlyIncome(), factor));
         BigDecimal reserves = factor == null || p.getChildReserve() == null || p.getMedicalReserve() == null
                 || p.getHousingReserve() == null || p.getOtherReserve() == null ? null
                 : money(scale(p.getChildReserve(), factor)).add(money(scale(p.getMedicalReserve(), factor)))
@@ -67,10 +68,10 @@ public final class RetirementCalculator {
         if (expense == null) problems.add("生活预算缺失或账上建议不足");
         if (income == null) problems.add("退休月收入缺失");
         if (reserves == null) problems.add("预留金额未填,无需预留也应明确填零");
-        if (contribution == null) problems.add("计划月投入未填");
+        if (!revision2 && contribution == null) problems.add("计划月投入未填");
         if (assets == null || debt == null) problems.add("资金数据尚未补齐");
         if (real == null || inflation == null) problems.add("收益或通胀假设未填");
-        if (p.getLowReturnPct() == null || p.getMiddleReturnPct() == null || p.getHighReturnPct() == null) problems.add("积累期三情景回报未填");
+        if (!revision2 && (p.getLowReturnPct() == null || p.getMiddleReturnPct() == null || p.getHighReturnPct() == null)) problems.add("积累期三情景回报未填");
         LocalDate retirementDate = null;
         try { retirementDate = YearMonth.parse(p.getTargetMonth()).atEndOfMonth(); }
         catch (Exception e) { problems.add("目标退休年月未填或无效"); }
@@ -90,11 +91,15 @@ public final class RetirementCalculator {
         }
         else if (principal.signum() < 0) { state = State.RESERVES_SHORT; message = "单独预留仍有缺口"; }
         else if (target == null) { state = State.NO_FINITE_TARGET; message = "这组假设没有有限的永久本金门槛"; }
-        else if (need.signum() == 0) { state = State.INCOME_COVERS; message = "计划退休起的收入覆盖生活费,仍需保留预留"; }
+        else if (need.signum() == 0) { state = State.INCOME_COVERS; message = revision2?"生活费明确为零,仍需保留负债与预留":"计划退休起的收入覆盖生活费,仍需保留预留"; }
         else { state = State.READY; message = principal.compareTo(target) >= 0 ? "按当前假设达到门槛" : "按当前假设尚有缺口"; }
         List<Scenario> scenarios = List.of();
-        if ((state == State.READY || state == State.INCOME_COVERS) && contribution != null) {
-            scenarios = List.of(project("低回报", p.getLowReturnPct(), principal, contribution, inflation, p.isContributionFollowsInflation(), target, today, retirementDate),
+        boolean projectionRates = revision2 && !p.isAdvancedScenarios() ? p.getMiddleReturnPct()!=null
+                : p.getLowReturnPct()!=null && p.getMiddleReturnPct()!=null && p.getHighReturnPct()!=null;
+        if ((state == State.READY || state == State.INCOME_COVERS) && contribution != null && projectionRates && (!revision2 || p.isSimulateFuture())) {
+            scenarios = revision2 && !p.isAdvancedScenarios()
+                    ? List.of(project("当前假设",p.getMiddleReturnPct(),principal,contribution,inflation,p.isContributionFollowsInflation(),target,today,retirementDate))
+                    : List.of(project("低回报", p.getLowReturnPct(), principal, contribution, inflation, p.isContributionFollowsInflation(), target, today, retirementDate),
                     project("中回报", p.getMiddleReturnPct(), principal, contribution, inflation, p.isContributionFollowsInflation(), target, today, retirementDate),
                     project("高回报", p.getHighReturnPct(), principal, contribution, inflation, p.isContributionFollowsInflation(), target, today, retirementDate));
         }

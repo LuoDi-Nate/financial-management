@@ -38,6 +38,7 @@ public class MacroBenchmarkService {
     }
 
     public void upsert(MacroBenchmark b) {
+        if("manual".equals(b.getSource())) b.setVerifiedAt(java.time.LocalDateTime.now());
         mapper.upsert(b);
         log.info("macro_benchmark upsert · year={} cpi={} m2={} source={}",
                 b.getYear(), b.getCpiHeadline(), b.getM2Growth(), b.getSource());

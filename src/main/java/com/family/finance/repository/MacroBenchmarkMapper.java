@@ -17,25 +17,25 @@ import java.util.Optional;
 @Mapper
 public interface MacroBenchmarkMapper {
 
-    @Select("SELECT year, cpi_headline AS cpiHeadline, m2_growth AS m2Growth, source, fetched_at AS fetchedAt "
+    @Select("SELECT year, cpi_headline AS cpiHeadline, m2_growth AS m2Growth, source, fetched_at AS fetchedAt, source_url AS sourceUrl, verified_at AS verifiedAt "
             + "FROM macro_benchmark ORDER BY year")
     List<MacroBenchmark> findAll();
 
-    @Select("SELECT year, cpi_headline AS cpiHeadline, m2_growth AS m2Growth, source, fetched_at AS fetchedAt "
+    @Select("SELECT year, cpi_headline AS cpiHeadline, m2_growth AS m2Growth, source, fetched_at AS fetchedAt, source_url AS sourceUrl, verified_at AS verifiedAt "
             + "FROM macro_benchmark WHERE year = #{year}")
     Optional<MacroBenchmark> findByYear(@Param("year") int year);
 
-    @Select("SELECT year, cpi_headline AS cpiHeadline, m2_growth AS m2Growth, source, fetched_at AS fetchedAt "
+    @Select("SELECT year, cpi_headline AS cpiHeadline, m2_growth AS m2Growth, source, fetched_at AS fetchedAt, source_url AS sourceUrl, verified_at AS verifiedAt "
             + "FROM macro_benchmark WHERE year BETWEEN #{from} AND #{to} ORDER BY year")
     List<MacroBenchmark> findRange(@Param("from") int from, @Param("to") int to);
 
     @Update("""
-            INSERT INTO macro_benchmark (year, cpi_headline, m2_growth, source)
-            VALUES (#{year}, #{cpiHeadline}, #{m2Growth}, #{source})
+            INSERT INTO macro_benchmark (year, cpi_headline, m2_growth, source, source_url, verified_at)
+            VALUES (#{year}, #{cpiHeadline}, #{m2Growth}, #{source}, #{sourceUrl}, #{verifiedAt})
             ON DUPLICATE KEY UPDATE
                 cpi_headline = VALUES(cpi_headline),
                 m2_growth    = VALUES(m2_growth),
-                source       = VALUES(source)
+                source       = VALUES(source), source_url = VALUES(source_url), verified_at = VALUES(verified_at), fetched_at = CURRENT_TIMESTAMP(3)
             """)
     int upsert(MacroBenchmark b);
 }

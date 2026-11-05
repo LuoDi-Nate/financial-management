@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 无 HTTP/数据库操作;可在服务端 AI 测试开关尚未实现时运行。
+# Read-only architecture guards; no HTTP or database mutations.
 set -eu
 qa139_root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$qa139_root"
@@ -30,5 +30,17 @@ check rg -q 'retirement_plans.csv' "$java/service/export/CsvExportService.java"
 for qa139_file in docker/clean-dev-data.sh deploy/deploy.sh deploy/_deploy-macos.sh; do check rg -q 'TRUNCATE TABLE retirement_plan;' "$qa139_file"; done
 check rg -q 'referrerpolicy="no-referrer"' src/main/resources/templates/goals/retirement.html
 check rg -q "addEventListener\('vpchange'" src/main/resources/static/js/retirement.js
+check rg -q 'FAMILY_FINANCIAL' "$java/service/goal/RetirementDataService.java"
+check rg -q 'reportSavings\(' "$java/service/goal/RetirementDataService.java"
+check rg -q 'points.size\(\)<12' "$java/service/goal/RetirementRateSources.java"
+check rg -q 'year=last-9' "$java/service/goal/RetirementRateSources.java"
+check rg -q 'previousRevisionJson|PreviousRevisionJson' "$java/service/goal/RetirementPlanService.java"
+check rg -q 'source=.seed.' db/migration/V79__verified_macro_sources.sql
+check rg -q 'data-retire-live' src/main/resources/templates/goals/retirement.html
+if rg -q 'name="monthlyIncome"|field="\*\{monthlyIncome\}"' src/main/resources/templates/goals/retirement.html; then echo 'FAIL: 标准表单仍收集持续收入' >&2; exit 1; fi
+qa139_pass=$((qa139_pass+1))
+check rg -q 'testStart = await guard.begin' scripts/e2e/lib/browser.cjs
+check rg -q 'beforeSend\(' "$java/service/checkup/llm/AbstractOpenAiCompatibleClient.java"
+check rg -q 'llmTestGate.block|testGate.block' "$java/service/checkup/llm/LlmRouter.java"
 check python3 scripts/family-isolation-audit.py
 echo "PASS: v1.39 $qa139_pass 项只读静态守护"

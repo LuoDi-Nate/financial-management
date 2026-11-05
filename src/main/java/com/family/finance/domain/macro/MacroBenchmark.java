@@ -30,4 +30,6 @@ public class MacroBenchmark {
     private BigDecimal m2Growth;
     private String source;
     private LocalDateTime fetchedAt;
+    private String sourceUrl;
+    private LocalDateTime verifiedAt;
 }
