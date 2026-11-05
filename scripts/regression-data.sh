@@ -416,6 +416,7 @@ fi
 # ============================================================================
 section "主线 12 · 支出逐笔化(v1.8 · 模式开关 + 扣余额 + 删除冲回 + 三条红线 + 支出构成)"
 XP="$(db "SELECT id FROM period WHERE family_id=$FAM AND status='OPEN' ORDER BY period_start DESC LIMIT 1")"
+XNOTE="e2e日常-$$"
 XA="$(db "SELECT id FROM account WHERE family_id=$FAM AND type='CASH' AND archived_at IS NULL ORDER BY id LIMIT 1")"
 XL="$(db "SELECT id FROM account WHERE family_id=$FAM AND type='LOAN' AND archived_at IS NULL ORDER BY id LIMIT 1")"
 if [ -n "$XP" ] && [ -n "$XA" ]; then
@@ -447,7 +448,7 @@ if [ -n "$XP" ] && [ -n "$XA" ]; then
   # 默认 true 会让「不扣余额」这个选项彻底失效,而那正是 v1.21 要的能力。
   c="$(POSTcode /entry/expense --data-urlencode "periodId=$XP" --data-urlencode "accountId=$XA" \
         --data-urlencode "categoryCode=consumption" --data-urlencode "amount=3200" \
-        --data-urlencode "affectsBalance=true" --data-urlencode "note=e2e日常")"
+        --data-urlencode "affectsBalance=true" --data-urlencode "note=$XNOTE")"
   eq "支出-录入 HTTP 2xx/3xx" "$([ "$c" -ge 200 ] && [ "$c" -lt 400 ] && echo ok || echo "$c")" "ok"
   eq "支出-账户余额 −3200(录入即出账)" "$(( xb0 - $(db "SELECT ROUND(end_balance) FROM period_snapshot WHERE period_id=$XP AND account_id=$XA") ))" "3200"
   # v1.21 FR-571 · 「落到账户」是【可选】的。不勾时 checkbox 不提交任何值 → 服务端 false →
@@ -463,7 +464,7 @@ if [ -n "$XP" ] && [ -n "$XA" ]; then
      "$(db "SELECT COUNT(*) FROM cash_flow WHERE period_id=$XP AND account_id=$XA AND note='e2e不扣余额' AND deleted_at IS NULL")" "1"
 
   eq "支出-流水 kind=EXPENSE 且 is_adjustment=0(口径 A · 家庭支出)" \
-     "$(db "SELECT CONCAT(kind,'|',is_adjustment) FROM cash_flow WHERE period_id=$XP AND account_id=$XA AND note='e2e日常' AND deleted_at IS NULL ORDER BY id DESC LIMIT 1")" "EXPENSE|0"
+     "$(db "SELECT CONCAT(kind,'|',is_adjustment) FROM cash_flow WHERE period_id=$XP AND account_id=$XA AND note='$XNOTE' AND deleted_at IS NULL ORDER BY id DESC LIMIT 1")" "EXPENSE|0"
 
   # ④ 服务端红线
   #    v1.19.3 起「被拒」的落地形态变了:校验失败不再冒成 500,而是带 flashError 回填报页(302)——
@@ -525,18 +526,33 @@ if [ -n "$XP" ] && [ -n "$XA" ]; then
   eq "支出-红线拒绝后未写库" \
      "$(db "SELECT COUNT(*) FROM cash_flow WHERE period_id=$XP AND kind='EXPENSE' AND category_code IN ('salary','cash_adjust','loan_payment','interest_paid') AND account_id=$XA AND deleted_at IS NULL")" "0"
 
-  # ⑤ 支出构成:段出现 + 该类目金额进得去
-  R="$(GET /reports)"
+  # ⑤ The rollover case can leave XP in the future. Report drawers follow their
+  # observed sealed month, so verify exclusion before adding a composition-only
+  # synthetic line in an eligible month. The global baseline restores everything.
+  if [ "$(db "SELECT period_start>CURDATE() FROM period WHERE id=$XP")" = 1 ]; then
+    DT="$(GET "/reports/expense-mix/detail?dim=category&groupKey=consumption&mixWin=1")"
+    case "$DT" in *"$XNOTE"*) bad "支出-未来账期不可混入观察窗" "future period=$XP" ;;
+      *) ok "支出-未来账期未混入观察窗" ;; esac
+  fi
+  XOBS="$(db "SELECT id FROM period WHERE family_id=$FAM AND status='CLOSED' AND period_start<=CURDATE() ORDER BY period_start DESC LIMIT 1")"
+  XOBS_DATE="$(db "SELECT period_start FROM period WHERE id=$XOBS")"
+  XOBS_MEMBER="$(db "SELECT MIN(id) FROM member WHERE family_id=$FAM AND archived_at IS NULL")"
+  XOBS_NOTE="e2e-observed-drawer-$$"
+  db "INSERT INTO cash_flow(period_id,account_id,kind,category_code,amount,affects_balance,is_adjustment,submitted_by,note)
+      VALUES($XOBS,$XA,'EXPENSE','consumption',23.45,0,0,$XOBS_MEMBER,'$XOBS_NOTE')"
+  XOBS_CF="$(db "SELECT id FROM cash_flow WHERE period_id=$XOBS AND account_id=$XA AND note='$XOBS_NOTE' ORDER BY id DESC LIMIT 1")"
+  R="$(GET "/reports?asof=$XOBS_DATE&range=1M&mixWin=1")"
   case "$R" in *'sec-expense-mix'*) eq "支出-报表出现支出构成段" ok ok ;;
                 *) bad "支出-构成段未渲染" "see /reports" ;; esac
   case "$R" in *'日常开支'*) eq "支出-构成含「日常开支」分组(consumption 已改名)" ok ok ;;
                 *) bad "支出-构成缺日常开支" "see /reports" ;; esac
-  DT="$(GET "/reports/expense-mix/detail?dim=category&groupKey=consumption&mixWin=1")"
-  case "$DT" in *'e2e日常'*) eq "支出-构成明细抽屉出逐笔" ok ok ;;
-                 *) bad "支出-明细抽屉无数据" "see /reports/expense-mix/detail" ;; esac
+  DT="$(GET "/reports/expense-mix/detail?dim=category&groupKey=consumption&mixWin=1&range=1M&asof=$XOBS_DATE")"
+  case "$DT" in *"$XOBS_NOTE"*) eq "支出-构成明细抽屉沿所选观察期出逐笔" ok ok ;;
+                 *) bad "支出-明细抽屉无数据" "asof=$XOBS_DATE fixture=$XOBS_CF" ;; esac
+  db "DELETE FROM cash_flow WHERE id=$XOBS_CF AND note='$XOBS_NOTE'"
 
   # ⑥ 删除 → 余额冲回原值
-  xcf="$(db "SELECT id FROM cash_flow WHERE period_id=$XP AND account_id=$XA AND note='e2e日常' AND deleted_at IS NULL ORDER BY id DESC LIMIT 1")"
+  xcf="$(db "SELECT id FROM cash_flow WHERE period_id=$XP AND account_id=$XA AND note='$XNOTE' AND deleted_at IS NULL ORDER BY id DESC LIMIT 1")"
   POSTcode "/entry/expense/$xcf/delete" --data-urlencode "periodId=$XP" >/dev/null
   eq "支出-删除后余额冲回" "$(db "SELECT ROUND(end_balance) FROM period_snapshot WHERE period_id=$XP AND account_id=$XA")" "$xb0"
   eq "支出-删除是软删(留痕可追)" "$(db "SELECT IF(deleted_at IS NULL,'no','yes') FROM cash_flow WHERE id=$xcf")" "yes"
