@@ -57,7 +57,8 @@ module.exports={
     if(!state.family)return;const f=state.family;
     db.raw(`DELETE FROM fixed_flow_occurrence WHERE family_id=${f};DELETE FROM fixed_flow WHERE family_id=${f};DELETE FROM audit_log WHERE family_id=${f};
       DELETE s FROM period_snapshot s JOIN period p ON p.id=s.period_id WHERE p.family_id=${f};DELETE FROM period WHERE family_id=${f};
-      DELETE FROM account WHERE family_id=${f};DELETE FROM family_runtime_config WHERE family_id=${f};DELETE FROM member WHERE family_id=${f};DELETE FROM family WHERE id=${f};`);
+      DELETE FROM account WHERE family_id=${f};DELETE FROM family_runtime_config WHERE family_id=${f};
+      DELETE FROM persistent_logins WHERE username=${q(state.name)};DELETE FROM member WHERE family_id=${f};DELETE FROM family WHERE id=${f};`);
     report.info('已清理贷款隔离家庭');state.family=null;
   }
 };

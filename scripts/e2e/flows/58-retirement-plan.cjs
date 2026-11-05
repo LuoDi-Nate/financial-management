@@ -385,6 +385,7 @@ module.exports = {
       DELETE g FROM period_account_group g JOIN period p ON p.id=g.period_id WHERE p.family_id=${f};
       DELETE FROM fx_rate WHERE family_id=${f}; DELETE FROM period WHERE family_id=${f};
       DELETE FROM account WHERE family_id=${f}; DELETE FROM family_runtime_config WHERE family_id=${f};
+      DELETE FROM persistent_logins WHERE username=${q(state.username)};
       DELETE FROM member WHERE family_id=${f}; DELETE FROM family WHERE id=${f};`);
     report.info('已清理隔离家庭与全部退休样本,原 beta 家庭未改动'); state.family=null;
   }
