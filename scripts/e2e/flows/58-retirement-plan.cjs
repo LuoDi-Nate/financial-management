@@ -397,6 +397,16 @@ module.exports = {
     await ui.goto(`/goals/${pendingGoal}/retirement?tab=plan`);
     await ui.assert(!(await ui.page.locator('[data-retire-live="funds"]').innerText()).includes('当前账期余额未填'),'补齐余额后直接重读数据,无需重新保存配置');
     await ui.assert(db.one(`SELECT plan_json FROM retirement_plan WHERE goal_id=${pendingGoal} AND family_id=${state.family}`)===savedConfig,'演算读取新余额不回写计划');
+    await ui.choose('scopeMode','CUSTOM');
+    const home=db.num(`SELECT id FROM account WHERE family_id=${state.family} AND type='PROPERTY'`);
+    await ui.page.check(`[name="accountIds"][value="${home}"]`);
+    await ui.assert(await ui.page.locator('.retire-realizable').count()===0,'自定义范围只选账户,不要求另填估值');
+    await ui.click('[data-retire-save]','保存主动选择的账户范围');
+    await ui.goto(`/goals/${pendingGoal}/retirement?tab=plan`);
+    await ui.assert((await ui.page.locator('[data-retire-live="funds"]').innerText()).includes('16,100,000.00'),'自定义所选账户按最新账面值汇总');
+    db.raw(`UPDATE period_snapshot SET end_balance=10010000 WHERE period_id=${latest} AND account_id=${home}`);
+    await ui.goto(`/goals/${pendingGoal}/retirement?tab=plan`);
+    await ui.assert((await ui.page.locator('[data-retire-live="funds"]').innerText()).includes('16,110,000.00'),'主动选入的非金融账户也实时读取余额,不冻结金额');
     await ui.phone(async mobile=>{
       await login(mobile.page,state.username);await mobile.goto('/goals/retirement/new');
       await mobile.page.check('[name="cityTier"][value="FIRST"]');

@@ -93,12 +93,6 @@
     if (form.elements.namedItem('revisionConfirmed') && !checked('revisionConfirmed')) fail('revisionConfirmed', '请确认升级修订二,原方案会完整保留');
     if (value('inflationSource') === 'MANUAL') amount('inflationPct', '通胀率', -20, 50, false);
     if (value('returnSource') === 'MANUAL') amount(checked('directRealRate') ? 'realReturnPct' : 'nominalReturnPct', '回报率', -99, 100, false);
-    if (value('scopeMode') === 'CUSTOM') root.querySelectorAll('.retire-asset-row').forEach(row => {
-      if (row.querySelector('[name="accountIds"]').checked) {
-        const input = row.querySelector('.retire-realizable input');
-        if (input) amount(input.name, '可变现金额');
-      }
-    });
     if (checked('simulateFuture')) {
       if (value('contributionSource') === 'MANUAL') amount('monthlyContribution', '每月结余', -1000000000, 1000000000);
       if (checked('advancedScenarios')) {

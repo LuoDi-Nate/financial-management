@@ -91,7 +91,7 @@ public class RetirementDataService {
             if ((selected || liability) && row != null && factor != null && row.fxToBase() != null
                     && row.fxToBase().subtract(factor).abs().compareTo(new BigDecimal("0.000001")) > 0)
                 problems.add(account.getDisplayName() + ":当前事实换汇与可追溯汇率不一致,请先核对汇率");
-            if (selected && !eligible) {
+            if (selected && !eligible && !revision2) {
                 amount = plan.getRealizableAmounts().get(account.getId());
                 if (amount == null || amount.signum() < 0) problems.add(account.getDisplayName() + ":需确认可变现金额(本位币)");
                 else amount = amount.multiply(RetirementCalculator.priceFactor(plan.getPriceDate() == null ? today : plan.getPriceDate(),
@@ -100,6 +100,7 @@ public class RetirementDataService {
                         .setScale(2, RoundingMode.HALF_EVEN);
                 note = "按人工确认的可变现金额,不按保额";
             }
+            if (selected && !eligible && revision2) note = "按账户最新账面估值纳入;实物或保单不等于可随时支用的现金";
             if (liability && amount != null) d = d.add(amount.abs());
             if (selected && amount != null) a = a.add(amount);
             var snapshot = snapshotById.get(account.getId());
@@ -171,7 +172,7 @@ public class RetirementDataService {
             Set<RetirementSourceMapper.SnapshotPoint> actualSnapshots=slice.closedPeriodIds().isEmpty()?Set.of():
                     new HashSet<>(sources.snapshots(familyId,slice.closedPeriodIds()));
             RetirementRateSources.Rate investment=!monthlyPeriods?RetirementRateSources.Rate.missing("周账期不能冒充月度投资年回报")
-                    :assetRows.stream().anyMatch(v->v.selected()&&!v.eligible())?RetirementRateSources.Rate.missing("资金范围含人工确认的非金融资产,请自行核对长期回报")
+                    :assetRows.stream().anyMatch(v->v.selected()&&!v.eligible())?RetirementRateSources.Rate.missing("资金范围含非金融资产,请自行核对长期回报")
                     :RetirementRateSources.investment(history,selected,today,id->facts.cashflowBreakdown(history,id),row->
                         row.fxToBase()!=null && actualSnapshots.contains(new RetirementSourceMapper.SnapshotPoint(row.periodId(),row.accountId())));
             BigDecimal originalAverage=null,includedAverage=null,removedAverage=null,nonConsumption=null;

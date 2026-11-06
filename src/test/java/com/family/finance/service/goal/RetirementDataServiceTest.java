@@ -137,6 +137,10 @@ class RetirementDataServiceTest {
         assertThat(household.sources().householdNetWorth()).isEqualByComparingTo("500");
         assertThat(p.getAccountIds()).isEmpty();p.setScopeMode("CUSTOM");
         assertThat(service.load(1,p,today).selectedAssets()).isZero();
+        cash.setType(AccountType.PROPERTY);p.getAccountIds().add(99L);p.getRealizableAmounts().put(99L,new BigDecimal("123"));
+        assertThat(service.load(1,p,today).selectedAssets()).isEqualByComparingTo("500");
+        when(row.endBalanceOrig()).thenReturn(new BigDecimal("600"));when(row.endBalanceBase()).thenReturn(new BigDecimal("600"));
+        assertThat(service.load(1,p,today).selectedAssets()).isEqualByComparingTo("600");
     }
     @Test void missingActualSnapshotCannotBecomeACompleteReturnIntervalThroughCarryForward() {
         var p=setup();p.setVersion(2);p.setScopeMode("FAMILY_FINANCIAL");

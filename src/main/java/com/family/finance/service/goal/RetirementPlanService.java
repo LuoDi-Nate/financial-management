@@ -286,7 +286,6 @@ public class RetirementPlanService {
         }
         if(!p.isNoOverlapConfirmed()) throw new IllegalArgumentException("请确认生活费与额外预留不重复");
         if(p.getAccountIds()==null || p.getExcludedCategoryIds()==null || p.getRealizableAmounts()==null) throw new IllegalArgumentException("账户和分类选择无效");
-        p.getRealizableAmounts().forEach((id,value)->{if(p.getAccountIds().contains(id)) nonnegative(value,"可变现金额");});
         if(p.isSimulateFuture()) {
             if("MANUAL".equals(p.getContributionSource())) {range(p.getMonthlyContribution(),new BigDecimal("-1000000000"),new BigDecimal("1000000000"),"每月结余");cents(p.getMonthlyContribution(),"每月结余");}
             if(p.isAdvancedScenarios()) {

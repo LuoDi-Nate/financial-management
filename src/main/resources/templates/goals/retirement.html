@@ -630,7 +630,7 @@
                         >
                         </span>
                       </label>
-                      <div th:if="${!a.eligible()}" class="retire-realizable">
+                      <div th:if="${plan.version==1 and !a.eligible()}" class="retire-realizable">
                         <label
                           class="field-label"
                           th:for="${'realizable-'+a.id()}"
