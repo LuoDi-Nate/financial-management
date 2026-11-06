@@ -415,6 +415,7 @@ module.exports = {
       await mobile.click('[data-retire-save]','手机前端提示未填配置');
       await mobile.visible('[data-retire-field-error="dependentCount"]','手机字段旁显示错误');
       await mobile.choose('dependentCount','1');await mobile.choose('childPlanningYears[0]','6');
+      await mobile.page.waitForFunction(()=>document.querySelector('[data-reserve-amount="education"]').textContent.includes('144,000.00'));
       await mobile.page.locator('#retire-reserves').screenshot({path:'/tmp/finance-v139-review/mobile-feedback-reserves.png'});
       await mobile.assert(await mobile.page.locator('.lsel-btn').evaluateAll(buttons=>buttons.filter(el=>el.getClientRects().length).every(el=>el.getBoundingClientRect().right<=innerWidth+1)),'手机自研下拉按钮均在屏内');
     });
