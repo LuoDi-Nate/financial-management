@@ -397,6 +397,7 @@ module.exports = {
     await ui.goto(`/goals/${pendingGoal}/retirement?tab=plan`);
     await ui.assert(!(await ui.page.locator('[data-retire-live="funds"]').innerText()).includes('当前账期余额未填'),'补齐余额后直接重读数据,无需重新保存配置');
     await ui.assert(db.one(`SELECT plan_json FROM retirement_plan WHERE goal_id=${pendingGoal} AND family_id=${state.family}`)===savedConfig,'演算读取新余额不回写计划');
+    await ui.click('#retire-scope > summary','展开当前默认折叠的资金范围');
     await ui.choose('scopeMode','CUSTOM');
     const home=db.num(`SELECT id FROM account WHERE family_id=${state.family} AND type='PROPERTY'`);
     await ui.page.check(`[name="accountIds"][value="${home}"]`);
