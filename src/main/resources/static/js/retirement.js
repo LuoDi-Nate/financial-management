@@ -6,12 +6,29 @@
   let chartData = JSON.parse(document.getElementById('retirement-chart-data').textContent);
   function value(name) { return form.elements.namedItem(name)?.value; }
   function checked(name) { return !!form.elements.namedItem(name)?.checked; }
+  function enhanceSelectors() {
+    window.LensSelect.enhanceAll(root);
+    root.querySelectorAll('select[data-lsel]').forEach(sel => {
+      const button = sel.closest('.lsel').querySelector('.lsel-btn');
+      button.classList.add('field-input');
+      if (sel.labels?.[0]) {
+        const label = sel.labels[0];
+        if (!label.id) label.id = sel.id + '-label';
+        button.setAttribute('aria-labelledby', label.id);
+        if (!label.dataset.retireSelectLabel) {
+          label.dataset.retireSelectLabel = 'true';
+          label.addEventListener('click', event => { event.preventDefault(); button.focus(); });
+        }
+      }
+    });
+  }
   function modes() {
     const conditions = {
       'manual-expense': value('autoExpense') !== 'true', 'custom-scope': value('scopeMode') === 'CUSTOM',
       'city-reserves': value('reserveMode') === 'CITY', 'custom-reserves': value('reserveMode') === 'CUSTOM',
       housing: value('reserveMode') === 'CUSTOM' || value('housingPlan') === 'CHANGE',
       'manual-return': value('returnSource') === 'MANUAL', 'manual-inflation': value('inflationSource') === 'MANUAL',
+      'nominal-return': value('returnSource') === 'MANUAL' && !checked('directRealRate'),
       'manual-contribution': value('contributionSource') === 'MANUAL', advanced: checked('advancedScenarios')
     };
     root.querySelectorAll('[data-retire-when]').forEach(el => { el.hidden = !conditions[el.dataset.retireWhen]; });
@@ -25,10 +42,79 @@
       const row = document.createElement('div'), label = document.createElement('label'), select = document.createElement('select');
       label.className = 'field-label'; label.htmlFor = 'child-years-' + i; label.textContent = '子女 ' + (i + 1) + ' · 剩余规划年数';
       select.id = label.htmlFor; select.name = 'childPlanningYears[' + i + ']'; select.className = 'field-input';
+      select.setAttribute('data-lsel', '');
       select.add(new Option('请选择剩余年数', ''));
       for (let y = 0; y <= 30; y++) select.add(new Option(y + ' 年' + ({18:' · 幼儿参考',12:' · 小学参考',6:' · 中学参考',3:' · 大学参考'}[y] || ''), String(y)));
       select.value = old[i] ?? ''; row.append(label, select); box.append(row);
     }
+    enhanceSelectors();
+  }
+  const touched = new Set();
+  let submitted = false;
+  form.noValidate = true;
+  function validateConfiguration(showAll) {
+    const errors = new Map();
+    function fail(name, message) { if (!errors.has(name)) errors.set(name, message); }
+    function required(name, message) { if (!String(value(name) ?? '').trim()) fail(name, message); }
+    function amount(name, label, min = 0, max = 1000000000000, cents = true) {
+      const raw = String(value(name) ?? '').trim();
+      const number = Number(raw);
+      if (!raw || !Number.isFinite(number) || number < min || number > max) fail(name, label + '请填写' + min + '至' + max + '之间的数值');
+      else if (cents && !/^-?\d+(?:\.\d{1,2})?$/.test(raw)) fail(name, label + '最多保留两位小数');
+    }
+    required('name', '请填写目标名称');
+    if (String(value('name') || '').length > 64) fail('name', '目标名称最多64字');
+    const month = String(value('targetMonth') || ''), parts = month.split('-').map(Number), now = new Date();
+    if (!/^\d{4}-\d{2}$/.test(month) || parts[0] < 1 || parts[1] < 1 || parts[1] > 12) fail('targetMonth', '请选择有效退休年月');
+    else if ((parts[0] - now.getFullYear()) * 12 + parts[1] - now.getMonth() - 1 > 600) fail('targetMonth', '目标年月须在未来50年内');
+    if (value('autoExpense') !== 'true') amount('monthlyExpense', '每月生活费');
+    if (value('reserveMode') === 'CITY') {
+      required('cityTier', '请选择城市方案');
+      required('dependentCount', '请选择需要额外教育预留的子女人数,无需预留请选择0位');
+      const count = Number(value('dependentCount')) || 0;
+      for (let i = 0; i < count; i++) required('childPlanningYears[' + i + ']', '请选择子女 ' + (i + 1) + ' 的剩余规划年数');
+      required('housingPlan', '请选择住房安排');
+      if (value('housingPlan') === 'CHANGE') amount('housingReserve', '住房净新增现金需求');
+    } else {
+      [['childReserve','额外教育预留'],['medicalReserve','医疗现金储备'],['housingReserve','住房净新增现金需求'],['otherReserve','应急及其他预留']]
+        .forEach(([name,label]) => amount(name,label));
+      if (value('educationGoalId') && !checked('educationConfirmed')) fail('educationConfirmed', '请核对关联教育目标的币值日期与剩余费用');
+    }
+    if (!checked('noOverlapConfirmed')) fail('noOverlapConfirmed', '请确认生活费与大额支出准备金没有重复');
+    if (form.elements.namedItem('adoptionConfirmed') && !checked('adoptionConfirmed')) fail('adoptionConfirmed', '请先比较旧新算法,并确认采用新方案');
+    if (form.elements.namedItem('revisionConfirmed') && !checked('revisionConfirmed')) fail('revisionConfirmed', '请确认升级修订二,原方案会完整保留');
+    if (value('inflationSource') === 'MANUAL') amount('inflationPct', '通胀率', -20, 50, false);
+    if (value('returnSource') === 'MANUAL') amount(checked('directRealRate') ? 'realReturnPct' : 'nominalReturnPct', '回报率', -99, 100, false);
+    if (value('scopeMode') === 'CUSTOM') root.querySelectorAll('.retire-asset-row').forEach(row => {
+      if (row.querySelector('[name="accountIds"]').checked) {
+        const input = row.querySelector('.retire-realizable input');
+        if (input) amount(input.name, '可变现金额');
+      }
+    });
+    if (checked('simulateFuture')) {
+      if (value('contributionSource') === 'MANUAL') amount('monthlyContribution', '每月结余', -1000000000, 1000000000);
+      if (checked('advancedScenarios')) {
+        ['lowReturnPct','middleReturnPct','highReturnPct'].forEach(name => amount(name,'情景回报',-99,100,false));
+        if (Number(value('lowReturnPct')) > Number(value('middleReturnPct')) || Number(value('middleReturnPct')) > Number(value('highReturnPct')))
+          fail('middleReturnPct', '情景回报应满足低≤中≤高');
+      }
+    }
+    root.querySelectorAll('[data-retire-field-error]').forEach(el => el.remove());
+    root.querySelectorAll('[aria-invalid="true"]').forEach(el => { el.removeAttribute('aria-invalid'); el.removeAttribute('aria-describedby'); });
+    errors.forEach((message,name) => {
+      if (!showAll && !submitted && !touched.has(name)) return;
+      const control = form.elements.namedItem(name);
+      const input = control instanceof RadioNodeList ? control[0] : control;
+      if (!input) return;
+      const visible = input.closest('.lsel')?.querySelector('.lsel-btn') || input;
+      const text = document.createElement('p');
+      text.id = 'retire-error-' + name.replace(/[^a-zA-Z0-9]/g,'-');
+      text.className = 'retire-field-error'; text.dataset.retireFieldError = name; text.textContent = message;
+      visible.setAttribute('aria-invalid','true'); visible.setAttribute('aria-describedby',text.id);
+      const container = input.closest('.lsel,.retire-check') || input;
+      container.insertAdjacentElement('afterend',text);
+    });
+    return errors;
   }
   let timer, request, generation = 0;
   const draftStatus = document.getElementById('retire-draft-status');
@@ -68,16 +154,36 @@
     if (!event.target.form || event.target.form.id !== form.id) return;
     draftStatus.hidden = false; draftStatus.textContent = '计划调整尚未保存。';
     if (event.target.name === 'dependentCount') children();
-    modes(); clearTimeout(timer); timer = setTimeout(recalculate, 450);
+    if (event.target.name) touched.add(event.target.name);
+    modes(); validateConfiguration(false); clearTimeout(timer); timer = setTimeout(recalculate, 450);
   }
   root.addEventListener('change', changed);
   root.addEventListener('input', event => { if (event.target.type === 'number') changed(event); });
+  root.addEventListener('focusout', event => {
+    if (event.target.form === form && event.target.name) { touched.add(event.target.name); validateConfiguration(false); }
+  });
   root.querySelector('[data-retire-example]').addEventListener('click', () => {
     form.elements.returnSource.value = 'MANUAL'; form.elements.inflationSource.value = 'MANUAL';
     form.elements.nominalReturnPct.value = '4.5'; form.elements.inflationPct.value = '2'; form.elements.directRealRate.checked = false;
     modes(); recalculate();
   });
-  form.addEventListener('submit', () => { clearTimeout(timer); generation++; if(request) request.abort(); });
+  form.addEventListener('submit', event => {
+    if (!event.submitter?.hasAttribute('data-retire-preview')) {
+      submitted = true;
+      const errors = validateConfiguration(true);
+      if (errors.size) {
+        event.preventDefault();
+        const control = form.elements.namedItem(errors.keys().next().value);
+        const input = control instanceof RadioNodeList ? control[0] : control;
+        tab(input.closest('[data-retire-panel]')?.dataset.retirePanel || 'plan');
+        for (let parent = input.parentElement; parent; parent = parent.parentElement) if (parent.tagName === 'DETAILS') parent.open = true;
+        const focus = input.closest('.lsel')?.querySelector('.lsel-btn') || input;
+        focus.focus(); focus.scrollIntoView({block:'center'});
+        return;
+      }
+    }
+    clearTimeout(timer); generation++; if(request) request.abort();
+  });
   function tab(name) {
     if (!['overview', 'plan', 'principle'].includes(name)) name = 'overview';
     root.dataset.tab = name;

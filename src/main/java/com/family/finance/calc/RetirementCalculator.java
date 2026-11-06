@@ -36,7 +36,7 @@ public final class RetirementCalculator {
         public LocalDate neutralDate() { return scenarios.size()==1?scenarios.getFirst().firstReached():scenarios.size()==3?scenarios.get(1).firstReached():null; }
         public String aiSummary() {
             return "退休生活账 · 今天购买力(" + asOf + ") · 状态=" + message
-                    + " · 本金=" + principal + " · 生活门槛=" + target + " · 单独预留=" + reserves
+                    + " · 本金=" + principal + " · 生活门槛=" + target + " · 大额支出准备金=" + reserves
                     + " · 生活费/月=" + monthlyExpense + " · 计划投入/月=" + monthlyContribution
                     + " · 目标退休月=" + retirementDate + " · 中性首次达到=" + neutralDate()
                     + "。数值均为系统计算,不得重算、补全缺失或把门槛说成保证退休。";
@@ -48,7 +48,7 @@ public final class RetirementCalculator {
         List<String> problems = new ArrayList<>(sourceProblems);
         boolean revision2=p.getVersion()>=2;
         if (!revision2 && !p.isBudgetConfirmed()) problems.add("生活预算尚未确认");
-        if (!revision2 && !p.isReservesConfirmed()) problems.add("单独预留尚未确认");
+        if (!revision2 && !p.isReservesConfirmed()) problems.add("大额支出准备金尚未确认");
         if (!p.isNoOverlapConfirmed()) problems.add("生活费与预留的归属尚未核对");
         if (!revision2 && !p.isAssetsConfirmed()) problems.add("资金范围尚未确认");
         if (!revision2 && !p.isIncomeConfirmed()) problems.add("退休收入的开始时间与购买力尚未确认");
@@ -90,7 +90,7 @@ public final class RetirementCalculator {
             state = State.MISSING; message = "待补齐 / 核对";
             coverage = null; gap = null; supported = null;
         }
-        else if (principal.signum() < 0) { state = State.RESERVES_SHORT; message = "单独预留仍有缺口"; }
+        else if (principal.signum() < 0) { state = State.RESERVES_SHORT; message = "大额支出准备金仍有缺口"; }
         else if (target == null) { state = State.NO_FINITE_TARGET; message = "这组假设没有有限的永久本金门槛"; }
         else if (need.signum() == 0) { state = State.INCOME_COVERS; message = revision2?"生活费明确为零,仍需保留负债与预留":"计划退休起的收入覆盖生活费,仍需保留预留"; }
         else { state = State.READY; message = principal.compareTo(target) >= 0 ? "按当前假设达到门槛" : "按当前假设尚有缺口"; }

@@ -42,6 +42,13 @@ body:has(.retirement-page[data-tab=plan]) #float-dock { position:static; flex-di
 .retire-settings-form input[type=number] { appearance:textfield; -moz-appearance:textfield; }
 .retire-settings-form input[type=number]::-webkit-inner-spin-button, .retire-settings-form input[type=number]::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
 .retire-settings-form .field-input:focus-visible { outline:none; box-shadow:0 2px 0 var(--brass); }
+.retirement-page .lsel-btn.field-input { width:100%; border:0; border-bottom:1px solid var(--rule); background:transparent; border-radius:0; padding:8px 28px 8px 0; min-height:44px; font-size:calc(16px * var(--fs-scale,1)); line-height:1.5; white-space:normal; overflow-wrap:anywhere; }
+.retirement-page .lsel-list li { white-space:normal; overflow-wrap:anywhere; font-size:calc(13px * var(--fs-scale,1)); }
+.retirement-page [aria-invalid=true] { border-color:var(--rust) !important; }
+.retire-field-error { color:var(--rust); font-size:calc(12px * var(--fs-scale,1)); line-height:1.7; margin-top:6px; }
+.retire-reserve-breakdown > div { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,2fr); gap:12px; border-bottom:1px solid var(--rule-soft); padding:10px 0; font-size:calc(13px * var(--fs-scale,1)); }
+.retire-reserve-breakdown dt { color:var(--ink-soft); }
+.retire-reserve-breakdown dd { text-align:right; overflow-wrap:anywhere; font-variant-numeric:tabular-nums; }
 .retire-unit { font-family:"JetBrains Mono",monospace; font-size:calc(11px * var(--fs-scale,1)); color:var(--ink-soft); white-space:nowrap; }
 .retire-field-hint { display:block; margin-top:8px; color:var(--ink-soft); font-size:calc(12px * var(--fs-scale,1)); line-height:1.7; overflow-wrap:anywhere; }
 .retire-field-hint.text-rust { color:var(--rust); }

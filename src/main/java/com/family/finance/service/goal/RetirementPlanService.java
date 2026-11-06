@@ -76,22 +76,24 @@ public class RetirementPlanService {
         }
         p.setMonthlyIncome(BigDecimal.ZERO);
         if ("CITY".equals(p.getReserveMode())) {
-            if(p.getCityTier()==null || p.getDependentCount()==null || p.getChildPlanningYears()==null
-                    || p.getDependentCount()<0 || p.getDependentCount()>8
-                    || p.getChildPlanningYears().size()!=p.getDependentCount() || !Arrays.asList("SETTLED","RENT","CHANGE").contains(p.getHousingPlan())
-                    || p.getChildPlanningYears().stream().anyMatch(y->y==null || y<0 || y>30)) {
-                problems.add("请明确选择城市、子女人数与剩余规划年数、住房安排");
-                p.setChildReserve(null); p.setMedicalReserve(null); p.setOtherReserve(null); p.setHousingReserve(null);
-            } else {
-                try {
+            try {
+                    var preset = RetirementReservePresets.require(p.getCityTier());
+                    boolean childrenKnown = p.getDependentCount()!=null && p.getDependentCount()>=0 && p.getDependentCount()<=8
+                            && p.getChildPlanningYears()!=null && p.getChildPlanningYears().size()==p.getDependentCount()
+                            && p.getChildPlanningYears().stream().allMatch(y->y!=null && y>=0 && y<=30);
                     var factor = RetirementCalculator.priceFactor(RetirementReservePresets.PRICE_DATE,today,
                             RetirementCalculator.fraction(p.getPriceInflationPct()==null?BigDecimal.ZERO:p.getPriceInflationPct()));
-                    var amounts=RetirementReservePresets.calculate(RetirementReservePresets.require(p.getCityTier()),p.getChildPlanningYears(),
+                    var amounts=RetirementReservePresets.calculate(preset,childrenKnown?p.getChildPlanningYears():List.of(),
                             p.isAutoExpense()?data.suggestedExpense():p.getMonthlyExpense(),sources.cnyToBase(),factor);
-                    p.setChildReserve(amounts.education());p.setMedicalReserve(amounts.medical());p.setOtherReserve(amounts.emergency());
-                    if(!"CHANGE".equals(p.getHousingPlan())) p.setHousingReserve(BigDecimal.ZERO);
+                    p.setChildReserve(childrenKnown?amounts.education():null);
+                    p.setMedicalReserve(amounts.medical());p.setOtherReserve(amounts.emergency());
+                    if(!childrenKnown) problems.add("请选择子女人数及每位子女的剩余规划年数");
+                    if(Arrays.asList("SETTLED","RENT").contains(p.getHousingPlan())) p.setHousingReserve(BigDecimal.ZERO);
+                    else if(!"CHANGE".equals(p.getHousingPlan())) { p.setHousingReserve(null);problems.add("请选择住房安排"); }
                     if(sources.cnyToBase()==null) problems.add("城市推荐值以人民币定价,当前缺少换算至家庭本位币的汇率");
-                } catch(IllegalArgumentException e) { problems.add(e.getMessage()); }
+            } catch(IllegalArgumentException e) {
+                problems.add(e.getMessage());
+                p.setChildReserve(null);p.setMedicalReserve(null);p.setOtherReserve(null);p.setHousingReserve(null);
             }
         }
         if("AUTO".equals(p.getContributionSource())) p.setMonthlyContribution(data.suggestedContribution());
@@ -186,11 +188,11 @@ public class RetirementPlanService {
         if (!Objects.equals(p.getBaseCurrency(), view.data().baseCurrency())) throw new IllegalArgumentException("计划币种与家庭本位币不一致");
         Set<Long> valid = new HashSet<>(view.data().assets().stream().filter(a -> !a.liability()).map(RetirementDataService.Asset::id).toList());
         if ((p.getVersion()==1 || "CUSTOM".equals(p.getScopeMode())) && !valid.containsAll(p.getAccountIds())) throw new IllegalArgumentException("资金范围中含失效或不属于本家庭的账户,请重新选择");
-        if (p.isAutoExpense() && view.data().suggestedExpense() == null) throw new IllegalArgumentException("自动预算的数据不足或需要人工核对,请先手填预算");
+        if (p.getVersion()==1 && p.isAutoExpense() && view.data().suggestedExpense() == null) throw new IllegalArgumentException("自动预算的数据不足或需要人工核对,请先手填预算");
         if (p.getVersion()==1 && view.data().debt().signum() > 0 && !p.isAfterDebtConfirmed()) throw new IllegalArgumentException("请确认偿清负债后的计划月投入");
         if(p.getVersion()>=2) {
-            if(!view.result().problems().isEmpty()) throw new IllegalArgumentException(String.join(";",view.result().problems()));
-            p.setPriceInflationPct(view.effective().getInflationPct());
+            // Persist configuration even when live balances, budget or rate sources are incomplete.
+            if(view.effective().getInflationPct()!=null) p.setPriceInflationPct(view.effective().getInflationPct());
         }
         if (p.getEducationGoalId() != null && (p.getVersion()==1 || "CUSTOM".equals(p.getReserveMode()))) {
             var education = goalService.require(familyId, p.getEducationGoalId());

@@ -186,7 +186,7 @@
               <b data-priv th:text="${money.amount(r.debt())}"> </b>
             </div>
             <div>
-              <span>− 单独预留 B</span>
+              <span>− 大额支出准备金 B</span>
               <b data-priv th:text="${money.amount(r.reserves())}"> </b>
             </div>
             <div>
@@ -251,6 +251,7 @@
                 >每月结余来源</label
               >
               <select
+                data-lsel
                 class="field-input"
                 th:field="*{contributionSource}"
                 form="retirement-form"
@@ -276,6 +277,7 @@
                 >结余金额</label
               >
               <select
+                data-lsel
                 class="field-input"
                 th:field="*{contributionFollowsInflation}"
                 form="retirement-form"
@@ -496,7 +498,7 @@
             <div class="eyebrow-ink mb-3">计 · 划 · 设 · 置</div>
             <a href="#retire-assets"> <span>01</span>家庭资金</a>
             <a href="#retire-life"> <span>02</span>每月生活费</a>
-            <a href="#retire-reserves"> <span>03</span>单独预留</a>
+            <a href="#retire-reserves"> <span>03</span>大额支出准备金</a>
             <a href="#retire-returns"> <span>04</span>回报与通胀</a>
           </nav>
           <div class="retire-settings-content">
@@ -563,7 +565,7 @@
                     th:if="${!view.data().problems().isEmpty()}"
                     th:href="@{/entry}"
                     class="retire-text-link text-xs"
-                    >去填报核对余额与汇率</a
+                    >去填报查看待补数据</a
                   >
                   <p class="retire-field-hint">
                     全家净资产
@@ -583,6 +585,7 @@
                 <p class="retire-field-hint">
                   默认纳入全家可支用金融资产,新增同类账户也会跟随。自住房、保单与其他实物不直接用来支付生活费。
                 </p>
+                <p class="retire-field-hint">保存的是参与账户与计算方式。余额、支出、收益和汇率在每次演算时读取,数据待补齐不影响保存。</p>
                 <details
                   class="retire-details"
                   id="retire-scope"
@@ -592,7 +595,7 @@
                   <label class="field-label mt-3" for="scopeMode"
                     >资金范围</label
                   >
-                  <select class="field-input" th:field="*{scopeMode}">
+                  <select data-lsel class="field-input" th:field="*{scopeMode}">
                     <option value="FAMILY_FINANCIAL">全家可支用金融资产</option>
                     <option value="CUSTOM">自行选择账户</option>
                   </select>
@@ -803,10 +806,11 @@
               </fieldset>
               <fieldset id="retire-reserves" class="retire-fieldset">
                 <legend>
-                  <span class="retire-section-no">03</span>单独预留
+                  <span class="retire-section-no">03</span>大额支出准备金
                 </legend>
+                <p class="retire-field-hint mb-4">育儿、医疗、住房等生活费之外的大项。养老日常开销已包含在每月生活费中,不再重复预留。</p>
                 <label class="field-label" for="reserveMode">预留方案</label>
-                <select class="field-input" th:field="*{reserveMode}">
+                <select data-lsel class="field-input" th:field="*{reserveMode}">
                   <option value="CITY">采用城市规划参考</option>
                   <option value="CUSTOM">自行填写金额</option>
                 </select>
@@ -826,7 +830,7 @@
                       <label class="field-label" for="dependentCount"
                         >需要额外教育预留的子女</label
                       >
-                      <select class="field-input" th:field="*{dependentCount}">
+                      <select data-lsel class="field-input" th:field="*{dependentCount}">
                         <option value="">请选择</option>
                         <option
                           th:each="n : ${#numbers.sequence(0,8)}"
@@ -839,7 +843,7 @@
                       <label class="field-label" for="housingPlan"
                         >住房安排</label
                       >
-                      <select class="field-input" th:field="*{housingPlan}">
+                      <select data-lsel class="field-input" th:field="*{housingPlan}">
                         <option value="">请选择</option>
                         <option value="SETTLED">已解决,无新增现金需求</option>
                         <option value="RENT">租房,房租已计入生活费</option>
@@ -856,6 +860,7 @@
                       >
                       </label>
                       <select
+                        data-lsel
                         class="field-input"
                         th:id="${'child-years-'+st.index}"
                         th:field="*{childPlanningYears[__${st.index}__]}"
@@ -951,7 +956,7 @@
                   <label class="field-label" for="educationGoalId"
                     >教育目标</label
                   >
-                  <select class="field-input" th:field="*{educationGoalId}">
+                  <select data-lsel class="field-input" th:field="*{educationGoalId}">
                     <option value="">不关联</option>
                     <option
                       th:each="g : ${educationChoices}"
@@ -968,14 +973,13 @@
                   </label>
                 </details>
                 <div class="retire-reference" data-retire-live="reserves">
-                  <div class="retire-reference-head">
-                    <span>额外教育 / 医疗 / 住房 / 应急</span>
-                    <b
-                      data-priv
-                      th:text="${T(com.family.finance.service.MoneyFormat).format2(plan.baseCurrency,view.effective().childReserve)+' / '+T(com.family.finance.service.MoneyFormat).format2(plan.baseCurrency,view.effective().medicalReserve)+' / '+T(com.family.finance.service.MoneyFormat).format2(plan.baseCurrency,view.effective().housingReserve)+' / '+T(com.family.finance.service.MoneyFormat).format2(plan.baseCurrency,view.effective().otherReserve)}"
-                    >
-                    </b>
-                  </div>
+                  <p class="text-sm mb-3" th:text="${plan.reserveMode=='CITY'?'城市推荐金额':'本次准备金'}"></p>
+                  <dl class="retire-reserve-breakdown">
+                    <div><dt>额外教育</dt><dd data-priv data-reserve-amount="education" th:text="${view.effective().childReserve==null?'待选择子女及年数':T(com.family.finance.service.MoneyFormat).format2(plan.baseCurrency,view.effective().childReserve)}"></dd></div>
+                    <div><dt>突发医疗</dt><dd data-priv data-reserve-amount="medical" th:text="${view.effective().medicalReserve==null?'待补齐':T(com.family.finance.service.MoneyFormat).format2(plan.baseCurrency,view.effective().medicalReserve)}"></dd></div>
+                    <div><dt>住房净新增</dt><dd data-priv data-reserve-amount="housing" th:text="${view.effective().housingReserve==null?'待选择住房安排':T(com.family.finance.service.MoneyFormat).format2(plan.baseCurrency,view.effective().housingReserve)}"></dd></div>
+                    <div><dt>应急储备</dt><dd data-priv data-reserve-amount="emergency" th:text="${view.effective().otherReserve==null?'待补齐生活费':T(com.family.finance.service.MoneyFormat).format2(plan.baseCurrency,view.effective().otherReserve)}"></dd></div>
+                  </dl>
                   <p class="retire-field-hint">
                     合计
                     <b
@@ -983,7 +987,7 @@
                       th:text="${T(com.family.finance.service.MoneyFormat).format2(plan.baseCurrency,r.reserves())}"
                     >
                     </b
-                    >。教育 = 每月额外费用 × 12 × 剩余年数之和;应急 = 月生活费 ×
+                    >。未填齐的分项不当作零。教育 = 每月额外费用 × 12 × 剩余年数之和;应急 = 月生活费 ×
                     预留月数。
                   </p>
                   <p
@@ -1009,11 +1013,11 @@
                     <label class="field-label" for="returnSource"
                       >年回报来源</label
                     >
-                    <select class="field-input" th:field="*{returnSource}">
+                    <select data-lsel class="field-input" th:field="*{returnSource}">
                       <option value="AUTO">参与账户的历史投资年化</option>
                       <option value="MANUAL">自行设定长期回报</option>
                     </select>
-                    <div data-retire-when="manual-return">
+                    <div data-retire-when="nominal-return">
                       <label class="field-label mt-4" for="nominalReturnPct"
                         >税费后名义年回报
                         <span class="retire-unit">%</span></label
@@ -1032,7 +1036,7 @@
                     <label class="field-label" for="inflationSource"
                       >通胀来源</label
                     >
-                    <select class="field-input" th:field="*{inflationSource}">
+                    <select data-lsel class="field-input" th:field="*{inflationSource}">
                       <option value="AUTO">
                         连续10个完整年度 CPI 几何均值
                       </option>
@@ -1360,7 +1364,7 @@
           <p>本次实际回报 r = <b th:text="${r.realRate()==null?'待补齐':#numbers.formatDecimal(r.realRate()*100,1,6)+'%'}"></b>
             <span th:if="${view.effective().directRealRate}"> · 直接填写</span>
           </p>
-          <p>P = 可支用资产 A − 全家庭负债 D − 单独预留 B</p>
+          <p>P = 可支用资产 A − 全家庭负债 D − 大额支出准备金 B</p>
           <p data-priv th:text="${'本次 P = '+money.amount(r.assets())+' − '+money.amount(r.debt())+' − '+money.amount(r.reserves())+' = '+money.amount(r.principal())}"></p>
           <p
             th:text="${view.plan().version==1?'升级前方案:T = 12 × max(X − J, 0) ÷ r':'修订二:T = 12 × 每月生活费 X ÷ r'}"
@@ -1425,6 +1429,7 @@
         {}
       </script>
     </main>
+    <script th:src="@{/js/lens-select.js(v=${buildVersion})}"></script>
     <script th:src="@{/js/retirement.js(v=${buildVersion})}"></script>
     <footer th:replace="~{fragments/layout :: footer}"></footer>
   </body>

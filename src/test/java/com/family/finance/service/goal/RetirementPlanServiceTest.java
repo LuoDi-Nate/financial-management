@@ -126,7 +126,37 @@ class RetirementPlanServiceTest {
         var view=service.evaluate(1,p,null,false,false);
         assertThat(view.result().target()).isNull();assertThat(view.effective().getNominalReturnPct()).isNull();
         assertThat(p.getNominalReturnPct()).isEqualByComparingTo("4.5");assertThat(p.getInflationPct()).isEqualByComparingTo("2");
-        assertThatThrownBy(()->service.save(1,9L,p,true)).hasMessageContaining("上一版固定假设");
+        assertThatCode(()->service.save(1,9L,p,true)).doesNotThrowAnyException();
+        verify(mapper).save(eq(1L),eq(9L),contains("\"returnSource\":\"AUTO\""),eq(true),eq(false));
+        assertThat(service.evaluate(1,p,null,false,true).result().target()).isNull();
+        assertThat(p.getNominalReturnPct()).isEqualByComparingTo("4.5");
+    }
+    @Test void missingLiveBalancesDoNotPreventSavingAccountSelectionOrBecomeZero() {
+        legacy();var p=plan();p.setVersion(2);p.getAccountIds().add(12L);
+        var asset=new RetirementDataService.Asset(12L,"合成基金",com.family.finance.domain.account.AccountType.FUND,
+                "CNY",null,null,BigDecimal.ONE,null,true,true,false,"可选择用于退休");
+        when(data.load(eq(1L),any(),any())).thenReturn(new RetirementDataService.Data("CNY",LocalDate.now(),List.of(asset),List.of(),
+                BigDecimal.ZERO,BigDecimal.ZERO,null,null,"missing",List.of("合成基金:当前账期余额未填"),List.of(),"CPI参考"));
+        assertThatCode(()->service.save(1,9L,p,true)).doesNotThrowAnyException();
+        var result=service.evaluate(1,p,null,false,true).result();
+        assertThat(result.assets()).isNull();assertThat(result.coverage()).isNull();
+        assertThat(result.problems()).contains("合成基金:当前账期余额未填");
+        p.getAccountIds().add(999L);
+        assertThatThrownBy(()->service.save(1,9L,p,true)).hasMessageContaining("不属于本家庭");
+    }
+    @Test void cityPreviewShowsKnownAmountsBeforeChildrenAndHousingAreComplete() {
+        legacy();var p=plan();p.setVersion(2);p.setReserveMode("CITY");p.setCityTier("SECOND");
+        var traced=new RetirementDataService.Sources(null,java.util.Set.of(),BigDecimal.ONE,null,null,null,null,List.of(),
+                RetirementRateSources.Rate.missing("无历史"),RetirementRateSources.Rate.missing("无CPI"));
+        when(data.load(eq(1L),any(),any())).thenReturn(new RetirementDataService.Data("CNY",LocalDate.now(),List.of(),List.of(),
+                BigDecimal.ZERO,BigDecimal.ZERO,null,null,"partial",List.of(),List.of(),"CPI参考",traced));
+        var view=service.evaluate(1,p,null,false,false);
+        assertThat(view.effective().getMedicalReserve()).isEqualByComparingTo("200000");
+        assertThat(view.effective().getOtherReserve()).isEqualByComparingTo("60000");
+        assertThat(view.effective().getChildReserve()).isNull();assertThat(view.effective().getHousingReserve()).isNull();
+        assertThat(view.result().reserves()).isNull();
+        p.setDependentCount(0);p.setHousingPlan("SETTLED");
+        assertThat(service.evaluate(1,p,null,false,false).result().reserves()).isEqualByComparingTo("260000");
     }
     @Test void cityModeRequiresExplicitChildrenAndHousingInsteadOfAssumingZero() {
         var p=plan();p.setVersion(2);p.setReserveMode("CITY");p.setCityTier("SECOND");

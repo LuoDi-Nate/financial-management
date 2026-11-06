@@ -47,5 +47,9 @@ for qa139_file in scripts/e2e/flows/50-account-delete-real-case.cjs scripts/e2e/
 done
 check rg -q 'beforeSend\(' "$java/service/checkup/llm/AbstractOpenAiCompatibleClient.java"
 check rg -q 'llmTestGate.block|testGate.block' "$java/service/checkup/llm/LlmRouter.java"
+check rg -q 'validateConfiguration\(true\)' src/main/resources/static/js/retirement.js
+check rg -q 'select.setAttribute\(.data-lsel.' src/main/resources/static/js/retirement.js
+if code "$java/service/goal/RetirementPlanService.java" | rg -q 'throw new IllegalArgumentException\(String.join'; then echo 'FAIL: 实时演算缺失阻塞配置保存' >&2; exit 1; fi
+qa139_pass=$((qa139_pass+1))
 check python3 scripts/family-isolation-audit.py
 echo "PASS: v1.39 $qa139_pass 项只读静态守护"
