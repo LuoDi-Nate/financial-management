@@ -161,7 +161,7 @@ class Ui {
       // panel 可能被 portal 到 body 上(避开 overflow 裁剪),所以两处都找
       const item = `li[data-v="${value}"]`;
       const inWrap = await this.page.locator(`${wrap} ${item}`).count();
-      await this.page.click(inWrap > 0 ? `${wrap} ${item}` : `.lsel-panel ${item}`, { timeout: 8000 });
+      await this.page.click(inWrap > 0 ? `${wrap} ${item}` : `.lsel-panel:not([hidden]) ${item}`, { timeout: 8000 });
       await this.page.waitForTimeout(250);
       const got = await this.page.locator(native).inputValue();
       return this.assert(String(got) === String(value),

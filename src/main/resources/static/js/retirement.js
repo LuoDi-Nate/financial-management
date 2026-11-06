@@ -19,6 +19,14 @@
           label.dataset.retireSelectLabel = 'true';
           label.addEventListener('click', event => { event.preventDefault(); button.focus(); });
         }
+        const search = sel.closest('.lsel').querySelector('.lsel-q');
+        if (search && !search.id) {
+          search.id = sel.id + '-search';
+          const searchLabel = document.createElement('label');
+          searchLabel.htmlFor = search.id; searchLabel.className = 'sr-only';
+          searchLabel.textContent = '搜索' + label.textContent.trim();
+          search.before(searchLabel);
+        }
       }
     });
   }
