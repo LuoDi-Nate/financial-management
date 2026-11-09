@@ -110,4 +110,24 @@ class GoalLlmServiceTest {
         assertThat(r.ok()).isTrue();
         assertThat(r.value()).isEqualTo(reply);
     }
+    @Test void monthlyReportUsesAvailableGoalProgressRatherThanTheLivingPrincipalState() {
+        String reply="本月家庭资产保持稳健,投资收益较上期小幅回暖,整体风险敞口处于合理区间,流动性也较为充足。"
+                + "目标进度按计划稳步推进,储蓄节奏总体稳定。建议继续保持当前的储蓄与投资节奏,"
+                + "定期复盘资产配置是否与长期目标的时间表相匹配,必要时对部分仓位做再平衡,"
+                + "以巩固后续的收益质量与整体抗风险能力,稳步缩小与目标之间的差距。";
+        var router=stubRouter(reply);var members=mock(MemberDirectory.class);
+        when(members.listAll(1L)).thenReturn(List.of());
+        var service=new GoalLlmService(router,mock(FamilyService.class),members,mock(FactViewService.class),new ObjectMapper());
+        var goal=Goal.builder().id(1L).familyId(1L).goalType(GoalType.RETIREMENT).name("退休").build();
+        var plan=new com.family.finance.domain.goal.RetirementPlan();plan.setVersion(2);plan.setBaseCurrency("CNY");
+        var view=mock(RetirementPlanService.View.class);var result=mock(com.family.finance.calc.RetirementCalculator.Result.class);
+        when(view.plan()).thenReturn(plan);when(view.result()).thenReturn(result);
+        when(view.progressAssets()).thenReturn(new BigDecimal("5000000"));when(view.progressTarget()).thenReturn(new BigDecimal("10000000"));
+        when(result.ready()).thenReturn(false);when(result.aiSummary()).thenReturn("所选账户资产A=5000000 · 所需总资金F=10000000 · 目标进度比率=0.5");
+        var progress=new GoalProgressService.GoalProgress(goal,null,new BigDecimal("5000000"),new BigDecimal("10000000"),
+                new BigDecimal("0.5"),null,null,null,null,null,null,1,view);
+        assertThat(service.generateMonthlyReport(1,goal,progress).ok()).isTrue();
+        when(view.progressTarget()).thenReturn(null);
+        assertThat(service.generateMonthlyReport(1,goal,progress).ok()).isFalse();
+    }
 }

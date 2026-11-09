@@ -41,6 +41,12 @@ async function form(ui, name) {
   await ui.fillByName('monthlyContribution','0');
   await ui.click('[data-retire-tab="plan"]','返回计划');
 }
+async function coreProgress(ui, label, values) {
+  const names={assets:'所选账户资产 A',target:'总资金需求 F',gap:'总资金缺口',coverage:'核心进度 A/F'};
+  for(const [key,expected] of Object.entries(values))
+    await ui.assert((await ui.page.locator(`[data-retire-value="${key}"]`).innerText()).trim()===expected,
+      label+':'+names[key]+' = '+expected);
+}
 async function screenshot(ui, suffix) {
   const dir = '/tmp/finance-v139-review'; fs.mkdirSync(dir,{recursive:true});
   await ui.page.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));
@@ -199,8 +205,8 @@ module.exports = {
     await form(ui,state.prefix+'-native');
     await ui.click('[data-retire-preview]','保存前执行系统演算');
     await ui.page.waitForLoadState('networkidle');
-    await ui.seesText('¥4,800,000.00','门槛与净生活本金均为480万');
-    await ui.assert((await ui.page.locator('[data-retire-value="coverage"]').innerText()).includes('100.00%'),'负债与预留只扣一次,覆盖100%');
+    await ui.seesText('¥4,800,000.00','辅助组成仍保留480万生活本金门槛');
+    await coreProgress(ui,'初始资金进度',{assets:'¥6,100,000.00',target:'¥6,100,000.00',gap:'¥0.00',coverage:'100.00%'});
     await ui.assert(db.num(`SELECT COUNT(*) FROM retirement_plan WHERE family_id=${state.family}`)===0,'演算预览不保存');
     await ui.click('[data-retire-tab="plan"]','返回调整计划');
     await ui.click('[data-retire-save]','保存新退休计划');
@@ -228,40 +234,69 @@ module.exports = {
       await ui.visible(`a[href="/goals/${state.native}"]`,page+':实际渲染目标入口');
       await ui.assert((await ui.page.locator(`a[href="/goals/${state.native}"]`).first().innerText()).includes('100.0%'),page+':目标条沿用同一退休结果');
     }
+
+    // A/F must be 50% here; the auxiliary P/T would be 37.5%.
+    const ratioPeriod=db.num(`SELECT id FROM period WHERE family_id=${state.family} AND status='OPEN' ORDER BY period_start DESC LIMIT 1`);
+    const ratioBalance=db.one(`SELECT s.end_balance FROM period_snapshot s JOIN period p ON p.id=s.period_id
+      WHERE p.family_id=${state.family} AND s.period_id=${ratioPeriod} AND s.account_id=${state.cash}`);
+    if(ratioPeriod===null || ratioBalance===null) throw new Error('50%进度用例缺少待恢复的合成余额');
+    try {
+      db.raw(`UPDATE period_snapshot s JOIN period p ON p.id=s.period_id SET s.end_balance=5000000
+        WHERE p.family_id=${state.family} AND s.period_id=${ratioPeriod} AND s.account_id=${state.cash}`);
+      await ui.goto(`/goals/${state.native}/retirement?tab=plan`);
+      await ui.fillByName('monthlyExpense','20000','#retirement-form');
+      await ui.fillByName('otherReserve','1200000','#retirement-form');
+      await ui.fillByName('realReturnPct','3','#retirement-form');
+      await ui.click('[data-retire-save]','保存500万资产与1000万总需求的合成方案');
+      await coreProgress(ui,'500万除以1000万',{assets:'¥5,000,000.00',target:'¥10,000,000.00',gap:'¥5,000,000.00',coverage:'50.00%'});
+      await ui.assert((await ui.page.locator('[data-retire-value="principal"]').innerText()).includes('3,000,000.00'),'扣负债及准备金后的300万本金仅作为辅助组成');
+      for(const page of ['/goals','/dashboard','/reports']) {
+        await ui.goto(page);
+        await ui.assert(/\b50\.0%/.test(await ui.page.locator(`a[href="/goals/${state.native}"]`).first().innerText()),page+':共享卡片显示A/F的50%,不显示P/T的37.5%');
+      }
+    } finally {
+      db.raw(`UPDATE period_snapshot s JOIN period p ON p.id=s.period_id SET s.end_balance=${q(ratioBalance)}
+        WHERE p.family_id=${state.family} AND s.period_id=${ratioPeriod} AND s.account_id=${state.cash}`);
+      await ui.goto(`/goals/${state.native}/retirement?tab=plan`);
+      await form(ui,state.prefix+'-native');
+      await ui.click('[data-retire-save]','恢复50%用例之前的合成计划');
+    }
     await ui.goto(`/goals/${state.native}/retirement`);
-    for (const [ccy,target] of [['USD','$600,000.00'],['HKD','HK$5,280,000.00']]) {
+    await coreProgress(ui,'50%用例还原后',{assets:'¥6,100,000.00',target:'¥6,100,000.00',gap:'¥0.00',coverage:'100.00%'});
+    for (const [ccy,target,zero] of [['USD','$762,500.00','$0.00'],['HKD','HK$6,710,000.00','HK$0.00']]) {
       await ui.click(`.retire-currencies a[href*="ccy=${ccy}"]`,'切换显示币种 '+ccy);
-      await ui.assert((await ui.page.locator('[data-retire-value="target"]').innerText()).includes(target),'本金门槛按汇率换算');
-      await ui.assert((await ui.page.locator('[data-retire-value="coverage"]').innerText()).includes('100.00%'),'覆盖率不随显示币种变化');
+      await coreProgress(ui,ccy+'视图同口径',{assets:target,target,gap:zero,coverage:'100.00%'});
     }
     await ui.click('[data-retire-tab="principle"]','打开原理');
-    await ui.assert((await ui.page.locator('[data-retire-live="math"]').innerText()).includes('HK$5,280,000.00'),'原理页代入同一份结果与显示币种');
+    await ui.assert((await ui.page.locator('[data-retire-live="math"]').innerText()).includes('HK$6,710,000.00'),'原理页代入同一份总资金需求与显示币种');
     await ui.visible('a[href="https://www.bilibili.com/video/BV1yUHP6rEYD/"]','原视频直达链接');
     await ui.assert(await ui.page.locator('a[href*="BV1yUHP6rEYD"]').getAttribute('referrerpolicy')==='no-referrer','来源外链不带家庭来源数据');
     await screenshot(ui,'desktop-principle');
     const foreign=db.num(`SELECT id FROM account WHERE family_id=${state.family} AND currency='USD'`);
     await ui.click('[data-retire-tab="plan"]','纳入外币账户');
     await ui.page.check(`input[name="accountIds"][value="${foreign}"]`); await ui.click('[data-retire-save]','保存外币资金范围');
-    await ui.assert((await ui.page.locator('[data-retire-value="principal"]').innerText()).includes('5,600,000.00'),'10万美元按当期汇率折为80万本金');
+    await coreProgress(ui,'纳入10万美元后',{assets:'¥6,900,000.00',target:'¥6,100,000.00',gap:'¥0.00',coverage:'113.11%'});
+    await ui.assert((await ui.page.locator('[data-retire-value="principal"]').innerText()).includes('5,600,000.00'),'外币折算后的生活本金在辅助公式中保留');
     await ui.click('[data-retire-tab="plan"]','恢复仅现金账户'); await ui.page.uncheck(`input[name="accountIds"][value="${foreign}"]`);
     await ui.click('[data-retire-save]','恢复基准资金范围');
     await ui.click('[data-retire-tab="plan"]','核对精确名义回报模式');
     await directMode(ui,false); await ui.fillByName('inflationPct','2','#retirement-form');
     await ui.click('[data-retire-save]','保存名义4.5%和通胀2%');
-    await ui.assert((await ui.page.locator('[data-retire-value="target"]').innerText()).includes('4,896,000.00'),'精确实际回报得到489.6倍,不是近似480倍');
+    await coreProgress(ui,'精确名义回报模式',{assets:'¥6,100,000.00',target:'¥6,196,000.00',gap:'¥96,000.00',coverage:'98.45%'});
+    await ui.seesText('¥4,896,000.00','总需求组成中的生活本金门槛仍为489.6万');
     await ui.click('[data-retire-tab="plan"]','恢复直接实际回报');
     await directMode(ui,true); await ui.fillByName('inflationPct','0','#retirement-form');
     await ui.page.check('[name="autoExpense"][value="true"]'); await ui.click('[data-retire-save]','授权跟随定稿预算');
     db.raw(`UPDATE cash_flow c JOIN period p ON p.id=c.period_id SET c.amount=20000
       WHERE p.family_id=${state.family} AND c.kind='EXPENSE' AND p.period_start=(SELECT MIN(pp.period_start) FROM period pp WHERE pp.family_id=${state.family})`);
     await ui.goto(`/goals/${state.native}/retirement`);
-    await ui.assert((await ui.page.locator('[data-retire-value="target"]').innerText()).includes('6,399,998.40'),'已授权自动预算跟随定稿纠正,月均精确到分');
+    await coreProgress(ui,'自动预算随定稿纠正',{assets:'¥6,100,000.00',target:'¥7,699,998.40',gap:'¥1,599,998.40',coverage:'79.22%'});
     await ui.click('[data-retire-tab="plan"]','切回固定生活预算'); await ui.page.check('[name="autoExpense"][value="false"]');
     await ui.click('[data-retire-save]','保存固定预算');
     db.raw(`UPDATE cash_flow c JOIN period p ON p.id=c.period_id SET c.amount=10000
       WHERE p.family_id=${state.family} AND c.kind='EXPENSE' AND p.period_start=(SELECT MIN(pp.period_start) FROM period pp WHERE pp.family_id=${state.family})`);
     await ui.goto(`/goals/${state.native}/retirement`);
-    await ui.assert((await ui.page.locator('[data-retire-value="target"]').innerText()).includes('4,800,000.00'),'未授权跟随时固定预算不被新账上建议覆盖');
+    await coreProgress(ui,'固定预算独立保留',{assets:'¥6,100,000.00',target:'¥6,100,000.00',gap:'¥0.00',coverage:'100.00%'});
     db.raw(`INSERT INTO goal_ai_report(goal_id,period_id,report_type,content,validator_status) VALUES(${state.native},0,'MONTHLY','合成历史目标报告','PASS')`);
     await ui.goto(`/goals/${state.native}/retirement`);
     await ui.seesText('旧计划或旧资金状态的历史解读','旧报告不冒充新算法结论');
@@ -274,6 +309,7 @@ module.exports = {
     await ui.click('[data-retire-tab="plan"]','检查零回报边界');
     await ui.fillByName('realReturnPct','0','#retirement-form'); await ui.click('[data-retire-save]','保存零实际回报');
     await ui.seesText('没有有限的永久本金门槛','零回报不显示0元门槛');
+    await coreProgress(ui,'零实际回报',{assets:'¥6,100,000.00',target:'无有限门槛',gap:'—',coverage:'—'});
     await ui.goto('/goals'); await ui.seesText('没有有限的永久本金门槛','目标列表与详情同一状态');
     await ui.goto(`/goals/${state.native}/retirement?tab=plan`); await ui.fillByName('realReturnPct','2.5','#retirement-form');
     await ui.click('[data-retire-save]','恢复正实际回报');
@@ -309,7 +345,7 @@ module.exports = {
       WHERE goal_id=${state.native} AND family_id=${state.family}`);
     const revisionOne=db.one(`SELECT plan_json FROM retirement_plan WHERE goal_id=${state.native}`);
     await ui.goto(`/goals/${state.native}/retirement`);
-    await ui.assert((await ui.page.locator('[data-retire-value="target"]').innerText()).includes('3,360,000.00'),'升级前继续使用含3000月收入的原门槛');
+    await ui.assert((await ui.page.locator('[data-retire-value="target"]').innerText()).includes('3,360,000.00'),'版本1继续使用含3000月收入的原生活门槛,未确认升级前保留旧口径');
     await ui.click('[data-retire-tab="plan"]','比较修订一与修订二');
     await ui.assert((await ui.page.locator('[data-retire-upgrade-compare]').innerText()).includes('3,360,000.00') &&
       (await ui.page.locator('[data-retire-upgrade-compare]').innerText()).includes('4,800,000.00'),'旧新门槛并排展示,移除J的影响可复核');
@@ -394,17 +430,16 @@ module.exports = {
     await ui.assert(!await ui.page.locator('[data-retire-reference]').evaluate(el=>el.open),'运行数据说明默认折叠');
     await ui.notSeesText('尚无已知余额','缺失余额不在正式结果中重复展开为报错');
     await ui.assert((await ui.page.locator('[data-retire-known-assets]').innerText()).includes('6,900,000.00'),'缺余额时展示已知账户小计,不冒充完整资产');
-    await ui.assert((await ui.page.locator('[data-retire-value="principal"]').innerText()).trim()==='—' &&
-      (await ui.page.locator('[data-retire-value="coverage"]').innerText()).trim()==='—','未知资产不伪填零本金或零覆盖率');
+    await coreProgress(ui,'所选账户余额不完整',{assets:'—',gap:'—',coverage:'—'});
+    await ui.assert((await ui.page.locator('[data-retire-value="principal"]').innerText()).trim()==='—','未知资产也不伪填辅助生活本金');
     await ui.assert((await ui.page.locator('.retire-bridge > div').nth(1).innerText()).includes('100,000.00'),'资产不完整时负债仍独立显示');
     await ui.click('[data-retire-reference] > summary','按需查看运行数据参考');
     await ui.assert((await ui.page.locator('[data-retire-reference]').innerText()).includes('尚无已知余额'),'展开后能核对真正未知的余额');
     await ui.goto(`/goals/${pendingGoal}/retirement?tab=plan`);await ui.choose('returnSource','MANUAL');
     await ui.click('[data-retire-save]','缺余额仍可调整回报假设');
     await ui.assert((await ui.page.locator('[data-retire-config-status]').innerText()).trim()==='配置已完成 · 已保存','缺余额不使手填回报配置变成未完成');
-    await ui.assert((await ui.page.locator('[data-retire-value="target"]').innerText()).includes('4,800,000.00'),'资产未知不阻止按手填假设计算生活门槛');
-    await ui.assert((await ui.page.locator('[data-retire-value="principal"]').innerText()).trim()==='—' &&
-      (await ui.page.locator('[data-retire-value="coverage"]').innerText()).trim()==='—','手填门槛可用时缺失本金及覆盖仍保持未知');
+    await coreProgress(ui,'资产未知但总需求独立可算',{assets:'—',target:'¥6,100,000.00',gap:'—',coverage:'—'});
+    await ui.assert((await ui.page.locator('[data-retire-value="principal"]').innerText()).trim()==='—','总需求可用时辅助本金仍保持未知');
     await ui.goto(`/goals/${pendingGoal}/retirement?tab=plan`);
     await ui.assert((await ui.page.locator('[data-retire-live="funds"]').innerText()).includes('暂无完整合计') &&
       (await ui.page.locator('[data-retire-live="funds"]').innerText()).includes('6,900,000.00'),'配置页分开展示完整合计未知与已知账户小计');
@@ -415,6 +450,9 @@ module.exports = {
     await ui.assert((await ui.page.locator('[data-retire-live="funds"]').innerText()).includes('6,912,345.00') &&
       !(await ui.page.locator('[data-retire-live="funds"]').innerText()).includes('暂无完整合计'),'补齐余额后直接恢复完整资产合计,无需重新保存配置');
     await ui.assert(db.one(`SELECT plan_json FROM retirement_plan WHERE goal_id=${pendingGoal} AND family_id=${state.family}`)===savedConfig,'演算读取新余额不回写计划');
+    await ui.click('[data-retire-tab="overview"]','查看补齐余额后的核心进度');
+    await coreProgress(ui,'补齐余额立即生效',{assets:'¥6,912,345.00',target:'¥6,100,000.00',gap:'¥0.00',coverage:'113.32%'});
+    await ui.click('[data-retire-tab="plan"]','返回收益来源设置');
 
     const missingRateSnapshot=JSON.parse(db.one(`SELECT JSON_OBJECT('id',s.id,'period_id',s.period_id,'account_id',s.account_id,
       'end_balance',s.end_balance,'submitted_by',s.submitted_by,'submitted_at',s.submitted_at,'note',s.note,'source_tag',s.source_tag)
@@ -427,8 +465,7 @@ module.exports = {
       await ui.choose('returnSource','AUTO');await ui.click('[data-retire-save]','仅动态回报来源不足时保存配置');
       await ui.assert((await ui.page.locator('[data-retire-config-status]').innerText()).trim()==='配置已完成 · 已保存','缺年回报仅影响运行指标,不影响已保存配置');
       await ui.assert((await ui.page.locator('[data-retire-value="principal"]').innerText()).includes('5,612,345.00'),'缺动态回报时生活本金仍独立可算');
-      await ui.assert((await ui.page.locator('[data-retire-value="target"]').innerText()).trim()==='暂无结果' &&
-        (await ui.page.locator('[data-retire-value="coverage"]').innerText()).trim()==='—','缺年回报只使门槛与覆盖不可用');
+      await coreProgress(ui,'缺动态年回报',{assets:'¥6,912,345.00',target:'暂无结果',gap:'—',coverage:'—'});
     } finally {
       const columns=Object.keys(missingRateSnapshot);
       db.raw(`INSERT INTO period_snapshot(${columns.join(',')})
@@ -452,9 +489,7 @@ module.exports = {
         WHERE p.family_id=${state.family} AND s.period_id=${latest} AND s.account_id=${state.cash}`);
       await ui.goto(`/goals/${pendingGoal}/retirement`);
       await ui.assert((await ui.page.locator('[data-retire-config-status]').innerText()).trim()==='配置已完成 · 已保存','本期未填余额不要求重新配置');
-      await ui.assert((await ui.page.locator('[data-retire-value="principal"]').innerText()).includes('5,612,345.00') &&
-        (await ui.page.locator('[data-retire-value="target"]').innerText()).includes('4,800,000.00') &&
-        (await ui.page.locator('[data-retire-value="coverage"]').innerText()).trim()==='116.92%','正常OPEN期沿用最近余额继续计算本金、门槛和覆盖');
+      await coreProgress(ui,'正常OPEN期沿用最近余额',{assets:'¥6,912,345.00',target:'¥6,100,000.00',gap:'¥0.00',coverage:'113.32%'});
       await ui.assert(!await ui.page.locator('[data-retire-reference]').evaluate(el=>el.open),'沿用余额仅在默认折叠的数据参考中提示');
       await ui.click('[data-retire-reference] > summary','核对沿用余额的实际来源');
       await ui.assert((await ui.page.locator('[data-retire-reference]').innerText()).includes('沿用最近已知余额'),'数据参考明确沿用最近已知余额');
@@ -484,9 +519,7 @@ module.exports = {
       await ui.click('[data-retire-save]','无完整收入历史也可保存AUTO结余来源');
       await ui.assert((await ui.page.locator('[data-retire-config-status]').innerText()).trim()==='配置已完成 · 已保存','可选AUTO结余缺历史时配置仍完成');
       await ui.assert((await ui.page.locator('[data-retire-live="projection"] > p b').first().innerText()).trim()==='—','AUTO结余无历史保持未知,不伪填零投入');
-      await ui.assert((await ui.page.locator('[data-retire-value="principal"]').innerText()).includes('5,612,345.00') &&
-        (await ui.page.locator('[data-retire-value="target"]').innerText()).includes('4,800,000.00') &&
-        (await ui.page.locator('[data-retire-value="coverage"]').innerText()).trim()==='116.92%','可选AUTO结余无数据不清空本金、门槛与覆盖');
+      await coreProgress(ui,'可选AUTO结余无历史',{assets:'¥6,912,345.00',target:'¥6,100,000.00',gap:'¥0.00',coverage:'113.32%'});
       await ui.assert(await ui.page.locator('#retirement-path').count()===0,'缺AUTO结余仅停止未来积累图');
       await ui.assert(!await ui.page.locator('[data-retire-reference]').evaluate(el=>el.open),'缺结余来源同样只在默认折叠的数据参考中说明');
       await ui.click('[data-retire-reference] > summary','查看未生成积累预测的原因');
@@ -504,11 +537,14 @@ module.exports = {
     await ui.page.check(`[name="accountIds"][value="${home}"]`);
     await ui.assert(await ui.page.locator('.retire-realizable').count()===0,'自定义范围只选账户,不要求另填估值');
     await ui.click('[data-retire-save]','保存主动选择的账户范围');
+    await coreProgress(ui,'主动选入非金融账户',{assets:'¥16,100,000.00',target:'¥6,100,000.00',gap:'¥0.00',coverage:'263.93%'});
     await ui.goto(`/goals/${pendingGoal}/retirement?tab=plan`);
     await ui.assert((await ui.page.locator('[data-retire-live="funds"]').innerText()).includes('16,100,000.00'),'自定义所选账户按最新账面值汇总');
     db.raw(`UPDATE period_snapshot SET end_balance=10010000 WHERE period_id=${latest} AND account_id=${home}`);
     await ui.goto(`/goals/${pendingGoal}/retirement?tab=plan`);
     await ui.assert((await ui.page.locator('[data-retire-live="funds"]').innerText()).includes('16,110,000.00'),'主动选入的非金融账户也实时读取余额,不冻结金额');
+    await ui.click('[data-retire-tab="overview"]','查看非金融账户余额变化后的核心进度');
+    await coreProgress(ui,'所选账户余额实时变化',{assets:'¥16,110,000.00',target:'¥6,100,000.00',gap:'¥0.00',coverage:'264.10%'});
     await ui.phone(async mobile=>{
       await login(mobile.page,state.username);await mobile.goto('/goals/retirement/new');
       await mobile.page.check('[name="cityTier"][value="FIRST"]');

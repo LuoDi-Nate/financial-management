@@ -393,7 +393,7 @@
               <div class="retire-chart">
                 <canvas
                   id="retirement-path"
-                  aria-label="未来本金的今天购买力路径"
+                  aria-label="预留后生活本金的今天购买力路径"
                 >
                 </canvas>
               </div>
@@ -402,7 +402,7 @@
                   <tr>
                     <th>假设</th>
                     <th>首次达到</th>
-                    <th>目标月本金</th>
+                    <th>目标月生活本金</th>
                     <th>目标月缺口</th>
                   </tr>
                 </thead>
@@ -417,7 +417,7 @@
                       th:text="${s.firstReached()==null?'50年内未达到':(s.firstReached()==r.asOf()?'当前':#temporals.format(s.firstReached(),'yyyy-MM'))}"
                     ></td>
                     <td
-                      data-label="目标月本金"
+                      data-label="目标月生活本金"
                       data-priv
                       th:text="${money.amount(s.atTargetMonth())}"
                     ></td>
