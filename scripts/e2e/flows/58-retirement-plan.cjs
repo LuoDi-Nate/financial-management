@@ -7,6 +7,7 @@ const fs = require('fs');
 const path = require('path');
 const state = { family:null, member:null, cash:null, native:null, legacy:null, username:null, prefix:null };
 const q = value => "'" + String(value).replace(/'/g,"''") + "'";
+const PLANNING_RETURN_BASIS = '规划假设 · 小Lin 2.5% 实际回报';
 
 async function login(page, username) {
   await page.context().clearCookies();
@@ -196,9 +197,16 @@ module.exports = {
     await ui.visible('#retire-draft-status','动态演算明确标为未保存草稿');
     await ui.assert(db.num(`SELECT COUNT(*) FROM retirement_plan WHERE family_id=${state.family}`)===0,'城市切换与自动演算不保存计划');
     await ui.choose('returnSource','AUTO');
-    await ui.page.waitForFunction(()=>/本次名义年回报\s*暂无数据/.test(document.querySelector('[data-retire-live="rates"]').textContent));
+    await ui.page.waitForFunction(basis=>document.querySelector('[data-retire-return-basis]')?.textContent.includes(basis),PLANNING_RETURN_BASIS);
+    const shortHistoryRates=await ui.page.locator('[data-retire-live="rates"]').innerText();
+    await ui.assert(shortHistoryRates.includes(PLANNING_RETURN_BASIS),'短历史AUTO在配置页明确采用小Lin2.5%实际回报规划假设');
+    await ui.assert(/规划名义年回报\s*4\.550*%/.test(shortHistoryRates) && /实际回报\s*2\.50*%/.test(shortHistoryRates),'2%通胀下由2.5%实际回报推得4.55%名义回报,不再次扣通胀');
+    await ui.click('[data-retire-tab="overview"]','查看短历史下的总资金需求与规划假设');
+    await ui.visible('[data-retire-return-basis]','规划假设在总资金需求下方明确可见');
+    await ui.assert((await ui.page.locator('[data-retire-return-basis]').innerText()).includes(PLANNING_RETURN_BASIS),'规划回报没有冒充已核验的历史收益');
+    await ui.click('[data-retire-tab="plan"]','返回配置核对原始历史来源');
     await ui.click('[data-retire-live="rates"] summary','展开短历史的收益来源');
-    await ui.assert((await ui.page.locator('[data-retire-live="rates"]').innerText()).includes('至少需要12个'),'短历史明确缺失,不回退节目示例');
+    await ui.assert((await ui.page.locator('[data-retire-live="rates"]').innerText()).includes('至少需要12个'),'采用规划假设仍保留历史来源不足原因,不降低12段门槛');
     await ui.assert(await ui.page.inputValue('[name="monthlyContribution"]') === '20000.00' ||
       Number(await ui.page.inputValue('[name="monthlyContribution"]'))===20000,'月投入建议包含旧总额和新账户收入,未停留在旧月份');
     await ui.assert(!(await ui.page.isChecked('[name="accountIds"][value="'+db.num(`SELECT id FROM account WHERE family_id=${state.family} AND type='PROPERTY'`)+'"]')),'自住房默认未纳入');
@@ -327,17 +335,38 @@ module.exports = {
     await ui.page.uncheck(`input[name="accountIds"][value="${state.cash}"]`);await ui.page.check(`input[name="accountIds"][value="${foreign}"]`);
     await ui.choose('returnSource','AUTO');
     await ui.page.waitForFunction(()=>/本次名义年回报\s*60/.test(document.querySelector('[data-retire-live="rates"]').textContent));
+    await ui.assert(await ui.page.locator('[data-retire-return-basis]').count()===0,'12段历史齐备时不再显示2.5%规划假设标签');
+    await ui.assert(!(await ui.page.locator('[data-retire-live="rates"]').innerText()).includes(PLANNING_RETURN_BASIS),'配置页同样使用真实60%历史回报,不以规划值覆盖');
     await ui.click('[data-retire-live="rates"] summary','查看真实月度投资来源');
     await ui.assert((await ui.page.locator('[data-retire-live="rates"]').innerText()).includes('12 个完整月度间隔'),'13张实际月末快照给出12个收益间隔');
     await ui.assert((await ui.page.locator('[data-retire-live="rates"]').innerText()).includes('300000.00'),'同为10万美元,历史汇率5到8的30万折算变化进入投资收益');
     const gap=db.num(`SELECT id FROM period WHERE family_id=${state.family} AND period_start=DATE_SUB('${current}',INTERVAL 6 MONTH)`);
-    db.raw(`DELETE FROM period_snapshot WHERE period_id=${gap} AND account_id=${foreign}`);
+    try {
+      db.raw(`DELETE s FROM period_snapshot s JOIN period p ON p.id=s.period_id
+        WHERE p.family_id=${state.family} AND s.period_id=${gap} AND s.account_id=${foreign}`);
+      await ui.choose('returnSource','MANUAL');await ui.choose('returnSource','AUTO');
+      await ui.page.waitForFunction(()=>document.querySelector('[data-retire-live="rates"]').textContent.includes('实际月末快照'));
+      await ui.page.waitForFunction(basis=>document.querySelector('[data-retire-return-basis]')?.textContent.includes(basis),PLANNING_RETURN_BASIS);
+      if(!await ui.page.locator('[data-retire-live="rates"] details').evaluate(el=>el.open))
+        await ui.click('[data-retire-live="rates"] summary','展开缺少实际快照的收益来源');
+      await ui.assert((await ui.page.locator('[data-retire-live="rates"]').innerText()).includes('实际月末快照'),'缺一张快照后仍拒绝用延续余额凑满一年');
+      await ui.click('[data-retire-tab="overview"]','查看缺历史快照时采用的规划假设');
+      await ui.visible('[data-retire-return-basis]','缺实际快照时规划假设仍明确可见');
+      await ui.assert((await ui.page.locator('[data-retire-return-basis]').innerText()).includes(PLANNING_RETURN_BASIS),'缺历史快照使用2.5%实际回报,并保留来源标识');
+      await coreProgress(ui,'缺历史快照仍按规划假设演算',{assets:'¥800,000.00',target:'¥6,100,000.00',gap:'¥5,300,000.00',coverage:'13.11%'});
+    } finally {
+      db.raw(`INSERT INTO period_snapshot(period_id,account_id,end_balance,submitted_by,source_tag)
+        SELECT ${gap},a.id,100000,${state.member},'MANUAL'
+        FROM account a JOIN period p ON p.family_id=a.family_id AND p.id=${gap}
+        WHERE a.family_id=${state.family} AND a.id=${foreign}`);
+    }
+    await ui.click('[data-retire-tab="plan"]','恢复快照后重新读取历史回报');
     await ui.choose('returnSource','MANUAL');await ui.choose('returnSource','AUTO');
-    await ui.page.waitForFunction(()=>document.querySelector('[data-retire-live="rates"]').textContent.includes('实际月末快照'));
-    if(!await ui.page.locator('[data-retire-live="rates"] details').evaluate(el=>el.open))
-      await ui.click('[data-retire-live="rates"] summary','展开缺少实际快照的收益来源');
-    await ui.assert((await ui.page.locator('[data-retire-live="rates"]').innerText()).includes('实际月末快照'),'缺一张快照后拒绝用延续余额凑满一年');
-    db.raw(`INSERT INTO period_snapshot(period_id,account_id,end_balance,submitted_by,source_tag) VALUES(${gap},${foreign},100000,${state.member},'MANUAL')`);
+    await ui.page.waitForFunction(()=>/本次名义年回报\s*60/.test(document.querySelector('[data-retire-live="rates"]').textContent));
+    await ui.assert(await ui.page.locator('[data-retire-return-basis]').count()===0,'恢复实际快照后规划假设标签自动消失');
+    await ui.assert(!(await ui.page.locator('[data-retire-live="rates"]').innerText()).includes(PLANNING_RETURN_BASIS),'恢复历史后配置来源同步退出规划假设');
+    await ui.click('[data-retire-tab="overview"]','核对真实60%回报重新参与核心演算');
+    await coreProgress(ui,'真实历史回报优先于2.5%规划值',{assets:'¥800,000.00',target:'¥1,500,000.00',gap:'¥700,000.00',coverage:'53.33%'});
     await ui.goto(`/goals/${state.native}/retirement`);
 
     db.raw(`UPDATE retirement_plan SET plan_json=JSON_MERGE_PATCH(plan_json,
@@ -472,13 +501,27 @@ module.exports = {
       FROM period_snapshot s JOIN period p ON p.id=s.period_id
       WHERE p.family_id=${state.family} AND s.period_id=${gap} AND s.account_id=${foreign}`));
     if(!missingRateSnapshot) throw new Error('缺年回报用例缺少待恢复的实际快照');
+    const manualReturnBefore=JSON.parse(savedConfig);
+    let planningConfigJson;
     try {
       db.raw(`DELETE s FROM period_snapshot s JOIN period p ON p.id=s.period_id
         WHERE p.family_id=${state.family} AND s.period_id=${gap} AND s.account_id=${foreign}`);
-      await ui.choose('returnSource','AUTO');await ui.click('[data-retire-save]','仅动态回报来源不足时保存配置');
-      await ui.assert((await ui.page.locator('[data-retire-config-status]').innerText()).trim()==='配置已完成 · 已保存','缺年回报仅影响运行指标,不影响已保存配置');
+      await ui.choose('returnSource','AUTO');await ui.click('[data-retire-save]','历史不足时保存AUTO回报与规划假设');
+      await ui.assert((await ui.page.locator('[data-retire-config-status]').innerText()).trim()==='配置已完成 · 已保存','采用规划回报时配置仍已完成并保存');
       await ui.assert((await ui.page.locator('[data-retire-value="principal"]').innerText()).includes('5,612,345.00'),'缺动态回报时生活本金仍独立可算');
-      await coreProgress(ui,'缺动态年回报',{assets:'¥6,912,345.00',target:'暂无结果',gap:'—',coverage:'—'});
+      await coreProgress(ui,'历史不足采用2.5%实际回报',{assets:'¥6,912,345.00',target:'¥6,100,000.00',gap:'¥0.00',coverage:'113.32%'});
+      await ui.visible('[data-retire-return-basis]','总需求下方可见规划回报来源');
+      await ui.assert((await ui.page.locator('[data-retire-return-basis]').innerText()).includes(PLANNING_RETURN_BASIS),'保存后的2.5%明确标为规划假设');
+      planningConfigJson=db.one(`SELECT plan_json FROM retirement_plan WHERE goal_id=${pendingGoal} AND family_id=${state.family}`);
+      const planningConfig=JSON.parse(planningConfigJson);
+      await ui.assert(planningConfig.returnSource==='AUTO','规划假设不把持久回报来源改成MANUAL');
+      await ui.assert(['nominalReturnPct','realReturnPct','directRealRate'].every(key=>planningConfig[key]===manualReturnBefore[key]),'规划回报只进入有效演算,原手填回报参数独立保留');
+      await ui.click('[data-retire-tab="plan"]','核对已保存AUTO规划回报的配置来源');
+      await ui.assert((await ui.page.locator('[data-retire-live="rates"]').innerText()).includes(PLANNING_RETURN_BASIS),'配置页同样明示2.5%实际回报规划假设');
+      await ui.assert(!await ui.page.locator('[data-retire-live="rates"] details').evaluate(el=>el.open),'实际历史不足的详细来源仍默认折叠');
+      await ui.click('[data-retire-live="rates"] summary','查看规划假设背后的原始历史不足原因');
+      const missingHistory=await ui.page.locator('[data-retire-live="rates"] details').innerText();
+      await ui.assert(missingHistory.includes('实际月末快照') && missingHistory.includes('至少需要12个'),'规划回报不覆盖历史缺快照原因,不降低12段门槛');
     } finally {
       const columns=Object.keys(missingRateSnapshot);
       db.raw(`INSERT INTO period_snapshot(${columns.join(',')})
@@ -486,6 +529,9 @@ module.exports = {
         FROM period p JOIN account a ON a.family_id=p.family_id AND a.id=${foreign}
         WHERE p.id=${gap} AND p.family_id=${state.family}`);
     }
+    await ui.goto(`/goals/${pendingGoal}/retirement`);
+    await ui.assert(await ui.page.locator('[data-retire-return-basis]').count()===0,'恢复足够历史后已保存AUTO计划自动退出规划假设');
+    await ui.assert(db.one(`SELECT plan_json FROM retirement_plan WHERE goal_id=${pendingGoal} AND family_id=${state.family}`)===planningConfigJson,'历史恢复只影响本次有效回报,无需重存且不改写计划');
     await ui.goto(`/goals/${pendingGoal}/retirement?tab=plan`);await ui.choose('returnSource','MANUAL');
     await ui.click('[data-retire-save]','恢复手填回报核对正常未关账口径');
 

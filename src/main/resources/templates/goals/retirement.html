@@ -163,6 +163,7 @@
                 data-retire-value="target"
               >
               </strong>
+              <small th:if="${view.usesPlanningReturn()}" data-retire-return-basis class="retire-field-hint text-brass-deep" th:text="${view.returnBasis()}"></small>
               <small class="retire-field-hint" th:if="${r.target()==null and r.realRate()==null}">回报或通胀来源暂无可用年率</small>
             </div>
             <div>
@@ -999,7 +1000,7 @@
                       >年回报来源</label
                     >
                     <select data-lsel class="field-input" th:field="*{returnSource}">
-                      <option value="AUTO">参与账户的历史投资年化</option>
+                      <option value="AUTO">历史回报优先 · 不足用2.5%实际回报规划</option>
                       <option value="MANUAL">自行设定长期回报</option>
                     </select>
                     <div data-retire-when="nominal-return">
@@ -1043,8 +1044,9 @@
                   </div>
                 </div>
                 <div data-retire-live="rates" class="retire-reference">
+                  <p th:if="${view.usesPlanningReturn()}" class="retire-field-hint text-brass-deep" th:text="${view.returnBasis()+';有合格历史后自动优先使用历史回报。'}"></p>
                   <p class="text-sm">
-                    本次名义年回报
+                    <span th:text="${view.usesPlanningReturn() ? '规划名义年回报' : '本次名义年回报'}"></span>
                     <b
                       th:text="${view.effective().nominalReturnPct==null?'暂无数据':view.effective().nominalReturnPct+'%'}"
                     >
@@ -1345,7 +1347,7 @@
             π = <b th:text="${view.effective().inflationPct==null?'待补齐':view.effective().inflationPct+'%'}"></b>
           </p>
           <p>本次实际回报 r = <b th:text="${r.realRate()==null?'暂无数据':#numbers.formatDecimal(r.realRate()*100,1,6)+'%'}"></b>
-            <span th:if="${view.effective().directRealRate}"> · 直接填写</span>
+            <span th:if="${view.effective().directRealRate}" th:text="${view.usesPlanningReturn() ? ' · '+view.returnBasis() : ' · 直接填写'}"></span>
           </p>
           <p>P = 可支用资产 A − 全家庭负债 D − 大额支出准备金 B</p>
           <p data-priv th:text="${'本次 P = '+money.amount(r.assets())+' − '+money.amount(r.debt())+' − '+money.amount(r.reserves())+' = '+money.amount(r.principal())}"></p>

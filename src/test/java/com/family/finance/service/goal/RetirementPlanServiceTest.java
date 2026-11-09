@@ -4,6 +4,7 @@ import com.family.finance.domain.goal.*;
 import com.family.finance.repository.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -38,6 +39,17 @@ class RetirementPlanServiceTest {
                 new BigDecimal("3000000"),BigDecimal.ZERO,null,null,"test",List.of(),List.of(),"CPI参考"));
         when(mapper.save(eq(1L),eq(9L),anyString(),eq(true),eq(false))).thenReturn(1);
         return g;
+    }
+    private void mockRateSources(String investmentPercent, String inflationPercent) {
+        var from=LocalDate.now().minusYears(1);var to=LocalDate.now().withDayOfMonth(1).minusDays(1);
+        var investment=investmentPercent==null ? RetirementRateSources.Rate.missing("历史样本不足")
+                : new RetirementRateSources.Rate(new BigDecimal(investmentPercent),from,to,List.of(),null,"已通过来源校验的历史年回报");
+        var inflation=inflationPercent==null ? RetirementRateSources.Rate.missing("无已核验CPI")
+                : new RetirementRateSources.Rate(new BigDecimal(inflationPercent),from,to,List.of(),null,"已核验年度CPI");
+        var sources=new RetirementDataService.Sources(new BigDecimal("3000000"),java.util.Set.of(),BigDecimal.ONE,
+                null,null,null,null,List.of(),investment,inflation);
+        when(data.load(eq(1L),any(),any())).thenReturn(new RetirementDataService.Data("CNY",LocalDate.now(),List.of(),List.of(),
+                new BigDecimal("3000000"),BigDecimal.ZERO,null,null,"rates",List.of(),List.of(),"CPI参考",sources));
     }
     @Test void adoptionRequiresExplicitConfirmationAndDoesNotChangeLegacyRow() {
         var g = legacy(); var p = plan();
@@ -121,15 +133,76 @@ class RetirementPlanServiceTest {
         service.restorePrevious(1,9,1L);
         verify(mapper).save(1,9,raw,true,false);
     }
-    @Test void automaticRatesRemainMissingRatherThanUsingDormantExampleValues() {
+    @Test void automaticReturnUsesPlanningAssumptionWithoutChangingStoredChoices() {
         legacy();var p=plan();p.setVersion(2);p.setReturnSource("AUTO");p.setInflationSource("AUTO");
+        p.setRealReturnPct(new BigDecimal("1.25"));String storedBefore=service.encode(p);
         var view=service.evaluate(1,p,null,false,false);
-        assertThat(view.result().target()).isNull();assertThat(view.effective().getNominalReturnPct()).isNull();
+        assertThat(view.effective().isDirectRealRate()).isTrue();assertThat(view.effective().getRealReturnPct()).isEqualByComparingTo("2.5");
+        assertThat(view.effective().getNominalReturnPct()).isNull();assertThat(view.effective().getInflationPct()).isNull();
+        assertThat(view.result().realRate()).isEqualByComparingTo("0.025");assertThat(view.result().target()).isEqualByComparingTo("4800000");
+        assertThat(view.result().assets()).isEqualByComparingTo("3000000");assertThat(view.result().coveragePct()).isEqualByComparingTo("62.5");
+        assertThat(view.result().ready()).isTrue();assertThat(view.configurationComplete()).isTrue();
+        assertThat(view.usesPlanningReturn()).isTrue();assertThat(view.returnBasis()).contains("规划假设","小Lin","2.5%");
+        assertThat(service.encode(p)).isEqualTo(storedBefore);
         assertThat(p.getNominalReturnPct()).isEqualByComparingTo("4.5");assertThat(p.getInflationPct()).isEqualByComparingTo("2");
         assertThatCode(()->service.save(1,9L,p,true)).doesNotThrowAnyException();
-        verify(mapper).save(eq(1L),eq(9L),contains("\"returnSource\":\"AUTO\""),eq(true),eq(false));
-        assertThat(service.evaluate(1,p,null,false,true).result().target()).isNull();
-        assertThat(p.getNominalReturnPct()).isEqualByComparingTo("4.5");
+        var savedJson=ArgumentCaptor.forClass(String.class);
+        verify(mapper).save(eq(1L),eq(9L),savedJson.capture(),eq(true),eq(false));
+        var saved=service.parse(savedJson.getValue());
+        assertThat(saved.getReturnSource()).isEqualTo("AUTO");assertThat(saved.getInflationSource()).isEqualTo("AUTO");
+        assertThat(saved.isDirectRealRate()).isFalse();assertThat(saved.getRealReturnPct()).isEqualByComparingTo("1.25");
+        assertThat(saved.getNominalReturnPct()).isEqualByComparingTo("4.5");assertThat(saved.getInflationPct()).isEqualByComparingTo("2");
+        var reevaluated=service.evaluate(1,saved,null,false,true);
+        assertThat(reevaluated.result().target()).isEqualByComparingTo("4800000");assertThat(reevaluated.usesPlanningReturn()).isTrue();
+    }
+    @Test void availableZeroAndNegativeHistoricalReturnsNeverUsePlanningAssumption() {
+        legacy();var p=plan();p.setVersion(2);p.setReturnSource("AUTO");p.setInflationSource("AUTO");
+        p.setDirectRealRate(true);p.setRealReturnPct(new BigDecimal("7"));
+        for(String percent:List.of("0","-1")) {
+            mockRateSources(percent,"0");
+            var view=service.evaluate(1,p,null,false,true);
+            assertThat(view.usesPlanningReturn()).isFalse();assertThat(view.returnBasis()).doesNotContain("规划假设");
+            assertThat(view.effective().isDirectRealRate()).isFalse();
+            assertThat(view.effective().getNominalReturnPct()).isEqualByComparingTo(percent);
+            assertThat(view.result().realRate()).isEqualByComparingTo(new BigDecimal(percent).movePointLeft(2));
+            assertThat(view.result().state()).isEqualTo(com.family.finance.calc.RetirementCalculator.State.NO_FINITE_TARGET);
+            assertThat(view.result().target()).isNull();assertThat(view.result().coverage()).isNull();
+        }
+        assertThat(p.getReturnSource()).isEqualTo("AUTO");assertThat(p.isDirectRealRate()).isTrue();
+        assertThat(p.getRealReturnPct()).isEqualByComparingTo("7");assertThat(p.getNominalReturnPct()).isEqualByComparingTo("4.5");
+    }
+    @Test void availablePositiveHistoryTakesPrecedenceEvenWhenInflationIsMissing() {
+        legacy();var p=plan();p.setVersion(2);p.setReturnSource("AUTO");p.setInflationSource("AUTO");
+        mockRateSources("8","2");
+        var known=service.evaluate(1,p,null,false,true);
+        assertThat(known.usesPlanningReturn()).isFalse();assertThat(known.returnBasis()).doesNotContain("规划假设");
+        assertThat(known.effective().isDirectRealRate()).isFalse();assertThat(known.effective().getNominalReturnPct()).isEqualByComparingTo("8");
+        assertThat(known.result().target()).isEqualByComparingTo("2040000");assertThat(known.result().ready()).isTrue();
+        mockRateSources("8",null);
+        var missingInflation=service.evaluate(1,p,null,false,true);
+        assertThat(missingInflation.usesPlanningReturn()).isFalse();assertThat(missingInflation.effective().isDirectRealRate()).isFalse();
+        assertThat(missingInflation.effective().getNominalReturnPct()).isEqualByComparingTo("8");
+        assertThat(missingInflation.effective().getInflationPct()).isNull();assertThat(missingInflation.result().realRate()).isNull();
+        assertThat(missingInflation.result().target()).isNull();
+        assertThat(p.getNominalReturnPct()).isEqualByComparingTo("4.5");assertThat(p.getInflationPct()).isEqualByComparingTo("2");
+    }
+    @Test void planningReturnDerivesNominalFromAvailableInflationAndLabelsItsSource() {
+        legacy();var p=plan();p.setVersion(2);p.setReturnSource("AUTO");p.setInflationSource("AUTO");
+        mockRateSources(null,"3");
+        var view=service.evaluate(1,p,null,false,true);
+        assertThat(view.usesPlanningReturn()).isTrue();assertThat(view.returnBasis()).contains("规划假设","小Lin","2.5%");
+        assertThat(view.data().sources().investment().percent()).isNull();
+        assertThat(view.effective().isDirectRealRate()).isTrue();assertThat(view.effective().getRealReturnPct()).isEqualByComparingTo("2.5");
+        assertThat(view.effective().getInflationPct()).isEqualByComparingTo("3");
+        assertThat(view.effective().getNominalReturnPct()).isEqualByComparingTo("5.575");
+        assertThat(view.effective().getMiddleReturnPct()).isEqualByComparingTo("5.575");
+        assertThat(view.result().target()).isEqualByComparingTo("4800000");assertThat(view.result().coveragePct()).isEqualByComparingTo("62.5");
+        assertThat(p.getReturnSource()).isEqualTo("AUTO");assertThat(p.getInflationSource()).isEqualTo("AUTO");
+        assertThat(p.getNominalReturnPct()).isEqualByComparingTo("4.5");assertThat(p.getInflationPct()).isEqualByComparingTo("2");
+        p.setReturnSource("MANUAL");
+        var manual=service.evaluate(1,p,null,false,true);
+        assertThat(manual.usesPlanningReturn()).isFalse();assertThat(manual.effective().isDirectRealRate()).isFalse();
+        assertThat(manual.effective().getNominalReturnPct()).isEqualByComparingTo("4.5");
     }
     @Test void unknownAccountDoesNotHideRecordedTotalOrBlockSavingSelection() {
         legacy();var p=plan();p.setVersion(2);p.getAccountIds().addAll(List.of(12L,13L));

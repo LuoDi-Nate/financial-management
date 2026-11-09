@@ -243,6 +243,7 @@ public class GoalLlmService {
 
     private String buildMonthlyReportPrompt(Goal goal, GoalProgressService.GoalProgress p) {
         if (p.isNewRetirement()) return p.retirement().result().aiSummary()
+                + "\n回报来源=" + p.retirement().returnBasis()
                 + "\n金额币种=" + p.retirement().plan().getBaseCurrency() + "。仅解释系统结果,不计算、不补全参数,不承诺退休安全。";
         // v0.16 · 自定义追踪目标:按指标 / 当前·目标 / 达标率 / 倒计时 / pace 组 prompt(预设仍走下方)
         if (goal.getGoalType() == GoalType.CUSTOM) {

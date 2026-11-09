@@ -102,7 +102,7 @@ public class RetirementController {
         var view = plans.active(me.getFamilyId(), goal).orElseThrow(() -> new IllegalArgumentException("请先采用新方案"));
         String text = "退休生活账 修订"+view.plan().getVersion()+"\n计划币种:" + view.plan().getBaseCurrency() + "\n计划金额基准日:" + view.plan().getPriceDate()
                 + "\n本次购买力日期:" + view.result().asOf() + "\n资金账期:" + view.data().balancePeriod()
-                + "\n" + view.result().aiSummary() + "\n来源月份:" + view.data().months()
+                + "\n" + view.result().aiSummary() + "\n回报来源:" + view.returnBasis() + "\n来源月份:" + view.data().months()
                 + "\n动态来源:"+view.data().sources()+"\n本次有效参数:\n"+plans.encode(view.effective())+"\n保存参数:\n" + plans.encode(view.plan())
                 + "\n原节目:https://www.bilibili.com/video/BV1yUHP6rEYD/\n480=12/2.5%;名义模式实际回报=(1+R)/(1+通胀)-1。\n";
         return ResponseEntity.ok().header("Content-Type", "text/plain; charset=UTF-8")

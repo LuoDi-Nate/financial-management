@@ -123,10 +123,15 @@ class GoalLlmServiceTest {
         var view=mock(RetirementPlanService.View.class);var result=mock(com.family.finance.calc.RetirementCalculator.Result.class);
         when(view.plan()).thenReturn(plan);when(view.result()).thenReturn(result);
         when(view.progressAssets()).thenReturn(new BigDecimal("5000000"));when(view.progressTarget()).thenReturn(new BigDecimal("10000000"));
+        when(view.returnBasis()).thenReturn("规划假设 · 小Lin 2.5% 实际回报");
         when(result.ready()).thenReturn(false);when(result.aiSummary()).thenReturn("所选账户资产A=5000000 · 所需总资金F=10000000 · 目标进度比率=0.5");
         var progress=new GoalProgressService.GoalProgress(goal,null,new BigDecimal("5000000"),new BigDecimal("10000000"),
                 new BigDecimal("0.5"),null,null,null,null,null,null,1,view);
         assertThat(service.generateMonthlyReport(1,goal,progress).ok()).isTrue();
+        var prompt=org.mockito.ArgumentCaptor.forClass(String.class);
+        org.mockito.Mockito.verify(router).invoke(org.mockito.ArgumentMatchers.eq(1L),
+                org.mockito.ArgumentMatchers.any(com.family.finance.service.llmtrace.PromptTrace.class),anyString(),prompt.capture());
+        assertThat(prompt.getValue()).contains("回报来源=规划假设 · 小Lin 2.5% 实际回报");
         when(view.progressTarget()).thenReturn(null);
         assertThat(service.generateMonthlyReport(1,goal,progress).ok()).isFalse();
     }

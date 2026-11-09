@@ -18,6 +18,7 @@ import java.util.*;
 @Service
 @RequiredArgsConstructor
 public class RetirementPlanService {
+    public static final BigDecimal PLANNING_REAL_RETURN_PCT = new BigDecimal("2.5");
     private final RetirementPlanMapper mapper;
     private final GoalMapper goals;
     private final FamilyMapper families;
@@ -33,6 +34,15 @@ public class RetirementPlanService {
         public boolean configurationComplete() { return configurationProblems.isEmpty(); }
         public BigDecimal progressAssets() { return plan.getVersion()>=2 ? result.assets() : result.principal(); }
         public BigDecimal progressTarget() { return plan.getVersion()>=2 ? result.totalAssetNeed() : result.target(); }
+        public boolean usesPlanningReturn() {
+            return plan.getVersion()>=2 && "AUTO".equals(plan.getReturnSource()) && data.sources().investment().percent()==null;
+        }
+        public String returnBasis() {
+            if(usesPlanningReturn()) return "规划假设 · 小Lin " + PLANNING_REAL_RETURN_PCT.toPlainString() + "% 实际回报";
+            if(plan.getVersion()==1) return "升级前固定回报假设";
+            if("AUTO".equals(plan.getReturnSource())) return "所选账户的合格历史投资回报";
+            return plan.isDirectRealRate() ? "自行设定的实际回报" : "自行设定的名义回报";
+        }
         public List<String> dataReferences() {
             var notes=new LinkedHashSet<String>(result.problems());
             if(plan.isAutoExpense() || (plan.isSimulateFuture() && "AUTO".equals(plan.getContributionSource()))) notes.addAll(data.budgetNotes());
@@ -79,7 +89,7 @@ public class RetirementPlanService {
         BigDecimal debt=p.getVersion()>=2 ? data.debt() : data.problems().isEmpty()?data.debt():null;
         var result = RetirementCalculator.calculate(effective, today, currencyMatches && accountsValid ? assets : null,
                 currencyMatches ? debt : null, data.suggestedExpense(), problems);
-        String fingerprint = com.family.finance.service.llmtrace.PromptRecorder.sha256(encode(p) + "|" + data.sources() + "|" + data.assets() + "|" + result.aiSummary());
+        String fingerprint = com.family.finance.service.llmtrace.PromptRecorder.sha256(encode(p) + "|" + encode(effective) + "|" + data.sources() + "|" + data.assets() + "|" + result.aiSummary());
         return new View(p, result, data, updatedAt, created, active, fingerprint,effective,List.copyOf(configurationProblems));
     }
 
@@ -93,7 +103,14 @@ public class RetirementPlanService {
         if ("AUTO".equals(p.getReturnSource())) {
             p.setDirectRealRate(false);
             p.setNominalReturnPct(sources.investment().percent());
-            if(p.getNominalReturnPct()==null) problems.add(sources.investment().problem());
+            if(p.getNominalReturnPct()==null) {
+                p.setDirectRealRate(true);
+                p.setRealReturnPct(PLANNING_REAL_RETURN_PCT);
+                if(p.getInflationPct()!=null) p.setNominalReturnPct(BigDecimal.ONE.add(PLANNING_REAL_RETURN_PCT.movePointLeft(2))
+                        .multiply(BigDecimal.ONE.add(p.getInflationPct().movePointLeft(2))).subtract(BigDecimal.ONE).movePointRight(2));
+                if(sources.investment().problem()!=null) problems.add(sources.investment().problem());
+                problems.add("历史回报暂不可用,本次采用小Lin " + PLANNING_REAL_RETURN_PCT.toPlainString() + "% 实际回报作规划假设,不代表你家的真实收益");
+            }
         }
         p.setMonthlyIncome(BigDecimal.ZERO);
         if ("CITY".equals(p.getReserveMode())) {
