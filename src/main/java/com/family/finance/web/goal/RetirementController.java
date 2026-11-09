@@ -182,7 +182,7 @@ public class RetirementController {
 
     public record Money(String currency, BigDecimal factor) {
         public String amount(BigDecimal value) {
-            return com.family.finance.service.MoneyFormat.format2(currency, value == null ? null : value.multiply(factor));
+            return value==null ? "—" : com.family.finance.service.MoneyFormat.format2(currency, value.multiply(factor));
         }
     }
 }

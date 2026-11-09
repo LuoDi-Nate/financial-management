@@ -41,6 +41,16 @@ public class RetirementDataService {
                        BigDecimal selectedAssets, BigDecimal debt, BigDecimal suggestedExpense,
                        BigDecimal suggestedContribution, String budgetFingerprint, List<String> problems,
                        List<String> budgetNotes, String cpiReference, Sources sources) {
+        public BigDecimal completeAssets() {
+            return assets.stream().filter(Asset::selected).allMatch(a -> a.amount()!=null) ? selectedAssets : null;
+        }
+        public BigDecimal completeDebt() {
+            return assets.stream().filter(Asset::liability).allMatch(a -> a.amount()!=null) ? debt : null;
+        }
+        public BigDecimal knownAssets() {
+            return assets.stream().filter(Asset::selected).map(Asset::amount).filter(Objects::nonNull)
+                    .reduce(BigDecimal::add).orElse(null);
+        }
         public Data(String baseCurrency, LocalDate balancePeriod, List<Asset> assets, List<Month> months,
                     BigDecimal selectedAssets, BigDecimal debt, BigDecimal suggestedExpense, BigDecimal suggestedContribution,
                     String budgetFingerprint, List<String> problems, List<String> budgetNotes, String cpiReference) {
@@ -73,6 +83,8 @@ public class RetirementDataService {
                 .collect(Collectors.toMap(AccountPeriodFact::accountId, r -> r, (a,b) -> a));
         var snapshotById = slice.lastPeriodId() == null ? Map.<Long, PeriodSnapshot>of()
                 : snapshots.findByPeriod(familyId, slice.lastPeriodId()).stream().collect(Collectors.toMap(PeriodSnapshot::getAccountId, r -> r));
+        var balanceSources = sources.balanceSources(familyId,today).stream()
+                .collect(Collectors.toMap(RetirementSourceMapper.BalanceSource::accountId,r -> r));
         List<Asset> assetRows = new ArrayList<>(); BigDecimal a = BigDecimal.ZERO, d = BigDecimal.ZERO;
         Set<Long> visible = new HashSet<>();
         for (var account : active) {
@@ -86,11 +98,13 @@ public class RetirementDataService {
             boolean selected = !liability && (revision2 && "FAMILY_FINANCIAL".equals(plan.getScopeMode())
                     ? eligible : plan.getAccountIds().contains(account.getId()));
             String note = liability ? "全家庭负债:统一预留一次" : eligible ? "可选择用于退休" : "默认不作为生活本金";
-            if ((selected || liability) && original == null) problems.add(account.getDisplayName() + ":当前账期余额未填");
+            if ((selected || liability) && original == null) problems.add(account.getDisplayName() + ":尚无已知余额,暂不计入完整资金指标");
             if ((selected || liability) && factor == null) problems.add(account.getDisplayName() + ":缺少 " + account.getCurrency() + " 换汇来源");
-            if ((selected || liability) && row != null && factor != null && row.fxToBase() != null
-                    && row.fxToBase().subtract(factor).abs().compareTo(new BigDecimal("0.000001")) > 0)
+            boolean fxMismatch = row != null && factor != null && row.fxToBase() != null
+                    && row.fxToBase().subtract(factor).abs().compareTo(new BigDecimal("0.000001")) > 0;
+            if ((selected || liability) && fxMismatch)
                 problems.add(account.getDisplayName() + ":当前事实换汇与可追溯汇率不一致,请先核对汇率");
+            if (original==null || factor==null || fxMismatch) amount=null;
             if (selected && !eligible && !revision2) {
                 amount = plan.getRealizableAmounts().get(account.getId());
                 if (amount == null || amount.signum() < 0) problems.add(account.getDisplayName() + ":需确认可变现金额(本位币)");
@@ -101,11 +115,15 @@ public class RetirementDataService {
                 note = "按人工确认的可变现金额,不按保额";
             }
             if (selected && !eligible && revision2) note = "按账户最新账面估值纳入;实物或保单不等于可随时支用的现金";
+            var balanceSource=balanceSources.get(account.getId());
+            var currentSnapshot=snapshotById.get(account.getId());
+            if (amount!=null && balanceSource!=null && (currentSnapshot==null || currentSnapshot.getEndBalance()==null
+                    || "CARRIED".equals(balanceSource.sourceTag())))
+                note += ";本期沿用最近已知余额(记录账期 " + balanceSource.periodStart() + ")";
             if (liability && amount != null) d = d.add(amount.abs());
             if (selected && amount != null) a = a.add(amount);
-            var snapshot = snapshotById.get(account.getId());
             assetRows.add(new Asset(account.getId(), account.getDisplayName(), account.getType(), account.getCurrency(), original,
-                    amount, factor, snapshot == null ? null : snapshot.getSubmittedAt(), eligible, selected, liability, note));
+                    amount, factor, balanceSource == null ? null : balanceSource.submittedAt(), eligible, selected, liability, note));
         }
         if(!revision2 || !"FAMILY_FINANCIAL".equals(plan.getScopeMode()))
             for (Long id : plan.getAccountIds()) if (!visible.contains(id)) problems.add("选中的账户 #" + id + " 已归档或删除,请重新确认资金范围");

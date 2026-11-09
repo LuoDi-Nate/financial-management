@@ -1,5 +1,16 @@
 # 家庭账房 v0.1 · QA 测试用例
 
+## v1.39 · 11-09 配置状态与运行数据分离
+
+| ID | 操作/输入 | 预期 | 验证 |
+|---|---|---|---|
+| v139-CONFIG-STATUS | 合法配置选AUTO但无余额/年回报,创建并刷新/编辑 | 已保存且配置完成;不出现“计划还没有保存”或整页红色缺数清单 | RetirementPlanServiceTest / e2e 58 |
+| v139-INDEPENDENT-METRICS | 分别缺资产、负债、消费、年回报、通胀、可选月结余 | 只影响依赖项;T/P/已知负债各自保留,未知不当0;当前价不因缺pi被抹去,历史价不冒充当前价 | RetirementCalculatorTest / RetirementPlanServiceTest |
+| v139-OPEN-CARRY | 进行期OPEN无本期余额,此前有已知快照 | 继续采用最近已知余额并展示来源,不要求关账;无任何历史时仅显示已知小计,不编造完整覆盖率 | RetirementDataServiceTest / e2e 58 |
+| v139-DATA-REFERENCE | 保存后有运行数据提醒 | 数据参考默认折叠,可主动展开;列表/仪表盘/报表标配置完成且未知覆盖率不绘假进度;双端不溢出 | e2e 58 / 静态守护 |
+
+本次执行结果待重新自测后登记;下方旧版数字不作为本次验证证据。
+
 > 基于 `prd/v0.1.md` 与 `tech-design/v0.1.md`,以可执行黑盒测试视角拆解 22 条 FR + 认证。
 > 每条用例:**ID · 一句话目标 · 操作步骤 · 预期 · 实际(执行后填)**。
 > 跑测脚本:`bash /tmp/qa-run.sh`(用 curl + grep 校验 HTML 结构与副作用)。

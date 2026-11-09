@@ -22,6 +22,14 @@ class RetirementCalculatorTest {
     private RetirementCalculator.Result calculate(RetirementPlan p, String assets, String debt) {
         return RetirementCalculator.calculate(p, today, n(assets), n(debt), null, List.of());
     }
+    private RetirementPlan revisionTwoPlan() {
+        var p = plan(); p.setVersion(2); p.setDirectRealRate(false);
+        p.setNominalReturnPct(n("4.55")); p.setInflationPct(n("2")); p.setMiddleReturnPct(n("4.55"));
+        p.setSimulateFuture(true);
+        p.setBudgetConfirmed(false); p.setReservesConfirmed(false); p.setAssetsConfirmed(false);
+        p.setIncomeConfirmed(false); p.setContributionConfirmed(false); p.setAfterDebtConfirmed(false);
+        return p;
+    }
     @Test void videoExampleReconcilesForwardReverseAndFundsBridge() {
         var r = calculate(plan(), "6000000", "0");
         assertThat(r.target()).isEqualByComparingTo("4800000");
@@ -139,5 +147,138 @@ class RetirementCalculatorTest {
         var r = calculate(p, "110000", "0"); var s = r.scenarios().get(1);
         assertThat(s.path().getLast()).isLessThan(r.target());
         assertThat(s.firstReached()).isNotNull();
+    }
+    @Test void revisionTwoSourceNotesKeepEveryAvailableMetricAndForecast() {
+        var r = RetirementCalculator.calculate(revisionTwoPlan(), today, n("6000000"), BigDecimal.ZERO,
+                null, List.of("部分账户沿用最近已知余额"));
+        assertThat(r.state()).isEqualTo(RetirementCalculator.State.READY);
+        assertThat(r.ready()).isTrue(); assertThat(r.reached()).isTrue();
+        assertThat(r.assets()).isEqualByComparingTo("6000000"); assertThat(r.debt()).isZero();
+        assertThat(r.reserves()).isEqualByComparingTo("1200000");
+        assertThat(r.principal()).isEqualByComparingTo("4800000");
+        assertThat(r.target()).isEqualByComparingTo("4800000"); assertThat(r.gap()).isZero();
+        assertThat(r.coverage()).isEqualByComparingTo("1");
+        assertThat(r.supportedExpense()).isEqualByComparingTo("10000");
+        assertThat(r.scenarios()).hasSize(1); assertThat(r.scenarios().getFirst().path()).hasSize(601);
+        assertThat(r.neutralDate()).isEqualTo(today);
+        assertThat(r.problems()).containsExactly("部分账户沿用最近已知余额");
+    }
+    @Test void revisionTwoMissingAssetsStillAllowsTheLivingThreshold() {
+        var r = RetirementCalculator.calculate(revisionTwoPlan(), today, null, BigDecimal.ZERO,
+                null, List.of("所选账户尚无可参考余额"));
+        assertThat(r.state()).isEqualTo(RetirementCalculator.State.MISSING);
+        assertThat(r.message()).isEqualTo("部分指标暂无数据");
+        assertThat(r.ready()).isFalse(); assertThat(r.reached()).isFalse();
+        assertThat(r.assets()).isNull(); assertThat(r.debt()).isZero();
+        assertThat(r.reserves()).isEqualByComparingTo("1200000");
+        assertThat(r.target()).isEqualByComparingTo("4800000");
+        assertThat(r.totalAssetNeed()).isEqualByComparingTo("6000000");
+        assertThat(r.principal()).isNull(); assertThat(r.netFunds()).isNull();
+        assertThat(r.gap()).isNull(); assertThat(r.coverage()).isNull(); assertThat(r.supportedExpense()).isNull();
+        assertThat(r.scenarios()).isEmpty();
+        assertThat(r.problems()).containsExactly("所选账户尚无可参考余额");
+    }
+    @Test void revisionTwoMissingDebtDoesNotEraseAssetsOrInventDebtOfZero() {
+        var r = RetirementCalculator.calculate(revisionTwoPlan(), today, n("6000000"), null,
+                null, List.of("负债余额暂无来源"));
+        assertThat(r.assets()).isEqualByComparingTo("6000000"); assertThat(r.debt()).isNull();
+        assertThat(r.target()).isEqualByComparingTo("4800000");
+        assertThat(r.totalNeed()).isEqualByComparingTo("6000000"); assertThat(r.totalAssetNeed()).isNull();
+        assertThat(r.principal()).isNull(); assertThat(r.netFunds()).isNull();
+        assertThat(r.ready()).isFalse(); assertThat(r.scenarios()).isEmpty();
+    }
+    @Test void revisionTwoMissingReserveOnlyAffectsMetricsThatDeductIt() {
+        var p = revisionTwoPlan(); p.setMedicalReserve(null);
+        var r = calculate(p, "6000000", "0");
+        assertThat(r.reserves()).isNull(); assertThat(r.principal()).isNull();
+        assertThat(r.netFunds()).isEqualByComparingTo("6000000");
+        assertThat(r.target()).isEqualByComparingTo("4800000"); assertThat(r.totalNeed()).isNull();
+        assertThat(r.gap()).isNull(); assertThat(r.coverage()).isNull(); assertThat(r.supportedExpense()).isNull();
+        assertThat(r.ready()).isFalse(); assertThat(r.scenarios()).isEmpty();
+    }
+    @Test void revisionTwoMissingExpenseKeepsPrincipalAndSupportedExpense() {
+        var p = revisionTwoPlan(); p.setAutoExpense(true);
+        var r = RetirementCalculator.calculate(p, today, n("6000000"), BigDecimal.ZERO,
+                null, List.of("自动生活费暂无完整月份可参考"));
+        assertThat(r.monthlyExpense()).isNull(); assertThat(r.target()).isNull();
+        assertThat(r.principal()).isEqualByComparingTo("4800000");
+        assertThat(r.supportedExpense()).isEqualByComparingTo("10000");
+        assertThat(r.gap()).isNull(); assertThat(r.coverage()).isNull();
+        assertThat(r.ready()).isFalse(); assertThat(r.scenarios()).isEmpty();
+        assertThat(r.problems()).containsExactly("自动生活费暂无完整月份可参考");
+    }
+    @Test void revisionTwoMissingReturnKeepsCurrentAmountsWithoutUsingExampleRates() {
+        var p = revisionTwoPlan(); p.setNominalReturnPct(null); p.setMiddleReturnPct(null);
+        var r = RetirementCalculator.calculate(p, today, n("6000000"), BigDecimal.ZERO,
+                null, List.of("历史收益样本不足"));
+        assertThat(r.monthlyExpense()).isEqualByComparingTo("10000");
+        assertThat(r.reserves()).isEqualByComparingTo("1200000");
+        assertThat(r.principal()).isEqualByComparingTo("4800000");
+        assertThat(r.realRate()).isNull(); assertThat(r.target()).isNull();
+        assertThat(r.gap()).isNull(); assertThat(r.coverage()).isNull(); assertThat(r.supportedExpense()).isNull();
+        assertThat(r.ready()).isFalse(); assertThat(r.scenarios()).isEmpty();
+        assertThat(r.problems()).containsExactly("历史收益样本不足");
+    }
+    @Test void revisionTwoMissingInflationDoesNotRebaseTodaysPrices() {
+        var p = revisionTwoPlan(); p.setInflationPct(null); p.setContributionFollowsInflation(true);
+        var r = RetirementCalculator.calculate(p, today, n("6000000"), BigDecimal.ZERO,
+                null, List.of("通胀数据暂无来源"));
+        assertThat(r.monthlyExpense()).isEqualByComparingTo("10000");
+        assertThat(r.monthlyContribution()).isEqualByComparingTo("8000");
+        assertThat(r.reserves()).isEqualByComparingTo("1200000");
+        assertThat(r.principal()).isEqualByComparingTo("4800000");
+        assertThat(r.realRate()).isNull(); assertThat(r.target()).isNull();
+        assertThat(r.ready()).isFalse(); assertThat(r.scenarios()).isEmpty();
+        assertThat(r.problems()).containsExactly("通胀数据暂无来源");
+    }
+    @Test void revisionTwoMissingInflationDoesNotPretendHistoricalPricesAreCurrent() {
+        var p = revisionTwoPlan(); p.setInflationPct(null); p.setPriceDate(today.minusYears(1));
+        p.setContributionFollowsInflation(true);
+        var r = calculate(p, "6000000", "0");
+        assertThat(r.assets()).isEqualByComparingTo("6000000"); assertThat(r.debt()).isZero();
+        assertThat(r.monthlyExpense()).isNull(); assertThat(r.monthlyContribution()).isNull();
+        assertThat(r.reserves()).isNull(); assertThat(r.principal()).isNull();
+        assertThat(r.target()).isNull(); assertThat(r.ready()).isFalse();
+        assertThat(r.scenarios()).isEmpty();
+    }
+    @Test void revisionTwoAutomaticExpenseAlreadyUsesTodaysPrices() {
+        var p = revisionTwoPlan(); p.setInflationPct(null); p.setPriceDate(today.minusYears(1)); p.setAutoExpense(true);
+        var r = RetirementCalculator.calculate(p, today, n("6000000"), BigDecimal.ZERO, n("1234"), List.of());
+        assertThat(r.monthlyExpense()).isEqualByComparingTo("1234");
+        assertThat(r.reserves()).isNull(); assertThat(r.principal()).isNull(); assertThat(r.target()).isNull();
+        assertThat(r.ready()).isFalse();
+    }
+    @Test void revisionTwoExplicitRealReturnCanRunWithoutInflationButCannotForecast() {
+        var p = revisionTwoPlan(); p.setDirectRealRate(true); p.setRealReturnPct(n("2.5")); p.setInflationPct(null);
+        var r = RetirementCalculator.calculate(p, today, n("6000000"), BigDecimal.ZERO,
+                null, List.of("通胀暂无数据,未来预测暂不可用"));
+        assertThat(r.ready()).isTrue(); assertThat(r.reached()).isTrue();
+        assertThat(r.principal()).isEqualByComparingTo("4800000");
+        assertThat(r.target()).isEqualByComparingTo("4800000");
+        assertThat(r.coverage()).isEqualByComparingTo("1");
+        assertThat(r.supportedExpense()).isEqualByComparingTo("10000");
+        assertThat(r.scenarios()).isEmpty();
+    }
+    @Test void revisionTwoMissingOptionalContributionOnlyDisablesForecast() {
+        var p = revisionTwoPlan(); p.setMonthlyContribution(null);
+        var r = RetirementCalculator.calculate(p, today, n("6000000"), BigDecimal.ZERO,
+                null, List.of("月投入暂无数据,未来预测暂不可用"));
+        assertThat(r.ready()).isTrue(); assertThat(r.reached()).isTrue();
+        assertThat(r.monthlyContribution()).isNull(); assertThat(r.target()).isEqualByComparingTo("4800000");
+        assertThat(r.gap()).isZero(); assertThat(r.coverage()).isEqualByComparingTo("1");
+        assertThat(r.supportedExpense()).isEqualByComparingTo("10000"); assertThat(r.scenarios()).isEmpty();
+        assertThat(r.problems()).containsExactly("月投入暂无数据,未来预测暂不可用");
+        p.setMonthlyContribution(BigDecimal.ZERO);
+        assertThat(calculate(p, "6000000", "0").scenarios()).hasSize(1);
+    }
+    @Test void revisionTwoExplicitZeroExpenseNeedsNoInventedReturnForAZeroThreshold() {
+        var p = revisionTwoPlan(); p.setMonthlyExpense(BigDecimal.ZERO);
+        p.setNominalReturnPct(null); p.setInflationPct(null);
+        var r = calculate(p, "6000000", "0");
+        assertThat(r.state()).isEqualTo(RetirementCalculator.State.INCOME_COVERS);
+        assertThat(r.ready()).isTrue(); assertThat(r.reached()).isTrue();
+        assertThat(r.realRate()).isNull(); assertThat(r.target()).isZero(); assertThat(r.gap()).isZero();
+        assertThat(r.coverage()).isNull(); assertThat(r.supportedExpense()).isNull();
+        assertThat(r.scenarios()).isEmpty();
     }
 }

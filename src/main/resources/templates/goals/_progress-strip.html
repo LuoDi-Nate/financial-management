@@ -44,14 +44,14 @@
               <th:block th:insert="~{fragments/_kpi-info :: i(${gp.goal.description != null and !gp.goal.description.isBlank() ? gp.goal.description : gp.goal.name}, null)}"/>
               <span class="font-mono text-xs text-ink-subtle ml-auto" style="max-width:50%;text-align:right" th:text="${gp.progressLabel()}">57.0%</span>
             </div>
-            <div class="w-full bg-card-soft h-1.5 mt-1 overflow-hidden">
+            <div th:if="${gp.progressAvailable()}" class="w-full bg-card-soft h-1.5 mt-1 overflow-hidden">
               <div class="h-full bg-brass-deep"
                    th:style="'width:' + ${gp.progressPct > 100 ? 100 : (gp.progressPct < 0 ? 0 : gp.progressPct)} + '%'"></div>
             </div>
             <!-- 当前/目标(万/%缩写 · data-priv)+ 时间 · 一行分居左右不换行 -->
             <div class="flex items-baseline justify-between gap-x-2 flex-wrap mt-0.5 font-mono text-[9px] text-ink-subtle">
               <span data-priv th:text="${gp.currentDisp()} + ' / ' + ${gp.targetDisp()}">15/50万</span>
-              <span th:if="${gp.isNewRetirement()}" th:text="${'当前退休计划 · 修订'+gp.retirement.plan.version}">当前退休计划</span>
+              <span th:if="${gp.isNewRetirement()}" th:text="${'当前退休计划 · 修订'+gp.retirement.plan.version+' · '+gp.configurationLabel()}">当前退休计划</span>
               <span th:if="${!gp.isCustom() and gp.neutralDate != null}" th:text="'中性 ' + ${#temporals.format(gp.neutralDate, 'yyyy')}">中性 2053</span>
               <span th:if="${gp.isCustom() and gp.daysLeft != null}" th:text="'还剩 ' + ${gp.daysLeft} + ' 天'">还剩 145 天</span>
               <span th:if="${gp.isCustom() and gp.daysLeft == null}">长期</span>

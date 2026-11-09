@@ -49,6 +49,11 @@ check rg -q 'beforeSend\(' "$java/service/checkup/llm/AbstractOpenAiCompatibleCl
 check rg -q 'llmTestGate.block|testGate.block' "$java/service/checkup/llm/LlmRouter.java"
 check rg -q 'validateConfiguration\(true\)' src/main/resources/static/js/retirement.js
 check rg -q 'select.setAttribute\(.data-lsel.' src/main/resources/static/js/retirement.js
+check rg -q 'configurationComplete\(' "$java/service/goal/RetirementPlanService.java"
+check rg -q 'data.completeAssets\(\)' "$java/service/goal/RetirementPlanService.java"
+check rg -q 'data.completeDebt\(\)' "$java/service/goal/RetirementPlanService.java"
+check rg -q 'data-retire-config-status' src/main/resources/templates/goals/retirement.html
+check rg -q 'data-retire-reference' src/main/resources/templates/goals/retirement.html
 if code "$java/service/goal/RetirementPlanService.java" | rg -q 'throw new IllegalArgumentException\(String.join'; then echo 'FAIL: 实时演算缺失阻塞配置保存' >&2; exit 1; fi
 qa139_pass=$((qa139_pass+1))
 check python3 scripts/family-isolation-audit.py

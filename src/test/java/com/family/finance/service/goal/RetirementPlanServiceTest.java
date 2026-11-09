@@ -140,6 +140,9 @@ class RetirementPlanServiceTest {
         assertThatCode(()->service.save(1,9L,p,true)).doesNotThrowAnyException();
         var result=service.evaluate(1,p,null,false,true).result();
         assertThat(result.assets()).isNull();assertThat(result.coverage()).isNull();
+        assertThat(result.debt()).isZero();
+        assertThat(result.target()).isEqualByComparingTo("4896000");
+        assertThat(service.evaluate(1,p,null,false,true).configurationComplete()).isTrue();
         assertThat(result.problems()).contains("合成基金:当前账期余额未填");
         p.getAccountIds().add(999L);
         assertThatThrownBy(()->service.save(1,9L,p,true)).hasMessageContaining("不属于本家庭");
@@ -164,5 +167,31 @@ class RetirementPlanServiceTest {
         p.setDependentCount(0);assertThatThrownBy(()->service.validate(p)).hasMessageContaining("住房安排");
         p.setHousingPlan("SETTLED");assertThatCode(()->service.validate(p)).doesNotThrowAnyException();
         p.setDependentCount(1);p.setChildPlanningYears(List.of(31));assertThatThrownBy(()->service.validate(p)).hasMessageContaining("剩余规划年数");
+    }
+    @Test void configurationCompletenessDependsOnChoicesRatherThanAutomaticSourceAvailability() {
+        legacy();var p=plan();p.setVersion(2);p.setReturnSource("AUTO");p.setInflationSource("AUTO");p.setAutoExpense(true);
+        var automatic=service.evaluate(1,p,null,false,true);
+        assertThat(automatic.configurationComplete()).isTrue();
+        assertThat(automatic.result().target()).isNull();
+        p.setReturnSource("MANUAL");p.setNominalReturnPct(null);
+        var manual=service.evaluate(1,p,null,false,true);
+        assertThat(manual.configurationComplete()).isFalse();
+        assertThat(manual.configurationProblems()).anyMatch(s->s.contains("回报率"));
+        assertThatThrownBy(()->service.save(1,9L,p,true)).hasMessageContaining("回报率");
+        p.setReturnSource("AUTO");p.setSimulateFuture(true);p.setContributionSource("AUTO");
+        assertThat(service.evaluate(1,p,null,false,true).configurationComplete()).isTrue();
+    }
+    @Test void missingDebtDoesNotEraseKnownAssetsOrIndependentThreshold() {
+        legacy();var p=plan();p.setVersion(2);
+        var loan=new RetirementDataService.Asset(12L,"合成贷款",com.family.finance.domain.account.AccountType.LOAN,
+                "CNY",null,null,BigDecimal.ONE,null,false,false,true,"全家庭负债");
+        when(data.load(eq(1L),any(),any())).thenReturn(new RetirementDataService.Data("CNY",LocalDate.now(),List.of(loan),List.of(),
+                new BigDecimal("3000000"),BigDecimal.ZERO,null,null,"missing-debt",List.of("合成贷款:尚无已知余额"),List.of(),"CPI参考"));
+        var view=service.evaluate(1,p,null,false,true);
+        assertThat(view.configurationComplete()).isTrue();
+        assertThat(view.result().assets()).isEqualByComparingTo("3000000");
+        assertThat(view.result().debt()).isNull();
+        assertThat(view.result().target()).isEqualByComparingTo("4896000");
+        assertThat(view.result().principal()).isNull();
     }
 }

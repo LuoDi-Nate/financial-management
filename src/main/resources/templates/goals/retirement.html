@@ -115,6 +115,9 @@
         data-retire-panel="overview"
       >
         <div data-retire-live="result">
+          <p class="text-sm mb-3" data-retire-config-status role="status"
+             th:classappend="${view.configurationComplete() ? 'text-forest' : 'text-ink-soft'}"
+             th:text="${activePlan and !previewing ? (view.configurationComplete() ? '配置已完成 · 已保存' : '配置已保存 · 有设置需要调整') : (view.configurationComplete() ? '配置已填齐 · 尚未保存' : '配置尚未填齐')}"></p>
           <div class="retire-section-head">
             <h2 class="font-display text-2xl" th:text="${r.message()}"></h2>
             <div
@@ -131,12 +134,16 @@
               </a>
             </div>
           </div>
-          <ul
-            th:if="${!r.problems().isEmpty()}"
-            class="retire-problems"
-            role="status"
-          >
-            <li th:each="problem : ${r.problems()}" th:text="${problem}"></li>
+          <details class="retire-details" data-retire-reference th:if="${!view.dataReferences().isEmpty()}">
+            <summary>数据参考 <span th:text="${'· '+view.dataReferences().size()+' 项'}"></span></summary>
+            <p class="retire-field-hint">以下仅影响对应指标的可用性或精度,不影响配置保存。本期未关账时使用最近已知余额,历史收支和收益取已定稿月份。</p>
+            <ul class="retire-field-hint">
+              <li th:each="reference : ${view.dataReferences()}" th:text="${reference}"></li>
+            </ul>
+            <a th:href="@{/entry}" class="retire-text-link text-xs">查看账上数据</a>
+          </details>
+          <ul class="retire-field-hint" th:if="${!view.configurationComplete()}">
+            <li th:each="problem : ${view.configurationProblems()}" th:text="${problem}"></li>
           </ul>
           <div class="retire-kpis">
             <div>
@@ -152,10 +159,11 @@
               <span>生活本金门槛 T</span>
               <strong
                 data-priv
-                th:text="${r.target() == null ? '无有限门槛 / 待补齐' : money.amount(r.target())}"
+                th:text="${r.target() == null ? (r.state().name()=='NO_FINITE_TARGET' ? '无有限门槛' : '暂无结果') : money.amount(r.target())}"
                 data-retire-value="target"
               >
               </strong>
+              <small class="retire-field-hint" th:if="${r.target()==null and r.realRate()==null}">回报来源尚无可用年率</small>
             </div>
             <div>
               <span>可供生活生息的本金 P</span>
@@ -180,6 +188,7 @@
             <div>
               <span>可支用资产 A</span>
               <b data-priv th:text="${money.amount(r.assets())}"> </b>
+              <span th:if="${r.assets()==null and view.data().knownAssets()!=null}"> · 已知账户合计 <b data-priv data-retire-known-assets th:text="${money.amount(view.data().knownAssets())}"></b></span>
             </div>
             <div>
               <span>− 全家庭负债 D</span>
@@ -548,25 +557,13 @@
                     <span>可支用资产</span>
                     <b
                       data-priv
-                      th:text="${T(com.family.finance.service.MoneyFormat).format2(plan.baseCurrency,r.assets())}"
+                      th:text="${r.assets()==null ? '暂无完整合计' : T(com.family.finance.service.MoneyFormat).format2(plan.baseCurrency,r.assets())}"
                     >
                     </b>
                   </div>
-                  <ul
-                    th:if="${!view.data().problems().isEmpty()}"
-                    class="retire-field-hint text-rust"
-                  >
-                    <li
-                      th:each="problem : ${view.data().problems()}"
-                      th:text="${problem}"
-                    ></li>
-                  </ul>
-                  <a
-                    th:if="${!view.data().problems().isEmpty()}"
-                    th:href="@{/entry}"
-                    class="retire-text-link text-xs"
-                    >去填报查看待补数据</a
-                  >
+                  <p th:if="${r.assets()==null and view.data().knownAssets()!=null}" class="retire-field-hint">
+                    已知账户合计 <b data-priv th:text="${T(com.family.finance.service.MoneyFormat).format2(plan.baseCurrency,view.data().knownAssets())}"></b> · 部分账户暂未计入
+                  </p>
                   <p class="retire-field-hint">
                     全家净资产
                     <b
@@ -577,7 +574,7 @@
                     · 全家庭负债
                     <b
                       data-priv
-                      th:text="${T(com.family.finance.service.MoneyFormat).format2(plan.baseCurrency,view.data().debt())}"
+                      th:text="${r.debt()==null ? '—' : T(com.family.finance.service.MoneyFormat).format2(plan.baseCurrency,r.debt())}"
                     >
                     </b>
                   </p>
@@ -1061,22 +1058,20 @@
                   <p class="text-sm">
                     本次名义年回报
                     <b
-                      th:text="${view.effective().nominalReturnPct==null?'待补齐':view.effective().nominalReturnPct+'%'}"
+                      th:text="${view.effective().nominalReturnPct==null?'暂无数据':view.effective().nominalReturnPct+'%'}"
                     >
                     </b>
                     · 通胀
                     <b
-                      th:text="${view.effective().inflationPct==null?'待补齐':view.effective().inflationPct+'%'}"
+                      th:text="${view.effective().inflationPct==null?'暂无数据':view.effective().inflationPct+'%'}"
                     >
                     </b>
                     · 实际回报
                     <b
-                      th:text="${r.realRate()==null?'待补齐':#numbers.formatDecimal(r.realRate()*100,1,4)+'%'}"
+                      th:text="${r.realRate()==null?'暂无数据':#numbers.formatDecimal(r.realRate()*100,1,4)+'%'}"
                     >
                     </b>
                   </p>
-                  <p class="retire-field-hint text-rust" th:if="${plan.returnSource=='AUTO' and view.data().sources().investment().problem()!=null}" th:text="${view.data().sources().investment().problem()}"></p>
-                  <p class="retire-field-hint text-rust" th:if="${plan.inflationSource=='AUTO' and view.data().sources().inflation().problem()!=null}" th:text="${view.data().sources().inflation().problem()}"></p>
                   <details class="retire-details">
                     <summary>查看收益和通胀来源</summary>
                     <p
@@ -1361,7 +1356,7 @@
             本次 R = <b th:text="${view.effective().nominalReturnPct==null?'待补齐':view.effective().nominalReturnPct+'%'}"></b>,
             π = <b th:text="${view.effective().inflationPct==null?'待补齐':view.effective().inflationPct+'%'}"></b>
           </p>
-          <p>本次实际回报 r = <b th:text="${r.realRate()==null?'待补齐':#numbers.formatDecimal(r.realRate()*100,1,6)+'%'}"></b>
+          <p>本次实际回报 r = <b th:text="${r.realRate()==null?'暂无数据':#numbers.formatDecimal(r.realRate()*100,1,6)+'%'}"></b>
             <span th:if="${view.effective().directRealRate}"> · 直接填写</span>
           </p>
           <p>P = 可支用资产 A − 全家庭负债 D − 大额支出准备金 B</p>

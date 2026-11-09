@@ -3,10 +3,25 @@ package com.family.finance.repository;
 import org.apache.ibatis.annotations.*;
 import java.util.Collection;
 import java.util.List;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 /** 这里只查有无来源,金额仍经事实/支出服务,不产生另一套金额聚合。 */
 @Mapper
 public interface RetirementSourceMapper {
+    record BalanceSource(Long accountId, LocalDate periodStart, LocalDateTime submittedAt, String sourceTag) { }
+    @Select("""
+        SELECT accountId,periodStart,submittedAt,sourceTag FROM (
+          SELECT s.account_id AS accountId,p.period_start AS periodStart,s.submitted_at AS submittedAt,
+                 s.source_tag AS sourceTag,
+                 ROW_NUMBER() OVER (PARTITION BY s.account_id ORDER BY p.period_start DESC) AS rn
+            FROM period_snapshot s JOIN period p ON p.id=s.period_id
+            JOIN account a ON a.id=s.account_id AND a.family_id=p.family_id
+           WHERE p.family_id=#{familyId} AND p.period_start <= #{asOf}
+             AND s.end_balance IS NOT NULL
+        ) balances WHERE rn=1
+        """)
+    List<BalanceSource> balanceSources(@Param("familyId") long familyId, @Param("asOf") LocalDate asOf);
     record SnapshotPoint(Long periodId,Long accountId) { }
     @Select("""
         <script>

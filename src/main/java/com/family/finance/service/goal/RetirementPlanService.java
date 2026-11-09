@@ -29,7 +29,17 @@ public class RetirementPlanService {
 
     public record View(RetirementPlan plan, RetirementCalculator.Result result, RetirementDataService.Data data,
                        LocalDateTime updatedAt, boolean createdForPlan, boolean active, String fingerprint,
-                       RetirementPlan effective) { }
+                       RetirementPlan effective, List<String> configurationProblems) {
+        public boolean configurationComplete() { return configurationProblems.isEmpty(); }
+        public List<String> dataReferences() {
+            var notes=new LinkedHashSet<String>(result.problems());
+            if(plan.isAutoExpense() || (plan.isSimulateFuture() && "AUTO".equals(plan.getContributionSource()))) notes.addAll(data.budgetNotes());
+            data.assets().stream().filter(a -> (a.selected() || a.liability()) && a.note().contains("沿用最近已知余额"))
+                    .map(a -> a.name()+":"+a.note()).forEach(notes::add);
+            notes.removeAll(configurationProblems);
+            return List.copyOf(notes);
+        }
+    }
 
     public Optional<View> active(long familyId, Goal goal) {
         if (goal.getGoalType() != GoalType.RETIREMENT) return Optional.empty();
@@ -53,13 +63,22 @@ public class RetirementPlanService {
     public View evaluate(long familyId, RetirementPlan p, LocalDateTime updatedAt, boolean created, boolean active) {
         LocalDate today = LocalDate.now();
         var data = dataService.load(familyId, p, today);
+        List<String> configurationProblems = new ArrayList<>();
+        try { validate(p); } catch(IllegalArgumentException e) { configurationProblems.add(e.getMessage()); }
+        boolean currencyMatches = Objects.equals(p.getBaseCurrency(),data.baseCurrency());
+        if(!currencyMatches) configurationProblems.add("家庭本位币已改变,请重新核对计划金额的币种");
+        Set<Long> validAccounts=data.assets().stream().filter(a -> !a.liability()).map(RetirementDataService.Asset::id).collect(java.util.stream.Collectors.toSet());
+        boolean accountsValid=p.getVersion()>=2 && "FAMILY_FINANCIAL".equals(p.getScopeMode()) || validAccounts.containsAll(p.getAccountIds());
+        if(!accountsValid) configurationProblems.add("资金范围中含失效或不属于本家庭的账户,请重新选择");
         List<String> problems = new ArrayList<>(data.problems());
         if (p.isAutoExpense() && data.suggestedExpense() == null) problems.add("自动生活费需至少3个可拆分的完整月份,可改为手填");
         RetirementPlan effective = p.getVersion() >= 2 ? effective(p,data,today,problems) : p;
-        var result = RetirementCalculator.calculate(effective, today, data.problems().isEmpty() ? data.selectedAssets() : null,
-                data.problems().isEmpty() ? data.debt() : null, data.suggestedExpense(), problems);
-        String fingerprint = com.family.finance.service.llmtrace.PromptRecorder.sha256(encode(p) + "|" + data.sources() + "|" + result.aiSummary());
-        return new View(p, result, data, updatedAt, created, active, fingerprint,effective);
+        BigDecimal assets=p.getVersion()>=2 ? data.completeAssets() : data.problems().isEmpty()?data.selectedAssets():null;
+        BigDecimal debt=p.getVersion()>=2 ? data.completeDebt() : data.problems().isEmpty()?data.debt():null;
+        var result = RetirementCalculator.calculate(effective, today, currencyMatches && accountsValid ? assets : null,
+                currencyMatches ? debt : null, data.suggestedExpense(), problems);
+        String fingerprint = com.family.finance.service.llmtrace.PromptRecorder.sha256(encode(p) + "|" + data.sources() + "|" + data.assets() + "|" + result.aiSummary());
+        return new View(p, result, data, updatedAt, created, active, fingerprint,effective,List.copyOf(configurationProblems));
     }
 
     private RetirementPlan effective(RetirementPlan stored, RetirementDataService.Data data, LocalDate today, List<String> problems) {
@@ -96,7 +115,10 @@ public class RetirementPlanService {
                 p.setChildReserve(null);p.setMedicalReserve(null);p.setOtherReserve(null);p.setHousingReserve(null);
             }
         }
-        if("AUTO".equals(p.getContributionSource())) p.setMonthlyContribution(data.suggestedContribution());
+        if("AUTO".equals(p.getContributionSource())) {
+            p.setMonthlyContribution(data.suggestedContribution());
+            if(p.isSimulateFuture() && p.getMonthlyContribution()==null) problems.add("月结余参考尚无完整收支数据,暂不预测达成时间");
+        }
         if(!p.isAdvancedScenarios()) p.setMiddleReturnPct(p.isDirectRealRate()
                 ? p.getRealReturnPct()==null || p.getInflationPct()==null ? null
                     : BigDecimal.ONE.add(p.getRealReturnPct().movePointLeft(2)).multiply(BigDecimal.ONE.add(p.getInflationPct().movePointLeft(2))).subtract(BigDecimal.ONE).movePointRight(2)

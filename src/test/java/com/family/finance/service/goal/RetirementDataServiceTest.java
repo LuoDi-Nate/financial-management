@@ -94,6 +94,24 @@ class RetirementDataServiceTest {
         assertThat(RetirementDataService.eligible(AccountType.CASH)).isTrue(); assertThat(RetirementDataService.eligible(AccountType.FUND)).isTrue();
         assertThat(RetirementDataService.eligible(AccountType.PROPERTY)).isFalse(); assertThat(RetirementDataService.eligible(AccountType.INSURANCE)).isFalse();
     }
+    @Test void openPeriodUsesCarriedBalanceWithoutBecomingAConfigurationOrRuntimeError() {
+        var p=setup();p.setVersion(2);p.setScopeMode("FAMILY_FINANCIAL");
+        var cash=Account.builder().id(99L).familyId(1L).displayName("合成现金").type(AccountType.CASH).currency("CNY").build();
+        when(accounts.findActiveByFamily(1)).thenReturn(List.of(cash));
+        var row=mock(AccountPeriodFact.class);when(row.periodId()).thenReturn(11L);when(row.accountId()).thenReturn(99L);
+        when(row.endBalanceOrig()).thenReturn(new BigDecimal("500"));when(row.endBalanceBase()).thenReturn(new BigDecimal("500"));when(row.fxToBase()).thenReturn(BigDecimal.ONE);
+        when(facts.load(null).rows()).thenReturn(List.of(row));
+        when(source.balanceSources(1,today)).thenReturn(List.of(new RetirementSourceMapper.BalanceSource(99L,LocalDate.of(2026,10,1),null,"MANUAL")));
+        var result=service.load(1,p,today);
+        assertThat(result.completeAssets()).isEqualByComparingTo("500");
+        assertThat(result.completeDebt()).isZero();assertThat(result.problems()).isEmpty();
+        assertThat(result.assets().getFirst().note()).contains("沿用最近已知余额","2026-10-01");
+        when(row.endBalanceOrig()).thenReturn(null);when(row.endBalanceBase()).thenReturn(null);
+        var unknown=service.load(1,p,today);
+        assertThat(unknown.completeAssets()).isNull();assertThat(unknown.completeDebt()).isZero();
+        assertThat(unknown.knownAssets()).isNull();
+        assertThat(unknown.problems()).anyMatch(s->s.contains("尚无已知余额"));
+    }
     @Test void weeklyPeriodCannotBeSilentlyTreatedAsMonthlyContribution() {
         var p = setup(7L,8L,9L); month(7,"1000","100",0,1); month(8,"1000","100",0,1); month(9,"1000","100",0,1);
         when(families.findById(1)).thenReturn(Optional.of(Family.builder().id(1L).baseCurrency("CNY").periodType(PeriodType.WEEKLY).build()));

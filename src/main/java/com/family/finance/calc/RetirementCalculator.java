@@ -26,6 +26,7 @@ public final class RetirementCalculator {
                          BigDecimal monthlyIncome, BigDecimal monthlyContribution, BigDecimal realRate,
                          BigDecimal target, BigDecimal gap, BigDecimal supportedExpense, BigDecimal coverage,
                          List<String> problems, List<Scenario> scenarios, LocalDate retirementDate) {
+        /** 当前运行可作有限门槛判断,不代表配置保存状态或预测是否可用。 */
         public boolean ready() { return state == State.READY || state == State.INCOME_COVERS; }
         public boolean reached() { return ready() && principal != null && principal.signum() >= 0
                 && target != null && principal.compareTo(target) >= 0; }
@@ -49,7 +50,7 @@ public final class RetirementCalculator {
         boolean revision2=p.getVersion()>=2;
         if (!revision2 && !p.isBudgetConfirmed()) problems.add("生活预算尚未确认");
         if (!revision2 && !p.isReservesConfirmed()) problems.add("大额支出准备金尚未确认");
-        if (!p.isNoOverlapConfirmed()) problems.add("生活费与预留的归属尚未核对");
+        if (!revision2 && !p.isNoOverlapConfirmed()) problems.add("生活费与预留的归属尚未核对");
         if (!revision2 && !p.isAssetsConfirmed()) problems.add("资金范围尚未确认");
         if (!revision2 && !p.isIncomeConfirmed()) problems.add("退休收入的开始时间与购买力尚未确认");
         if (!revision2 && !p.isContributionConfirmed()) problems.add("计划月投入尚未确认");
@@ -58,7 +59,8 @@ public final class RetirementCalculator {
         BigDecimal real = p.isDirectRealRate() ? fraction(p.getRealReturnPct())
                 : p.getNominalReturnPct() == null || inflation == null ? null
                 : BigDecimal.ONE.add(fraction(p.getNominalReturnPct())).divide(BigDecimal.ONE.add(inflation), MC).subtract(BigDecimal.ONE);
-        BigDecimal factor = p.getPriceDate() == null || inflation == null ? null : priceFactor(p.getPriceDate(), today, inflation);
+        BigDecimal factor = revision2 && today.equals(p.getPriceDate()) ? BigDecimal.ONE
+                : p.getPriceDate() == null || inflation == null ? null : priceFactor(p.getPriceDate(), today, inflation);
         BigDecimal expense = p.isAutoExpense() ? autoExpenseToday : money(scale(p.getMonthlyExpense(), factor));
         BigDecimal income = revision2?BigDecimal.ZERO:money(scale(p.getMonthlyIncome(), factor));
         BigDecimal reserves = factor == null || p.getChildReserve() == null || p.getMedicalReserve() == null
@@ -66,29 +68,36 @@ public final class RetirementCalculator {
                 : money(scale(p.getChildReserve(), factor)).add(money(scale(p.getMedicalReserve(), factor)))
                     .add(money(scale(p.getHousingReserve(), factor))).add(money(scale(p.getOtherReserve(), factor)));
         BigDecimal contribution = p.isContributionFollowsInflation() ? money(scale(p.getMonthlyContribution(), factor)) : p.getMonthlyContribution();
-        if (expense == null) problems.add("生活预算缺失或账上建议不足");
-        if (income == null) problems.add("退休月收入缺失");
-        if (reserves == null) problems.add("预留金额未填,无需预留也应明确填零");
-        if (!revision2 && contribution == null) problems.add("计划月投入未填");
-        if (assets == null || debt == null) problems.add("资金数据尚未补齐");
-        if (real == null || inflation == null) problems.add("收益或通胀假设未填");
-        if (!revision2 && (p.getLowReturnPct() == null || p.getMiddleReturnPct() == null || p.getHighReturnPct() == null)) problems.add("积累期三情景回报未填");
+        if (!revision2) {
+            if (expense == null) problems.add("生活预算缺失或账上建议不足");
+            if (income == null) problems.add("退休月收入缺失");
+            if (reserves == null) problems.add("预留金额未填,无需预留也应明确填零");
+            if (contribution == null) problems.add("计划月投入未填");
+            if (assets == null || debt == null) problems.add("资金数据尚未补齐");
+            if (real == null || inflation == null) problems.add("收益或通胀假设未填");
+            if (p.getLowReturnPct() == null || p.getMiddleReturnPct() == null || p.getHighReturnPct() == null) problems.add("积累期三情景回报未填");
+        }
         LocalDate retirementDate = null;
         try { retirementDate = YearMonth.parse(p.getTargetMonth()).atEndOfMonth(); }
-        catch (Exception e) { problems.add("目标退休年月未填或无效"); }
+        catch (Exception e) { if (!revision2) problems.add("目标退休年月未填或无效"); }
         BigDecimal principal = assets == null || debt == null || reserves == null ? null : assets.subtract(debt).subtract(reserves);
         BigDecimal need = expense == null || income == null ? null : expense.subtract(income).max(BigDecimal.ZERO);
-        BigDecimal target = need == null || real == null ? null : need.signum() == 0 ? BigDecimal.ZERO
-                : real.signum() <= 0 ? null : need.multiply(TWELVE).divide(real, MC);
+        BigDecimal target = null;
+        if (need != null) {
+            if (need.signum() == 0 && (revision2 || real != null)) target = BigDecimal.ZERO;
+            else if (real != null && real.signum() > 0) target = need.multiply(TWELVE).divide(real, MC);
+        }
         BigDecimal gap = target == null || principal == null ? null : target.subtract(principal).max(BigDecimal.ZERO);
         BigDecimal coverage = target == null || target.signum() == 0 || principal == null ? null : principal.divide(target, MC);
         BigDecimal supported = real == null || real.signum() <= 0 || principal == null || principal.signum() < 0 || income == null ? null
                 : income.add(principal.multiply(real).divide(TWELVE, MC));
         State state;
         String message;
-        if (!problems.isEmpty()) {
-            state = State.MISSING; message = "待补齐 / 核对";
-            coverage = null; gap = null; supported = null;
+        // R2 的来源说明不是全局开关;只有当前判断真正依赖的数据缺失才影响运行状态。
+        boolean missingCore = principal == null || need == null || (need.signum() > 0 && real == null);
+        if (revision2 ? missingCore : !problems.isEmpty()) {
+            state = State.MISSING; message = revision2 ? "部分指标暂无数据" : "待补齐 / 核对";
+            if (!revision2) { coverage = null; gap = null; supported = null; }
         }
         else if (principal.signum() < 0) { state = State.RESERVES_SHORT; message = "大额支出准备金仍有缺口"; }
         else if (target == null) { state = State.NO_FINITE_TARGET; message = "这组假设没有有限的永久本金门槛"; }
@@ -97,7 +106,8 @@ public final class RetirementCalculator {
         List<Scenario> scenarios = List.of();
         boolean projectionRates = revision2 && !p.isAdvancedScenarios() ? p.getMiddleReturnPct()!=null
                 : p.getLowReturnPct()!=null && p.getMiddleReturnPct()!=null && p.getHighReturnPct()!=null;
-        if ((state == State.READY || state == State.INCOME_COVERS) && contribution != null && projectionRates && (!revision2 || p.isSimulateFuture())) {
+        if ((state == State.READY || state == State.INCOME_COVERS) && contribution != null && inflation != null
+                && retirementDate != null && projectionRates && (!revision2 || p.isSimulateFuture())) {
             scenarios = revision2 && !p.isAdvancedScenarios()
                     ? List.of(project("当前假设",p.getMiddleReturnPct(),principal,contribution,inflation,p.isContributionFollowsInflation(),target,today,retirementDate))
                     : List.of(project("低回报", p.getLowReturnPct(), principal, contribution, inflation, p.isContributionFollowsInflation(), target, today, retirementDate),

@@ -223,6 +223,10 @@ public class GoalProgressService {
         // ── v0.16 视图辅助 ──
         public boolean isCustom() { return goal.getGoalType() == GoalType.CUSTOM; }
         public boolean isNewRetirement() { return retirement != null; }
+        public boolean progressAvailable() { return retirement==null || retirement.result().coverage()!=null; }
+        public String configurationLabel() {
+            return retirement==null ? "" : retirement.configurationComplete()?"配置已完成":"配置需调整";
+        }
         public String progressLabel() {
             if (retirement != null && (!retirement.result().ready() || retirement.result().coverage() == null))
                 return retirement.result().message();
