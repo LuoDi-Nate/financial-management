@@ -5,6 +5,7 @@ import com.family.finance.domain.family.Family;
 import com.family.finance.domain.fx.FxRate;
 import com.family.finance.domain.goal.RetirementPlan;
 import com.family.finance.domain.period.PeriodType;
+import com.family.finance.domain.snapshot.PeriodSnapshot;
 import com.family.finance.factview.*;
 import com.family.finance.repository.*;
 import com.family.finance.service.expense.ExpenseLedgerService;
@@ -50,6 +51,11 @@ class RetirementDataServiceTest {
         budgets.put(id,new ExpenseLedgerService.RetirementBudget(new BigDecimal(expense),BigDecimal.ZERO,"测试来源",false));
         var s = facts.load(null);
         when(facts.cashflowBreakdown(s,id)).thenReturn(new CashflowBreakdown(new BigDecimal(income),new BigDecimal(expense),new BigDecimal(income).subtract(new BigDecimal(expense))));
+    }
+    private AccountPeriodFact balance(long accountId, String amount) {
+        var row=mock(AccountPeriodFact.class);when(row.periodId()).thenReturn(11L);when(row.accountId()).thenReturn(accountId);
+        when(row.endBalanceOrig()).thenReturn(new BigDecimal(amount));when(row.endBalanceBase()).thenReturn(new BigDecimal(amount));
+        when(row.fxToBase()).thenReturn(BigDecimal.ONE);return row;
     }
     @Test void oldPmcAndNewAccountIncomeUseSameSettledWindow() {
         var p = setup(7L,8L,10L); month(7,"10000","4000",1,0); month(8,"12000","6000",0,2); month(10,"14000","7000",0,1);
@@ -103,14 +109,72 @@ class RetirementDataServiceTest {
         when(facts.load(null).rows()).thenReturn(List.of(row));
         when(source.balanceSources(1,today)).thenReturn(List.of(new RetirementSourceMapper.BalanceSource(99L,LocalDate.of(2026,10,1),null,"MANUAL")));
         var result=service.load(1,p,today);
-        assertThat(result.completeAssets()).isEqualByComparingTo("500");
-        assertThat(result.completeDebt()).isZero();assertThat(result.problems()).isEmpty();
+        assertThat(result.selectedAssets()).isEqualByComparingTo("500");
+        assertThat(result.debt()).isZero();assertThat(result.problems()).isEmpty();
         assertThat(result.assets().getFirst().note()).contains("沿用最近已知余额","2026-10-01");
-        when(row.endBalanceOrig()).thenReturn(null);when(row.endBalanceBase()).thenReturn(null);
+        when(facts.load(null).rows()).thenReturn(List.of());when(source.balanceSources(1,today)).thenReturn(List.of());
         var unknown=service.load(1,p,today);
-        assertThat(unknown.completeAssets()).isNull();assertThat(unknown.completeDebt()).isZero();
-        assertThat(unknown.knownAssets()).isNull();
-        assertThat(unknown.problems()).anyMatch(s->s.contains("尚无已知余额"));
+        assertThat(unknown.selectedAssets()).isZero();assertThat(unknown.debt()).isZero();
+        assertThat(unknown.sources().householdNetWorth()).isZero();
+        assertThat(unknown.assets().getFirst().original()).isNull();assertThat(unknown.assets().getFirst().amount()).isNull();
+        assertThat(unknown.problems()).contains("合成现金:尚未登记余额,当前按已有账面金额汇总");
+        verify(snapshots,times(2)).findByPeriod(1,11L);verifyNoMoreInteractions(snapshots);
+    }
+    @Test void currentCarriedAndUnrecordedAccountsSumOnlyKnownAmountsAndRefreshOnRead() {
+        var p=setup();p.setVersion(2);p.getAccountIds().addAll(List.of(99L,100L,101L));
+        var current=Account.builder().id(99L).familyId(1L).displayName("合成当期现金").type(AccountType.CASH).currency("CNY").build();
+        var carried=Account.builder().id(100L).familyId(1L).displayName("合成沿用基金").type(AccountType.FUND).currency("CNY").build();
+        var empty=Account.builder().id(101L).familyId(1L).displayName("合成空账户").type(AccountType.CASH).currency("CNY").build();
+        var loan=Account.builder().id(102L).familyId(1L).displayName("合成贷款").type(AccountType.LOAN).currency("CNY").build();
+        when(accounts.findActiveByFamily(1)).thenReturn(List.of(current,carried,empty,loan));
+        var currentRow=balance(99L,"1000000");var carriedRow=balance(100L,"2000000");
+        when(facts.load(null).rows()).thenReturn(List.of(currentRow,carriedRow));
+        var currentSnapshot=PeriodSnapshot.builder().accountId(99L).periodId(11L).endBalance(new BigDecimal("1000000"))
+                .submittedAt(today.atStartOfDay()).sourceTag("MANUAL").build();
+        when(snapshots.findByPeriod(1,11L)).thenReturn(List.of(currentSnapshot));
+        var currentSource=new RetirementSourceMapper.BalanceSource(99L,today.withDayOfMonth(1),today.atStartOfDay(),"MANUAL");
+        var carriedSource=new RetirementSourceMapper.BalanceSource(100L,LocalDate.of(2026,10,1),LocalDate.of(2026,10,31).atStartOfDay(),"MANUAL");
+        when(source.balanceSources(1,today)).thenReturn(List.of(currentSource,carriedSource));
+
+        var initial=service.load(1,p,today);
+        assertThat(initial.selectedAssets()).isEqualByComparingTo("3000000");assertThat(initial.debt()).isZero();
+        assertThat(initial.sources().householdNetWorth()).isEqualByComparingTo("3000000");
+        assertThat(initial.sources().accountIds()).containsExactlyInAnyOrder(99L,100L,101L);
+        assertThat(initial.assets()).filteredOn(a->a.id().equals(99L)).singleElement().satisfies(a->{
+            assertThat(a.amount()).isEqualByComparingTo("1000000");assertThat(a.note()).doesNotContain("沿用最近已知余额");
+        });
+        assertThat(initial.assets()).filteredOn(a->a.id().equals(100L)).singleElement().satisfies(a->{
+            assertThat(a.amount()).isEqualByComparingTo("2000000");assertThat(a.note()).contains("沿用最近已知余额","2026-10-01");
+        });
+        assertThat(initial.assets()).filteredOn(a->a.id().equals(101L)).singleElement().satisfies(a->{
+            assertThat(a.selected()).isTrue();assertThat(a.original()).isNull();assertThat(a.amount()).isNull();assertThat(a.recordedAt()).isNull();
+        });
+        assertThat(initial.assets()).filteredOn(RetirementDataService.Asset::liability).singleElement().satisfies(a->assertThat(a.amount()).isNull());
+        assertThat(initial.problems()).contains("合成空账户:尚未登记余额,当前按已有账面金额汇总","合成贷款:尚未登记余额,当前按已有账面金额汇总");
+
+        when(currentRow.endBalanceOrig()).thenReturn(new BigDecimal("1100000"));when(currentRow.endBalanceBase()).thenReturn(new BigDecimal("1100000"));
+        currentSnapshot.setEndBalance(new BigDecimal("1100000"));
+        var refreshed=service.load(1,p,today);
+        assertThat(refreshed.selectedAssets()).isEqualByComparingTo("3100000");
+        assertThat(refreshed.sources().householdNetWorth()).isEqualByComparingTo("3100000");
+        assertThat(refreshed.assets()).filteredOn(a->a.id().equals(101L)).singleElement().satisfies(a->assertThat(a.amount()).isNull());
+        assertThat(initial.selectedAssets()).isEqualByComparingTo("3000000");
+
+        // 模拟用户另行登记后,下一次只读加载应立即包含新增账面金额。
+        var addedRow=balance(101L,"400000");
+        when(facts.load(null).rows()).thenReturn(List.of(currentRow,carriedRow,addedRow));
+        var addedSnapshot=PeriodSnapshot.builder().accountId(101L).periodId(11L).endBalance(new BigDecimal("400000"))
+                .submittedAt(today.atStartOfDay()).sourceTag("MANUAL").build();
+        when(snapshots.findByPeriod(1,11L)).thenReturn(List.of(currentSnapshot,addedSnapshot));
+        when(source.balanceSources(1,today)).thenReturn(List.of(currentSource,carriedSource,
+                new RetirementSourceMapper.BalanceSource(101L,today.withDayOfMonth(1),today.atStartOfDay(),"MANUAL")));
+        var registered=service.load(1,p,today);
+        assertThat(registered.selectedAssets()).isEqualByComparingTo("3500000");assertThat(registered.debt()).isZero();
+        assertThat(registered.sources().householdNetWorth()).isEqualByComparingTo("3500000");
+        assertThat(registered.assets()).filteredOn(a->a.id().equals(101L)).singleElement().satisfies(a->assertThat(a.amount()).isEqualByComparingTo("400000"));
+        assertThat(registered.assets()).filteredOn(RetirementDataService.Asset::liability).singleElement().satisfies(a->assertThat(a.amount()).isNull());
+        assertThat(registered.problems()).containsExactly("合成贷款:尚未登记余额,当前按已有账面金额汇总");
+        verify(snapshots,times(3)).findByPeriod(1,11L);verifyNoMoreInteractions(snapshots);
     }
     @Test void weeklyPeriodCannotBeSilentlyTreatedAsMonthlyContribution() {
         var p = setup(7L,8L,9L); month(7,"1000","100",0,1); month(8,"1000","100",0,1); month(9,"1000","100",0,1);

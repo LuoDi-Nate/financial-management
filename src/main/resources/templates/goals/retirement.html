@@ -154,7 +154,6 @@
                 data-retire-value="assets"
               >
               </strong>
-              <small th:if="${r.assets()==null and view.data().knownAssets()!=null}" class="retire-field-hint">已知账户小计 <b data-priv data-retire-known-assets th:text="${money.amount(view.data().knownAssets())}"></b> · 暂不计算完整进度</small>
             </div>
             <div>
               <span th:text="${view.plan().version>=2 ? '财务自由所需资金 F' : '生活本金门槛 T'}"></span>
@@ -549,13 +548,10 @@
                     <span>可支用资产</span>
                     <b
                       data-priv
-                      th:text="${r.assets()==null ? '暂无完整合计' : T(com.family.finance.service.MoneyFormat).format2(plan.baseCurrency,r.assets())}"
+                      th:text="${r.assets()==null ? '—' : T(com.family.finance.service.MoneyFormat).format2(plan.baseCurrency,r.assets())}"
                     >
                     </b>
                   </div>
-                  <p th:if="${r.assets()==null and view.data().knownAssets()!=null}" class="retire-field-hint">
-                    已知账户合计 <b data-priv th:text="${T(com.family.finance.service.MoneyFormat).format2(plan.baseCurrency,view.data().knownAssets())}"></b> · 部分账户暂未计入
-                  </p>
                   <p class="retire-field-hint">
                     全家净资产
                     <b

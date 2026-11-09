@@ -131,19 +131,25 @@ class RetirementPlanServiceTest {
         assertThat(service.evaluate(1,p,null,false,true).result().target()).isNull();
         assertThat(p.getNominalReturnPct()).isEqualByComparingTo("4.5");
     }
-    @Test void missingLiveBalancesDoNotPreventSavingAccountSelectionOrBecomeZero() {
-        legacy();var p=plan();p.setVersion(2);p.getAccountIds().add(12L);
+    @Test void unknownAccountDoesNotHideRecordedTotalOrBlockSavingSelection() {
+        legacy();var p=plan();p.setVersion(2);p.getAccountIds().addAll(List.of(12L,13L));
+        String reference="合成基金:尚未登记余额,当前按已有账面金额汇总";
         var asset=new RetirementDataService.Asset(12L,"合成基金",com.family.finance.domain.account.AccountType.FUND,
                 "CNY",null,null,BigDecimal.ONE,null,true,true,false,"可选择用于退休");
-        when(data.load(eq(1L),any(),any())).thenReturn(new RetirementDataService.Data("CNY",LocalDate.now(),List.of(asset),List.of(),
-                BigDecimal.ZERO,BigDecimal.ZERO,null,null,"missing",List.of("合成基金:当前账期余额未填"),List.of(),"CPI参考"));
+        var known=new RetirementDataService.Asset(13L,"合成现金",com.family.finance.domain.account.AccountType.CASH,
+                "CNY",new BigDecimal("3000000"),new BigDecimal("3000000"),BigDecimal.ONE,null,true,true,false,"可选择用于退休");
+        when(data.load(eq(1L),any(),any())).thenReturn(new RetirementDataService.Data("CNY",LocalDate.now(),List.of(asset,known),List.of(),
+                new BigDecimal("3000000"),BigDecimal.ZERO,null,null,"partial",List.of(reference),List.of(),"CPI参考"));
         assertThatCode(()->service.save(1,9L,p,true)).doesNotThrowAnyException();
-        var result=service.evaluate(1,p,null,false,true).result();
-        assertThat(result.assets()).isNull();assertThat(result.coverage()).isNull();
-        assertThat(result.debt()).isZero();
+        var view=service.evaluate(1,p,null,false,true);var result=view.result();
+        assertThat(result.assets()).isEqualByComparingTo("3000000");assertThat(result.debt()).isZero();
         assertThat(result.target()).isEqualByComparingTo("4896000");
-        assertThat(service.evaluate(1,p,null,false,true).configurationComplete()).isTrue();
-        assertThat(result.problems()).contains("合成基金:当前账期余额未填");
+        assertThat(result.totalAssetNeed()).isEqualByComparingTo("4896000");
+        assertThat(result.gap()).isEqualByComparingTo("1896000");assertThat(result.coveragePct()).isEqualByComparingTo("61.27");
+        assertThat(result.ready()).isTrue();assertThat(view.configurationComplete()).isTrue();
+        assertThat(view.data().assets().getFirst().original()).isNull();assertThat(view.data().assets().getFirst().amount()).isNull();
+        assertThat(view.data().selectedAssets()).isEqualByComparingTo("3000000");
+        assertThat(result.problems()).contains(reference);assertThat(view.dataReferences()).contains(reference);
         p.getAccountIds().add(999L);
         assertThatThrownBy(()->service.save(1,9L,p,true)).hasMessageContaining("不属于本家庭");
     }
@@ -181,18 +187,24 @@ class RetirementPlanServiceTest {
         p.setReturnSource("AUTO");p.setSimulateFuture(true);p.setContributionSource("AUTO");
         assertThat(service.evaluate(1,p,null,false,true).configurationComplete()).isTrue();
     }
-    @Test void missingDebtDoesNotEraseKnownAssetsOrIndependentThreshold() {
-        legacy();var p=plan();p.setVersion(2);
+    @Test void unrecordedDebtKeepsRecordedTotalsAndDataReference() {
+        legacy();var p=plan();p.setVersion(2);p.getAccountIds().add(13L);
+        String reference="合成贷款:尚未登记余额,当前按已有账面金额汇总";
         var loan=new RetirementDataService.Asset(12L,"合成贷款",com.family.finance.domain.account.AccountType.LOAN,
                 "CNY",null,null,BigDecimal.ONE,null,false,false,true,"全家庭负债");
-        when(data.load(eq(1L),any(),any())).thenReturn(new RetirementDataService.Data("CNY",LocalDate.now(),List.of(loan),List.of(),
-                new BigDecimal("3000000"),BigDecimal.ZERO,null,null,"missing-debt",List.of("合成贷款:尚无已知余额"),List.of(),"CPI参考"));
+        var known=new RetirementDataService.Asset(13L,"合成现金",com.family.finance.domain.account.AccountType.CASH,
+                "CNY",new BigDecimal("3000000"),new BigDecimal("3000000"),BigDecimal.ONE,null,true,true,false,"可选择用于退休");
+        when(data.load(eq(1L),any(),any())).thenReturn(new RetirementDataService.Data("CNY",LocalDate.now(),List.of(loan,known),List.of(),
+                new BigDecimal("3000000"),BigDecimal.ZERO,null,null,"missing-debt",List.of(reference),List.of(),"CPI参考"));
         var view=service.evaluate(1,p,null,false,true);
         assertThat(view.configurationComplete()).isTrue();
         assertThat(view.result().assets()).isEqualByComparingTo("3000000");
-        assertThat(view.result().debt()).isNull();
-        assertThat(view.result().target()).isEqualByComparingTo("4896000");
-        assertThat(view.result().principal()).isNull();
+        assertThat(view.result().debt()).isZero();assertThat(view.result().principal()).isEqualByComparingTo("3000000");
+        assertThat(view.result().totalAssetNeed()).isEqualByComparingTo("4896000");
+        assertThat(view.result().coveragePct()).isEqualByComparingTo("61.27");assertThat(view.result().ready()).isTrue();
+        assertThat(view.data().assets().getFirst().amount()).isNull();
+        assertThat(view.result().problems()).contains(reference);assertThat(view.dataReferences()).contains(reference);
+        verifyNoInteractions(mapper,goalMapper);
     }
     @Test void sharedGoalProgressUsesSelectedAssetsOverTotalRequiredFunds() {
         var goal=legacy();var p=plan();p.setVersion(2);p.setDirectRealRate(true);

@@ -75,8 +75,8 @@ public class RetirementPlanService {
         List<String> problems = new ArrayList<>(data.problems());
         if (p.isAutoExpense() && data.suggestedExpense() == null) problems.add("自动生活费需至少3个可拆分的完整月份,可改为手填");
         RetirementPlan effective = p.getVersion() >= 2 ? effective(p,data,today,problems) : p;
-        BigDecimal assets=p.getVersion()>=2 ? data.completeAssets() : data.problems().isEmpty()?data.selectedAssets():null;
-        BigDecimal debt=p.getVersion()>=2 ? data.completeDebt() : data.problems().isEmpty()?data.debt():null;
+        BigDecimal assets=p.getVersion()>=2 ? data.selectedAssets() : data.problems().isEmpty()?data.selectedAssets():null;
+        BigDecimal debt=p.getVersion()>=2 ? data.debt() : data.problems().isEmpty()?data.debt():null;
         var result = RetirementCalculator.calculate(effective, today, currencyMatches && accountsValid ? assets : null,
                 currencyMatches ? debt : null, data.suggestedExpense(), problems);
         String fingerprint = com.family.finance.service.llmtrace.PromptRecorder.sha256(encode(p) + "|" + data.sources() + "|" + data.assets() + "|" + result.aiSummary());

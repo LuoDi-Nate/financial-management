@@ -2,11 +2,13 @@
 
 ## v1.39 · 11-09 配置状态与运行数据分离
 
+最新返工增加`v139-CURRENT-ACCOUNT-SUM`:同选一个有当前余额、一个沿用历史余额及一个无记录账户,主合计显示现有账面金额之和;空账户不阻断A/F,不补写零快照。补入余额后刷新即更新且配置JSON不变。此前“主合计未知、只显小计”的断言按维护者新决定废止,下面历史结果不代表本次已验证。
+
 | ID | 操作/输入 | 预期 | 验证 |
 |---|---|---|---|
 | v139-CONFIG-STATUS | 合法配置选AUTO但无余额/年回报,创建并刷新/编辑 | 已保存且配置完成;不出现“计划还没有保存”或整页红色缺数清单 | RetirementPlanServiceTest / e2e 58 |
 | v139-INDEPENDENT-METRICS | 分别缺资产、负债、消费、年回报、通胀、可选月结余 | 只影响依赖项;T/P/已知负债各自保留,未知不当0;当前价不因缺pi被抹去,历史价不冒充当前价 | RetirementCalculatorTest / RetirementPlanServiceTest |
-| v139-OPEN-CARRY | 进行期OPEN无本期余额,此前有已知快照 | 继续采用最近已知余额并展示来源,不要求关账;无任何历史时仅显示已知小计,不编造完整覆盖率 | RetirementDataServiceTest / e2e 58 |
+| v139-OPEN-CARRY | 进行期OPEN无本期余额,此前有已知快照 | 继续采用最近已知余额并展示来源,不要求关账;另有空账户时照常汇总已有账面金额并计算进度,原空账户保持无快照 | RetirementDataServiceTest / e2e 58 |
 | v139-DATA-REFERENCE | 保存后有运行数据提醒 | 数据参考默认折叠,可主动展开;列表/仪表盘/报表标配置完成且未知覆盖率不绘假进度;双端不溢出 | e2e 58 / 静态守护 |
 | v139-PROGRESS-A-F | 所需总资金1000万,所选账户合计500万;包含准备金与负债 | 主进度50%,分子直接采用所选账户和;全站A/F一致,不以P/T替代;零生活费但有额外需求时仍按实际F计算 | RetirementCalculatorTest / RetirementPlanServiceTest / e2e 58 |
 

@@ -422,36 +422,49 @@ module.exports = {
     await ui.choose('scopeMode','FAMILY_FINANCIAL');await ui.choose('returnSource','AUTO');
     db.raw(`INSERT INTO account(family_id,display_name,type,currency) VALUES(${state.family},${q(state.prefix+'-unfilled')},'FUND','CNY')`);
     const unfilled=db.num(`SELECT id FROM account WHERE family_id=${state.family} AND display_name=${q(state.prefix+'-unfilled')}`);
+    const unfilledSnapshotsQuery=`SELECT COUNT(*) FROM period_snapshot s JOIN period p ON p.id=s.period_id
+      WHERE p.family_id=${state.family} AND s.account_id=${unfilled}`;
+    await ui.assert(db.num(unfilledSnapshotsQuery)===0,'合成空账户没有当前或历史余额快照');
+    await ui.assert(db.num(`SELECT COUNT(*) FROM stock_holding h JOIN account a ON a.id=h.account_id
+      WHERE a.family_id=${state.family} AND a.id=${unfilled}`)===0,'合成空账户没有持仓,不是遗漏实时估值');
     await ui.click('[data-retire-save]','余额和历史收益不足时保存新目标配置');
     const pendingGoal=db.num(`SELECT id FROM family_goal WHERE family_id=${state.family} AND name=${q(state.prefix+'-pending-data')}`);
     await ui.assert(pendingGoal>0 && await ui.page.locator('[data-retire-value="target"]').isVisible(),'新目标实际保存并打开结果,不被演算数据不足阻塞');
     await ui.assert(db.num(`SELECT COUNT(*) FROM retirement_plan WHERE family_id=${state.family} AND goal_id=${pendingGoal} AND JSON_UNQUOTE(JSON_EXTRACT(plan_json,'$.returnSource'))='AUTO'` )===1,'动态来源按配置保存,没有偷偷改成手填');
     await ui.assert((await ui.page.locator('[data-retire-config-status]').innerText()).trim()==='配置已完成 · 已保存','缺余额和收益历史仍显示配置已完成且已保存');
     await ui.assert(!await ui.page.locator('[data-retire-reference]').evaluate(el=>el.open),'运行数据说明默认折叠');
-    await ui.notSeesText('尚无已知余额','缺失余额不在正式结果中重复展开为报错');
-    await ui.assert((await ui.page.locator('[data-retire-known-assets]').innerText()).includes('6,900,000.00'),'缺余额时展示已知账户小计,不冒充完整资产');
-    await coreProgress(ui,'所选账户余额不完整',{assets:'—',gap:'—',coverage:'—'});
-    await ui.assert((await ui.page.locator('[data-retire-value="principal"]').innerText()).trim()==='—','未知资产也不伪填辅助生活本金');
-    await ui.assert((await ui.page.locator('.retire-bridge > div').nth(1).innerText()).includes('100,000.00'),'资产不完整时负债仍独立显示');
+    await ui.notSeesText('尚未登记余额','空账户提示默认折叠,不展开为保存错误');
+    await coreProgress(ui,'所选账户中有空账户',{assets:'¥6,900,000.00'});
+    await ui.assert((await ui.page.locator('[data-retire-value="principal"]').innerText()).trim()==='¥5,600,000.00','空账户不清空已有资产扣除负债与准备金后的本金');
+    await ui.assert((await ui.page.locator('.retire-bridge > div').nth(1).innerText()).includes('100,000.00'),'空账户不影响全家庭负债10万');
+    await ui.assert((await ui.page.locator('.retire-bridge > div').nth(2).innerText()).includes('1,200,000.00'),'空账户不影响准备金120万');
+    await ui.assert(await ui.page.locator('[data-retire-known-assets]').count()===0,'现有账面合计直接作为主A,不另设已知账户小计');
+    await ui.assert(db.num(unfilledSnapshotsQuery)===0,'保存与读取目标没有替空账户创建零余额快照');
     await ui.click('[data-retire-reference] > summary','按需查看运行数据参考');
-    await ui.assert((await ui.page.locator('[data-retire-reference]').innerText()).includes('尚无已知余额'),'展开后能核对真正未知的余额');
+    const emptyReference=await ui.page.locator('[data-retire-reference]').innerText();
+    await ui.assert(emptyReference.includes(state.prefix+'-unfilled') && emptyReference.includes('尚未登记余额'),'展开后点名尚未登记余额的空账户');
     await ui.goto(`/goals/${pendingGoal}/retirement?tab=plan`);await ui.choose('returnSource','MANUAL');
     await ui.click('[data-retire-save]','缺余额仍可调整回报假设');
     await ui.assert((await ui.page.locator('[data-retire-config-status]').innerText()).trim()==='配置已完成 · 已保存','缺余额不使手填回报配置变成未完成');
-    await coreProgress(ui,'资产未知但总需求独立可算',{assets:'—',target:'¥6,100,000.00',gap:'—',coverage:'—'});
-    await ui.assert((await ui.page.locator('[data-retire-value="principal"]').innerText()).trim()==='—','总需求可用时辅助本金仍保持未知');
+    await coreProgress(ui,'空账户仅提示而不阻断已有资金进度',{assets:'¥6,900,000.00',target:'¥6,100,000.00',gap:'¥0.00',coverage:'113.11%'});
+    await ui.assert((await ui.page.locator('[data-retire-value="principal"]').innerText()).trim()==='¥5,600,000.00','手填回报时本金仍按已有资产减负债与准备金计算');
+    await ui.assert(!await ui.page.locator('[data-retire-reference]').evaluate(el=>el.open),'可计算进度的空账户提示仍默认折叠');
     await ui.goto(`/goals/${pendingGoal}/retirement?tab=plan`);
-    await ui.assert((await ui.page.locator('[data-retire-live="funds"]').innerText()).includes('暂无完整合计') &&
-      (await ui.page.locator('[data-retire-live="funds"]').innerText()).includes('6,900,000.00'),'配置页分开展示完整合计未知与已知账户小计');
+    const fundsWithEmpty=await ui.page.locator('[data-retire-live="funds"]').innerText();
+    await ui.assert(fundsWithEmpty.includes('¥6,900,000.00') && !/已知账户小计|已知账户合计|暂无完整合计|暂不计算完整进度/.test(fundsWithEmpty),'配置页直接展示现有账面合计,没有全有才算的提示');
+    await ui.assert(db.num(unfilledSnapshotsQuery)===0,'调整假设和重新打开配置仍未生成空账户余额');
     const latest=db.num(`SELECT id FROM period WHERE family_id=${state.family} ORDER BY period_start DESC LIMIT 1`);
-    db.raw(`INSERT INTO period_snapshot(period_id,account_id,end_balance,submitted_by,source_tag) VALUES(${latest},${unfilled},12345,${state.member},'MANUAL')`);
     const savedConfig=db.one(`SELECT plan_json FROM retirement_plan WHERE goal_id=${pendingGoal} AND family_id=${state.family}`);
+    db.raw(`INSERT INTO period_snapshot(period_id,account_id,end_balance,submitted_by,source_tag) VALUES(${latest},${unfilled},12345,${state.member},'MANUAL')`);
     await ui.goto(`/goals/${pendingGoal}/retirement?tab=plan`);
-    await ui.assert((await ui.page.locator('[data-retire-live="funds"]').innerText()).includes('6,912,345.00') &&
-      !(await ui.page.locator('[data-retire-live="funds"]').innerText()).includes('暂无完整合计'),'补齐余额后直接恢复完整资产合计,无需重新保存配置');
+    await ui.assert((await ui.page.locator('[data-retire-live="funds"]').innerText()).includes('6,912,345.00'),'登记12345后直接计入现有账面合计,无需重新保存配置');
+    await ui.assert(db.num(unfilledSnapshotsQuery)===1 && db.num(`SELECT COUNT(*) FROM period_snapshot s JOIN period p ON p.id=s.period_id
+      WHERE p.family_id=${state.family} AND s.account_id=${unfilled} AND s.end_balance=0`)===0,'空账户只有显式登记的余额快照,没有系统伪造的零余额');
     await ui.assert(db.one(`SELECT plan_json FROM retirement_plan WHERE goal_id=${pendingGoal} AND family_id=${state.family}`)===savedConfig,'演算读取新余额不回写计划');
     await ui.click('[data-retire-tab="overview"]','查看补齐余额后的核心进度');
     await coreProgress(ui,'补齐余额立即生效',{assets:'¥6,912,345.00',target:'¥6,100,000.00',gap:'¥0.00',coverage:'113.32%'});
+    await ui.assert((await ui.page.locator('[data-retire-value="principal"]').innerText()).trim()==='¥5,612,345.00','登记的12345同样实时进入辅助生活本金');
+    await ui.assert(await ui.page.locator('[data-retire-reference]').evaluateAll(references=>references.every(el=>!el.textContent.includes('尚未登记余额'))),'登记余额后空账户提示自动消失');
     await ui.click('[data-retire-tab="plan"]','返回收益来源设置');
 
     const missingRateSnapshot=JSON.parse(db.one(`SELECT JSON_OBJECT('id',s.id,'period_id',s.period_id,'account_id',s.account_id,

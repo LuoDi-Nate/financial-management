@@ -50,8 +50,8 @@ check rg -q 'llmTestGate.block|testGate.block' "$java/service/checkup/llm/LlmRou
 check rg -q 'validateConfiguration\(true\)' src/main/resources/static/js/retirement.js
 check rg -q 'select.setAttribute\(.data-lsel.' src/main/resources/static/js/retirement.js
 check rg -q 'configurationComplete\(' "$java/service/goal/RetirementPlanService.java"
-check rg -q 'data.completeAssets\(\)' "$java/service/goal/RetirementPlanService.java"
-check rg -q 'data.completeDebt\(\)' "$java/service/goal/RetirementPlanService.java"
+check rg -qF 'p.getVersion()>=2 ? data.selectedAssets()' "$java/service/goal/RetirementPlanService.java"
+check rg -qF 'p.getVersion()>=2 ? data.debt()' "$java/service/goal/RetirementPlanService.java"
 check rg -q 'data-retire-config-status' src/main/resources/templates/goals/retirement.html
 check rg -q 'data-retire-reference' src/main/resources/templates/goals/retirement.html
 check rg -q 'view.progressAssets\(\), view.progressTarget\(\)' "$java/service/goal/GoalProgressService.java"

@@ -41,16 +41,6 @@ public class RetirementDataService {
                        BigDecimal selectedAssets, BigDecimal debt, BigDecimal suggestedExpense,
                        BigDecimal suggestedContribution, String budgetFingerprint, List<String> problems,
                        List<String> budgetNotes, String cpiReference, Sources sources) {
-        public BigDecimal completeAssets() {
-            return assets.stream().filter(Asset::selected).allMatch(a -> a.amount()!=null) ? selectedAssets : null;
-        }
-        public BigDecimal completeDebt() {
-            return assets.stream().filter(Asset::liability).allMatch(a -> a.amount()!=null) ? debt : null;
-        }
-        public BigDecimal knownAssets() {
-            return assets.stream().filter(Asset::selected).map(Asset::amount).filter(Objects::nonNull)
-                    .reduce(BigDecimal::add).orElse(null);
-        }
         public Data(String baseCurrency, LocalDate balancePeriod, List<Asset> assets, List<Month> months,
                     BigDecimal selectedAssets, BigDecimal debt, BigDecimal suggestedExpense, BigDecimal suggestedContribution,
                     String budgetFingerprint, List<String> problems, List<String> budgetNotes, String cpiReference) {
@@ -98,7 +88,7 @@ public class RetirementDataService {
             boolean selected = !liability && (revision2 && "FAMILY_FINANCIAL".equals(plan.getScopeMode())
                     ? eligible : plan.getAccountIds().contains(account.getId()));
             String note = liability ? "全家庭负债:统一预留一次" : eligible ? "可选择用于退休" : "默认不作为生活本金";
-            if ((selected || liability) && original == null) problems.add(account.getDisplayName() + ":尚无已知余额,暂不计入完整资金指标");
+            if ((selected || liability) && original == null) problems.add(account.getDisplayName() + ":尚未登记余额,当前按已有账面金额汇总");
             if ((selected || liability) && factor == null) problems.add(account.getDisplayName() + ":缺少 " + account.getCurrency() + " 换汇来源");
             boolean fxMismatch = row != null && factor != null && row.fxToBase() != null
                     && row.fxToBase().subtract(factor).abs().compareTo(new BigDecimal("0.000001")) > 0;
@@ -206,9 +196,7 @@ public class RetirementDataService {
                         .divide(BigDecimal.valueOf(expenseValues.size()),2,RoundingMode.HALF_EVEN);
                 nonConsumption=includedAverage==null?null:includedAverage.subtract(consumptionMean).subtract(removedAverage);
             }
-            boolean completeNet=active.stream().allMatch(acc->{var row=balances.get(acc.getId());return row!=null && row.endBalanceBase()!=null
-                    && factor(acc.getCurrency(),currency,rates)!=null;});
-            BigDecimal net=completeNet?active.stream().map(acc->balances.get(acc.getId()).endBalanceBase()).reduce(BigDecimal.ZERO,BigDecimal::add):null;
+            BigDecimal net=assetRows.stream().map(Asset::amount).filter(Objects::nonNull).reduce(BigDecimal.ZERO,BigDecimal::add);
             traced=new Sources(net,Set.copyOf(selected),factor("CNY",currency,rates),originalAverage,includedAverage,nonConsumption,removedAverage,
                     List.copyOf(budgetIds),investment,RetirementRateSources.cpi(macroRows,today));
         }
