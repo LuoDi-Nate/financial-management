@@ -8,6 +8,7 @@
 | v139-INDEPENDENT-METRICS | 分别缺资产、负债、消费、年回报、通胀、可选月结余 | 只影响依赖项;T/P/已知负债各自保留,未知不当0;当前价不因缺pi被抹去,历史价不冒充当前价 | RetirementCalculatorTest / RetirementPlanServiceTest |
 | v139-OPEN-CARRY | 进行期OPEN无本期余额,此前有已知快照 | 继续采用最近已知余额并展示来源,不要求关账;无任何历史时仅显示已知小计,不编造完整覆盖率 | RetirementDataServiceTest / e2e 58 |
 | v139-DATA-REFERENCE | 保存后有运行数据提醒 | 数据参考默认折叠,可主动展开;列表/仪表盘/报表标配置完成且未知覆盖率不绘假进度;双端不溢出 | e2e 58 / 静态守护 |
+| v139-PROGRESS-A-F | 所需总资金1000万,所选账户合计500万;包含准备金与负债 | 主进度50%,分子直接采用所选账户和;全站A/F一致,不以P/T替代;零生活费但有额外需求时仍按实际F计算 | RetirementCalculatorTest / RetirementPlanServiceTest / e2e 58 |
 
 本次执行结果待重新自测后登记;下方旧版数字不作为本次验证证据。
 

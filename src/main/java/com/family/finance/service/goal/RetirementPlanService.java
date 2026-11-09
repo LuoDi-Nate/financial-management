@@ -31,6 +31,8 @@ public class RetirementPlanService {
                        LocalDateTime updatedAt, boolean createdForPlan, boolean active, String fingerprint,
                        RetirementPlan effective, List<String> configurationProblems) {
         public boolean configurationComplete() { return configurationProblems.isEmpty(); }
+        public BigDecimal progressAssets() { return plan.getVersion()>=2 ? result.assets() : result.principal(); }
+        public BigDecimal progressTarget() { return plan.getVersion()>=2 ? result.totalAssetNeed() : result.target(); }
         public List<String> dataReferences() {
             var notes=new LinkedHashSet<String>(result.problems());
             if(plan.isAutoExpense() || (plan.isSimulateFuture() && "AUTO".equals(plan.getContributionSource()))) notes.addAll(data.budgetNotes());
@@ -225,7 +227,7 @@ public class RetirementPlanService {
         if (goal == null) {
             goal = Goal.builder().familyId(familyId).goalType(GoalType.RETIREMENT).name(p.getName().trim())
                     .metric(GoalMetric.AMOUNT_TOTAL).comparator(GoalComparator.GTE).timeMode(TimeMode.OPEN)
-                    .targetValue(view.result().target()).targetDate(view.result().retirementDate()).paramsJson("{}")
+                    .targetValue(view.progressTarget()).targetDate(view.result().retirementDate()).paramsJson("{}")
                     .description("退休生活账 · 当前计划 · 修订"+p.getVersion()).build();
             goals.insert(goal);
         }

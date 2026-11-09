@@ -65,10 +65,10 @@ public class GoalProgressService {
                 Goal displayed = new Goal();
                 org.springframework.beans.BeanUtils.copyProperties(goal, displayed);
                 displayed.setName(view.plan().getName()); displayed.setTargetDate(r.retirementDate());
-                return new GoalProgress(displayed, goalService.parseParams(goal), r.principal(), r.target(),
+                return new GoalProgress(displayed, goalService.parseParams(goal), view.progressAssets(), view.progressTarget(),
                         r.coverage() == null ? BigDecimal.ZERO : r.coverage(), r.monthlyContribution(), null,
                         goal.metricOrDefault(), goal.comparatorOrDefault(), goal.timeModeOrDefault(), null,
-                        view.plan().getAccountIds().size(), view);
+                        view.plan().getVersion()>=2 ? view.data().sources().accountIds().size() : view.plan().getAccountIds().size(), view);
             }
         }
 
@@ -228,7 +228,7 @@ public class GoalProgressService {
             return retirement==null ? "" : retirement.configurationComplete()?"配置已完成":"配置需调整";
         }
         public String progressLabel() {
-            if (retirement != null && (!retirement.result().ready() || retirement.result().coverage() == null))
+            if (retirement != null && retirement.result().coverage() == null)
                 return retirement.result().message();
             return progressPct().setScale(1, java.math.RoundingMode.HALF_EVEN).toPlainString() + "%";
         }

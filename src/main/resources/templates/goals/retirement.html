@@ -147,35 +147,36 @@
           </ul>
           <div class="retire-kpis">
             <div>
-              <span>每月生活费 X</span>
+              <span th:text="${view.plan().version>=2 ? '所选账户当前合计 A' : '可供生活生息的本金 P'}"></span>
               <strong
                 data-priv
-                th:text="${money.amount(r.monthlyExpense())}"
-                data-retire-value="expense"
+                th:text="${money.amount(view.progressAssets())}"
+                data-retire-value="assets"
               >
               </strong>
+              <small th:if="${r.assets()==null and view.data().knownAssets()!=null}" class="retire-field-hint">已知账户小计 <b data-priv data-retire-known-assets th:text="${money.amount(view.data().knownAssets())}"></b> · 暂不计算完整进度</small>
             </div>
             <div>
-              <span>生活本金门槛 T</span>
+              <span th:text="${view.plan().version>=2 ? '财务自由所需资金 F' : '生活本金门槛 T'}"></span>
               <strong
                 data-priv
-                th:text="${r.target() == null ? (r.state().name()=='NO_FINITE_TARGET' ? '无有限门槛' : '暂无结果') : money.amount(r.target())}"
+                th:text="${view.progressTarget() == null ? (r.state().name()=='NO_FINITE_TARGET' ? '无有限门槛' : '暂无结果') : money.amount(view.progressTarget())}"
                 data-retire-value="target"
               >
               </strong>
               <small class="retire-field-hint" th:if="${r.target()==null and r.realRate()==null}">回报或通胀来源暂无可用年率</small>
             </div>
             <div>
-              <span>可供生活生息的本金 P</span>
+              <span>距离目标还差</span>
               <strong
                 data-priv
-                th:text="${money.amount(r.principal())}"
-                data-retire-value="principal"
+                th:text="${money.amount(r.gap())}"
+                data-retire-value="gap"
               >
               </strong>
             </div>
             <div>
-              <span>覆盖率 P ÷ T</span>
+              <span th:text="${view.plan().version>=2 ? '目标进度 A ÷ F' : '覆盖率 P ÷ T'}"></span>
               <strong
                 data-priv
                 th:text="${r.coveragePct() == null ? '—' : r.coveragePct().toPlainString() + '%'}"
@@ -186,33 +187,26 @@
           </div>
           <div class="retire-bridge">
             <div>
-              <span>可支用资产 A</span>
-              <b data-priv th:text="${money.amount(r.assets())}"> </b>
-              <span th:if="${r.assets()==null and view.data().knownAssets()!=null}">已知账户合计 <b data-priv data-retire-known-assets th:text="${money.amount(view.data().knownAssets())}"></b></span>
+              <span>生活本金需求 T</span>
+              <b data-priv th:text="${money.amount(r.target())}"> </b>
             </div>
             <div>
-              <span>− 全家庭负债 D</span>
+              <span>+ 全家庭负债 D</span>
               <b data-priv th:text="${money.amount(r.debt())}"> </b>
             </div>
             <div>
-              <span>− 大额支出准备金 B</span>
+              <span>+ 大额支出准备金 B</span>
               <b data-priv th:text="${money.amount(r.reserves())}"> </b>
             </div>
             <div>
-              <span>= 生活本金 P</span>
-              <b data-priv th:text="${money.amount(r.principal())}"> </b>
+              <span>= 所需总资金 F</span>
+              <b data-priv th:text="${money.amount(r.totalAssetNeed())}"> </b>
             </div>
           </div>
           <div class="retire-summary">
             <p>
-              生活本金缺口
-              <b
-                data-priv
-                data-retire-value="gap"
-                th:text="${money.amount(r.gap())}"
-              >
-              </b>
-              · 可支持月生活费
+              每月生活费 X <b data-priv data-retire-value="expense" th:text="${money.amount(r.monthlyExpense())}"></b>
+              · 当前本金可支持月生活费
               <b data-priv th:text="${money.amount(r.supportedExpense())}"> </b>
             </p>
             <p>
@@ -222,11 +216,9 @@
                 th:text="${money.amount(view.data().sources().householdNetWorth())}"
               >
               </b>
-              · 可支用资产 A
-              <b data-priv th:text="${money.amount(r.assets())}"> </b> ·
-              资产总需求 T + B + D
-              <b data-priv th:text="${money.amount(r.totalAssetNeed())}"> </b>
+              · 预留后生息本金 P <b data-priv data-retire-value="principal" th:text="${money.amount(r.principal())}"></b>
             </p>
+            <p th:if="${view.plan().version>=2}">进度 = 所选账户当前合计 ÷ 所需总资金。准备金与负债计入资金需求,各计一次。</p>
             <p th:if="${view.plan().version == 1}">
               升级前方案仍保留持续月收入 J
               <b data-priv th:text="${money.amount(r.monthlyIncome())}"> </b
@@ -244,7 +236,7 @@
         >
           <summary>按现在的结余,什么时候能达到</summary>
           <p class="retire-field-hint">
-            结余只改变达到时间,不改变生活本金门槛。负债已一次预留,结余还需考虑偿清后的家庭安排。
+            结余只改变达到时间,不改变当前目标进度。预测将准备金与负债先留出,仅模拟剩余生活本金的积累;结余还需考虑偿清后的家庭安排。
           </p>
           <label class="retire-check">
             <input
@@ -395,7 +387,7 @@
               </table>
             </details>
             <p th:if="${r.scenarios().isEmpty()}" class="retire-field-hint">
-              尚未计算:先补齐基础计划;没有可用结余时可手填。未开启时不推算达到年份。
+              未开启时不推算达到年份;已开启但缺少回报或结余来源时暂不预测,不影响保存配置。
             </p>
             <th:block th:if="${!r.scenarios().isEmpty()}">
               <div class="retire-chart">
@@ -1368,8 +1360,10 @@
             T = <b data-priv th:text="${r.target()==null?r.message():money.amount(r.target())}"></b>
           </p>
           <p th:if="${view.plan().version==1}">原持续收入 J = <b data-priv th:text="${money.amount(r.monthlyIncome())}"></b> / 月</p>
-          <p>缺口 = max(T − P, 0); 覆盖率 = P ÷ T</p>
-          <p>本次缺口 <b data-priv th:text="${money.amount(r.gap())}"></b> · 覆盖率
+          <p th:if="${view.plan().version>=2}">所需总资金 F = 生活本金 T + 大额支出准备金 B + 全家庭负债 D</p>
+          <p th:if="${view.plan().version>=2}" data-priv th:text="${'本次 F = '+money.amount(r.target())+' + '+money.amount(r.reserves())+' + '+money.amount(r.debt())+' = '+money.amount(view.progressTarget())}"></p>
+          <p th:text="${view.plan().version>=2 ? '缺口 = max(F − A, 0); 目标进度 = A ÷ F' : '升级前口径:缺口 = max(T − P, 0); 覆盖率 = P ÷ T'}"></p>
+          <p>本次缺口 <b data-priv th:text="${money.amount(r.gap())}"></b> · 进度
             <b data-priv th:text="${r.coveragePct()==null?'—':r.coveragePct().toPlainString()+'%'}"></b>
           </p>
           <p class="retire-field-hint">购买力日期 <span th:text="${r.asOf()}"></span> · 显示币种 <span th:text="${money.currency()}"></span>。显示率经过四舍五入,演算使用完整精度。</p>

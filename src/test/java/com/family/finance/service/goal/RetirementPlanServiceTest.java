@@ -194,4 +194,22 @@ class RetirementPlanServiceTest {
         assertThat(view.result().target()).isEqualByComparingTo("4896000");
         assertThat(view.result().principal()).isNull();
     }
+    @Test void sharedGoalProgressUsesSelectedAssetsOverTotalRequiredFunds() {
+        var goal=legacy();var p=plan();p.setVersion(2);p.setDirectRealRate(true);
+        p.setChildReserve(new BigDecimal("4200000"));
+        when(data.load(eq(1L),any(),any())).thenReturn(new RetirementDataService.Data("CNY",LocalDate.now(),List.of(),List.of(),
+                new BigDecimal("5000000"),new BigDecimal("1000000"),null,null,"progress-ratio",List.of(),List.of(),"CPI参考"));
+        when(mapper.find(1,9)).thenReturn(Optional.of(new RetirementPlanMapper.Row(9,1,service.encode(p),true,false,null)));
+        var shared=new GoalProgressService(goals,mock(com.family.finance.factview.FactViewService.class),mock(PeriodMapper.class),
+                mock(AccountMapper.class),mock(SnapshotMapper.class),mock(PeriodMemberCashflowMapper.class),
+                mock(GoalMetricEvaluator.class),mock(GoalAccountMapper.class),mock(com.family.finance.service.expense.ExpenseLedgerService.class));
+        org.springframework.test.util.ReflectionTestUtils.setField(shared,"retirementPlans",service);
+        var progress=shared.compute(1,goal);
+        assertThat(progress.pv()).isEqualByComparingTo("5000000");
+        assertThat(progress.target()).isEqualByComparingTo("10000000");
+        assertThat(progress.progressPct()).isEqualByComparingTo("50.00");
+        assertThat(progress.progressLabel()).isEqualTo("50.0%");
+        assertThat(progress.configurationLabel()).isEqualTo("配置已完成");
+        assertThat(progress.progressAvailable()).isTrue();assertThat(progress.targetReached()).isFalse();
+    }
 }

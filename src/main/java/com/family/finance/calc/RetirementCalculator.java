@@ -28,8 +28,10 @@ public final class RetirementCalculator {
                          List<String> problems, List<Scenario> scenarios, LocalDate retirementDate) {
         /** 当前运行可作有限门槛判断,不代表配置保存状态或预测是否可用。 */
         public boolean ready() { return state == State.READY || state == State.INCOME_COVERS; }
-        public boolean reached() { return ready() && principal != null && principal.signum() >= 0
-                && target != null && principal.compareTo(target) >= 0; }
+        public boolean reached() {
+            BigDecimal requiredAssets = totalAssetNeed();
+            return ready() && assets != null && requiredAssets != null && assets.compareTo(requiredAssets) >= 0;
+        }
         public BigDecimal totalNeed() { return target == null || reserves == null ? null : target.add(reserves); }
         public BigDecimal totalAssetNeed() { return totalNeed()==null || debt==null?null:totalNeed().add(debt); }
         public BigDecimal netFunds() { return assets == null || debt == null ? null : assets.subtract(debt); }
@@ -37,7 +39,10 @@ public final class RetirementCalculator {
         public LocalDate neutralDate() { return scenarios.size()==1?scenarios.getFirst().firstReached():scenarios.size()==3?scenarios.get(1).firstReached():null; }
         public String aiSummary() {
             return "退休生活账 · 今天购买力(" + asOf + ") · 状态=" + message
-                    + " · 本金=" + principal + " · 生活门槛=" + target + " · 大额支出准备金=" + reserves
+                    + " · 所选账户资产A=" + assets + " · 所需总资金F=" + totalAssetNeed()
+                    + " · 目标进度比率=" + coverage + " · 资金缺口=" + gap
+                    + " · 生活本金P=" + principal + " · 生活本金门槛T=" + target
+                    + " · 大额支出准备金B=" + reserves + " · 负债D=" + debt
                     + " · 生活费/月=" + monthlyExpense + " · 计划投入/月=" + monthlyContribution
                     + " · 目标退休月=" + retirementDate + " · 中性首次达到=" + neutralDate()
                     + "。数值均为系统计算,不得重算、补全缺失或把门槛说成保证退休。";
@@ -87,8 +92,13 @@ public final class RetirementCalculator {
             if (need.signum() == 0 && (revision2 || real != null)) target = BigDecimal.ZERO;
             else if (real != null && real.signum() > 0) target = need.multiply(TWELVE).divide(real, MC);
         }
-        BigDecimal gap = target == null || principal == null ? null : target.subtract(principal).max(BigDecimal.ZERO);
-        BigDecimal coverage = target == null || target.signum() == 0 || principal == null ? null : principal.divide(target, MC);
+        BigDecimal requiredAssets = target == null || reserves == null || debt == null ? null
+                : revision2 ? money(target).add(money(reserves)).add(money(debt)) : target.add(reserves).add(debt);
+        // R2 的目标进度是所选资产 A / 总资金需求 F;P / T 仅保留给旧版和生活本金预测。
+        BigDecimal progressFunds = revision2 ? money(assets) : principal;
+        BigDecimal progressNeed = revision2 ? requiredAssets : target;
+        BigDecimal gap = progressNeed == null || progressFunds == null ? null : progressNeed.subtract(progressFunds).max(BigDecimal.ZERO);
+        BigDecimal coverage = progressNeed == null || progressNeed.signum() == 0 || progressFunds == null ? null : progressFunds.divide(progressNeed, MC);
         BigDecimal supported = real == null || real.signum() <= 0 || principal == null || principal.signum() < 0 || income == null ? null
                 : income.add(principal.multiply(real).divide(TWELVE, MC));
         State state;
@@ -102,7 +112,7 @@ public final class RetirementCalculator {
         else if (principal.signum() < 0) { state = State.RESERVES_SHORT; message = "大额支出准备金仍有缺口"; }
         else if (target == null) { state = State.NO_FINITE_TARGET; message = "这组假设没有有限的永久本金门槛"; }
         else if (need.signum() == 0) { state = State.INCOME_COVERS; message = revision2?"生活费明确为零,仍需保留负债与预留":"计划退休起的收入覆盖生活费,仍需保留预留"; }
-        else { state = State.READY; message = principal.compareTo(target) >= 0 ? "按当前假设达到门槛" : "按当前假设尚有缺口"; }
+        else { state = State.READY; message = assets.compareTo(requiredAssets) >= 0 ? "按当前假设达到门槛" : "按当前假设尚有缺口"; }
         List<Scenario> scenarios = List.of();
         boolean projectionRates = revision2 && !p.isAdvancedScenarios() ? p.getMiddleReturnPct()!=null
                 : p.getLowReturnPct()!=null && p.getMiddleReturnPct()!=null && p.getHighReturnPct()!=null;

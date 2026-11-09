@@ -177,6 +177,7 @@ class RetirementCalculatorTest {
         assertThat(r.gap()).isNull(); assertThat(r.coverage()).isNull(); assertThat(r.supportedExpense()).isNull();
         assertThat(r.scenarios()).isEmpty();
         assertThat(r.problems()).containsExactly("所选账户尚无可参考余额");
+        assertThat(r.aiSummary()).contains("所选账户资产A=null", "所需总资金F=6000000.00", "目标进度比率=null");
     }
     @Test void revisionTwoMissingDebtDoesNotEraseAssetsOrInventDebtOfZero() {
         var r = RetirementCalculator.calculate(revisionTwoPlan(), today, n("6000000"), null,
@@ -260,13 +261,14 @@ class RetirementCalculatorTest {
         assertThat(r.scenarios()).isEmpty();
     }
     @Test void revisionTwoMissingOptionalContributionOnlyDisablesForecast() {
-        var p = revisionTwoPlan(); p.setMonthlyContribution(null);
-        var r = RetirementCalculator.calculate(p, today, n("6000000"), BigDecimal.ZERO,
+        var p = revisionTwoPlan(); p.setMonthlyExpense(n("15000")); p.setMonthlyContribution(null);
+        var r = RetirementCalculator.calculate(p, today, n("5000000"), n("1600000"),
                 null, List.of("月投入暂无数据,未来预测暂不可用"));
-        assertThat(r.ready()).isTrue(); assertThat(r.reached()).isTrue();
-        assertThat(r.monthlyContribution()).isNull(); assertThat(r.target()).isEqualByComparingTo("4800000");
-        assertThat(r.gap()).isZero(); assertThat(r.coverage()).isEqualByComparingTo("1");
-        assertThat(r.supportedExpense()).isEqualByComparingTo("10000"); assertThat(r.scenarios()).isEmpty();
+        assertThat(r.ready()).isTrue(); assertThat(r.reached()).isFalse();
+        assertThat(r.monthlyContribution()).isNull(); assertThat(r.target()).isEqualByComparingTo("7200000");
+        assertThat(r.totalAssetNeed()).isEqualByComparingTo("10000000");
+        assertThat(r.gap()).isEqualByComparingTo("5000000"); assertThat(r.coverage()).isEqualByComparingTo("0.5");
+        assertThat(r.supportedExpense()).isEqualByComparingTo("4583.33"); assertThat(r.scenarios()).isEmpty();
         assertThat(r.problems()).containsExactly("月投入暂无数据,未来预测暂不可用");
         p.setMonthlyContribution(BigDecimal.ZERO);
         assertThat(calculate(p, "6000000", "0").scenarios()).hasSize(1);
@@ -278,7 +280,79 @@ class RetirementCalculatorTest {
         assertThat(r.state()).isEqualTo(RetirementCalculator.State.INCOME_COVERS);
         assertThat(r.ready()).isTrue(); assertThat(r.reached()).isTrue();
         assertThat(r.realRate()).isNull(); assertThat(r.target()).isZero(); assertThat(r.gap()).isZero();
-        assertThat(r.coverage()).isNull(); assertThat(r.supportedExpense()).isNull();
+        assertThat(r.totalAssetNeed()).isEqualByComparingTo("1200000");
+        assertThat(r.coverage()).isEqualByComparingTo("5"); assertThat(r.supportedExpense()).isNull();
         assertThat(r.scenarios()).isEmpty();
+    }
+    @Test void revisionTwoProgressUsesSelectedAssetsOverFullFundingNeed() {
+        var p = revisionTwoPlan(); p.setMonthlyExpense(n("15000"));
+        var r = calculate(p, "5000000", "1600000");
+        assertThat(r.target()).isEqualByComparingTo("7200000");
+        assertThat(r.reserves()).isEqualByComparingTo("1200000"); assertThat(r.debt()).isEqualByComparingTo("1600000");
+        assertThat(r.totalAssetNeed()).isEqualByComparingTo("10000000");
+        assertThat(r.assets()).isEqualByComparingTo("5000000");
+        assertThat(r.principal()).isEqualByComparingTo("2200000");
+        assertThat(r.coverage()).isEqualByComparingTo("0.5"); assertThat(r.coveragePct()).isEqualByComparingTo("50");
+        assertThat(r.gap()).isEqualByComparingTo("5000000");
+        assertThat(r.supportedExpense()).isEqualByComparingTo("4583.33");
+        assertThat(r.state()).isEqualTo(RetirementCalculator.State.READY); assertThat(r.reached()).isFalse();
+        assertThat(r.scenarios().getFirst().path().getFirst()).isEqualByComparingTo("2200000");
+        assertThat(r.aiSummary()).contains("所选账户资产A=5000000.00", "所需总资金F=10000000.00",
+                "目标进度比率=0.5", "资金缺口=5000000.00", "生活本金P=2200000.00", "生活本金门槛T=7200000.00");
+    }
+    @Test void revisionTwoReachesTheGoalWhenAssetsCoverTheFullNeed() {
+        var p = revisionTwoPlan(); p.setMonthlyExpense(n("15000"));
+        var below = calculate(p, "9999999.99", "1600000");
+        assertThat(below.ready()).isTrue(); assertThat(below.reached()).isFalse();
+        assertThat(below.message()).isEqualTo("按当前假设尚有缺口");
+        assertThat(below.gap()).isEqualByComparingTo("0.01"); assertThat(below.coverage()).isLessThan(BigDecimal.ONE);
+        var at = calculate(p, "10000000", "1600000");
+        assertThat(at.ready()).isTrue(); assertThat(at.reached()).isTrue();
+        assertThat(at.message()).isEqualTo("按当前假设达到门槛");
+        assertThat(at.gap()).isZero(); assertThat(at.coverage()).isEqualByComparingTo("1");
+        var above = calculate(p, "10000000.01", "1600000");
+        assertThat(above.reached()).isTrue(); assertThat(above.gap()).isZero();
+        assertThat(above.coverage()).isGreaterThan(BigDecimal.ONE);
+    }
+    @Test void revisionTwoProgressRetainsAssetsWhenReservesExceedThem() {
+        var r = calculate(revisionTwoPlan(), "100000", "200000");
+        assertThat(r.principal()).isEqualByComparingTo("-1300000");
+        assertThat(r.totalAssetNeed()).isEqualByComparingTo("6200000");
+        assertThat(r.coveragePct()).isEqualByComparingTo("1.61"); assertThat(r.gap()).isEqualByComparingTo("6100000");
+        assertThat(r.state()).isEqualTo(RetirementCalculator.State.RESERVES_SHORT);
+        assertThat(r.reached()).isFalse(); assertThat(r.supportedExpense()).isNull(); assertThat(r.scenarios()).isEmpty();
+    }
+    @Test void versionOneKeepsLivingPrincipalProgressAndEquivalentFundingDecision() {
+        var p = plan(); p.setMonthlyExpense(n("15000"));
+        var r = calculate(p, "5000000", "1600000");
+        assertThat(r.target()).isEqualByComparingTo("7200000"); assertThat(r.principal()).isEqualByComparingTo("2200000");
+        assertThat(r.totalAssetNeed()).isEqualByComparingTo("10000000");
+        assertThat(r.coveragePct()).isEqualByComparingTo("30.56"); assertThat(r.gap()).isEqualByComparingTo("5000000");
+        assertThat(r.reached()).isFalse();
+        assertThat(r.aiSummary()).contains("所选账户资产A=5000000.00", "所需总资金F=10000000.00",
+                "目标进度比率=" + r.coverage()).doesNotContain("A/F");
+        assertThat(calculate(p, "10000000", "1600000").reached()).isTrue();
+    }
+    @Test void revisionTwoZeroLivingExpenseStillMeasuresReservesAndDebt() {
+        var p = revisionTwoPlan(); p.setMonthlyExpense(BigDecimal.ZERO);
+        var shortFunds = calculate(p, "500000", "300000");
+        assertThat(shortFunds.target()).isZero(); assertThat(shortFunds.totalAssetNeed()).isEqualByComparingTo("1500000");
+        assertThat(shortFunds.coveragePct()).isEqualByComparingTo("33.33");
+        assertThat(shortFunds.gap()).isEqualByComparingTo("1000000"); assertThat(shortFunds.reached()).isFalse();
+        assertThat(shortFunds.state()).isEqualTo(RetirementCalculator.State.RESERVES_SHORT);
+        var funded = calculate(p, "1500000", "300000");
+        assertThat(funded.coverage()).isEqualByComparingTo("1"); assertThat(funded.gap()).isZero();
+        assertThat(funded.state()).isEqualTo(RetirementCalculator.State.INCOME_COVERS); assertThat(funded.reached()).isTrue();
+    }
+    @Test void revisionTwoZeroTotalNeedDoesNotDivideByZero() {
+        var p = revisionTwoPlan(); p.setMonthlyExpense(BigDecimal.ZERO);
+        p.setChildReserve(BigDecimal.ZERO); p.setMedicalReserve(BigDecimal.ZERO);
+        p.setHousingReserve(BigDecimal.ZERO); p.setOtherReserve(BigDecimal.ZERO);
+        for (String assets : List.of("0", "1000")) {
+            var r = calculate(p, assets, "0");
+            assertThat(r.target()).isZero(); assertThat(r.totalAssetNeed()).isZero();
+            assertThat(r.coverage()).isNull(); assertThat(r.coveragePct()).isNull(); assertThat(r.gap()).isZero();
+            assertThat(r.state()).isEqualTo(RetirementCalculator.State.INCOME_COVERS); assertThat(r.reached()).isTrue();
+        }
     }
 }
