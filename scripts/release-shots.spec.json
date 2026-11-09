@@ -4,7 +4,7 @@
     {
       "path": "/goals",
       "name": "retirement-progress",
-      "eval": "var a=document.querySelector('a[href$=\"/retirement\"]');if(!a)throw new Error('需要一个已保存的退休计划');a.click();",
+      "eval": "var a=Array.from(document.querySelectorAll('a[href^=\"/goals/\"]')).find(a=>a.textContent.includes('退休生活账'));if(!a)throw new Error('需要一个已保存的退休计划');a.click();",
       "wait": 3500,
       "selector": "#retire-overview [data-retire-live=\"result\"]"
     },
@@ -18,7 +18,7 @@
     {
       "path": "/goals",
       "name": "retirement-formula",
-      "eval": "var a=document.querySelector('a[href$=\"/retirement\"]');if(!a)throw new Error('需要一个已保存的退休计划');a.href+='?tab=principle';a.click();",
+      "eval": "var a=Array.from(document.querySelectorAll('a[href^=\"/goals/\"]')).find(a=>a.textContent.includes('退休生活账'));if(!a)throw new Error('需要一个已保存的退休计划');a.href+='/retirement?tab=principle';a.click();",
       "wait": 3500,
       "selector": "#retire-principle"
     },
@@ -39,7 +39,7 @@
     {
       "path": "/goals",
       "name": "retirement-progress",
-      "eval": "var a=document.querySelector('a[href$=\"/retirement\"]');if(!a)throw new Error('需要一个已保存的退休计划');a.click();",
+      "eval": "var a=Array.from(document.querySelectorAll('a[href^=\"/goals/\"]')).find(a=>a.textContent.includes('退休生活账'));if(!a)throw new Error('需要一个已保存的退休计划');a.click();",
       "wait": 3500,
       "full": false
     },
@@ -53,7 +53,7 @@
     {
       "path": "/goals",
       "name": "retirement-formula",
-      "eval": "var a=document.querySelector('a[href$=\"/retirement\"]');if(!a)throw new Error('需要一个已保存的退休计划');a.href+='?tab=principle';a.click();",
+      "eval": "var a=Array.from(document.querySelectorAll('a[href^=\"/goals/\"]')).find(a=>a.textContent.includes('退休生活账'));if(!a)throw new Error('需要一个已保存的退休计划');a.href+='/retirement?tab=principle';a.click();",
       "wait": 3500,
       "full": false
     },
