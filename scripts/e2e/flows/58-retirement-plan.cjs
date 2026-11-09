@@ -416,11 +416,26 @@ module.exports = {
       !(await ui.page.locator('[data-retire-live="funds"]').innerText()).includes('暂无完整合计'),'补齐余额后直接恢复完整资产合计,无需重新保存配置');
     await ui.assert(db.one(`SELECT plan_json FROM retirement_plan WHERE goal_id=${pendingGoal} AND family_id=${state.family}`)===savedConfig,'演算读取新余额不回写计划');
 
-    await ui.choose('returnSource','AUTO');await ui.click('[data-retire-save]','仅动态回报来源不足时保存配置');
-    await ui.assert((await ui.page.locator('[data-retire-config-status]').innerText()).trim()==='配置已完成 · 已保存','缺年回报仅影响运行指标,不影响已保存配置');
-    await ui.assert((await ui.page.locator('[data-retire-value="principal"]').innerText()).includes('5,612,345.00'),'缺动态回报时生活本金仍独立可算');
-    await ui.assert((await ui.page.locator('[data-retire-value="target"]').innerText()).trim()==='暂无结果' &&
-      (await ui.page.locator('[data-retire-value="coverage"]').innerText()).trim()==='—','缺年回报只使门槛与覆盖不可用');
+    const missingRateSnapshot=JSON.parse(db.one(`SELECT JSON_OBJECT('id',s.id,'period_id',s.period_id,'account_id',s.account_id,
+      'end_balance',s.end_balance,'submitted_by',s.submitted_by,'submitted_at',s.submitted_at,'note',s.note,'source_tag',s.source_tag)
+      FROM period_snapshot s JOIN period p ON p.id=s.period_id
+      WHERE p.family_id=${state.family} AND s.period_id=${gap} AND s.account_id=${foreign}`));
+    if(!missingRateSnapshot) throw new Error('缺年回报用例缺少待恢复的实际快照');
+    try {
+      db.raw(`DELETE s FROM period_snapshot s JOIN period p ON p.id=s.period_id
+        WHERE p.family_id=${state.family} AND s.period_id=${gap} AND s.account_id=${foreign}`);
+      await ui.choose('returnSource','AUTO');await ui.click('[data-retire-save]','仅动态回报来源不足时保存配置');
+      await ui.assert((await ui.page.locator('[data-retire-config-status]').innerText()).trim()==='配置已完成 · 已保存','缺年回报仅影响运行指标,不影响已保存配置');
+      await ui.assert((await ui.page.locator('[data-retire-value="principal"]').innerText()).includes('5,612,345.00'),'缺动态回报时生活本金仍独立可算');
+      await ui.assert((await ui.page.locator('[data-retire-value="target"]').innerText()).trim()==='暂无结果' &&
+        (await ui.page.locator('[data-retire-value="coverage"]').innerText()).trim()==='—','缺年回报只使门槛与覆盖不可用');
+    } finally {
+      const columns=Object.keys(missingRateSnapshot);
+      db.raw(`INSERT INTO period_snapshot(${columns.join(',')})
+        SELECT ${columns.map(c=>missingRateSnapshot[c]===null?'NULL':q(missingRateSnapshot[c])).join(',')}
+        FROM period p JOIN account a ON a.family_id=p.family_id AND a.id=${foreign}
+        WHERE p.id=${gap} AND p.family_id=${state.family}`);
+    }
     await ui.goto(`/goals/${pendingGoal}/retirement?tab=plan`);await ui.choose('returnSource','MANUAL');
     await ui.click('[data-retire-save]','恢复手填回报核对正常未关账口径');
 
