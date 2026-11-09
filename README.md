@@ -94,16 +94,13 @@
 
 ## 近期更新 · Releases
 
-**开发分支 v1.39 · 退休生活账与 AI 可用性修复(beta 待验收,未发布)**
-退休目标公开资金桥、实际回报和月度预测,联动家庭余额与定稿收支;老目标比较后采用,可退出恢复原参数。修复商户分类/本地 Agent 主备路由、失败提示、模板状态阻塞设置页及超时热改。见 [PRD](prd/v1.39.md)、[技术设计](tech-design/v1.39.md)与[原节目调研](docs/research/retirement-xiaolin-2026-11.md)。
+**v1.39.0 · 退休目标、贷款设置与 AI 可用性修复(待发布)**
+退休进度按所选账户当前合计除以所需总资金计算,配置保存与运行数据分开;历史回报不足时明确采用小Lin2.5%实际回报规划,旧目标需比较后采用。一并交付贷款固定还款设置、服务端模型测试保护与AI主备路由修复。见 [PRD](prd/v1.39.md)、[技术设计](tech-design/v1.39.md)与[原节目调研](docs/research/retirement-xiaolin-2026-11.md)。
 
 > 完整发布记录与截图见 [Releases](https://github.com/LuoDi-Nate/financial-management/releases)(本段每版只留 2–4 行,细节不搬过来)。
 
 **[v1.37.1](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.37.1) · 封板报告的储蓄率与观察账期一致**
 修复储蓄区漏算后续逐笔月份，以及风险、人赚、收益基准和余额来源的口径问题；支出明细保留账期与范围，金额单位随币种切换。无需新增数据库迁移，历史报告按修正口径重算([核算记录](docs/reports-metric-audit-v1.37.1.md))。
-
-**[v1.37.0](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.37.0) · iPhone Duo 按苹果规范:主屏 App 里操作挪到右侧一列**
-装到主屏上用时,外屏和内屏横着的情况下,顶栏按钮和右下浮钮收进页面右侧一列(本页目录 / 超级 Agent / 隐私眼 · 仪表盘 / 填报 / 账户 / 报表 / 更多);帐篷、外屏横握不再冻结旋转;内屏横时弹框开在右半边、网格改偶数列,避开折痕。浏览器里和普通 iPhone、iPad、电脑都不变([PRD](prd/v1.37.md) · [调研](docs/research/iphone-duo-hig-2026-10.md))。
 
 ## 主要能力
 
@@ -387,8 +384,8 @@ bash scripts/regression-data.sh # 数据层/口径回归(原 e2e.sh · curl 端�
 
 | 版本 | 文档 |
 |---|---|
-| `v1.39` | [PRD](prd/v1.39.md)(修订二开发中)· [技术设计](tech-design/v1.39.md) · [预览](preview/v1.39/retirement-setup.html) · [原节目与算法调研](docs/research/retirement-xiaolin-2026-11.md) |
-| `v1.38` | [PRD](prd/v1.38.md)(与v1.39共同开发验收)· [预览 · 贷款固定还款](preview/v1.38/loan-repay.html) · [预览 · 测试环境不调大模型](preview/v1.38/ai-stub.html) |
+| `v1.39` | [PRD](prd/v1.39.md)(已实施,待发布)· [技术设计](tech-design/v1.39.md) · [预览](preview/v1.39/retirement-setup.html) · [原节目与算法调研](docs/research/retirement-xiaolin-2026-11.md) |
+| `v1.38` | [PRD](prd/v1.38.md)(随v1.39.0一并交付)· [技术设计](tech-design/v1.38.md) · [预览 · 贷款固定还款](preview/v1.38/loan-repay.html) · [预览 · 测试环境不调大模型](preview/v1.38/ai-stub.html) |
 | `v1.37` | [PRD](prd/v1.37.md)(已实施)· [技术设计](tech-design/v1.37.md) · [预览](preview/v1.37/side-rail.html) · [Duo 官方规范调研](docs/research/iphone-duo-hig-2026-10.md) |
 | `v1.36` | [PRD](prd/v1.36.md)(已实施)· [技术设计](tech-design/v1.36.md) · [实测对比图](preview/v1.36/shots/) |
 | `v1.35` | [PRD](prd/v1.35.md)(已实施)· [技术设计](tech-design/v1.35.md) · [预览](preview/v1.35/) · [UI 调研](docs/research/ui-frameworks-2026-10.md) |

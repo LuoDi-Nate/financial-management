@@ -2,7 +2,7 @@
 
 按 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 风格记录。每个版本详细需求见对应 [`prd/vX.Y.md`](prd/),技术设计见 [`tech-design/vX.Y.md`](tech-design/),QA case 见 [`docs/qa-cases.md`](docs/qa-cases.md)。
 
-## [v1.39.0] · v1.38与退休修订二联合beta · 未发布
+## [v1.39.0] · 退休目标、贷款设置与AI修复 · 待发布
 
 - 修复退休三个页签切换时页面框架横移:概览、调整和原理统一外层宽度,表单保留800px易读上限;滚动条占位固定,长短内容切换不挤动标题和页签,表单输入继续保留。
 

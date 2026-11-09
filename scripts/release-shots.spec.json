@@ -1,74 +1,74 @@
 {
-  "_comment": "v1.34.0 · 持仓拖拽排序(#40)+ 账户拖拽排序 + 持仓改名(#41)+ 危险操作区重做。拖到一半的两张用 drag(按住拖过去拍,拍完原路拖回再松手 —— 不保存、不改库)。持仓用 beta 演示账户 #4 富途证券-港美股(3 只);金额在隐私模式下打码。",
+  "_comment": "v1.39.0:退休进度、共用设置表单、算法说明、贷款设置及服务端模型测试保护。沿目标列表进入第一个已有退休计划,不固定本地目标编号;只读取beta页面,默认隐私模式,不保存配置或调用模型。",
   "pc": [
     {
-      "path": "/accounts/4/holdings/order",
-      "name": "holding-order-drag",
-      "wait": 1200,
-      "waitFor": "[data-sort-board][data-sort-saved]",
-      "eval": "[].forEach.call(document.querySelectorAll('[data-agent-fab], #agent-fab, #ask-float, .ask-fab'), function(e){ e.style.display='none'; }); window.scrollTo(0,0);",
-      "drag": {
-        "from": "[data-sort-list] [data-sort-id]:nth-child(3)",
-        "to": "[data-sort-list] [data-sort-id]:nth-child(1)"
-      },
-      "selector": "main"
+      "path": "/goals",
+      "name": "retirement-progress",
+      "eval": "var a=document.querySelector('a[href$=\"/retirement\"]');if(!a)throw new Error('需要一个已保存的退休计划');a.click();",
+      "wait": 3500,
+      "selector": "#retire-overview [data-retire-live=\"result\"]"
     },
     {
-      "path": "/accounts/order",
-      "name": "account-order-drag",
-      "wait": 1200,
-      "waitFor": "[data-sort-board][data-sort-saved]",
-      "eval": "[].forEach.call(document.querySelectorAll('[data-agent-fab], #agent-fab, #ask-float, .ask-fab'), function(e){ e.style.display='none'; }); [].forEach.call(document.querySelectorAll('[data-ao-group]'), function(g, i){ if (i > 0) g.style.display='none'; }); var p=document.querySelector('main p.font-mono'); if(p) p.style.display='none'; window.scrollTo(0,0);",
-      "drag": {
-        "from": "section[data-ao-group] [data-sort-id]:nth-child(4)",
-        "to": "section[data-ao-group] [data-sort-id]:nth-child(2)"
-      },
-      "selector": "main"
+      "path": "/goals/retirement/new",
+      "name": "retirement-settings",
+      "waitFor": "#retire-assets",
+      "wait": 2500,
+      "selector": "#retire-assets"
     },
     {
-      "path": "/accounts/4/holdings",
-      "name": "holdings-head-rename",
-      "wait": 1200,
-      "waitFor": ".holding-list-head",
-      "eval": "[].forEach.call(document.querySelectorAll('[data-agent-fab], #agent-fab, #ask-float, .ask-fab'), function(e){ e.style.display='none'; }); var m=document.querySelector('main'); m.style.maxWidth='860px'; m.style.marginLeft='auto'; m.style.marginRight='auto'; var d=document.querySelector('[data-hold-rename]'); if(d) d.open=true; var h=document.querySelector('.holding-list-head'); window.scrollTo(0, h.getBoundingClientRect().top + window.scrollY - 140);",
-      "clipUnion": [
-        ".holding-list-head",
-        "main article",
-        "[data-hold-rename-input]"
-      ]
+      "path": "/goals",
+      "name": "retirement-formula",
+      "eval": "var a=document.querySelector('a[href$=\"/retirement\"]');if(!a)throw new Error('需要一个已保存的退休计划');a.href+='?tab=principle';a.click();",
+      "wait": 3500,
+      "selector": "#retire-principle"
     },
     {
-      "path": "/accounts/4/edit",
-      "name": "danger-zone",
-      "wait": 1000,
-      "waitFor": "[data-danger-zone]",
-      "eval": "[].forEach.call(document.querySelectorAll('[data-agent-fab], #agent-fab, #ask-float, .ask-fab'), function(e){ e.style.display='none'; });",
-      "selector": "[data-danger-zone]"
+      "path": "/admin/fixed-flows",
+      "name": "loan-settings",
+      "waitFor": "#loan-setup",
+      "selector": "#loan-setup"
+    },
+    {
+      "path": "/admin/ai-access",
+      "name": "ai-test-protection",
+      "waitFor": "#test-mode",
+      "selector": "#test-mode"
     }
   ],
   "mobile": [
     {
-      "path": "/accounts/4/holdings/order",
-      "name": "holding-order",
-      "wait": 1500,
-      "waitFor": "[data-sort-board][data-sort-saved]",
-      "eval": "window.scrollTo(0,0); [].forEach.call(document.querySelectorAll('body *'), function(e){ var cs=getComputedStyle(e); if(cs.position==='fixed'){ var r=e.getBoundingClientRect(); if(r.top>window.innerHeight-260) e.style.display='none'; } });",
+      "path": "/goals",
+      "name": "retirement-progress",
+      "eval": "var a=document.querySelector('a[href$=\"/retirement\"]');if(!a)throw new Error('需要一个已保存的退休计划');a.click();",
+      "wait": 3500,
       "full": false
     },
     {
-      "path": "/accounts/order",
-      "name": "account-order",
-      "wait": 1500,
-      "waitFor": "[data-sort-board][data-sort-saved]",
-      "eval": "window.scrollTo(0,0); [].forEach.call(document.querySelectorAll('body *'), function(e){ var cs=getComputedStyle(e); if(cs.position==='fixed'){ var r=e.getBoundingClientRect(); if(r.top>window.innerHeight-260) e.style.display='none'; } });",
+      "path": "/goals/retirement/new",
+      "name": "retirement-settings",
+      "waitFor": "#retire-assets",
+      "wait": 2500,
       "full": false
     },
     {
-      "path": "/accounts",
-      "name": "accounts-head",
-      "wait": 1500,
-      "waitFor": "[data-acct-actions]",
-      "eval": "window.scrollTo(0,0); [].forEach.call(document.querySelectorAll('body *'), function(e){ var cs=getComputedStyle(e); if(cs.position==='fixed'){ var r=e.getBoundingClientRect(); if(r.top>window.innerHeight-260) e.style.display='none'; } });",
+      "path": "/goals",
+      "name": "retirement-formula",
+      "eval": "var a=document.querySelector('a[href$=\"/retirement\"]');if(!a)throw new Error('需要一个已保存的退休计划');a.href+='?tab=principle';a.click();",
+      "wait": 3500,
+      "full": false
+    },
+    {
+      "path": "/admin/fixed-flows#loan-setup",
+      "name": "loan-settings",
+      "waitFor": "#loan-setup",
+      "eval": "document.querySelector('#loan-setup').scrollIntoView();",
+      "full": false
+    },
+    {
+      "path": "/admin/ai-access#test-mode",
+      "name": "ai-test-protection",
+      "waitFor": "#test-mode",
+      "eval": "document.querySelector('#test-mode').scrollIntoView();",
       "full": false
     }
   ]
