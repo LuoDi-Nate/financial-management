@@ -115,7 +115,7 @@ public class GoalLlmService {
     public AiResult<String> generateMonthlyReport(long familyId, Goal goal,
                                                   GoalProgressService.GoalProgress progress) {
         if (progress.isNewRetirement() && !progress.retirement().result().ready())
-            return AiResult.unavailable("退休计划尚待补齐或没有有限门槛,请先核对计划,不调用 AI 补算。");
+            return AiResult.unavailable("当前退休指标尚不能作完整门槛判断,暂不生成月报;可在退休生活账查看数据参考,配置保存不受影响。");
         try {
             List<Member> members = memberDirectory.listAll(familyId);
             PromptBuilder.NameMapping mapping = PromptBuilder.buildNameMapping(members);

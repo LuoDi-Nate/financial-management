@@ -190,7 +190,8 @@ module.exports = {
     await ui.visible('#retire-draft-status','动态演算明确标为未保存草稿');
     await ui.assert(db.num(`SELECT COUNT(*) FROM retirement_plan WHERE family_id=${state.family}`)===0,'城市切换与自动演算不保存计划');
     await ui.choose('returnSource','AUTO');
-    await ui.page.waitForFunction(()=>/本次名义年回报\s*待补齐/.test(document.querySelector('[data-retire-live="rates"]').textContent));
+    await ui.page.waitForFunction(()=>/本次名义年回报\s*暂无数据/.test(document.querySelector('[data-retire-live="rates"]').textContent));
+    await ui.click('[data-retire-live="rates"] summary','展开短历史的收益来源');
     await ui.assert((await ui.page.locator('[data-retire-live="rates"]').innerText()).includes('至少需要12个'),'短历史明确缺失,不回退节目示例');
     await ui.assert(await ui.page.inputValue('[name="monthlyContribution"]') === '20000.00' ||
       Number(await ui.page.inputValue('[name="monthlyContribution"]'))===20000,'月投入建议包含旧总额和新账户收入,未停留在旧月份');
@@ -206,6 +207,7 @@ module.exports = {
     await ui.page.waitForLoadState('networkidle');
     state.native=db.num(`SELECT goal_id FROM retirement_plan WHERE family_id=${state.family} AND created_for_plan=1`);
     await ui.assert(!!state.native && db.num(`SELECT active FROM retirement_plan WHERE goal_id=${state.native}`)===1,'新方案已持久化并启用');
+    await ui.assert((await ui.page.locator('[data-retire-config-status]').innerText()).trim()==='配置已完成 · 已保存','正式计划明确区分配置完成与演算状态');
     await ui.notVisible('#retire-draft-status','保存后回到正式计划,草稿提示消失');
     await ui.click('[data-retire-tab="plan"]','检查已保存计划的设置');
     await settings(ui,'修改计划',reference);
@@ -296,6 +298,8 @@ module.exports = {
     db.raw(`DELETE FROM period_snapshot WHERE period_id=${gap} AND account_id=${foreign}`);
     await ui.choose('returnSource','MANUAL');await ui.choose('returnSource','AUTO');
     await ui.page.waitForFunction(()=>document.querySelector('[data-retire-live="rates"]').textContent.includes('实际月末快照'));
+    if(!await ui.page.locator('[data-retire-live="rates"] details').evaluate(el=>el.open))
+      await ui.click('[data-retire-live="rates"] summary','展开缺少实际快照的收益来源');
     await ui.assert((await ui.page.locator('[data-retire-live="rates"]').innerText()).includes('实际月末快照'),'缺一张快照后拒绝用延续余额凑满一年');
     db.raw(`INSERT INTO period_snapshot(period_id,account_id,end_balance,submitted_by,source_tag) VALUES(${gap},${foreign},100000,${state.member},'MANUAL')`);
     await ui.goto(`/goals/${state.native}/retirement`);
@@ -386,17 +390,99 @@ module.exports = {
     const pendingGoal=db.num(`SELECT id FROM family_goal WHERE family_id=${state.family} AND name=${q(state.prefix+'-pending-data')}`);
     await ui.assert(pendingGoal>0 && await ui.page.locator('[data-retire-value="target"]').isVisible(),'新目标实际保存并打开结果,不被演算数据不足阻塞');
     await ui.assert(db.num(`SELECT COUNT(*) FROM retirement_plan WHERE family_id=${state.family} AND goal_id=${pendingGoal} AND JSON_UNQUOTE(JSON_EXTRACT(plan_json,'$.returnSource'))='AUTO'` )===1,'动态来源按配置保存,没有偷偷改成手填');
-    await ui.seesText('当前账期余额未填','保存后计算结果仍如实列出缺失余额');
+    await ui.assert((await ui.page.locator('[data-retire-config-status]').innerText()).trim()==='配置已完成 · 已保存','缺余额和收益历史仍显示配置已完成且已保存');
+    await ui.assert(!await ui.page.locator('[data-retire-reference]').evaluate(el=>el.open),'运行数据说明默认折叠');
+    await ui.notSeesText('尚无已知余额','缺失余额不在正式结果中重复展开为报错');
+    await ui.assert((await ui.page.locator('[data-retire-known-assets]').innerText()).includes('6,900,000.00'),'缺余额时展示已知账户小计,不冒充完整资产');
+    await ui.assert((await ui.page.locator('[data-retire-value="principal"]').innerText()).trim()==='—' &&
+      (await ui.page.locator('[data-retire-value="coverage"]').innerText()).trim()==='—','未知资产不伪填零本金或零覆盖率');
+    await ui.assert((await ui.page.locator('.retire-bridge > div').nth(1).innerText()).includes('100,000.00'),'资产不完整时负债仍独立显示');
+    await ui.click('[data-retire-reference] > summary','按需查看运行数据参考');
+    await ui.assert((await ui.page.locator('[data-retire-reference]').innerText()).includes('尚无已知余额'),'展开后能核对真正未知的余额');
     await ui.goto(`/goals/${pendingGoal}/retirement?tab=plan`);await ui.choose('returnSource','MANUAL');
     await ui.click('[data-retire-save]','缺余额仍可调整回报假设');
+    await ui.assert((await ui.page.locator('[data-retire-config-status]').innerText()).trim()==='配置已完成 · 已保存','缺余额不使手填回报配置变成未完成');
+    await ui.assert((await ui.page.locator('[data-retire-value="target"]').innerText()).includes('4,800,000.00'),'资产未知不阻止按手填假设计算生活门槛');
+    await ui.assert((await ui.page.locator('[data-retire-value="principal"]').innerText()).trim()==='—' &&
+      (await ui.page.locator('[data-retire-value="coverage"]').innerText()).trim()==='—','手填门槛可用时缺失本金及覆盖仍保持未知');
     await ui.goto(`/goals/${pendingGoal}/retirement?tab=plan`);
-    await ui.assert((await ui.page.locator('[data-retire-live="funds"]').innerText()).includes('当前账期余额未填'),'缺余额未伪填零');
+    await ui.assert((await ui.page.locator('[data-retire-live="funds"]').innerText()).includes('暂无完整合计') &&
+      (await ui.page.locator('[data-retire-live="funds"]').innerText()).includes('6,900,000.00'),'配置页分开展示完整合计未知与已知账户小计');
     const latest=db.num(`SELECT id FROM period WHERE family_id=${state.family} ORDER BY period_start DESC LIMIT 1`);
     db.raw(`INSERT INTO period_snapshot(period_id,account_id,end_balance,submitted_by,source_tag) VALUES(${latest},${unfilled},12345,${state.member},'MANUAL')`);
     const savedConfig=db.one(`SELECT plan_json FROM retirement_plan WHERE goal_id=${pendingGoal} AND family_id=${state.family}`);
     await ui.goto(`/goals/${pendingGoal}/retirement?tab=plan`);
-    await ui.assert(!(await ui.page.locator('[data-retire-live="funds"]').innerText()).includes('当前账期余额未填'),'补齐余额后直接重读数据,无需重新保存配置');
+    await ui.assert((await ui.page.locator('[data-retire-live="funds"]').innerText()).includes('6,912,345.00') &&
+      !(await ui.page.locator('[data-retire-live="funds"]').innerText()).includes('暂无完整合计'),'补齐余额后直接恢复完整资产合计,无需重新保存配置');
     await ui.assert(db.one(`SELECT plan_json FROM retirement_plan WHERE goal_id=${pendingGoal} AND family_id=${state.family}`)===savedConfig,'演算读取新余额不回写计划');
+
+    await ui.choose('returnSource','AUTO');await ui.click('[data-retire-save]','仅动态回报来源不足时保存配置');
+    await ui.assert((await ui.page.locator('[data-retire-config-status]').innerText()).trim()==='配置已完成 · 已保存','缺年回报仅影响运行指标,不影响已保存配置');
+    await ui.assert((await ui.page.locator('[data-retire-value="principal"]').innerText()).includes('5,612,345.00'),'缺动态回报时生活本金仍独立可算');
+    await ui.assert((await ui.page.locator('[data-retire-value="target"]').innerText()).trim()==='暂无结果' &&
+      (await ui.page.locator('[data-retire-value="coverage"]').innerText()).trim()==='—','缺年回报只使门槛与覆盖不可用');
+    await ui.goto(`/goals/${pendingGoal}/retirement?tab=plan`);await ui.choose('returnSource','MANUAL');
+    await ui.click('[data-retire-save]','恢复手填回报核对正常未关账口径');
+
+    // Simulate an ordinary OPEN month without a current snapshot, then restore the exact synthetic row.
+    const snapshotColumns=['id','period_id','account_id','end_balance','submitted_by','submitted_at','note','source_tag'];
+    const snapshotQuery=`SELECT JSON_OBJECT(${snapshotColumns.map(c=>q(c)+',s.'+c).join(',')})
+      FROM period_snapshot s JOIN period p ON p.id=s.period_id WHERE p.family_id=${state.family} AND s.period_id=${latest} AND s.account_id=${state.cash}`;
+    const snapshotBefore=db.one(snapshotQuery), cashSnapshot=JSON.parse(snapshotBefore);
+    if(!cashSnapshot) throw new Error('沿用余额用例缺少待恢复的合成快照');
+    await ui.assert(db.one(`SELECT status FROM period WHERE id=${latest} AND family_id=${state.family}`)==='OPEN','沿用余额用例以真实OPEN账期为前提');
+    const carryConfig=db.one(`SELECT plan_json FROM retirement_plan WHERE goal_id=${pendingGoal} AND family_id=${state.family}`);
+    try {
+      db.raw(`DELETE s FROM period_snapshot s JOIN period p ON p.id=s.period_id
+        WHERE p.family_id=${state.family} AND s.period_id=${latest} AND s.account_id=${state.cash}`);
+      await ui.goto(`/goals/${pendingGoal}/retirement`);
+      await ui.assert((await ui.page.locator('[data-retire-config-status]').innerText()).trim()==='配置已完成 · 已保存','本期未填余额不要求重新配置');
+      await ui.assert((await ui.page.locator('[data-retire-value="principal"]').innerText()).includes('5,612,345.00') &&
+        (await ui.page.locator('[data-retire-value="target"]').innerText()).includes('4,800,000.00') &&
+        (await ui.page.locator('[data-retire-value="coverage"]').innerText()).trim()==='116.92%','正常OPEN期沿用最近余额继续计算本金、门槛和覆盖');
+      await ui.assert(!await ui.page.locator('[data-retire-reference]').evaluate(el=>el.open),'沿用余额仅在默认折叠的数据参考中提示');
+      await ui.click('[data-retire-reference] > summary','核对沿用余额的实际来源');
+      await ui.assert((await ui.page.locator('[data-retire-reference]').innerText()).includes('沿用最近已知余额'),'数据参考明确沿用最近已知余额');
+      await ui.assert(!(await ui.page.locator('[data-retire-reference]').innerText()).includes('当前账期余额未填'),'正常延续余额不被当作本期漏填错误');
+      await ui.assert(db.one(`SELECT plan_json FROM retirement_plan WHERE goal_id=${pendingGoal} AND family_id=${state.family}`)===carryConfig,'沿用历史余额不回写计划配置');
+    } finally {
+      db.raw(`INSERT INTO period_snapshot(${snapshotColumns.join(',')})
+        SELECT ${snapshotColumns.map(c=>cashSnapshot[c]===null?'NULL':q(cashSnapshot[c])).join(',')}
+        FROM period p JOIN account a ON a.family_id=p.family_id AND a.id=${state.cash}
+        WHERE p.id=${latest} AND p.family_id=${state.family}`);
+    }
+    await ui.assert(db.one(snapshotQuery)===snapshotBefore,'沿用余额用例完整恢复原合成快照');
+
+    // Hide only this family's historical income; AUTO C must not clear otherwise computable metrics.
+    const incomeIds=db.col(`SELECT c.id FROM cash_flow c JOIN period p ON p.id=c.period_id
+      WHERE p.family_id=${state.family} AND c.kind='INCOME' AND c.deleted_at IS NULL`);
+    const totalIncome=JSON.parse(db.one(`SELECT JSON_OBJECT('id',id,'amount',total_income_input,'updatedAt',updated_at)
+      FROM period_member_cashflow WHERE family_id=${state.family} AND member_id=${state.member} AND total_income_input IS NOT NULL`));
+    if(!incomeIds.length || !totalIncome) throw new Error('AUTO结余用例缺少待恢复的合成收入');
+    try {
+      db.raw(`UPDATE cash_flow c JOIN period p ON p.id=c.period_id SET c.deleted_at=CURRENT_TIMESTAMP(3)
+        WHERE p.family_id=${state.family} AND c.id IN(${incomeIds.join(',')})`);
+      db.raw(`UPDATE period_member_cashflow SET total_income_input=NULL WHERE family_id=${state.family} AND id=${totalIncome.id}`);
+      await ui.goto(`/goals/${pendingGoal}/retirement`);
+      await ui.choose('contributionSource','AUTO');
+      await ui.click('[data-retire-tab="plan"]','保存只影响可选积累预测的AUTO结余');
+      await ui.click('[data-retire-save]','无完整收入历史也可保存AUTO结余来源');
+      await ui.assert((await ui.page.locator('[data-retire-config-status]').innerText()).trim()==='配置已完成 · 已保存','可选AUTO结余缺历史时配置仍完成');
+      await ui.assert((await ui.page.locator('[data-retire-live="projection"] > p b').first().innerText()).trim()==='—','AUTO结余无历史保持未知,不伪填零投入');
+      await ui.assert((await ui.page.locator('[data-retire-value="principal"]').innerText()).includes('5,612,345.00') &&
+        (await ui.page.locator('[data-retire-value="target"]').innerText()).includes('4,800,000.00') &&
+        (await ui.page.locator('[data-retire-value="coverage"]').innerText()).trim()==='116.92%','可选AUTO结余无数据不清空本金、门槛与覆盖');
+      await ui.assert(await ui.page.locator('#retirement-path').count()===0,'缺AUTO结余仅停止未来积累图');
+      await ui.assert(!await ui.page.locator('[data-retire-reference]').evaluate(el=>el.open),'缺结余来源同样只在默认折叠的数据参考中说明');
+      await ui.click('[data-retire-reference] > summary','查看未生成积累预测的原因');
+      await ui.assert((await ui.page.locator('[data-retire-reference]').innerText()).includes('暂不预测达成时间'),'数据参考明确只有预测因结余来源不足而暂停');
+    } finally {
+      db.raw(`UPDATE cash_flow c JOIN period p ON p.id=c.period_id SET c.deleted_at=NULL
+        WHERE p.family_id=${state.family} AND c.id IN(${incomeIds.join(',')})`);
+      db.raw(`UPDATE period_member_cashflow SET total_income_input=${q(totalIncome.amount)},updated_at=${q(totalIncome.updatedAt)}
+        WHERE family_id=${state.family} AND id=${totalIncome.id}`);
+    }
+    await ui.goto(`/goals/${pendingGoal}/retirement?tab=plan`);
     await ui.click('#retire-scope > summary','展开当前默认折叠的资金范围');
     await ui.choose('scopeMode','CUSTOM');
     const home=db.num(`SELECT id FROM account WHERE family_id=${state.family} AND type='PROPERTY'`);

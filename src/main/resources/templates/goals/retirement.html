@@ -117,7 +117,7 @@
         <div data-retire-live="result">
           <p class="text-sm mb-3" data-retire-config-status role="status"
              th:classappend="${view.configurationComplete() ? 'text-forest' : 'text-ink-soft'}"
-             th:text="${activePlan and !previewing ? (view.configurationComplete() ? '配置已完成 · 已保存' : '配置已保存 · 有设置需要调整') : (view.configurationComplete() ? '配置已填齐 · 尚未保存' : '配置尚未填齐')}"></p>
+             th:text="${activePlan and !previewing and (view.active() or !upgrading) ? (view.configurationComplete() ? '配置已完成 · 已保存' : '配置已保存 · 有设置需要调整') : (view.configurationComplete() ? '配置已填齐 · 尚未保存' : '配置尚未填齐')}"></p>
           <div class="retire-section-head">
             <h2 class="font-display text-2xl" th:text="${r.message()}"></h2>
             <div
@@ -163,7 +163,7 @@
                 data-retire-value="target"
               >
               </strong>
-              <small class="retire-field-hint" th:if="${r.target()==null and r.realRate()==null}">回报来源尚无可用年率</small>
+              <small class="retire-field-hint" th:if="${r.target()==null and r.realRate()==null}">回报或通胀来源暂无可用年率</small>
             </div>
             <div>
               <span>可供生活生息的本金 P</span>
@@ -188,7 +188,7 @@
             <div>
               <span>可支用资产 A</span>
               <b data-priv th:text="${money.amount(r.assets())}"> </b>
-              <span th:if="${r.assets()==null and view.data().knownAssets()!=null}"> · 已知账户合计 <b data-priv data-retire-known-assets th:text="${money.amount(view.data().knownAssets())}"></b></span>
+              <span th:if="${r.assets()==null and view.data().knownAssets()!=null}">已知账户合计 <b data-priv data-retire-known-assets th:text="${money.amount(view.data().knownAssets())}"></b></span>
             </div>
             <div>
               <span>− 全家庭负债 D</span>
