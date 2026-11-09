@@ -58,6 +58,9 @@ check rg -q 'PLANNING_REAL_RETURN_PCT' "$java/service/goal/RetirementPlanService
 check rg -q 'data-retire-return-basis' src/main/resources/templates/goals/retirement.html
 check rg -q 'view.progressAssets\(\), view.progressTarget\(\)' "$java/service/goal/GoalProgressService.java"
 check rg -q '目标进度 = A ÷ F' src/main/resources/templates/goals/retirement.html
+check rg -q 'scrollbar-gutter:stable' src/main/resources/static/css/retirement.css
+if rg -q '^[[:space:]]*\.retirement-page\[data-tab=[^]]+\].*max-width:' src/main/resources/static/css/retirement.css; then echo 'FAIL: 页签切换改变页面外框宽度' >&2; exit 1; fi
+qa139_pass=$((qa139_pass+1))
 if code "$java/service/goal/RetirementPlanService.java" | rg -q 'throw new IllegalArgumentException\(String.join'; then echo 'FAIL: 实时演算缺失阻塞配置保存' >&2; exit 1; fi
 qa139_pass=$((qa139_pass+1))
 check python3 scripts/family-isolation-audit.py

@@ -67,6 +67,44 @@ async function dimensions(ui, label) {
     .every(el=>el.scrollWidth<=el.clientWidth+2)),label + ':表格长文本在单元格内换行');
 }
 
+async function stableTabs(ui, label) {
+  const originalTab=await ui.page.locator('.retirement-page').getAttribute('data-tab');
+  const originalViewport=ui.page.viewportSize();
+  const formState=()=>ui.page.locator('#retirement-form').evaluate(el=>JSON.stringify([...new FormData(el).entries()]));
+  const values=await formState();
+  const frame=()=>ui.page.evaluate(()=>{
+    const rect=selector=>{
+      const r=document.querySelector(selector).getBoundingClientRect();
+      return [r.left,r.top,r.width,r.height];
+    };
+    return {main:rect('.retirement-page').slice(0,3),heading:rect('.retire-heading'),tabs:rect('.retire-tabs'),scrollY};
+  });
+  const same=(a,b)=>Object.keys(a).every(key=>Array.isArray(a[key])
+    ? a[key].every((value,i)=>Math.abs(value-b[key][i])<=1) : Math.abs(a[key]-b[key])<=1);
+  try {
+    for(const tall of [false,true]) {
+      if(tall) await ui.page.setViewportSize({width:originalViewport.width,height:1800});
+      await ui.page.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));
+      await ui.page.locator('[data-retire-tab="overview"]').click();
+      await ui.page.waitForTimeout(500);
+      if(!tall) await ui.page.evaluate(()=>window.scrollTo({top:120,behavior:'instant'}));
+      const before=await frame();
+      for(const name of ['plan','principle','overview','plan']) {
+        await ui.page.locator(`[data-retire-tab="${name}"]`).click();
+        await ui.page.waitForTimeout(200);
+        await ui.assert(same(before,await frame()),label+(tall?'长短内容滚动条切换':'滚动后切换')+':'+name+'外框、标题、页签及滚动位置稳定');
+      }
+    }
+    await ui.assert(await formState()===values,label+':反复切换三个页签保留全部表单输入');
+    await ui.assert(await ui.page.locator('#retirement-form').evaluate(el=>el.getBoundingClientRect().width<=800),label+':统一页面框架后表单仍不超过800px');
+  } finally {
+    await ui.page.setViewportSize(originalViewport);
+    await ui.page.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));
+    await ui.page.locator(`[data-retire-tab="${originalTab}"]`).click();
+    await ui.page.waitForTimeout(500);
+  }
+}
+
 async function settings(ui, label, reference) {
   const fields = await ui.page.locator('#retirement-form input:not([type=hidden]):not([type=checkbox]):not([type=radio]), #retirement-form select').evaluateAll(inputs => inputs.map(el => {
     const css=getComputedStyle(el), r=el.getBoundingClientRect();
@@ -171,6 +209,7 @@ module.exports = {
       const css=getComputedStyle(el);return {font:css.fontFamily,size:parseFloat(css.fontSize)};
     });
     await ui.goto('/goals/new/retirement');
+    await stableTabs(ui,'电脑新建计划');
     await settings(ui,'新建计划',reference);
     await screenshot(ui,'desktop-settings');
     await ui.assert(!await ui.page.locator('#retire-scope').evaluate(el=>el.open),'默认资金范围折叠');
@@ -231,6 +270,7 @@ module.exports = {
     await ui.assert(await ui.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'设置特大字号无横向溢出');
     await ui.click('#fs-menu summary','恢复字号菜单'); await ui.click('#fs-menu [data-fs-opt="std"]','恢复标准字号');
     await ui.goto(`/goals/${state.native}/retirement`);
+    await stableTabs(ui,'电脑已保存计划');
     await dimensions(ui,'电脑');
     await ui.assert(await ui.page.locator('#retirement-path').evaluate(el => {
       const pixels=el.getContext('2d').getImageData(0,0,el.width,el.height).data;
@@ -406,6 +446,7 @@ module.exports = {
     await ui.phone(async mobile => {
       await login(mobile.page,state.username);
       await mobile.goto(`/goals/${state.native}/retirement`);
+      await stableTabs(mobile,'手机已保存计划');
       await dimensions(mobile,'手机'); await screenshot(mobile,'mobile-overview');
       await mobile.assert(await mobile.page.locator('#float-dock').evaluate(el=>getComputedStyle(el).position==='fixed'),'手机:生活账沿用系统悬浮工具');
       await mobile.click('[data-retire-tab="plan"]','手机调整计划');
