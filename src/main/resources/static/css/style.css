@@ -3107,7 +3107,7 @@ body.adm-open #float-dock { display: none !important; }
 span[class~="border"]:not([class*="rounded"]):not(.pill) { border-radius: var(--r-sm); }
 div.flex[class~="border"]:has(> :is(a, button, label)[class*="border-l"]) { border-radius: var(--r-md); overflow: hidden; }
 /* 目标摘要展开时允许浮层越过卡片边界。 */
-div[data-goal-strip-card]:has([data-goal-progress-summary]:not(.hidden)) { overflow: visible; }
+div.flex[data-goal-strip-card]:has([data-goal-progress-summary]:not(.hidden)) { overflow: visible; }
 :is(button, summary)[class*="tracking-"], :is(a, label)[class~="border"][class*="tracking-"] { letter-spacing: .02em; }
 :is(button, summary).uppercase, :is(a, label)[class~="border"].uppercase { text-transform: none; }
 

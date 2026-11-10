@@ -30,6 +30,10 @@ async function dashboardStrip(ui,goal,date,label){
     const r=el.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth+1&&r.top>=0&&r.bottom<=innerHeight+1;
   }),label+'摘要完整位于视口内');
   await ui.page.screenshot({path:'/tmp/finance-v140-review/goal-summary-'+label+'.png'});
+  await ui.assert(await panel.locator('.goal-summary-section').first().evaluate(el=>{
+    const r=el.getBoundingClientRect(),top=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
+    return top===el||el.contains(top);
+  }),label+'摘要正文未被卡片裁切或遮挡');
   await panel.locator('.goal-summary-section').first().click();
   await ui.assert(await panel.isVisible()&&ui.page.url()===pageUrl,label+'阅读摘要不误跳目标页');
   await ui.page.screenshot({path:'/tmp/finance-v140-review/goal-summary-'+label+'.png'});
