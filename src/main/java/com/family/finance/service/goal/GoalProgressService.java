@@ -207,6 +207,7 @@ public class GoalProgressService {
             return new GoalProgress(goal,params,pv,target,progress,monthlyContribution,scenarios,metric,comparator,timeMode,pace,accountCount,retirement,view);
         }
         public List<com.family.finance.domain.goal.GoalIndicator> indicators() { return forecast==null?List.of():forecast.indicators(); }
+        public GoalProgressSummary summary(boolean includeForecast) { return GoalProgressSummary.from(this,includeForecast); }
         public GoalProgress(Goal goal, GoalParams params, BigDecimal pv, BigDecimal target, BigDecimal progress,
                             BigDecimal monthlyContribution, GoalProjector.ScenarioResult scenarios, GoalMetric metric,
                             GoalComparator comparator, TimeMode timeMode, GoalPaceCalculator.Pace pace, int accountCount) {

@@ -19,6 +19,23 @@ async function dashboardStrip(ui,goal,date,label){
   await ui.assert(axis&&etaBox&&Math.abs(axis.x+axis.width-etaBox.x-etaBox.width)<=1&&etaBox.y>=axis.y+axis.height-1,label+'预计时间位于进度轴右下角');
   await ui.assert(await ui.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),label+'目标条无横向溢出');
   await card.screenshot({path:'/tmp/finance-v140-review/dashboard-strip-'+label+'.png'});
+  const pageUrl=ui.page.url();
+  await card.locator('[data-kpi-info]').click();
+  const panel=card.locator('[data-goal-progress-summary]');
+  await ui.assert(await panel.isVisible()&&ui.page.url()===pageUrl,label+'点击小i打开摘要且不跳转');
+  const text=await panel.innerText();
+  await ui.assert(text.includes('7,200,000.00')&&text.includes('800,000.00')&&text.includes('2,000,000.00')&&text.includes('10,000,000.00'),label+'摘要列出生活本金/准备金/负债和总需求');
+  await ui.assert(text.includes('50.0%')&&text.includes('125个月')&&text.includes(date),label+'摘要解释同一进度和达成月份');
+  await ui.assert(await panel.evaluate(el=>{
+    const r=el.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth+1&&r.top>=0&&r.bottom<=innerHeight+1;
+  }),label+'摘要完整位于视口内');
+  await panel.locator('.goal-summary-section').first().click();
+  await ui.assert(await panel.isVisible()&&ui.page.url()===pageUrl,label+'阅读摘要不误跳目标页');
+  await ui.page.screenshot({path:'/tmp/finance-v140-review/goal-summary-'+label+'.png'});
+  await ui.page.locator('[onclick*="togglePrivacy"]:visible').first().click();
+  await card.locator('[data-kpi-info]').click();
+  await ui.assert(await panel.locator('[data-priv]').first().evaluate(el=>getComputedStyle(el).filter.includes('blur')),label+'摘要金额跟随隐私模式');
+  await ui.page.locator('[onclick*="togglePrivacy"]:visible').first().click();
 }
 module.exports={name:'61-goal-indicators',title:'目标多指标、家庭结余与独立保存',async run(ui){
   state.username='e2e-goals140-'+Date.now();
@@ -61,6 +78,9 @@ module.exports={name:'61-goal-indicators',title:'目标多指标、家庭结余�
     }
   });
   await ui.goto('/reports');await ui.assert(await ui.page.locator('[data-estimate-dashboard]').count()===0,'报表目标条不带入今日预计时间');
+  const reportCard=ui.page.locator(`a[href="/goals/${state.goal}"]`).first();
+  await reportCard.locator('[data-kpi-info]').click();
+  await ui.assert(!(await reportCard.locator('[data-goal-progress-summary]').innerText()).includes('预计达成时间'),'报表摘要也不混入今日预计时间');
   await ui.goto(`/goals/${state.goal}/retirement`);
   await ui.click('[data-estimate-edit]','从时间指标调整估算');await ui.page.check('[name=estimateSource][value=MANUAL]');await ui.page.fill('[name=estimateMonthlyAmount]','20000');
   await eta(ui,dateAfter(250));await ui.assert(await ui.page.locator('[data-estimate-draft]').isVisible(),'未保存估算有明确提示');

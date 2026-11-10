@@ -3974,7 +3974,10 @@ LSJ="$RD/src/main/resources/static/js/lens-select.js"
 #   ② 原来还断言 README 里有 `pc_lens.jpg?v=3` —— 那是 v0.11 时代「近期更新」段的一张截图热链,
 #      而 README 按维护规则只保留最近 1–2 个版本,那行早就正常滚掉了。护栏钉在会被正常维护搬走的
 #      字面量上 = 迟早假红。这条删掉,不换成别的字面量。
-{ grep -qF '_kpi-info :: i(${gp.goal.description' "$RD/src/main/resources/templates/goals/_progress-strip.html" \
+# 2026-11-10:维护者将目标小i内容改为计算摘要,守同源值与金额隐私,不再守旧备注字面量。
+{ grep -qF 'gp.summary(goalsHistoricalReport != true)' "$RD/src/main/resources/templates/goals/_progress-strip.html" \
+  && grep -q 'data-goal-progress-summary' "$RD/src/main/resources/templates/goals/_progress-strip.html" \
+  && grep -q 'section.privateValues()' "$RD/src/main/resources/templates/goals/_progress-strip.html" \
   && grep -q '.kpi-info-btn::after, .tap::after' "$RD/src/main/resources/static/css/style.css" \
   && grep -q 'inset: -12px' "$RD/src/main/resources/static/css/style.css" \
   && grep -q 'setDatasetVisibility' "$RD/src/main/resources/templates/dashboard/_region.html" \
@@ -3982,7 +3985,7 @@ LSJ="$RD/src/main/resources/static/js/lens-select.js"
   && grep -q 'CN_MIRROR' "$RD/Dockerfile" \
   && grep -q 'CN_MIRROR=0' "$RD/.github/workflows/docker-publish.yml" \
   && [ -f "$RD/deploy/maven-settings-central.xml" ]; } \
-  && log_ok "v11-R7 五项(目标ⓘ弹描述stopPropagation · 热区::after-12px · 图例toggle回归 · lens截图成员结构v3 · CI去aliyun单点)" \
+  && log_ok "v11-R7 五项(目标ⓘ同源计算摘要及金额隐私 · 热区::after-12px · 图例toggle回归 · lens截图成员结构v3 · CI去aliyun单点)" \
   || log_bad "v11-R7 五项缺件" "see _progress-strip/style.css/_region/EntryController/Dockerfile/workflow"
 
 # ===================== v1.2 · 归因复盘 + 再平衡闭环 + 性能底盘 =====================

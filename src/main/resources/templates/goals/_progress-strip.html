@@ -40,8 +40,7 @@
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-1">
               <span class="text-sm text-ink truncate group-hover:text-brass-deep transition" th:text="${gp.goal.name}">退休</span>
-              <!-- 2026-07-19:ⓘ 换 kpi-info 组件 —— 点击弹描述(stopPropagation,不再误跳目标详情);热区随全局扩大 -->
-              <th:block th:insert="~{fragments/_kpi-info :: i(${gp.goal.description != null and !gp.goal.description.isBlank() ? gp.goal.description : gp.goal.name}, null)}"/>
+              <th:block th:insert="~{goals/_progress-strip :: summary(${gp.summary(goalsHistoricalReport != true)})}"/>
               <span class="font-mono text-xs text-ink-subtle ml-auto" style="max-width:50%;text-align:right" th:text="${gp.progressLabel()}">57.0%</span>
             </div>
             <div th:if="${gp.progressAvailable()}" class="w-full bg-card-soft h-1.5 mt-1 overflow-hidden" data-goal-strip-axis>
@@ -81,6 +80,22 @@
     </div>
   </div>
 </section>
+
+<span th:fragment="summary(summary)" class="kpi-info-wrap">
+  <button type="button" class="kpi-info-btn" data-kpi-info aria-label="目标进度计算摘要" title="目标进度计算摘要">
+    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+  </button>
+  <span class="kpi-info-panel goal-progress-summary hidden" data-goal-progress-summary>
+    <span class="goal-summary-basis" th:text="${summary.basis()}"></span>
+    <span class="goal-summary-section" th:each="section : ${summary.sections()}">
+      <b th:text="${section.title()}"></b>
+      <span th:text="${section.formula()}"></span>
+      <span th:if="${section.values()!=null}" class="goal-summary-values" th:attr="data-priv=${section.privateValues() ? '' : null}" th:text="${section.values()}"></span>
+      <span class="goal-summary-note" th:text="${section.note()}"></span>
+    </span>
+    <span th:if="${!summary.assumption().isEmpty()}" class="goal-summary-note" th:text="${summary.assumption()}"></span>
+  </span>
+</span>
 
 <!-- 引导卡:无目标时 -->
 <section th:fragment="emptyHint" th:if="${goals == null or #lists.isEmpty(goals)}"
