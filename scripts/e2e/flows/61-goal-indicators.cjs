@@ -23,6 +23,7 @@ module.exports={name:'61-goal-indicators',title:'目标多指标、家庭结余�
     db.raw(`INSERT INTO period(family_id,period_type,period_start,period_end,status)VALUES(${state.family},'MONTHLY',DATE_SUB('${current}',INTERVAL ${back} MONTH),LAST_DAY(DATE_SUB('${current}',INTERVAL ${back} MONTH)),'${back?'CLOSED':'OPEN'}')`);
     const pid=db.num(`SELECT id FROM period WHERE family_id=${state.family} AND period_start=DATE_SUB('${current}',INTERVAL ${back} MONTH)`);
     db.raw(`INSERT INTO period_snapshot(period_id,account_id,end_balance,submitted_by,source_tag)SELECT ${pid},id,IF(type='LOAN',-2000000,5000000),${state.member},'MANUAL' FROM account WHERE family_id=${state.family}`);
+    db.raw(`INSERT INTO fx_rate(family_id,period_id,base_currency,quote_currency,rate,source)VALUES(${state.family},${pid},'CNY','USD',0.125,'MANUAL'),(${state.family},${pid},'CNY','HKD',1.1,'MANUAL')`);
     if(back)db.raw(`INSERT INTO period_member_cashflow(family_id,period_id,member_id,total_income_input,total_expense_input)VALUES(${state.family},${pid},${state.member},80000,40000)`);
   }
   await login(ui.page,state.username);await ui.goto('/goals');await ui.click('a[href="/goals/new/retirement"]','从空目标页新建退休');
@@ -56,7 +57,12 @@ module.exports={name:'61-goal-indicators',title:'目标多指标、家庭结余�
   await ui.assert(db.num(`SELECT forecast_wish_override FROM family_goal WHERE id=${state.goal}`)===0,'只保存结余不冻结希望月份');
   await ui.goto('/goals');await ui.assert((await ui.page.locator(`a[href="/goals/${state.goal}"] [data-estimate-list]`).innerText()).includes(dateAfter(167)),'列表日期使用已保存资金与结余');
   await shot(ui,'desktop-list');await ui.goto(`/goals/${state.goal}/retirement?ccy=USD`);await eta(ui,dateAfter(167));
+  await ui.assert((await ui.page.locator('.retire-currencies [aria-current=true]').innerText()).trim()==='USD','确实显示美元,没有回退本位币');
+  await ui.assert((await ui.page.locator('[data-estimate-contribution]').innerText()).includes('3,750.00'),'美元月结余按汇率换算');
   await ui.assert((await ui.page.locator('[data-retire-value=coverage]').innerText()).includes('50'),'币种切换不改变完成度');
+  await ui.goto(`/goals/${state.goal}/retirement?ccy=HKD`);await eta(ui,dateAfter(167));
+  await ui.assert((await ui.page.locator('.retire-currencies [aria-current=true]').innerText()).trim()==='HKD','确实显示港元');
+  await ui.assert((await ui.page.locator('[data-estimate-contribution]').innerText()).includes('33,000.00'),'港元月结余按汇率换算');
   await ui.click('[data-estimate-edit]','回到估算设置');await ui.page.fill('[name=estimateWishMonth]','');await ui.page.fill('[name=estimateMonthlyAmount]','0');await save(ui);await eta(ui,'暂无达成月份');
   await ui.assert(db.num(`SELECT forecast_wish_override FROM family_goal WHERE id=${state.goal}`)===1&&db.one(`SELECT forecast_wish_month FROM family_goal WHERE id=${state.goal}`)==='NULL','明确不设希望月份与继承分开');
   await ui.page.fill('[name=estimateMonthlyAmount]','-5000');await save(ui);await eta(ui,'暂无达成月份');
