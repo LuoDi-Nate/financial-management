@@ -38,6 +38,9 @@ public interface GoalMapper {
             """)
     List<Goal> findActiveByFamily(@Param("familyId") long familyId);
 
+    @Select("SELECT " + COLUMNS + " FROM family_goal WHERE family_id=#{familyId} ORDER BY id")
+    List<Goal> findAllByFamily(@Param("familyId") long familyId);
+
     @Select("SELECT " + COLUMNS + """
               FROM family_goal
              WHERE family_id = #{familyId}

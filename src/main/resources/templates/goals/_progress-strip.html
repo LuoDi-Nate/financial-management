@@ -56,6 +56,8 @@
               <span th:if="${gp.isCustom() and gp.daysLeft != null}" th:text="'还剩 ' + ${gp.daysLeft} + ' 天'">还剩 145 天</span>
               <span th:if="${gp.isCustom() and gp.daysLeft == null}">长期</span>
             </div>
+            <p th:if="${goalsHistoricalReport != true and gp.forecast!=null and gp.forecast.supported()}" class="text-xs text-ink-soft mt-1" data-estimate-dashboard
+               th:text="${'按结余 · '+gp.forecast.dateLabel()}"></p>
           </div>
         </a>
         <!-- AI洞察 · 所有目标(含自定义)· 手机隐藏,桌面显 -->

@@ -219,6 +219,7 @@ v1.39 退休计划是独立 `retirement_plan` 中的确定性假设,不是账户
 
 | # | 触发 | 必须同步 | 守护 |
 |---|---|---|---|
+| L39 · 目标多指标(v1.40) | 新增目标观察指标、月结余来源或估算偏好 | 主达成条件不变,观察指标各有状态/单位/来源。结余时间=ceil(max(F−A,0)/C),不重复扣D/B、不计复利;已达成优先于缺C,零/负/缺失分开。自动C只取6个已结束自然月中的有效已定稿家庭净结余,不按目标账户筛选,请求内共享。独立family_goal列保存偏好,主编辑不覆盖;手填带币种。列表/详情/仪表盘同源,报表既有当前计划条不加今日ETA,旧投资情景及旧退休采用不改 | GoalCashflowCalculatorTest · MonthlyContributionServiceTest · GoalForecastServiceTest · `qa-run.sh --static-v140` · e2e 61 |
 | L38 · 配置表单交互(2026-11-06/09) | 新增/修改选择器、配置校验或退休保存 | 选择器用自研data-lsel,动态字段同样增强;前端字段旁先校验并定位首错,服务端仍校验。退休配置完整只看规则及条件字段,AUTO选择不以来源可用性为前提。当前A/D直接汇总已有账面金额,空账户不得把合计变成“—”或阻止进度;单账户未知保留null,不写零快照,数据覆盖默认折叠提示。未关账正常沿用已有余额;来源不足只影响真正依赖它的指标。城市分项独立预览,养老日常在X,额外部分称大额支出准备金 | RetirementPlanServiceTest · RetirementCalculatorTest · RetirementDataServiceTest · `qa-run.sh --static-v139` · e2e 58 |
 | L34 · 退休计划(v1.39) | 改退休金额/来源/计划版本/预测 | 消费者只读GoalProgress.retirement及统一有效副本;R2进度=所选账户当前合计A/总需求F(T+B+D),1000万需求/500万资产=50%,B/D各计一次。时间仅可选预测。动态预算锚已定稿同窗,手填独立保留。FAMILY_FINANCIAL跟随新增账户,CUSTOM空选不回退。真实历史收益须12完整间隔/13快照,不足按维护者11-09决定用小Lin2.5%实际回报规划并明示来源;真实0/负回报不可回落,不重复扣通胀、不改原AUTO参数。CPI采用10核验年度。R2无J,旧版显式升级完整留存,不写流水。effective与来源入指纹,比率/达成月跨币种不变 | RetirementCalculatorTest · RetirementDataServiceTest · RetirementRateSourcesTest · RetirementPlanServiceTest · `qa-run.sh --static-v139` · e2e 58 |
 | L35 · AI 出口(v1.39) | 新增文本或本地 Agent 调用/改超时与状态 | 分类走 LlmRouter,工具流用同一候选及平台冷却;已有可见产出不重放。超时逐请求读配置;失败原因是请求局部安全文案,不透传异常正文。设置页只读模板缓存,显式检查才查远端,缓存按配置指纹隔离 | LlmAvailabilityV139Test · LocalToolLoopRoutingTest · ManagedTemplateStatusTest · `qa-run.sh --static-v139` |

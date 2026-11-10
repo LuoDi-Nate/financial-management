@@ -4,6 +4,7 @@ import com.family.finance.domain.goal.Goal;
 import com.family.finance.domain.goal.GoalComparator;
 import com.family.finance.domain.goal.GoalMetric;
 import com.family.finance.domain.goal.GoalParams;
+import com.family.finance.domain.goal.GoalForecastForm;
 import com.family.finance.domain.goal.GoalType;
 import com.family.finance.domain.goal.TimeMode;
 import com.family.finance.repository.GoalAccountMapper;
@@ -48,6 +49,8 @@ public class GoalService {
     private final com.family.finance.service.expense.ExpenseLedgerService expenseLedger; // v0.16 · 自定义目标绑定账户
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.family.finance.repository.RetirementPlanMapper retirementPlanMapper;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private GoalForecastService forecasts;
 
     // ---------- v0.5 FR-82 · FIRE 月支出自动派生 ----------
 
@@ -145,6 +148,12 @@ public class GoalService {
 
     @Transactional
     public Goal create(long familyId, GoalType type, String name, GoalParams params) {
+        return create(familyId,type,name,params,null);
+    }
+
+    @Transactional
+    public Goal create(long familyId, GoalType type, String name, GoalParams params, GoalForecastForm estimate) {
+        validateForecast(estimate);
         validateParams(type, params);
         String paramsJson = serialize(params);
         BigDecimal targetValue;
@@ -180,6 +189,7 @@ public class GoalService {
             .paramsJson(paramsJson)
             .build();
         goalMapper.insert(goal);
+        if(estimate!=null && estimate.getEstimateSource()!=null)forecasts.save(familyId,goal.getId(),estimate);
         return goal;
     }
 
@@ -231,6 +241,14 @@ public class GoalService {
     @Transactional
     public Goal createCustom(long familyId, String name, String description, GoalMetric metric, GoalComparator cmp,
                              BigDecimal targetValue, TimeMode timeMode, LocalDate targetDate, List<Long> accountIds) {
+        return createCustom(familyId,name,description,metric,cmp,targetValue,timeMode,targetDate,accountIds,null);
+    }
+
+    @Transactional
+    public Goal createCustom(long familyId, String name, String description, GoalMetric metric, GoalComparator cmp,
+                             BigDecimal targetValue, TimeMode timeMode, LocalDate targetDate, List<Long> accountIds,
+                             GoalForecastForm estimate) {
+        validateForecast(estimate);
         Goal goal = Goal.builder()
             .familyId(familyId)
             .goalType(GoalType.CUSTOM)
@@ -245,7 +263,16 @@ public class GoalService {
             .build();
         goalMapper.insert(goal);
         rebindAccounts(familyId, goal.getId(), accountIds);
+        if(estimate!=null && estimate.getEstimateSource()!=null) {
+            if(!GoalForecastService.supports(goal,null))throw new IllegalArgumentException("此目标不支持按结余估算时间");
+            forecasts.save(familyId,goal.getId(),estimate);
+        }
         return goal;
+    }
+
+    private void validateForecast(GoalForecastForm estimate) {
+        if(estimate!=null && estimate.getEstimateSource()!=null && !estimate.errors().isEmpty())
+            throw new IllegalArgumentException(estimate.errors().values().iterator().next());
     }
 
     @Transactional

@@ -26,6 +26,7 @@ public class GoalForecastService {
         public String dateLabel() { return result == null ? "" : result.dateLabel(); }
         public String durationLabel() { return result == null ? "" : result.durationLabel(); }
         public String reason() { return result == null ? "" : result.reason(); }
+        public String amount(BigDecimal value) { return value==null?"—":com.family.finance.service.MoneyFormat.format2(currency,value); }
     }
     public class Context {
         private final long familyId; private final LocalDate asOf;

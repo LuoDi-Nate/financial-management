@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org"><body>
+<section th:fragment="result(f)" id="goal-estimate-result" data-goal-estimate-result class="goal-estimate-result"
+         th:if="${f != null and f.supported()}">
+  <p data-estimate-overview-draft hidden class="goal-estimate-draft">当前时间试算尚未保存</p>
+  <div class="goal-estimate-band">
+    <div><span class="goal-estimate-label">按当前结余预计达成</span><strong data-estimate-date th:attr="data-estimate-state=${f.result().state()}" th:text="${f.dateLabel()}"></strong></div>
+    <div><span class="goal-estimate-label">从现在起还需</span><strong data-estimate-duration th:text="${f.durationLabel()}"></strong></div>
+    <div><span class="goal-estimate-label">本目标月可用结余</span><b data-priv data-estimate-contribution th:text="${money != null ? money.amount(f.result().contribution()) : f.amount(f.result().contribution())}"></b>
+      <a href="#goal-estimate-settings" class="btn-ghost text-xs" data-estimate-edit>调整时间估算</a></div>
+  </div>
+  <p class="goal-estimate-caption" th:text="${f.reason()}"></p>
+  <p class="goal-estimate-caption" th:text="${f.result().comparisonLabel()}"></p>
+  <p class="goal-estimate-caption" th:text="${f.source()=='AUTO' ? '假设家庭结余全部用于本目标,未分配给其它目标。' : '仅按本目标的手填月可用结余估算。'}"></p>
+  <details class="goal-estimate-reference">
+    <summary>结余来源与估算依据</summary>
+    <p class="goal-estimate-caption"><span th:text="${f.sourceLabel()}"></span> · 观察日 <span th:text="${f.result().asOf()}"></span></p>
+    <p class="goal-estimate-caption">目标金额与月结余按当前水平不变估算,不额外计算未来投资收益、加薪或物价变化。</p>
+    <th:block th:if="${f.window()!=null}">
+      <p class="goal-estimate-caption" th:text="${f.window().note()+' · '+f.window().from()+' 至 '+f.window().to()}"></p>
+      <table class="w-full m-cards text-sm"><thead><tr><th>月份</th><th>家庭收入</th><th>家庭支出</th><th>月结余</th><th>采用情况</th></tr></thead>
+        <tbody><tr th:each="m : ${f.window().months()}">
+          <td class="m-title" th:text="${#temporals.format(m.start(),'yyyy-MM')}"></td>
+          <td data-label="家庭收入" data-priv th:text="${money!=null?money.amount(m.income()):f.amount(m.income())}"></td>
+          <td data-label="家庭支出" data-priv th:text="${money!=null?money.amount(m.expense()):f.amount(m.expense())}"></td>
+          <td data-label="月结余" data-priv th:text="${money!=null?money.amount(m.saving()):f.amount(m.saving())}"></td>
+          <td data-label="采用情况" th:text="${m.reason()}"></td>
+        </tr></tbody></table>
+    </th:block>
+    <p class="goal-estimate-caption" th:if="${f.source()=='AUTO' and f.window()==null}" th:text="${f.result().state().name()=='ACHIEVED'?'资金已达成,无需结余数据。':'自动结余暂无可用来源,可手填估算。'}"></p>
+  </details>
+</section>
+
+<section th:fragment="editor(f,goalId)" id="goal-estimate-settings" data-goal-estimate-editor class="goal-estimate-settings"
+         th:if="${f != null and f.supported()}" th:attr="data-goal-id=${goalId}">
+  <link rel="stylesheet" th:href="@{/css/goal-estimate.css(v=${buildVersion})}">
+  <h2 class="font-display text-xl mb-2">调整时间估算</h2>
+  <p class="goal-estimate-caption">设置本目标每月可用的结余,资金完成度和原有投资情景保持各自口径。</p>
+  <form th:if="${goalId != null}" id="goal-estimate-form" th:action="@{|/goals/${goalId}/estimate|}" method="post">
+    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+  </form>
+  <fieldset class="mt-5"><legend class="field-label">月可用结余来源</legend>
+    <label class="goal-estimate-radio"><input type="radio" name="estimateSource" value="AUTO" th:checked="${f.form().estimateSource=='AUTO'}" th:attr="form=${goalId==null?'retirement-form':'goal-estimate-form'}"><span>跟随家庭月结余<small>近6个已结束月,取有效净结余的中位数</small></span></label>
+    <label class="goal-estimate-radio"><input type="radio" name="estimateSource" value="MANUAL" th:checked="${f.form().estimateSource=='MANUAL'}" th:attr="form=${goalId==null?'retirement-form':'goal-estimate-form'}"><span>自己填写本目标月可用结余<small>可只将部分家庭结余用于这个目标</small></span></label>
+  </fieldset>
+  <div data-estimate-manual th:hidden="${f.form().estimateSource!='MANUAL'}" class="mt-4">
+    <label class="field-label" for="estimate-monthly">每月可用结余 / <span th:text="${f.currency()}"></span></label>
+    <input id="estimate-monthly" name="estimateMonthlyAmount" type="number" step="0.01" min="-1000000000" max="1000000000" inputmode="decimal" class="field-input field-input-num" th:value="${f.form().estimateMonthlyAmount}" th:attr="form=${goalId==null?'retirement-form':'goal-estimate-form'}">
+    <p class="goal-estimate-field-error" data-estimate-error="estimateMonthlyAmount" th:text="${f.errors().get('estimateMonthlyAmount')}"></p>
+    <p class="goal-estimate-caption">0表示没有新增结余,负数表示每月净流出。</p>
+  </div>
+  <div class="mt-4"><label for="estimate-wish" class="field-label">时间估算希望月份 <span class="text-ink-subtle">(可选)</span></label>
+    <input id="estimate-wish" name="estimateWishMonth" type="text" placeholder="YYYY-MM" class="field-input" th:value="${f.form().estimateWishMonth}" th:attr="form=${goalId==null?'retirement-form':'goal-estimate-form'}">
+    <p class="goal-estimate-field-error" data-estimate-error="estimateWishMonth" th:text="${f.errors().get('estimateWishMonth')}"></p>
+  </div>
+  <p class="goal-estimate-draft" data-estimate-draft hidden>时间估算有未保存的调整</p>
+  <div class="goal-estimate-actions" th:if="${goalId!=null}">
+    <button type="submit" form="goal-estimate-form" class="btn-ink" data-estimate-save><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>保存时间估算</button>
+    <button type="button" class="btn-paper" data-estimate-reset><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 11a9 9 0 1 1 2 7M3 4v7h7"/></svg>还原已保存</button>
+  </div>
+  <p th:if="${goalId==null}" class="goal-estimate-caption">月结余设置随新目标一起保存。</p>
+  <p role="status" data-estimate-status class="goal-estimate-caption"></p>
+  <script th:src="@{/js/goal-estimate.js(v=${buildVersion})}"></script>
+</section>
+
+<section th:fragment="math(f)" class="goal-estimate-math" th:if="${f != null and f.supported()}">
+  <h3 class="font-display text-xl mt-5 mb-3">按结余多久达成</h3>
+  <p>月数 = 当前资金缺口 ÷ 本目标月可用结余,向上取整。</p>
+  <p data-priv th:text="${'本次缺口 '+(money!=null?money.amount(f.result().gap()):f.amount(f.result().gap()))+' · 月结余 '+(money!=null?money.amount(f.result().contribution()):f.amount(f.result().contribution()))}"></p>
+  <p th:text="${f.dateLabel()+' · 还需'+f.durationLabel()}"></p>
+  <p class="goal-estimate-caption">从本次观察月向后计整月,预计月末补齐当前资金缺口;准备金和负债不再重复扣除。原有投资情景单独计算。</p>
+</section>
+</body></html>

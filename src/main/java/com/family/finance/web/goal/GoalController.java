@@ -5,6 +5,8 @@ import com.family.finance.domain.goal.Goal;
 import com.family.finance.domain.goal.GoalComparator;
 import com.family.finance.domain.goal.GoalMetric;
 import com.family.finance.domain.goal.GoalParams;
+import com.family.finance.domain.goal.GoalForecastForm;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import com.family.finance.domain.goal.GoalType;
 import com.family.finance.domain.goal.TimeMode;
 import com.family.finance.domain.member.Member;
@@ -131,7 +133,8 @@ public class GoalController {
                              @RequestParam(required = false) BigDecimal fixedBaseline,
                              @RequestParam(required = false) String expenseMode,
                              @RequestParam(required = false) Integer expenseWindowMonths,
-                             @RequestParam(required = false) String expenseSmoothing) {
+                             @RequestParam(required = false) String expenseSmoothing,
+                             @ModelAttribute("estimate") GoalForecastForm estimate) {
         GoalType goalType = parseType(type);
         GoalParams params = GoalParams.builder()
             .currentAge(currentAge)
@@ -150,7 +153,7 @@ public class GoalController {
             .expenseWindowMonths(expenseWindowMonths)
             .expenseSmoothing(expenseSmoothing)
             .build();
-        Goal created = goalService.create(me.getFamilyId(), goalType, name, params);
+        Goal created = goalService.create(me.getFamilyId(), goalType, name, params,estimate);
         // v0.5 FR-82 · AUTO 模式立即派生一次(不必等周期关闭 · 用户建完即见)
         if ("AUTO_MONTHLY".equalsIgnoreCase(expenseMode)) {
             goalService.recomputeAutoExpenseGoals(me.getFamilyId());
@@ -178,11 +181,12 @@ public class GoalController {
                                @RequestParam(required = false) BigDecimal targetValue,
                                @RequestParam(required = false, defaultValue = "OPEN") String timeRange,
                                @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate customDate,
-                               @RequestParam(required = false) List<Long> accountIds) {
+                               @RequestParam(required = false) List<Long> accountIds,
+                               @ModelAttribute("estimate") GoalForecastForm estimate) {
         GoalMetric m = GoalMetric.fromOrDefault(metric);
         GoalComparator c = (comparator == null || comparator.isBlank()) ? m.defaultComparator() : GoalComparator.fromOrDefault(comparator);
         Goal g = goalService.createCustom(me.getFamilyId(), name, description, m, c, targetValue,
-            timeModeFor(timeRange), deadlineFor(timeRange, customDate), accountIds);
+            timeModeFor(timeRange), deadlineFor(timeRange, customDate), accountIds,estimate);
         return "redirect:/goals/" + g.getId();
     }
 

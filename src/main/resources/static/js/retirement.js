@@ -128,6 +128,7 @@
     status.textContent = '正在更新演算…';
     try {
       const body = new FormData(form); body.set('ccy', chartData.currency);
+      if(window.goalEstimateData)for(const [name,value]of Object.entries(window.goalEstimateData()))body.set(name,value);
       const response = await fetch(form.action + '/preview', {method:'POST',body,signal:request.signal,headers:{'X-Retirement-Preview':'true'}});
       if (!response.ok) throw new Error('preview');
       const page = new DOMParser().parseFromString(await response.text(), 'text/html');
@@ -143,6 +144,7 @@
         el.querySelectorAll('details').forEach((d,i) => { if (open[i] !== undefined) d.open = open[i]; });
       });
       chartData = data; if (root.dataset.tab === 'overview') draw();
+      document.dispatchEvent(new CustomEvent('goal-estimate-rendered'));
       status.textContent = '演算已更新,尚未保存。';
       draftStatus.hidden = false; draftStatus.textContent = '这是尚未保存的测算。';
     } catch (error) {

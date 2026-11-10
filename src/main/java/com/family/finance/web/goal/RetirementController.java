@@ -30,6 +30,7 @@ public class RetirementController {
     private final GoalAiReportMapper reports;
     private final NavService nav;
     private final com.family.finance.service.llmtrace.PromptPeekLinks promptPeek;
+    private final GoalForecastService forecasts;
 
     @InitBinder("plan")
     void bind(WebDataBinder binder) {
@@ -59,6 +60,7 @@ public class RetirementController {
     @PostMapping({"/goals/retirement/new/preview", "/goals/{id:[0-9]+}/retirement/preview"})
     String preview(@AuthenticationPrincipal MemberPrincipal me, @PathVariable(required = false) Long id,
                    @ModelAttribute("plan") RetirementPlan plan, org.springframework.validation.BindingResult binding,
+                   @ModelAttribute("estimate") GoalForecastForm estimate,
                    @RequestParam(required = false) String ccy, Model model) {
         Goal goal = id == null ? null : retirementGoal(me, id);
         trustedBasis(me, goal, plan);
@@ -67,23 +69,27 @@ public class RetirementController {
             return page(me, goal, plans.draft(me.getFamilyId(), goal), "plan", ccy, model);
         }
         model.addAttribute("previewing", true);
+        if (estimate.getEstimateSource()!=null) model.addAttribute("estimateDraft",estimate);
         return page(me, goal, plan, "overview", ccy, model);
     }
 
     @PostMapping({"/goals/retirement/new", "/goals/{id:[0-9]+}/retirement"})
     String save(@AuthenticationPrincipal MemberPrincipal me, @PathVariable(required = false) Long id,
                 @ModelAttribute("plan") RetirementPlan plan, org.springframework.validation.BindingResult binding,
+                @ModelAttribute("estimate") GoalForecastForm estimate,
                 @RequestParam(defaultValue = "false") boolean adoptionConfirmed,
                 @RequestParam(defaultValue = "false") boolean revisionConfirmed, Model model, RedirectAttributes ra) {
         Goal goal = id == null ? null : retirementGoal(me, id);
         trustedBasis(me, goal, plan);
         try {
             if (binding.hasErrors()) throw new IllegalArgumentException("金额或选择格式无效,请检查后重试");
-            Goal saved = plans.save(me.getFamilyId(), id, plan, adoptionConfirmed, revisionConfirmed, me.getMemberId());
+            Goal saved = plans.save(me.getFamilyId(), id, plan, adoptionConfirmed, revisionConfirmed, me.getMemberId(),
+                    estimate.getEstimateSource()==null?null:estimate);
             ra.addFlashAttribute("note", "退休计划已保存,未修改账户、流水或旧算法参数。");
             return "redirect:/goals/" + saved.getId() + "/retirement";
         } catch (IllegalArgumentException e) {
             model.addAttribute("error", e.getMessage());
+            if(estimate.getEstimateSource()!=null)model.addAttribute("estimateDraft",estimate);
             return page(me, goal, plan, "plan", plan.getBaseCurrency(), model);
         }
     }
@@ -156,6 +162,9 @@ public class RetirementController {
         model.addAttribute("nativePlan", active.map(RetirementPlanService.View::createdForPlan).orElse(goal == null));
         model.addAttribute("nav", nav.load(me)); model.addAttribute("goal", goal); model.addAttribute("plan", p);
         model.addAttribute("view", view); model.addAttribute("r", view.result()); model.addAttribute("tab", tab);
+        Goal estimateGoal=goal==null?Goal.builder().familyId(familyId).goalType(GoalType.RETIREMENT).build():goal;
+        model.addAttribute("forecast",forecasts.evaluate(estimateGoal,view.progressAssets(),view.progressTarget(),view.result().coverage(),
+                view,(GoalForecastForm)model.getAttribute("estimateDraft"),forecasts.context(familyId,LocalDate.now())));
         model.addAttribute("previewing", Boolean.TRUE.equals(model.getAttribute("previewing")));
         if (goal != null && active.isEmpty()) model.addAttribute("legacy", progress.compute(familyId, goal));
         String requested = ccy == null ? p.getBaseCurrency() : ccy.toUpperCase(java.util.Locale.ROOT);
@@ -178,6 +187,11 @@ public class RetirementController {
             model.addAttribute("budgetChanged", p.getBudgetFingerprint() != null && !p.getBudgetFingerprint().equals(snapshot.data().budgetFingerprint()));
         }
         return "goals/retirement";
+    }
+
+    @InitBinder("estimate")
+    void bindEstimate(WebDataBinder binder) {
+        binder.setAllowedFields("estimateSource","estimateMonthlyAmount","estimateWishMonth");
     }
 
     public record Money(String currency, BigDecimal factor) {

@@ -55,6 +55,8 @@ public class CsvExportService {
     private final com.family.finance.repository.FixedFlowMapper fixedFlowMapper;
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.family.finance.repository.RetirementPlanMapper retirementPlanMapper;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.family.finance.repository.GoalMapper goalMapper;
 
     public void writeZip(long familyId, OutputStream out) throws IOException {
         try (ZipOutputStream zip = new ZipOutputStream(out)) {
@@ -210,7 +212,7 @@ public class CsvExportService {
                 writer.write("家庭账房 v0.1 数据导出\n");
                 writer.write("导出时间: " + STAMP.format(LocalDateTime.now()) + "\n");
                 writer.write("家庭: " + family.getName() + " (id=" + family.getId() + ")\n\n");
-                writer.write("12 张 CSV 表格使用 UTF-8 编码,带 BOM,Excel 可直接打开。\n");
+                writer.write("CSV 表格使用 UTF-8 编码,带 BOM,Excel 可直接打开。\n");
                 writer.write("文件清单:\n");
                 writer.write("  families.csv     家庭基础信息\n");
                 writer.write("  members.csv      成员(不含密码哈希)\n");
@@ -224,8 +226,15 @@ public class CsvExportService {
                 writer.write("  fixed_flows.csv            固定收支的设置(含停用的)\n");
                 writer.write("  fixed_flow_occurrences.csv 固定收支每期的结果(确认 / 这期没有 / 关联)· 钱在 cash_flows / transfers / snapshots 里\n");
                 writer.write("  retirement_plans.csv       退休计划:币种、购买力基准日、全部输入与启用状态\n");
+                writer.write("  goal_forecasts.csv         目标时间估算偏好:来源、手填月结余及币种、希望月份(含归档目标)\n");
                 // v1.33 PRD §8 · 回收站不进导出包(删掉的账户在各表里本来就没有了),写明
                 writer.write("\n删除到「回收站」的账户不在这份导出里;要导出它,先在 管理 → 回收站 里恢复。\n");
+            });
+            writeEntry(zip,"goal_forecasts.csv",writer->{
+                line(writer,"goal_id","family_id","name","source","manual_amount","manual_currency","wish_month","wish_override","archived_at");
+                if(goalMapper!=null)for(var g:goalMapper.findAllByFamily(familyId))line(writer,s(g.getId()),s(g.getFamilyId()),e(g.getName()),
+                        e(g.getForecastSource()),s(g.getForecastManualAmount()),e(g.getForecastManualCurrency()),e(g.getForecastWishMonth()),
+                        s(g.getForecastWishOverride()),ts(g.getArchivedAt()));
             });
         }
     }
