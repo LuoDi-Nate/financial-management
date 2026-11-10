@@ -27,7 +27,7 @@
           <td data-label="采用情况" th:text="${m.reason()}"></td>
         </tr></tbody></table>
     </th:block>
-    <p class="goal-estimate-caption" th:if="${f.source()=='AUTO' and f.window()==null}" th:text="${f.result().state().name()=='ACHIEVED'?'资金已达成,无需结余数据。':'自动结余暂无可用来源,可手填估算。'}"></p>
+    <p class="goal-estimate-caption" th:if="${f.source()=='AUTO' and f.window()==null}" th:text="${f.result().state().name()=='ACHIEVED'?'资金已达成,无需结余数据。':f.reason()}"></p>
   </details>
 </section>
 

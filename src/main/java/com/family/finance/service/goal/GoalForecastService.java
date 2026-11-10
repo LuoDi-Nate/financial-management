@@ -79,6 +79,8 @@ public class GoalForecastService {
             }
         }
         String currency=context.currency(), source=form.getEstimateSource();
+        if(draft==null && "AUTO".equals(source) && goal.getForecastManualCurrency()!=null && !currency.equals(goal.getForecastManualCurrency()))
+            form.setEstimateMonthlyAmount("");
         String label="MANUAL".equals(source)?"本目标手填月可用结余":"家庭近6个已结束月净结余中位数";
         if(draft==null && goal.getForecastSource()==null && retirement!=null && "MANUAL".equals(source))
             label="沿用原退休计划的手填月投入";
@@ -88,18 +90,19 @@ public class GoalForecastService {
             contribution=form.amount();
             String manualCurrency=goal.getForecastSource()==null && retirement!=null?retirement.plan().getBaseCurrency():goal.getForecastManualCurrency();
             currencyMismatch=draft==null && manualCurrency!=null && !currency.equals(manualCurrency);
-            if(currencyMismatch) contribution=null;
+            if(currencyMismatch) { contribution=null; form.setEstimateMonthlyAmount(""); }
         }
         var basis=GoalCashflowCalculator.calculate(context.asOf,assets,target,contribution,wish);
-        if(errors.isEmpty() && "AUTO".equals(source) && basis.state()!=GoalCashflowCalculator.State.ACHIEVED) {
+        if(errors.isEmpty() && "AUTO".equals(source) && basis.gap()!=null && basis.gap().signum()>0) {
             window=context.window(); contribution=window==null?null:window.median();
             basis=GoalCashflowCalculator.calculate(context.asOf,assets,target,contribution,wish);
         }
         if(currencyMismatch) basis=GoalCashflowCalculator.unavailable(basis,"手填结余的币种已改变,请按当前本位币重新核对");
         if(!errors.isEmpty()) basis=GoalCashflowCalculator.unavailable(basis,"请修正时间估算的输入");
-        if(context.failed && "AUTO".equals(source)) basis=GoalCashflowCalculator.unavailable(basis,"月结余来源暂不可用,资金进度仍有效");
+        if(context.failed && "AUTO".equals(source) && basis.gap()!=null && basis.gap().signum()>0) basis=GoalCashflowCalculator.unavailable(basis,"月结余来源暂不可用,资金进度仍有效");
+        BigDecimal fundingProgress=assets==null || target==null?null:progress;
         var indicators=List.of(
-            new GoalIndicator(GoalIndicator.Kind.FUNDING_PROGRESS,"资金完成度",new GoalIndicator.Ratio(progress),progress==null?"MISSING":"AVAILABLE","原目标口径"),
+            new GoalIndicator(GoalIndicator.Kind.FUNDING_PROGRESS,"资金完成度",new GoalIndicator.Ratio(fundingProgress),fundingProgress==null?"MISSING":"AVAILABLE","原目标口径"),
             new GoalIndicator(GoalIndicator.Kind.FUNDING_GAP,"资金缺口",new GoalIndicator.Amount(basis.gap(),currency),basis.gap()==null?"MISSING":"AVAILABLE","原目标资金"),
             new GoalIndicator(GoalIndicator.Kind.CASHFLOW_DATE,"按当前结余预计达成",new GoalIndicator.DateAndMonths(basis.date(),basis.months()),basis.state().name(),label),
             new GoalIndicator(GoalIndicator.Kind.DEADLINE_DELTA,"希望月份对照",new GoalIndicator.MonthDifference(basis.monthDelta()),basis.monthDelta()==null?"MISSING":"AVAILABLE","时间估算希望月份"));

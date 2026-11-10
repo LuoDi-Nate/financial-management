@@ -44,7 +44,7 @@ class GoalForecastServiceTest {
     @Test void achievedDoesNotLoadSavings(){var r=service.evaluate(goal(),BigDecimal.TEN,BigDecimal.ONE,BigDecimal.TEN,null,null,service.context(1,today));assertEquals(GoalCashflowCalculator.State.ACHIEVED,r.result().state());verifyNoInteractions(contributions);}
     @Test void storedManualCurrencyCannotBeReinterpreted(){
         var g=goal();g.setForecastSource("MANUAL");g.setForecastManualAmount(new BigDecimal("40000"));g.setForecastManualCurrency("USD");
-        var r=evaluate(g,service.context(1,today));assertTrue(r.reason().contains("币种"));assertNull(r.result().date());assertEquals("AVAILABLE",r.indicators().getFirst().state());verifyNoInteractions(contributions);
+        var r=evaluate(g,service.context(1,today));assertTrue(r.reason().contains("币种"));assertNull(r.result().date());assertEquals("",r.form().getEstimateMonthlyAmount());assertEquals("AVAILABLE",r.indicators().getFirst().state());verifyNoInteractions(contributions);
     }
     @Test void zeroAndNegativeManualStayManual(){for(String c:List.of("0","-100")){var g=goal();g.setForecastSource("MANUAL");g.setForecastManualAmount(new BigDecimal(c));g.setForecastManualCurrency("CNY");assertEquals(GoalCashflowCalculator.State.NO_GROWTH,evaluate(g,service.context(1,today)).result().state());}verifyNoInteractions(contributions);}
     @Test void autoSaveDoesNotSubmitHiddenManualAmountOrCurrency(){
@@ -70,5 +70,16 @@ class GoalForecastServiceTest {
         var view=mock(RetirementPlanService.View.class);when(view.plan()).thenReturn(plan);
         var result=service.evaluate(g,new BigDecimal("5000000"),new BigDecimal("10000000"),new BigDecimal("0.5"),view,null,service.context(1,today));
         assertEquals(100,result.result().months());assertTrue(result.sourceLabel().contains("原退休计划"));verifyNoInteractions(contributions);
+    }
+    @Test void missingTargetNeverBecomesZeroProgressOrQueriesUnrelatedSavings(){
+        var result=service.evaluate(goal(),BigDecimal.TEN,null,BigDecimal.ZERO,null,null,service.context(1,today));
+        assertEquals("MISSING",result.indicators().getFirst().state());
+        assertNull(((GoalIndicator.Ratio)result.indicators().getFirst().value()).fraction());
+        assertEquals(GoalCashflowCalculator.State.NEEDS_DATA,result.result().state());verifyNoInteractions(contributions);
+    }
+    @Test void hiddenManualAmountInAnotherCurrencyMustBeReenteredBeforeChoosingManual(){
+        var g=goal();g.setForecastSource("AUTO");g.setForecastManualAmount(BigDecimal.TEN);g.setForecastManualCurrency("USD");
+        var result=evaluate(g,service.context(1,today));assertEquals("",result.form().getEstimateMonthlyAmount());
+        assertEquals(BigDecimal.TEN,g.getForecastManualAmount());assertEquals("USD",g.getForecastManualCurrency());
     }
 }
