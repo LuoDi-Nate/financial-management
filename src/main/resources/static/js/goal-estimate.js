@@ -7,7 +7,7 @@
   const ownForm=document.getElementById('goal-estimate-form');
   const inputs=[...editor.querySelectorAll('[name^=estimate]')];
   const field=name=>inputs.find(el=>el.name===name&&(!['radio','checkbox'].includes(el.type)||el.checked));
-  const values=()=>Object.fromEntries(['estimateSource','estimateMonthlyAmount','estimateWishMonth'].map(name=>[name,field(name)?.value||'']));
+  const values=()=>Object.fromEntries(['estimateSource','estimateMonthlyAmount','estimateWishMonth','estimateWishOverride'].map(name=>[name,field(name)?.value||'']));
   let baseline=values(),timer,request,generation=0;
   const status=editor.querySelector('[data-estimate-status]'),dirty=editor.querySelector('[data-estimate-draft]');
   function paintDraft(){const changed=JSON.stringify(values())!==JSON.stringify(baseline);dirty.hidden=!changed;document.querySelectorAll('[data-estimate-overview-draft]').forEach(el=>el.hidden=!changed);}
@@ -36,7 +36,7 @@
       paintDraft();
     }catch(e){if(e.name!=='AbortError')status.textContent='时间试算暂未更新,请稍后重试。';}
   }
-  inputs.forEach(el=>el.addEventListener('input',()=>{valid();paintDraft();status.textContent='';clearTimeout(timer);timer=setTimeout(preview,450);}));
+  inputs.forEach(el=>el.addEventListener('input',()=>{if(el.name==='estimateWishMonth')field('estimateWishOverride').value='true';valid();paintDraft();status.textContent='';clearTimeout(timer);timer=setTimeout(preview,450);}));
   if(ownForm)ownForm.addEventListener('submit',async event=>{
     event.preventDefault();const errors=valid();if(Object.keys(errors).length){field(Object.keys(errors)[0]).focus();return;}
     clearTimeout(timer);++generation;if(request)request.abort();
@@ -52,6 +52,7 @@
     if(retirement){retirement.querySelector('[data-retire-tab=plan]').click();}requestAnimationFrame(()=>{editor.scrollIntoView({block:'start',behavior:'smooth'});});
   });
   window.goalEstimateData=values;
+  window.goalEstimatePlanChanged=(name,value)=>{if(name==='targetMonth'&&field('estimateWishOverride').value==='false'){field('estimateWishMonth').value=value;baseline.estimateWishMonth=value;paintDraft();}};
   if(mainForm)mainForm.addEventListener('submit',event=>{
     const errors=valid();if(Object.keys(errors).length&&editor.dataset.goalId===''){event.preventDefault();retirement.querySelector('[data-retire-tab=plan]').click();field(Object.keys(errors)[0]).focus();return;}
     mainForm.querySelectorAll('[data-estimate-plan-copy]').forEach(el=>el.remove());

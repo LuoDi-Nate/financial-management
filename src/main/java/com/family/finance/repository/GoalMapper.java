@@ -81,12 +81,13 @@ public interface GoalMapper {
                SET forecast_source = #{source},
                    forecast_manual_amount = CASE WHEN #{source} = 'MANUAL' THEN #{amount} ELSE forecast_manual_amount END,
                    forecast_manual_currency = CASE WHEN #{source} = 'MANUAL' THEN #{currency} ELSE forecast_manual_currency END,
-                   forecast_wish_month = #{wishMonth}, forecast_wish_override = TRUE
+                   forecast_wish_month = #{wishMonth}, forecast_wish_override = #{wishOverride}
              WHERE family_id = #{familyId} AND id = #{goalId} AND archived_at IS NULL
             """)
     int updateForecast(@Param("familyId") long familyId, @Param("goalId") long goalId,
                        @Param("source") String source, @Param("amount") java.math.BigDecimal amount,
-                       @Param("currency") String currency, @Param("wishMonth") String wishMonth);
+                       @Param("currency") String currency, @Param("wishMonth") String wishMonth,
+                       @Param("wishOverride") boolean wishOverride);
 
     @Update("""
             UPDATE family_goal

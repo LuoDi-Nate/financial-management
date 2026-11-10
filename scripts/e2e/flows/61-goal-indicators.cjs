@@ -35,6 +35,7 @@ module.exports={name:'61-goal-indicators',title:'目标多指标、家庭结余�
   await ui.page.check('[name=noOverlapConfirmed]');await ui.click('[data-retire-save]','保存合法退休目标');await ui.page.waitForLoadState('networkidle');
   state.goal=db.num(`SELECT goal_id FROM retirement_plan WHERE family_id=${state.family} AND active=1`);
   await ui.assert(Boolean(state.goal),'新退休计划已保存');
+  await ui.assert(db.num(`SELECT forecast_wish_override FROM family_goal WHERE id=${state.goal}`)===0,'未改估算月份时继承主计划');
   await ui.assert((await ui.page.locator('[data-retire-value=coverage]').innerText()).includes('50'),'主资金仍为500万/1000万=50%');
   await eta(ui,dateAfter(125));await ui.assert((await ui.page.locator('[data-estimate-duration]').innerText()).includes('10年5个月'),'月结余4万还需125个月');
   const original=db.one(`SELECT plan_json FROM retirement_plan WHERE goal_id=${state.goal} AND family_id=${state.family}`);
@@ -45,14 +46,19 @@ module.exports={name:'61-goal-indicators',title:'目标多指标、家庭结余�
   await ui.page.fill('[name=estimateMonthlyAmount]','20000');await save(ui);
   await ui.assert(db.num(`SELECT forecast_manual_amount FROM family_goal WHERE id=${state.goal} AND family_id=${state.family}`)===20000,'独立结余已持久化');
   await ui.assert(db.one(`SELECT plan_json FROM retirement_plan WHERE goal_id=${state.goal}`)===original,'保存估算不重写原退休JSON');
-  await ui.fillByName('monthlyExpense','17000','#retirement-form');await ui.page.waitForTimeout(650);
+  await ui.fillByName('monthlyExpense','17000','#retirement-form');
+  const changedWish=(y+11)+'-'+String(m).padStart(2,'0');await ui.fillByName('targetMonth',changedWish,'#retirement-form');
+  await ui.page.waitForTimeout(650);
+  await ui.assert(await ui.page.inputValue('[name=estimateWishMonth]')===changedWish,'未覆盖的估算希望月份随主草稿更新');
   await ui.page.fill('[name=estimateMonthlyAmount]','30000');await save(ui);
   await ui.assert(await ui.page.inputValue('[name=monthlyExpense]')==='17000','保存估算保留未保存的生活费草稿');
   await ui.assert(db.one(`SELECT plan_json FROM retirement_plan WHERE goal_id=${state.goal}`)===original,'主草稿没有被估算保存偷偷写入');
+  await ui.assert(db.num(`SELECT forecast_wish_override FROM family_goal WHERE id=${state.goal}`)===0,'只保存结余不冻结希望月份');
   await ui.goto('/goals');await ui.assert((await ui.page.locator(`a[href="/goals/${state.goal}"] [data-estimate-list]`).innerText()).includes(dateAfter(167)),'列表日期使用已保存资金与结余');
   await shot(ui,'desktop-list');await ui.goto(`/goals/${state.goal}/retirement?ccy=USD`);await eta(ui,dateAfter(167));
   await ui.assert((await ui.page.locator('[data-retire-value=coverage]').innerText()).includes('50'),'币种切换不改变完成度');
-  await ui.click('[data-estimate-edit]','回到估算设置');await ui.page.fill('[name=estimateMonthlyAmount]','0');await save(ui);await eta(ui,'暂无达成月份');
+  await ui.click('[data-estimate-edit]','回到估算设置');await ui.page.fill('[name=estimateWishMonth]','');await ui.page.fill('[name=estimateMonthlyAmount]','0');await save(ui);await eta(ui,'暂无达成月份');
+  await ui.assert(db.num(`SELECT forecast_wish_override FROM family_goal WHERE id=${state.goal}`)===1&&db.one(`SELECT forecast_wish_month FROM family_goal WHERE id=${state.goal}`)==='NULL','明确不设希望月份与继承分开');
   await ui.page.fill('[name=estimateMonthlyAmount]','-5000');await save(ui);await eta(ui,'暂无达成月份');
   await ui.assert((await ui.page.locator('[data-retire-value=coverage]').innerText()).includes('50'),'零和负结余不清空资金进度');
   db.raw(`DELETE FROM period_member_cashflow WHERE family_id=${state.family}`);
@@ -69,7 +75,7 @@ module.exports={name:'61-goal-indicators',title:'目标多指标、家庭结余�
     for(const tab of ['overview','principle','plan'])await mobile.click(`[data-retire-tab=${tab}]`,'手机切换页签');
     await mobile.assert(await mobile.page.inputValue('[name=estimateMonthlyAmount]')===value,'三页签保留结余输入');await shot(mobile,'mobile-settings');
   });
-  await ui.goto('/goals/new/custom');await ui.page.fill('[name=name]','合成收益率目标');await ui.choose('metric','RETURN_XIRR');await ui.page.fill('[name=targetValue]','7');await ui.page.locator('button[type=submit]').click();await ui.page.waitForLoadState('networkidle');
+  await ui.goto('/goals/new/custom');await ui.page.fill('[name=name]','合成收益率目标');await ui.page.check('[name=metric][value=RETURN_XIRR]');await ui.page.fill('[name=targetValue]','7');await ui.page.locator('button[type=submit]').click();await ui.page.waitForLoadState('networkidle');
   await ui.assert(await ui.page.locator('[data-goal-estimate-result]').count()===0,'收益率目标不伪造结余达成日期');
   await ui.assert(db.num(`SELECT COUNT(*) FROM llm_prompt_record WHERE family_id=${state.family}`)===0,'本流程没有模型准备/调用');
   await login(ui.page,USER);

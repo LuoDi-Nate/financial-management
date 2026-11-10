@@ -62,15 +62,26 @@ public class GoalForecastService {
         f.setEstimateMonthlyAmount(amount==null?"":amount.toPlainString());
         String wish=Boolean.TRUE.equals(goal.getForecastWishOverride())?goal.getForecastWishMonth()
                 :retirement!=null?retirement.plan().getTargetMonth():goal.getTargetDate()==null?null:YearMonth.from(goal.getTargetDate()).toString();
-        f.setEstimateWishMonth(wish==null?"":wish); return f;
+        f.setEstimateWishMonth(wish==null?"":wish);
+        f.setEstimateWishOverride(Boolean.TRUE.equals(goal.getForecastWishOverride())); return f;
     }
     public View evaluate(Goal goal, BigDecimal assets, BigDecimal target, BigDecimal progress,
                          RetirementPlanService.View retirement, GoalForecastForm draft, Context context) {
         if(!supports(goal,retirement)) return new View(false,null,context.currency(),"AUTO","",null,new GoalForecastForm(),Map.of(),List.of());
         GoalForecastForm form=draft==null?form(goal,retirement):draft.copy();
         Map<String,String> errors=form.errors();
+        java.time.YearMonth wish=null;
+        if(errors.isEmpty()) {
+            if(form.wishOverride()) wish=form.wish();
+            else {
+                String inherited=retirement!=null?retirement.plan().getTargetMonth():goal.getTargetDate()==null?null:java.time.YearMonth.from(goal.getTargetDate()).toString();
+                try { wish=inherited==null?null:java.time.YearMonth.parse(inherited); } catch(RuntimeException ignored) { }
+            }
+        }
         String currency=context.currency(), source=form.getEstimateSource();
         String label="MANUAL".equals(source)?"本目标手填月可用结余":"家庭近6个已结束月净结余中位数";
+        if(draft==null && goal.getForecastSource()==null && retirement!=null && "MANUAL".equals(source))
+            label="沿用原退休计划的手填月投入";
         BigDecimal contribution=null; MonthlyContributionService.Window window=null;
         boolean currencyMismatch=false;
         if(errors.isEmpty() && "MANUAL".equals(source)) {
@@ -79,10 +90,10 @@ public class GoalForecastService {
             currencyMismatch=draft==null && manualCurrency!=null && !currency.equals(manualCurrency);
             if(currencyMismatch) contribution=null;
         }
-        var basis=GoalCashflowCalculator.calculate(context.asOf,assets,target,contribution,errors.isEmpty()?form.wish():null);
+        var basis=GoalCashflowCalculator.calculate(context.asOf,assets,target,contribution,wish);
         if(errors.isEmpty() && "AUTO".equals(source) && basis.state()!=GoalCashflowCalculator.State.ACHIEVED) {
             window=context.window(); contribution=window==null?null:window.median();
-            basis=GoalCashflowCalculator.calculate(context.asOf,assets,target,contribution,form.wish());
+            basis=GoalCashflowCalculator.calculate(context.asOf,assets,target,contribution,wish);
         }
         if(currencyMismatch) basis=GoalCashflowCalculator.unavailable(basis,"手填结余的币种已改变,请按当前本位币重新核对");
         if(!errors.isEmpty()) basis=GoalCashflowCalculator.unavailable(basis,"请修正时间估算的输入");
@@ -103,12 +114,13 @@ public class GoalForecastService {
         if(!form.errors().isEmpty()) throw new IllegalArgumentException("时间估算的输入无效");
         var goal=goals.findById(familyId,goalId).filter(g->g.getArchivedAt()==null).orElseThrow(()->new IllegalArgumentException("目标不可用"));
         String currency=families.findById(familyId).orElseThrow().getBaseCurrency();
+        String wishMonth=form.wishOverride() && form.wish()!=null?form.wish().toString():null;
         int count=goals.updateForecast(familyId,goalId,form.getEstimateSource(),"MANUAL".equals(form.getEstimateSource())?form.amount():null,
-                currency,form.getEstimateWishMonth()==null || form.getEstimateWishMonth().isBlank()?null:form.getEstimateWishMonth());
+                currency,wishMonth,form.wishOverride());
         if(count==0) {
             var actual=goals.findById(familyId,goalId).filter(g->g.getArchivedAt()==null).orElseThrow(()->new IllegalArgumentException("目标不可用"));
-            if(!Objects.equals(actual.getForecastSource(),form.getEstimateSource()) || !Boolean.TRUE.equals(actual.getForecastWishOverride())
-                    || !Objects.equals(actual.getForecastWishMonth(),form.wish()==null?null:form.wish().toString())
+            if(!Objects.equals(actual.getForecastSource(),form.getEstimateSource()) || Boolean.TRUE.equals(actual.getForecastWishOverride())!=form.wishOverride()
+                    || !Objects.equals(actual.getForecastWishMonth(),wishMonth)
                     || "MANUAL".equals(form.getEstimateSource()) && (actual.getForecastManualAmount()==null
                     || actual.getForecastManualAmount().compareTo(form.amount())!=0 || !currency.equals(actual.getForecastManualCurrency())))
                 throw new IllegalStateException("时间估算未能保存");

@@ -20,7 +20,7 @@ public class GoalForecastController {
     private final GoalForecastService forecasts;
 
     @InitBinder("estimate")
-    void bind(WebDataBinder binder) { binder.setAllowedFields("estimateSource","estimateMonthlyAmount","estimateWishMonth"); }
+    void bind(WebDataBinder binder) { binder.setAllowedFields("estimateSource","estimateMonthlyAmount","estimateWishMonth","estimateWishOverride"); }
 
     @PostMapping("/goals/{id:[0-9]+}/estimate/preview")
     public Object preview(@AuthenticationPrincipal MemberPrincipal me,@PathVariable long id,

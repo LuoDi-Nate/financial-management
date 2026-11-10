@@ -49,9 +49,26 @@ class GoalForecastServiceTest {
     @Test void zeroAndNegativeManualStayManual(){for(String c:List.of("0","-100")){var g=goal();g.setForecastSource("MANUAL");g.setForecastManualAmount(new BigDecimal(c));g.setForecastManualCurrency("CNY");assertEquals(GoalCashflowCalculator.State.NO_GROWTH,evaluate(g,service.context(1,today)).result().state());}verifyNoInteractions(contributions);}
     @Test void autoSaveDoesNotSubmitHiddenManualAmountOrCurrency(){
         var g=goal();g.setForecastManualAmount(BigDecimal.TEN);g.setForecastManualCurrency("USD");
-        when(goals.findById(1,2)).thenReturn(Optional.of(g));when(goals.updateForecast(anyLong(),anyLong(),anyString(),any(),anyString(),any())).thenReturn(1);
+        when(goals.findById(1,2)).thenReturn(Optional.of(g));when(goals.updateForecast(anyLong(),anyLong(),anyString(),any(),anyString(),any(),anyBoolean())).thenReturn(1);
         var form=new GoalForecastForm();form.setEstimateSource("AUTO");form.setEstimateMonthlyAmount("invalid");service.save(1,2,form);
-        verify(goals).updateForecast(1,2,"AUTO",null,"CNY",null);verifyNoInteractions(contributions);
+        verify(goals).updateForecast(1,2,"AUTO",null,"CNY",null,true);verifyNoInteractions(contributions);
     }
-    @Test void foreignAndArchivedGoalsCannotSave(){var form=new GoalForecastForm();form.setEstimateSource("AUTO");assertThrows(IllegalArgumentException.class,()->service.save(9,2,form));verify(goals,never()).updateForecast(anyLong(),anyLong(),any(),any(),any(),any());}
+    @Test void foreignAndArchivedGoalsCannotSave(){var form=new GoalForecastForm();form.setEstimateSource("AUTO");assertThrows(IllegalArgumentException.class,()->service.save(9,2,form));verify(goals,never()).updateForecast(anyLong(),anyLong(),any(),any(),any(),any(),anyBoolean());}
+    @Test void inheritedWishUsesCurrentPlanAndNotStaleDraftText(){
+        var g=goal();g.setForecastSource("MANUAL");g.setForecastManualAmount(new BigDecimal("40000"));g.setForecastManualCurrency("CNY");g.setTargetDate(LocalDate.of(2032,6,1));
+        var f=service.form(g,null);assertFalse(f.wishOverride());f.setEstimateWishMonth("2036-11");
+        var result=service.evaluate(g,new BigDecimal("5000000"),new BigDecimal("10000000"),new BigDecimal("0.5"),null,f,service.context(1,today));
+        assertEquals(java.time.YearMonth.of(2032,6),result.result().wish());
+    }
+    @Test void explicitNoWishIsDifferentFromInheritance(){
+        var g=goal();g.setForecastSource("MANUAL");g.setForecastManualAmount(new BigDecimal("40000"));g.setForecastManualCurrency("CNY");g.setTargetDate(LocalDate.of(2032,6,1));g.setForecastWishOverride(true);
+        assertNull(evaluate(g,service.context(1,today)).result().wish());
+    }
+    @Test void originalRetirementManualReferenceKeepsItsProvenance(){
+        var g=goal();g.setGoalType(GoalType.RETIREMENT);
+        var plan=new RetirementPlan();plan.setVersion(2);plan.setBaseCurrency("CNY");plan.setContributionSource("MANUAL");plan.setMonthlyContribution(new BigDecimal("50000"));
+        var view=mock(RetirementPlanService.View.class);when(view.plan()).thenReturn(plan);
+        var result=service.evaluate(g,new BigDecimal("5000000"),new BigDecimal("10000000"),new BigDecimal("0.5"),view,null,service.context(1,today));
+        assertEquals(100,result.result().months());assertTrue(result.sourceLabel().contains("原退休计划"));verifyNoInteractions(contributions);
+    }
 }

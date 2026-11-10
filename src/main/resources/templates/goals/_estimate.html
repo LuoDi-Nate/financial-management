@@ -39,6 +39,7 @@
   <form th:if="${goalId != null}" id="goal-estimate-form" th:action="@{|/goals/${goalId}/estimate|}" method="post">
     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
   </form>
+  <input type="hidden" name="estimateWishOverride" th:value="${f.form().wishOverride()}" th:attr="form=${goalId==null?'retirement-form':'goal-estimate-form'}">
   <fieldset class="mt-5"><legend class="field-label">月可用结余来源</legend>
     <label class="goal-estimate-radio"><input type="radio" name="estimateSource" value="AUTO" th:checked="${f.form().estimateSource=='AUTO'}" th:attr="form=${goalId==null?'retirement-form':'goal-estimate-form'}"><span>跟随家庭月结余<small>近6个已结束月,取有效净结余的中位数</small></span></label>
     <label class="goal-estimate-radio"><input type="radio" name="estimateSource" value="MANUAL" th:checked="${f.form().estimateSource=='MANUAL'}" th:attr="form=${goalId==null?'retirement-form':'goal-estimate-form'}"><span>自己填写本目标月可用结余<small>可只将部分家庭结余用于这个目标</small></span></label>

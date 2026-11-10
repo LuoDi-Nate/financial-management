@@ -158,6 +158,7 @@
     if (!event.target.form || event.target.form.id !== form.id) return;
     draftStatus.hidden = false; draftStatus.textContent = '计划调整尚未保存。';
     if (event.target.name === 'dependentCount') children();
+    if(window.goalEstimatePlanChanged)window.goalEstimatePlanChanged(event.target.name,event.target.value);
     if (event.target.name) touched.add(event.target.name);
     modes(); validateConfiguration(false); clearTimeout(timer); timer = setTimeout(recalculate, 450);
   }

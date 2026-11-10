@@ -111,6 +111,13 @@ public class RetirementController {
                 + "\n" + view.result().aiSummary() + "\n回报来源:" + view.returnBasis() + "\n来源月份:" + view.data().months()
                 + "\n动态来源:"+view.data().sources()+"\n本次有效参数:\n"+plans.encode(view.effective())+"\n保存参数:\n" + plans.encode(view.plan())
                 + "\n原节目:https://www.bilibili.com/video/BV1yUHP6rEYD/\n480=12/2.5%;名义模式实际回报=(1+R)/(1+通胀)-1。\n";
+        var forecast=forecasts.evaluate(goal,view.progressAssets(),view.progressTarget(),view.result().coverage(),view,null,
+                forecasts.context(me.getFamilyId(),view.result().asOf()));
+        if(forecast.supported())text += "\n按当前结余预计达成:"+forecast.dateLabel()+" · 还需"+forecast.durationLabel()
+                +"\n月可用结余:"+forecast.amount(forecast.result().contribution())+"\n结余来源:"+forecast.sourceLabel()
+                +"\n观察日:"+forecast.result().asOf()+"\n估算说明:"+forecast.reason()
+                +"\n独立估算设置:"+goal.getForecastSource()+";手填币种="+goal.getForecastManualCurrency()
+                +";希望月份="+goal.getForecastWishMonth()+";显式覆盖="+goal.getForecastWishOverride()+"\n";
         return ResponseEntity.ok().header("Content-Type", "text/plain; charset=UTF-8")
                 .header("Content-Disposition", "attachment; filename=retirement-" + id + ".txt")
                 .header("Cache-Control", "no-store").body(text);
@@ -191,7 +198,7 @@ public class RetirementController {
 
     @InitBinder("estimate")
     void bindEstimate(WebDataBinder binder) {
-        binder.setAllowedFields("estimateSource","estimateMonthlyAmount","estimateWishMonth");
+        binder.setAllowedFields("estimateSource","estimateMonthlyAmount","estimateWishMonth","estimateWishOverride");
     }
 
     public record Money(String currency, BigDecimal factor) {
