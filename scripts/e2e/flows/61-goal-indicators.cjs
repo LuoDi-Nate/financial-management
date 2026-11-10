@@ -37,7 +37,7 @@ module.exports={name:'61-goal-indicators',title:'目标多指标、家庭结余�
   state.goal=db.num(`SELECT goal_id FROM retirement_plan WHERE family_id=${state.family} AND active=1`);
   await ui.assert(Boolean(state.goal),'新退休计划已保存');
   await ui.assert(db.num(`SELECT forecast_wish_override FROM family_goal WHERE id=${state.goal}`)===0,'未改估算月份时继承主计划');
-  await ui.assert((await ui.page.locator('[data-retire-value=coverage]').innerText()).includes('50'),'主资金仍为500万/1000万=50%');
+  await ui.assert(await ui.page.evaluate(()=>document.querySelector('[data-retire-value=coverage]').textContent.includes('50')),'主资金仍为500万/1000万=50%');
   await eta(ui,dateAfter(125));await ui.assert((await ui.page.locator('[data-estimate-duration]').innerText()).includes('10年5个月'),'月结余4万还需125个月');
   const original=db.one(`SELECT plan_json FROM retirement_plan WHERE goal_id=${state.goal} AND family_id=${state.family}`);
   await shot(ui,'desktop-retirement');
