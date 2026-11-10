@@ -29,6 +29,7 @@
     <div class="grid grid-cols-2 md:grid-cols-3 gap-1.5 sm:gap-2">
       <!-- v0.5.4 · 每个目标 = 主卡链接 + 右侧「AI 阅读总结」小入口(直达本期月报锚点)· 两个并列 <a> 不嵌套 -->
       <div th:each="gp, gpStat : ${goals}"
+           data-goal-strip-card
            th:classappend="${gpStat.index >= 2} ? 'hidden md:flex' : 'flex'"
            class="items-stretch border border-rule-soft hover:bg-paper transition group">
         <a th:href="@{|/goals/${gp.goal.id}|}"

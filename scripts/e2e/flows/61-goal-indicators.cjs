@@ -29,6 +29,7 @@ async function dashboardStrip(ui,goal,date,label){
   await ui.assert(await panel.evaluate(el=>{
     const r=el.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth+1&&r.top>=0&&r.bottom<=innerHeight+1;
   }),label+'摘要完整位于视口内');
+  await ui.page.screenshot({path:'/tmp/finance-v140-review/goal-summary-'+label+'.png'});
   await panel.locator('.goal-summary-section').first().click();
   await ui.assert(await panel.isVisible()&&ui.page.url()===pageUrl,label+'阅读摘要不误跳目标页');
   await ui.page.screenshot({path:'/tmp/finance-v140-review/goal-summary-'+label+'.png'});
