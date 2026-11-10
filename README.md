@@ -384,7 +384,7 @@ bash scripts/regression-data.sh # 数据层/口径回归(原 e2e.sh · curl 端�
 
 | 版本 | 文档 |
 |---|---|
-| `v1.40` | [PRD](prd/v1.40.md)(需求待评审,尚未开发)· [交互预览](preview/v1.40/goals.html) · 技术设计待PRD通过后单独评审 |
+| `v1.40` | [PRD](prd/v1.40.md)(已通过)· [技术设计](tech-design/v1.40.md)(待评审,尚未编码)· [交互预览](preview/v1.40/goals.html) |
 | `v1.39` | [PRD](prd/v1.39.md)(已发布v1.39.0)· [技术设计](tech-design/v1.39.md) · [预览](preview/v1.39/retirement-setup.html) · [原节目与算法调研](docs/research/retirement-xiaolin-2026-11.md) |
 | `v1.38` | [PRD](prd/v1.38.md)(随v1.39.0一并交付)· [技术设计](tech-design/v1.38.md) · [预览 · 贷款固定还款](preview/v1.38/loan-repay.html) · [预览 · 测试环境不调大模型](preview/v1.38/ai-stub.html) |
 | `v1.37` | [PRD](prd/v1.37.md)(已实施)· [技术设计](tech-design/v1.37.md) · [预览](preview/v1.37/side-rail.html) · [Duo 官方规范调研](docs/research/iphone-duo-hig-2026-10.md) |
