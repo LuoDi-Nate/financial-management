@@ -19,6 +19,8 @@ public class GoalForecastService {
     private final MonthlyContributionService contributions;
     private final FamilyMapper families;
     private final GoalMapper goals;
+    @org.springframework.beans.factory.annotation.Autowired(required=false)
+    private com.family.finance.service.AuditLogService audit;
 
     public record View(boolean supported, GoalCashflowCalculator.Result result, String currency, String source,
                        String sourceLabel, MonthlyContributionService.Window window, GoalForecastForm form,
@@ -94,6 +96,10 @@ public class GoalForecastService {
     }
     @Transactional
     public void save(long familyId,long goalId,GoalForecastForm form) {
+        save(familyId,goalId,form,null);
+    }
+    @Transactional
+    public void save(long familyId,long goalId,GoalForecastForm form,Long actorId) {
         if(!form.errors().isEmpty()) throw new IllegalArgumentException("时间估算的输入无效");
         var goal=goals.findById(familyId,goalId).filter(g->g.getArchivedAt()==null).orElseThrow(()->new IllegalArgumentException("目标不可用"));
         String currency=families.findById(familyId).orElseThrow().getBaseCurrency();
@@ -107,5 +113,7 @@ public class GoalForecastService {
                     || actual.getForecastManualAmount().compareTo(form.amount())!=0 || !currency.equals(actual.getForecastManualCurrency())))
                 throw new IllegalStateException("时间估算未能保存");
         }
+        if(actorId!=null && audit!=null) audit.record(familyId,actorId,com.family.finance.domain.audit.AuditLogType.SYSTEM,
+                "family_goal",goalId,"保存时间估算偏好 · "+form.getEstimateSource());
     }
 }

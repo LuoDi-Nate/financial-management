@@ -3,8 +3,6 @@ package com.family.finance.web.goal;
 import com.family.finance.auth.MemberPrincipal;
 import com.family.finance.domain.goal.GoalForecastForm;
 import com.family.finance.service.goal.*;
-import com.family.finance.service.AuditLogService;
-import com.family.finance.domain.audit.AuditLogType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -20,7 +18,6 @@ public class GoalForecastController {
     private final GoalService goals;
     private final GoalProgressService progress;
     private final GoalForecastService forecasts;
-    private final AuditLogService audit;
 
     @InitBinder("estimate")
     void bind(WebDataBinder binder) { binder.setAllowedFields("estimateSource","estimateMonthlyAmount","estimateWishMonth"); }
@@ -43,8 +40,7 @@ public class GoalForecastController {
             if(ajax!=null) return ResponseEntity.badRequest().body("请检查时间估算的字段");
             return preview(me,id,estimate,model);
         }
-        forecasts.save(me.getFamilyId(),id,estimate);
-        audit.record(me.getFamilyId(),me.getMemberId(),AuditLogType.SYSTEM,"family_goal",id,"保存时间估算偏好 · "+estimate.getEstimateSource());
+        forecasts.save(me.getFamilyId(),id,estimate,me.getMemberId());
         if(ajax!=null) return ResponseEntity.noContent().build();
         return "redirect:/goals/"+id+(gp.isNewRetirement()?"/retirement?tab=plan":"#goal-estimate-settings");
     }
