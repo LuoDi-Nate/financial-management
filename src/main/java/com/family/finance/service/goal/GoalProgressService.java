@@ -36,6 +36,7 @@ import java.util.Set;
  */
 @Service
 @RequiredArgsConstructor
+@lombok.extern.slf4j.Slf4j
 public class GoalProgressService {
 
     private static final int CONTRIBUTION_LOOKBACK_PERIODS = 6;
@@ -54,8 +55,14 @@ public class GoalProgressService {
     private final com.family.finance.service.expense.ExpenseLedgerService expenseLedger;
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private RetirementPlanService retirementPlans;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private GoalForecastService forecasts;
 
     public GoalProgress compute(long familyId, Goal goal) {
+        return decorate(computeCore(familyId,goal), forecasts == null ? null : forecasts.context(familyId,LocalDate.now()));
+    }
+
+    private GoalProgress computeCore(long familyId, Goal goal) {
         // v0.16 · 自定义追踪目标走通用 evaluator + pace;预设三类保持既有口径 + 三情景
         if (goal.getGoalType() == GoalType.CUSTOM) return computeCustom(familyId, goal);
         if (retirementPlans != null && goal.getGoalType() == GoalType.RETIREMENT) {
@@ -102,8 +109,18 @@ public class GoalProgressService {
     public List<GoalProgress> computeAll(long familyId) {
         List<Goal> goals = goalService.findActiveByFamily(familyId);
         List<GoalProgress> out = new ArrayList<>(goals.size());
-        for (Goal g : goals) out.add(compute(familyId, g));
+        var context=forecasts==null?null:forecasts.context(familyId,LocalDate.now());
+        for (Goal g : goals) out.add(decorate(computeCore(familyId,g),context));
         return out;
+    }
+
+    private GoalProgress decorate(GoalProgress value, GoalForecastService.Context context) {
+        if(forecasts==null || context==null) return value;
+        try { return value.withForecast(forecasts.evaluate(value.goal(),value.pv(),value.target(),value.progress(),value.retirement(),null,context)); }
+        catch(RuntimeException e) {
+            log.warn("goal observation unavailable goal={} category={}",value.goal().getId(),e.getClass().getSimpleName());
+            return value;
+        }
     }
 
     // ---------- PV 计算 ----------
@@ -177,8 +194,19 @@ public class GoalProgressService {
         TimeMode timeMode,
         GoalPaceCalculator.Pace pace,
         int accountCount,
-        RetirementPlanService.View retirement
+        RetirementPlanService.View retirement,
+        GoalForecastService.View forecast
     ) {
+        public GoalProgress(Goal goal, GoalParams params, BigDecimal pv, BigDecimal target, BigDecimal progress,
+                            BigDecimal monthlyContribution, GoalProjector.ScenarioResult scenarios, GoalMetric metric,
+                            GoalComparator comparator, TimeMode timeMode, GoalPaceCalculator.Pace pace, int accountCount,
+                            RetirementPlanService.View retirement) {
+            this(goal,params,pv,target,progress,monthlyContribution,scenarios,metric,comparator,timeMode,pace,accountCount,retirement,null);
+        }
+        public GoalProgress withForecast(GoalForecastService.View view) {
+            return new GoalProgress(goal,params,pv,target,progress,monthlyContribution,scenarios,metric,comparator,timeMode,pace,accountCount,retirement,view);
+        }
+        public List<com.family.finance.domain.goal.GoalIndicator> indicators() { return forecast==null?List.of():forecast.indicators(); }
         public GoalProgress(Goal goal, GoalParams params, BigDecimal pv, BigDecimal target, BigDecimal progress,
                             BigDecimal monthlyContribution, GoalProjector.ScenarioResult scenarios, GoalMetric metric,
                             GoalComparator comparator, TimeMode timeMode, GoalPaceCalculator.Pace pace, int accountCount) {
