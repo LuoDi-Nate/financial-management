@@ -21,10 +21,10 @@ const monthText = n => Math.floor(n / 12) + '年' + String(n % 12 + 1).padStart(
 const duration = n => n === 0 ? '0个月' : (Math.floor(n / 12) ? Math.floor(n / 12) + '年' : '') + (n % 12 ? n % 12 + '个月' : '');
 const monthNumber = s => Number(s.slice(0,4)) * 12 + Number(s.slice(5)) - 1;
 function facts(g) {
-  const current = g.id === 'retirement' && sample === 'achieved' ? 10500000 : g.assets;
+  const current = g.id === 'retirement' && ['achieved','funded-missing'].includes(sample) ? 10500000 : g.assets;
   let automatic = g.missing ? null : 40000;
   if (g.id === 'retirement') {
-    if (sample === 'missing') automatic = null;
+    if (['missing','funded-missing'].includes(sample)) automatic = null;
     if (sample === 'zero') automatic = 0;
     if (sample === 'negative') automatic = -5000;
     if (sample === 'long') automatic = 1000;
@@ -76,6 +76,7 @@ function render() {
   $('settings-not-applicable').hidden = !rate;
   $('investment-note').hidden = selected.id !== 'retirement';
   $('retirement-target-source').hidden = selected.id !== 'retirement';
+  $('time-assumptions').hidden = rate;
   if (rate) {
     $('progress-equation').textContent = '当前年化5.0%,希望达到7.0%,相差2.0个百分点。';
     $('time-equation').textContent = '月结余增加本金,不能直接推出未来投资收益率达到7%的月份。';
@@ -108,6 +109,7 @@ function render() {
   }
   $('source-value').textContent = r.c == null ? '暂无完整月结余' : money(r.c) + ' / 月';
   $('source-label').textContent = draft.source === 'AUTO' ? '家庭近6个完整月净结余中位数' : '本目标手填月可用结余';
+  $('contribution-reference-title').textContent = draft.source === 'AUTO' ? '查看月结余来源' : '查看家庭结余参考';
   $('source-assumption').textContent = draft.source === 'AUTO' ? '假设这些家庭结余全部用于本目标,未分配给其它目标。' : '只按分给本目标的这部分月结余估算。';
   $('source-warning').hidden = r.state !== 'missing' && r.state !== 'no-growth';
   $('source-warning').textContent = r.state === 'missing' ? '暂无完整结余参考,仅影响时间估算。资金完成度仍有效,目标配置已保存。' : '当前结余不能缩小资金缺口。资金完成度继续按已有资产计算。';
@@ -130,7 +132,7 @@ function render() {
   }
   $('progress-equation').textContent = money(r.assets) + ' ÷ ' + money(r.target) + ' = ' + r.progress.toFixed(1) + '%。';
   $('time-equation').textContent = r.state === 'ready' ? money(r.gap) + ' ÷ 每月' + money(r.c) + ',向上取整为' + r.months + '个月。' : r.state === 'achieved' ? '当前资金已达到所需资金,还需0个月;无需月结余数据。' : r.caption + '。不生成具体的达成日期。';
-  $('date-equation').textContent = r.state === 'ready' ? '从2026年11月起,向后' + r.months + '个月,预计' + r.date + '月末达到当前资金门槛。' : '基准日2026-11-10,不使用上一组条件的预测日期。';
+  $('date-equation').textContent = r.state === 'ready' ? '从2026年11月起,向后' + r.months + '个月,预计' + r.date + '末达到当前资金门槛。' : '基准日2026-11-10,不使用上一组条件的预测日期。';
 }
 function switchTab(name,focus=false) {
   activeTab = name;
