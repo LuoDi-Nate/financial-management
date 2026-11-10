@@ -56,6 +56,22 @@ class GoalProgressSummaryTest {
         assertFalse(summary.sections().stream().anyMatch(s -> s.title().contains("时间")));
         assertEquals("",summary.assumption());
     }
+    @Test void revisionOneExplainsItsIncomeAndNetPrincipalInsteadOfRevisionTwoTotal() {
+        var original = retirement("5000000","40000","2.5","CNY");
+        var plan = original.retirement().plan(); plan.setVersion(1); plan.setMonthlyIncome(n("3000")); plan.setMonthlyContribution(BigDecimal.ZERO);
+        plan.setBudgetConfirmed(true); plan.setReservesConfirmed(true); plan.setNoOverlapConfirmed(true); plan.setAssetsConfirmed(true);
+        plan.setIncomeConfirmed(true); plan.setContributionConfirmed(true); plan.setAfterDebtConfirmed(true);
+        var result = RetirementCalculator.calculate(plan,TODAY,n("5000000"),n("2000000"),null,List.of());
+        var view = mock(RetirementPlanService.View.class); when(view.plan()).thenReturn(plan); when(view.result()).thenReturn(result);
+        when(view.returnBasis()).thenReturn("升级前固定回报假设");
+        var progress = new GoalProgressService.GoalProgress(original.goal(),null,result.principal(),result.target(),result.coverage(),null,null,
+                GoalMetric.AMOUNT_TOTAL,GoalComparator.GTE,TimeMode.OPEN,null,2,view);
+        var summary = GoalProgressSummary.from(progress,false);
+        assertTrue(section(summary,"原计划生活本金目标").values().contains("退休月收入:¥3,000.00"));
+        assertTrue(section(summary,"原计划可生息本金").values().endsWith("¥2,200,000.00"));
+        assertEquals("可生息本金 ÷ 原计划生活本金目标",section(summary,"当前进度").formula());
+        assertFalse(summary.toString().contains("财务自由所需资金"));
+    }
     @ParameterizedTest @ValueSource(strings={"0","-5000"})
     void noGrowthDoesNotShowADivisionOrInventDate(String contribution) {
         var section = section(GoalProgressSummary.from(retirement("5000000",contribution,"2.5","CNY"),true),"预计达成时间");

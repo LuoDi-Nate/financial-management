@@ -26,7 +26,9 @@
     var shift = Math.max(8 - rect.left, Math.min(0, width - 8 - rect.right));
     panel.style.marginLeft = shift + 'px';
     var button = panel.previousElementSibling.getBoundingClientRect();
-    var below = innerHeight - button.bottom - 8, above = button.top - 8;
+    var sticky = document.querySelector('header.sticky');
+    var topLimit = Math.max(8, sticky ? sticky.getBoundingClientRect().bottom + 8 : 8);
+    var below = innerHeight - button.bottom - 8, above = button.top - topLimit;
     var useAbove = rect.height > below && above > below;
     if (useAbove) { panel.style.top = 'auto'; panel.style.bottom = 'calc(100% + 4px)'; }
     panel.style.maxHeight = Math.max(96, useAbove ? above : below) + 'px';

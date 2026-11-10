@@ -37,6 +37,15 @@ public record GoalProgressSummary(String basis, List<Section> sections, String a
                     progress.target() == null ? "生活本金:" + amount(currency,r.target()) + "\n准备金:" + amount(currency,r.reserves()) + " · 负债:" + amount(currency,r.debt())
                             : amount(currency,r.target()) + " + " + amount(currency,r.reserves()) + " + " + amount(currency,r.debt()) + " = " + amount(currency,progress.target()),
                     "准备金与负债各计一次。", true));
+        } else if (retirement != null) {
+            var r = retirement.result();
+            basis += " · 观察日 " + r.asOf();
+            sections.add(new Section("原计划生活本金目标", "月生活费减去退休月收入,不低于零,再 × 12 ÷ 实际年回报",
+                    "月生活费:" + amount(currency,r.monthlyExpense()) + " · 退休月收入:" + amount(currency,r.monthlyIncome())
+                            + "\n生活本金目标:" + amount(currency,progress.target()), retirement.returnBasis() + realRateBasis(retirement), true));
+            sections.add(new Section("原计划可生息本金", "所选账户资产 - 全部负债 - 大额支出准备金",
+                    amount(currency,r.assets()) + " - " + amount(currency,r.debt()) + " - " + amount(currency,r.reserves())
+                            + " = " + amount(currency,r.principal()), "沿用此计划采用的原算法。", true));
         } else {
             String formula = switch (progress.goal().getGoalType()) {
                 case RETIREMENT -> "原计划:月生活费 × 12,按退休年份通胀折算后除以提取率";
@@ -52,6 +61,7 @@ public record GoalProgressSummary(String basis, List<Section> sections, String a
         boolean reducing = progress.isCustom() && progress.comparator() == GoalComparator.LTE;
         String progressFormula = reducing ? "当前值不高于目标即达成;否则按目标值 ÷ 当前值显示进度"
                 : retirement != null && retirement.plan().getVersion() >= 2 ? "所选账户当前合计 ÷ 财务自由所需资金"
+                : retirement != null ? "可生息本金 ÷ 原计划生活本金目标"
                 : "当前值 ÷ 目标值";
         sections.add(new Section("当前进度", progressFormula,
                 "当前:" + value(progress,currency,progress.pv()) + " · 目标:" + value(progress,currency,progress.target())
