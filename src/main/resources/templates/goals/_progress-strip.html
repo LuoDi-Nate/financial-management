@@ -91,7 +91,7 @@
     <span class="goal-summary-section" th:each="section : ${summary.sections()}">
       <b th:text="${section.title()}"></b>
       <span th:text="${section.formula()}"></span>
-      <span th:if="${section.values()!=null}" class="goal-summary-values" th:attr="data-priv=${section.privateValues() ? '' : null}" th:text="${section.values()}"></span>
+      <span th:if="${section.values()!=null}" class="goal-summary-values" th:attr="data-priv=${section.privateValues() ? 'true' : null}" th:text="${section.values()}"></span>
       <span class="goal-summary-note" th:text="${section.note()}"></span>
     </span>
     <span th:if="${!summary.assumption().isEmpty()}" class="goal-summary-note" th:text="${summary.assumption()}"></span>
