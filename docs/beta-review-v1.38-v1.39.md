@@ -1,8 +1,15 @@
 # v1.38 + v1.39 联合 beta 验收
 
-状态:维护者于2026-11-09确认上线,两版beta验收通过,正在准备v1.39.0发布预检。两版使用同一份1.39.0程序,开发分支为`v1.39-retirement-plan`;尚未发布。
+状态:维护者于2026-11-09通过两版beta验收,2026-11-10明确回复`release v1.39.0`。已发布生产与双架构Docker镜像,两版统一使用1.39.0。
 
-当前部署源码:`6e099662`。程序SHA-256:`94294994ba1eae713edc8a715912f637df9fff37bd2ef39e3f00c6389d09bbd1`。部署包与全量单测验证后的构建包指纹一致。
+beta验收部署源码:`6e099662`。程序SHA-256:`94294994ba1eae713edc8a715912f637df9fff37bd2ef39e3f00c6389d09bbd1`。该部署包与全量单测验证后的构建包指纹一致。
+
+## 2026-11-10发布验证
+
+- 发布标签`v1.39.0`对应`e5a71173`,已推送GitLab与GitHub;从该标签在本机构建生产包,传输两端SHA-256一致:`ea8438e6f26611b7d76e727d1ad27d929fe82c1b3a7b4e510d7fbcadadcb30c1`。
+- 生产部署先备份数据库,再应用V76—V79四项迁移并重启。公网返回`UP / 1.39.0`,生产本机与公网的`/health`、`/login`均为HTTP 200;未导入beta业务数据或测试保护设置。
+- [Docker发布CI](https://github.com/LuoDi-Nate/financial-management/actions/runs/42746586299)成功,标签及源码与本次发布一致。GHCR的`v1.39.0`与`latest`均可匿名拉取,指纹同为`sha256:c5dc46a2f0425600f13f25aaac6520d0d019baa93b5b85e5ee49b2b2992daff9`,均包含`linux/amd64`和`linux/arm64`。
+- [发布说明与界面截图](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.39.0)集中展示本版变化;下方保留各轮beta验证记录,不将历史“未发布”状态当作当前状态。
 
 ## 最新三页签布局验证
 

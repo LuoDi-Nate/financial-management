@@ -94,7 +94,7 @@
 
 ## 近期更新 · Releases
 
-**v1.39.0 · 退休目标、贷款设置与 AI 可用性修复(待发布)**
+**[v1.39.0](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.39.0) · 退休目标、贷款设置与 AI 可用性修复**
 退休进度按所选账户当前合计除以所需总资金计算,配置保存与运行数据分开;历史回报不足时明确采用小Lin2.5%实际回报规划,旧目标需比较后采用。一并交付贷款固定还款设置、服务端模型测试保护与AI主备路由修复。见 [PRD](prd/v1.39.md)、[技术设计](tech-design/v1.39.md)与[原节目调研](docs/research/retirement-xiaolin-2026-11.md)。
 
 > 完整发布记录与截图见 [Releases](https://github.com/LuoDi-Nate/financial-management/releases)(本段每版只留 2–4 行,细节不搬过来)。
