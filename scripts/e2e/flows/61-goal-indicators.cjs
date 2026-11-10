@@ -9,6 +9,17 @@ async function login(page,user){await page.context().clearCookies();await page.g
 async function eta(ui,text){await ui.page.waitForFunction(s=>document.querySelector('[data-estimate-date]')?.textContent.trim()===s,text);await ui.assert((await ui.page.locator('[data-estimate-date]').innerText()).trim()===text,'时间指标:'+text);}
 async function save(ui){await ui.click('[data-estimate-save]','保存本目标月结余');await ui.page.waitForFunction(()=>document.querySelector('[data-estimate-status]').textContent.includes('已保存'));}
 async function shot(ui,name){fs.mkdirSync('/tmp/finance-v140-review',{recursive:true});await ui.page.screenshot({path:'/tmp/finance-v140-review/'+name+'.png',fullPage:true});}
+async function dashboardStrip(ui,goal,date,label){
+  await ui.goto('/dashboard');
+  const card=ui.page.locator(`a[href="/goals/${goal}"]`).filter({has:ui.page.locator('[data-estimate-dashboard]')});
+  await ui.assert((await card.innerText()).includes('预计 '+date),label+'仪表盘采用同一预计月份');
+  await ui.assert(!/当前退休计划|修订|配置已完成/.test(await card.innerText()),label+'目标条不再显示退休配置状态');
+  const axis=await card.locator('[data-goal-strip-axis]').boundingBox();
+  const etaBox=await card.locator('[data-estimate-dashboard]').boundingBox();
+  await ui.assert(axis&&etaBox&&Math.abs(axis.x+axis.width-etaBox.x-etaBox.width)<=1&&etaBox.y>=axis.y+axis.height-1,label+'预计时间位于进度轴右下角');
+  await ui.assert(await ui.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),label+'目标条无横向溢出');
+  await card.screenshot({path:'/tmp/finance-v140-review/dashboard-strip-'+label+'.png'});
+}
 module.exports={name:'61-goal-indicators',title:'目标多指标、家庭结余与独立保存',async run(ui){
   state.username='e2e-goals140-'+Date.now();
   db.raw(`INSERT INTO family(name,base_currency,period_type)VALUES(${q(state.username)},'CNY','MONTHLY')`);
@@ -41,6 +52,16 @@ module.exports={name:'61-goal-indicators',title:'目标多指标、家庭结余�
   await eta(ui,dateAfter(125));await ui.assert((await ui.page.locator('[data-estimate-duration]').innerText()).includes('10年5个月'),'月结余4万还需125个月');
   const original=db.one(`SELECT plan_json FROM retirement_plan WHERE goal_id=${state.goal} AND family_id=${state.family}`);
   await shot(ui,'desktop-retirement');
+  await dashboardStrip(ui,state.goal,dateAfter(125),'desktop');
+  await ui.phone(async mobile=>{
+    await login(mobile.page,state.username);
+    for(const width of [390,320]){
+      await mobile.page.setViewportSize({width,height:844});
+      await dashboardStrip(mobile,state.goal,dateAfter(125),'mobile-'+width);
+    }
+  });
+  await ui.goto('/reports');await ui.assert(await ui.page.locator('[data-estimate-dashboard]').count()===0,'报表目标条不带入今日预计时间');
+  await ui.goto(`/goals/${state.goal}/retirement`);
   await ui.click('[data-estimate-edit]','从时间指标调整估算');await ui.page.check('[name=estimateSource][value=MANUAL]');await ui.page.fill('[name=estimateMonthlyAmount]','20000');
   await eta(ui,dateAfter(250));await ui.assert(await ui.page.locator('[data-estimate-draft]').isVisible(),'未保存估算有明确提示');
   await ui.page.fill('[name=estimateMonthlyAmount]','');await ui.assert(await ui.page.locator('[data-estimate-save]').isDisabled(),'非法手填前端拦截');await ui.assert(await ui.page.locator('[data-estimate-error=estimateMonthlyAmount]').isVisible(),'错误在金额字段旁');
