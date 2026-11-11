@@ -127,11 +127,15 @@ class GoalLlmServiceTest {
         when(result.ready()).thenReturn(false);when(result.aiSummary()).thenReturn("所选账户资产A=5000000 · 所需总资金F=10000000 · 目标进度比率=0.5");
         var progress=new GoalProgressService.GoalProgress(goal,null,new BigDecimal("5000000"),new BigDecimal("10000000"),
                 new BigDecimal("0.5"),null,null,null,null,null,null,1,view);
+        var calculated = com.family.finance.calc.GoalCashflowCalculator.calculate(java.time.LocalDate.of(2026,11,11),
+                progress.pv(), progress.target(), new BigDecimal("40000"), null);
+        progress = progress.withForecast(new GoalForecastService.View(true,calculated,"CNY","MANUAL","本目标手填",null,
+                new com.family.finance.domain.goal.GoalForecastForm(),java.util.Map.of(),java.util.List.of()));
         assertThat(service.generateMonthlyReport(1,goal,progress).ok()).isTrue();
         var prompt=org.mockito.ArgumentCaptor.forClass(String.class);
         org.mockito.Mockito.verify(router).invoke(org.mockito.ArgumentMatchers.eq(1L),
                 org.mockito.ArgumentMatchers.any(com.family.finance.service.llmtrace.PromptTrace.class),anyString(),prompt.capture());
-        assertThat(prompt.getValue()).contains("回报来源=规划假设 · 小Lin 2.5% 实际回报");
+        assertThat(prompt.getValue()).contains("回报来源=规划假设 · 小Lin 2.5% 实际回报", "2037年04月", "125", "本目标手填");
         when(view.progressTarget()).thenReturn(null);
         assertThat(service.generateMonthlyReport(1,goal,progress).ok()).isFalse();
     }

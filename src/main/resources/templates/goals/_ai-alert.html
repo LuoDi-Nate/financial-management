@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<body>
+<th:block th:fragment="alert">
+  <section th:if="${aiAlert != null}" class="mb-6 border-l-4 border-rust pl-4 py-4" data-goal-ai-alert>
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-3" data-peek-host>
+      <h2 class="font-display text-xl text-rust">AI · 偏离预警</h2>
+      <span class="flex items-center gap-2">
+        <span class="text-xs text-ink-soft" th:text="${#temporals.format(aiAlert.generatedAt, 'yyyy-MM-dd HH:mm')}"></span>
+        <th:block th:replace="~{fragments/_prompt-peek :: btn(${alertPeekSrc})}"></th:block>
+      </span>
+    </div>
+    <p th:if="${alertStale == true}" class="text-sm text-brass-deep mb-3">这是先前计划或资金状态的历史预警,请结合当前进度查看。</p>
+    <p class="text-sm text-ink-soft whitespace-pre-line leading-relaxed mb-3" th:utext="${@aiText.priv(aiAlert.content)}"></p>
+    <form th:action="@{|/goals/${goal.id}/alert/dismiss|}" method="post">
+      <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+      <button type="submit" class="btn-paper text-xs">我知道了</button>
+    </form>
+  </section>
+</th:block>
+</body>
+</html>

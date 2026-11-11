@@ -410,11 +410,12 @@ public class GoalController {
     public String generateReport(@AuthenticationPrincipal MemberPrincipal me,
                                  @PathVariable long id,
                                  org.springframework.web.servlet.mvc.support.RedirectAttributes ra) {
-        goalService.require(me.getFamilyId(), id); // 权限校验
+        Goal goal = goalService.require(me.getFamilyId(), id); // 权限校验
+        boolean retirement = progressService.compute(me.getFamilyId(), goal).isNewRetirement();
         var result = goalReportService.generateNowResult(me.getFamilyId(), id);
         ra.addFlashAttribute(result.ok() ? "reportNote" : "reportError", result.ok()
                 ? "目标月报已更新。" : result.error());
-        return "redirect:/goals/" + id;
+        return "redirect:/goals/" + id + (retirement ? "/retirement" : "") + "#ai-report";
     }
 
     // ---------- 软删 ----------

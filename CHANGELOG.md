@@ -2,6 +2,12 @@
 
 按 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 风格记录。每个版本详细需求见对应 [`prd/vX.Y.md`](prd/),技术设计见 [`tech-design/vX.Y.md`](tech-design/),QA case 见 [`docs/qa-cases.md`](docs/qa-cases.md)。
 
+## [v1.40.1] · 开发中 · 目标 AI 洞察
+
+- 补齐新退休目标的 AI 洞察标题入口、仪表盘直达、跨页签定位及未确认偏离预警。
+- 解读增加同源的结余达成时间和来源;计划、资金与结余依据变化后标明历史解读,生成失败保留原报告。未自动重算或调用真实模型。
+- 验证及beta验收记录见 [补丁需求](prd/v1.40.1.md)。
+
 ## [v1.40.0] · 2026-11-11 · 目标多指标与结余达成时间
 
 - 维护者精确确认后发布。生产版本1.40.0,备份及V80迁移成功,本机与公网health/login均200;Docker双架构及latest同摘要验证通过,[Release](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.40.0)包含六张隐私截图。详细验证边界见[发布记录](docs/beta-review-v1.40.md)。

@@ -1,5 +1,6 @@
 /* Historical monthly fixtures need a separate synthetic family; all target configuration
- * and preference changes use real page controls. No close-period or model action. */
+ * and preference changes use real page controls. AI reports are synthetic; the
+ * generate failure path runs only with the server model gate verified on. */
 const db=require('../lib/db.cjs');
 const {BASE,USER,PASS}=require('../lib/browser.cjs');
 const fs=require('fs');
@@ -9,6 +10,63 @@ async function login(page,user){await page.context().clearCookies();await page.g
 async function eta(ui,text){await ui.page.waitForFunction(s=>document.querySelector('[data-estimate-date]')?.textContent.trim()===s,text);await ui.assert((await ui.page.locator('[data-estimate-date]').innerText()).trim()===text,'时间指标:'+text);}
 async function save(ui){await ui.click('[data-estimate-save]','保存本目标月结余');await ui.page.waitForFunction(()=>document.querySelector('[data-estimate-status]').textContent.includes('已保存'));}
 async function shot(ui,name){fs.mkdirSync('/tmp/finance-v140-review',{recursive:true});await ui.page.screenshot({path:'/tmp/finance-v140-review/'+name+'.png',fullPage:true});}
+async function insights(ui) {
+  await ui.goto(`/goals/${state.goal}/retirement`);
+  await ui.assert(await ui.page.locator('[data-retire-insights]').isVisible(),'退休页标题保留 AI 洞察入口');
+  await ui.page.locator('[data-retire-insights]').click();
+  await ui.assert((await ui.page.locator('#ai-report').innerText()).includes('立即生成月报'),'空态提供立即生成入口');
+  // Historical AI output requires a paid model; only this isolated family's report fixtures are inserted.
+  db.raw(`INSERT INTO goal_ai_report(goal_id,period_id,report_type,content,validator_status)VALUES(${state.goal},0,'MONTHLY','合成月报:请结合当前资金完成度及月结余查看目标。','PASS'),(${state.goal},0,'ALERT','合成预警:请核对目标投入节奏。','PASS')`);
+  await ui.goto('/dashboard');
+  await ui.page.locator(`a[href="/goals/${state.goal}/retirement#ai-report"]`).click();
+  await ui.assert(ui.page.url().endsWith('/retirement#ai-report'),'仪表盘 AI 洞察直接进入新退休页');
+  await ui.assert((await ui.page.locator('#ai-report').innerText()).includes('合成月报'),'已有月报可读');
+  await ui.assert((await ui.page.locator('#ai-report').innerText()).includes('以下为历史解读'),'旧指纹报告明确标为历史解读');
+  await ui.assert(await ui.page.locator('[data-goal-ai-alert]').isVisible(),'新退休页显示未确认偏离预警');
+  await ui.assert(await ui.page.locator('#ai-report [data-peek-host]').count()>0,'报告有提示词来源面板宿主');
+  for(const tab of ['plan','principle']) {
+    await ui.page.locator(`[data-retire-tab=${tab}]`).click();
+    await ui.page.locator('[data-retire-insights]').click();
+    await ui.assert(await ui.page.locator('#ai-report').isVisible(),'从'+tab+'能回到洞察正文');
+  }
+  await ui.page.locator('#ai-report').screenshot({path:'/tmp/finance-v140-review/ai-insights-desktop.png'});
+  await ui.phone(async mobile=>{
+    await login(mobile.page,state.username);
+    for(const width of [390,320]){
+      await mobile.page.setViewportSize({width,height:844});
+      await mobile.goto(`/goals/${state.goal}/retirement?tab=plan#ai-report`);
+      await mobile.assert(await mobile.page.locator('#ai-report').isVisible(),'手机'+width+'直达隐藏页签内的AI正文');
+      await mobile.assert(await mobile.page.locator('#ai-report h2').first().evaluate(el=>{
+        const r=el.getBoundingClientRect(),top=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
+        return r.top>=38 && r.bottom<=innerHeight && (top===el||el.contains(top));
+      }),'手机'+width+'AI标题在视口且未被顶栏遮挡');
+      await mobile.assert(await mobile.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'手机'+width+'洞察无横向溢出');
+      await mobile.page.screenshot({path:'/tmp/finance-v140-review/ai-insights-mobile-'+width+'.png'});
+    }
+  });
+  await ui.page.locator('[data-goal-ai-alert] button[type=submit]').click();
+  await ui.page.waitForLoadState('networkidle');
+  await ui.assert(await ui.page.locator('[data-goal-ai-alert]').count()===0,'确认后预警隐藏');
+  await ui.assert(db.num(`SELECT COUNT(*) FROM goal_ai_report WHERE goal_id=${state.goal} AND report_type='ALERT' AND dismissed_at IS NOT NULL`)===1,'预警确认已持久化');
+  const guard=require('../../ai-test-guard.cjs');
+  const before=await guard.begin(BASE);
+  const endpoint=`**/goals/${state.goal}/report/generate`;
+  const allowServerGuard=route=>route.continue();
+  // This exact form action reaches the verified server guard; actual model sends remain blocked.
+  await ui.page.route(endpoint,allowServerGuard);
+  try {
+    await ui.page.locator('[data-retire-insights]').click();
+    await ui.page.locator('#ai-report button[type=submit]').click();
+    await ui.page.waitForLoadState('networkidle');
+    await ui.assert(ui.page.url().endsWith('/retirement#ai-report'),'生成失败仍返回新目标洞察');
+    await ui.assert(await ui.page.locator('#ai-report [role=alert]').isVisible(),'失败原因在洞察内可见');
+    await ui.assert((await ui.page.locator('#ai-report').innerText()).includes('合成月报'),'模型不可用时保留原报告');
+    await ui.assert(db.one(`SELECT content FROM goal_ai_report WHERE goal_id=${state.goal} AND report_type='MONTHLY'`)==='合成月报:请结合当前资金完成度及月结余查看目标。','生成失败不覆盖已存报告');
+  } finally {
+    await ui.page.unroute(endpoint,allowServerGuard);
+    await guard.finish(BASE,before);
+  }
+}
 async function dashboardStrip(ui,goal,date,label){
   await ui.goto('/dashboard');
   const card=ui.page.locator(`a[href="/goals/${goal}"]`).filter({has:ui.page.locator('[data-estimate-dashboard]')});
@@ -130,9 +188,11 @@ module.exports={name:'61-goal-indicators',title:'目标多指标、家庭结余�
   await ui.goto('/goals/new/custom');await ui.page.fill('[name=name]','合成收益率目标');await ui.page.check('[name=metric][value=RETURN_XIRR]');await ui.page.fill('[name=targetValue]','7');await ui.page.locator('button[type=submit]').click();await ui.page.waitForLoadState('networkidle');
   await ui.assert(await ui.page.locator('[data-goal-estimate-result]').count()===0,'收益率目标不伪造结余达成日期');
   await ui.assert(db.num(`SELECT COUNT(*) FROM llm_prompt_record WHERE family_id=${state.family}`)===0,'本流程没有模型准备/调用');
+  await insights(ui);
   await login(ui.page,USER);
 },async cleanup(ui,report){
   if(!state.family)return;const f=state.family;
+  db.raw(`DELETE FROM llm_prompt_record WHERE family_id=${f};DELETE FROM llm_system_prompt WHERE family_id=${f}`);
   db.raw(`DELETE FROM goal_ai_report WHERE goal_id IN(SELECT id FROM family_goal WHERE family_id=${f});DELETE FROM goal_account WHERE goal_id IN(SELECT id FROM family_goal WHERE family_id=${f});DELETE FROM retirement_plan WHERE family_id=${f};DELETE FROM family_goal WHERE family_id=${f};DELETE FROM audit_log WHERE family_id=${f};
     DELETE c FROM cash_flow c JOIN period p ON p.id=c.period_id WHERE p.family_id=${f};DELETE s FROM period_snapshot s JOIN period p ON p.id=s.period_id WHERE p.family_id=${f};DELETE t FROM snapshot_todo t JOIN period p ON p.id=t.period_id WHERE p.family_id=${f};DELETE FROM period_member_cashflow WHERE family_id=${f};DELETE c FROM period_member_completion c JOIN period p ON p.id=c.period_id WHERE p.family_id=${f};DELETE a FROM period_account_attr a JOIN period p ON p.id=a.period_id WHERE p.family_id=${f};DELETE g FROM period_account_group g JOIN period p ON p.id=g.period_id WHERE p.family_id=${f};DELETE FROM fx_rate WHERE family_id=${f};DELETE FROM period WHERE family_id=${f};DELETE FROM account WHERE family_id=${f};DELETE FROM family_runtime_config WHERE family_id=${f};DELETE FROM persistent_logins WHERE username=${q(state.username)};DELETE FROM member WHERE family_id=${f};DELETE FROM family WHERE id=${f}`);
   report.info('目标隔离家庭与全部样本已清理');state.family=null;

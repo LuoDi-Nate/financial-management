@@ -27,4 +27,8 @@ check node --check src/main/resources/static/js/goal-estimate.js
 check node --check scripts/e2e/flows/61-goal-indicators.cjs
 if rg -q 'Math.ceil|new Date\(' src/main/resources/static/js/goal-estimate.js; then echo 'FAIL: 前端重复日期公式' >&2; exit 1; fi
 qa140_pass=$((qa140_pass+1))
+check rg -q 'data-retire-insights' src/main/resources/templates/goals/retirement.html
+check rg -q 'goals/_ai-alert :: alert' src/main/resources/templates/goals/retirement.html
+check rg -q 'contextFingerprint\(snapshot, savedForecast\)' "$java/web/goal/RetirementController.java"
+check rg -q 'forecastContext\(progress.forecast\(\)\)' "$java/service/goal/GoalLlmService.java"
 echo "PASS: v1.40 $qa140_pass 项只读静态守护(另含v1.39原53项)"

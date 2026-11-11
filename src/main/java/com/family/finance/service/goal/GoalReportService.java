@@ -45,7 +45,7 @@ public class GoalReportService {
                             .content(r.value())
                             .validatorStatus("PASS")
                             .promptRecordId(r.promptRecordId())
-                            .contextFingerprint(progress.retirement() == null ? null : progress.retirement().fingerprint())
+                            .contextFingerprint(contextFingerprint(progress.retirement(), progress.forecast()))
                             .build();
                         reportMapper.upsertOwned(familyId, report);
                         log.info("goal={} monthly report generated · period={}", g.getId(), periodId);
@@ -86,7 +86,7 @@ public class GoalReportService {
                     .content(r.value())
                     .validatorStatus("PASS")
                     .promptRecordId(r.promptRecordId())
-                    .contextFingerprint(progress.retirement() == null ? null : progress.retirement().fingerprint())
+                    .contextFingerprint(contextFingerprint(progress.retirement(), progress.forecast()))
                     .build();
                 reportMapper.upsertOwned(familyId, report);
                 log.info("goal={} monthly report generated on-demand", goalId);
@@ -132,7 +132,7 @@ public class GoalReportService {
                             .content(r.value())
                             .validatorStatus("PASS")
                             .promptRecordId(r.promptRecordId())
-                            .contextFingerprint(progress.retirement() == null ? null : progress.retirement().fingerprint())
+                            .contextFingerprint(contextFingerprint(progress.retirement(), progress.forecast()))
                             .build();
                         reportMapper.upsertOwned(familyId, report);
                         log.info("goal={} alert generated · reason={}", g.getId(), reason);
@@ -149,6 +149,18 @@ public class GoalReportService {
     /**
      * 简化版偏离检测 · 只看月储蓄能力是否过低(进度对比需要历史快照,v0.3 暂不做)。
      */
+    public static String contextFingerprint(RetirementPlanService.View retirement, GoalForecastService.View forecast) {
+        if (retirement == null) return null;
+        String context = GoalLlmService.forecastContext(forecast);
+        if (context.isEmpty()) return retirement.fingerprint();
+        try {
+            byte[] bytes = (retirement.fingerprint() + context).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
     private String detectAlertReason(GoalProgressService.GoalProgress p) {
         if (p.monthlyContribution() != null && p.monthlyContribution().signum() < 0) {
             return "近期月度支出 > 收入 · 储蓄能力为负";

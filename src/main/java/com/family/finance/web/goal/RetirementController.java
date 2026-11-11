@@ -170,8 +170,9 @@ public class RetirementController {
         model.addAttribute("nav", nav.load(me)); model.addAttribute("goal", goal); model.addAttribute("plan", p);
         model.addAttribute("view", view); model.addAttribute("r", view.result()); model.addAttribute("tab", tab);
         Goal estimateGoal=goal==null?Goal.builder().familyId(familyId).goalType(GoalType.RETIREMENT).build():goal;
-        model.addAttribute("forecast",forecasts.evaluate(estimateGoal,view.progressAssets(),view.progressTarget(),view.result().coverage(),
-                view,(GoalForecastForm)model.getAttribute("estimateDraft"),forecasts.context(familyId,LocalDate.now())));
+        var forecast = forecasts.evaluate(estimateGoal,view.progressAssets(),view.progressTarget(),view.result().coverage(),
+                view,(GoalForecastForm)model.getAttribute("estimateDraft"),forecasts.context(familyId,LocalDate.now()));
+        model.addAttribute("forecast", forecast);
         model.addAttribute("previewing", Boolean.TRUE.equals(model.getAttribute("previewing")));
         if (goal != null && active.isEmpty()) model.addAttribute("legacy", progress.compute(familyId, goal));
         String requested = ccy == null ? p.getBaseCurrency() : ccy.toUpperCase(java.util.Locale.ROOT);
@@ -185,11 +186,22 @@ public class RetirementController {
         model.addAttribute("educationChoices", goals.findActiveByFamily(familyId).stream().filter(g -> g.getGoalType() == GoalType.EDUCATION).toList());
         if (goal != null && active.isPresent()) {
             var snapshot = active.get();
+            var savedForecast = Boolean.TRUE.equals(model.getAttribute("previewing")) || "plan".equals(tab)
+                    ? forecasts.evaluate(goal,snapshot.progressAssets(),snapshot.progressTarget(),snapshot.result().coverage(),
+                        snapshot,null,forecasts.context(familyId,LocalDate.now())) : forecast;
+            String fingerprint = GoalReportService.contextFingerprint(snapshot, savedForecast);
             reports.findLatestByGoalAndType(familyId, goal.getId(), "MONTHLY").ifPresent(report -> {
                 model.addAttribute("report", report);
-                model.addAttribute("reportStale", !snapshot.fingerprint().equals(report.getContextFingerprint()));
+                model.addAttribute("reportStale", !fingerprint.equals(report.getContextFingerprint()));
                 model.addAttribute("reportPeekSrc", promptPeek.of(familyId, report.getPromptRecordId(),
                         com.family.finance.service.llmtrace.PromptSurface.GOAL_REPORT, report.getGeneratedAt(), null));
+            });
+            reports.findLatestByGoalAndType(familyId, goal.getId(), "ALERT")
+                    .filter(report -> report.getDismissedAt() == null).ifPresent(report -> {
+                model.addAttribute("aiAlert", report);
+                model.addAttribute("alertStale", !fingerprint.equals(report.getContextFingerprint()));
+                model.addAttribute("alertPeekSrc", promptPeek.of(familyId, report.getPromptRecordId(),
+                        com.family.finance.service.llmtrace.PromptSurface.GOAL_ALERT, report.getGeneratedAt(), null));
             });
             model.addAttribute("budgetChanged", p.getBudgetFingerprint() != null && !p.getBudgetFingerprint().equals(snapshot.data().budgetFingerprint()));
         }

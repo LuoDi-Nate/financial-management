@@ -197,6 +197,16 @@
     if (name === 'overview') draw();
   }
   root.querySelectorAll('[data-retire-tab]').forEach(el => el.addEventListener('click', () => tab(el.dataset.retireTab)));
+  function showInsights() {
+    if (location.hash !== '#ai-report') return;
+    tab('overview');
+    requestAnimationFrame(() => document.getElementById('ai-report')?.scrollIntoView({block:'start'}));
+  }
+  root.querySelector('[data-retire-insights]')?.addEventListener('click', () => {
+    tab('overview');
+    requestAnimationFrame(() => document.getElementById('ai-report')?.scrollIntoView({block:'start'}));
+  });
+  window.addEventListener('hashchange', showInsights);
   root.querySelectorAll('[data-retire-goto]').forEach(el => el.addEventListener('click', () => {
     tab(el.dataset.retireGoto);
     root.querySelector('.retire-tabs').scrollIntoView({block:'start'});
@@ -245,4 +255,5 @@
   root.querySelector('.retire-future').addEventListener('toggle', event => { if(event.target.open) draw(); });
   children(); modes();
   tab(root.dataset.tab || 'overview');
+  showInsights();
 })();

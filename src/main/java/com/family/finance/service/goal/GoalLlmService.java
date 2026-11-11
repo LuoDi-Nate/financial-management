@@ -129,8 +129,9 @@ public class GoalLlmService {
                 1. 150-300 字 · 一段话或最多 3 段
                 2. 不使用真名(用 成员A / 成员B 代号)· 不担保 · 不推荐具体产品
                 3. 聚焦本月进度变化 + 节奏点评 + 1 个可执行建议
+                4. 数字和日期只引用系统提供的结果,禁止自行计算或补全;没有历史对照时不编造进度变化
                 """;
-            String user = buildMonthlyReportPrompt(goal, progress) + preferenceSuffix(familyId, mapping);
+            String user = buildMonthlyReportPrompt(goal, progress) + forecastContext(progress.forecast()) + preferenceSuffix(familyId, mapping);
             PromptTrace trace = trace(PromptSurface.GOAL_REPORT, familyId, mapping);
             String raw = invokeWithFailover(familyId, trace, system, user);
             if (raw == null) return AiResult.<String>unavailable(trace.failureMessage()).withRecord(trace.recordId());
@@ -165,8 +166,9 @@ public class GoalLlmService {
                 1. 200-300 字 · 朱印感(严肃但不焦虑)
                 2. 不使用真名 · 不担保 · 不推荐具体产品
                 3. 给出具体调整方案 1-2 条(增加月供 / 调整账户配置 / 重设目标参数)
+                4. 数字和日期只引用系统结果,禁止自行计算或补全
                 """;
-            String user = buildAlertPrompt(goal, progress, alertReason) + preferenceSuffix(familyId, mapping);
+            String user = buildAlertPrompt(goal, progress, alertReason) + forecastContext(progress.forecast()) + preferenceSuffix(familyId, mapping);
             PromptTrace trace = trace(PromptSurface.GOAL_ALERT, familyId, mapping);
             String raw = invokeWithFailover(familyId, trace, system, user);
             if (raw == null) return AiResult.<String>unavailable(trace.failureMessage()).withRecord(trace.recordId());
@@ -282,6 +284,22 @@ public class GoalLlmService {
                 target == null ? "?(应急 derived)" : target.setScale(0, RoundingMode.HALF_UP).toPlainString(),
                 p.monthlyContribution() == null ? "?" : p.monthlyContribution().setScale(0, RoundingMode.HALF_UP).toPlainString(),
                 p.neutralDate() == null ? "未达成范围" : p.neutralDate().toString());
+    }
+
+    static String forecastContext(GoalForecastService.View forecast) {
+        if (forecast == null || !forecast.supported() || forecast.result() == null) return "";
+        var r = forecast.result();
+        return "\n按当前结余预计达成(系统已计算,与投资情景分开):"
+                + "\n状态=" + r.state() + " · 观察日=" + r.asOf()
+                + "\n当前资金缺口=" + forecast.amount(r.gap())
+                + " · 月可用结余=" + forecast.amount(r.contribution())
+                + "\n预计达成=" + forecast.dateLabel() + " · 还需=" + forecast.durationLabel()
+                + " · 月数=" + r.months()
+                + "\n希望月份=" + r.wish() + " · 对照=" + r.comparisonLabel()
+                + "\n来源=" + forecast.sourceLabel()
+                + (forecast.window() == null ? "" : " · " + forecast.window().note())
+                + "\n说明=" + forecast.reason()
+                + "。缺失不当零,无预计日期时不得推算;不额外计入未来投资收益、加薪或物价变化。\n";
     }
 
     private String buildAlertPrompt(Goal goal, GoalProgressService.GoalProgress p, String reason) {

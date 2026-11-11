@@ -41,6 +41,11 @@
             </span>
           </p>
         </div>
+        <div class="flex flex-wrap items-center gap-2" th:if="${activePlan}">
+        <a href="#ai-report" data-retire-insights class="btn-paper btn-accent text-xs">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+          AI 洞察
+        </a>
         <a
           th:if="${activePlan}"
           th:href="@{|/goals/${goal.id}/retirement/export|}"
@@ -58,6 +63,7 @@
             <path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5" /></svg
           >导出测算</a
         >
+        </div>
       </div>
       <p
         th:if="${note != null}"
@@ -451,7 +457,9 @@
           id="ai-report"
           class="retire-source-section"
         >
-          <h2 class="font-display text-2xl mb-3">目标月报</h2>
+          <h2 class="font-display text-2xl mb-3">AI 洞察</h2>
+          <th:block th:replace="~{goals/_ai-alert :: alert}"></th:block>
+          <h3 class="font-display text-xl mb-3">目标月报</h3>
           <p
             th:if="${reportError != null}"
             role="alert"
@@ -465,19 +473,15 @@
             th:text="${reportNote}"
           ></p>
           <p th:if="${report == null}" class="text-sm text-ink-soft">
-            尚未生成,确定性测算无需 AI。
+            尚未生成目标月报。
           </p>
           <th:block th:if="${report != null}">
-            <p
-              class="text-xs text-ink-soft"
-              th:text="${report.generatedAt}"
-            ></p>
-            <th:block
-              th:replace="~{fragments/_prompt-peek :: btn(${reportPeekSrc})}"
-            >
-            </th:block>
+            <div class="flex flex-wrap items-center gap-2" data-peek-host>
+              <span class="text-xs text-ink-soft" th:text="${#temporals.format(report.generatedAt, 'yyyy-MM-dd HH:mm')}"></span>
+              <th:block th:replace="~{fragments/_prompt-peek :: btn(${reportPeekSrc})}"></th:block>
+            </div>
             <p th:if="${reportStale}" class="text-sm text-brass-deep mt-2">
-              这是旧计划或旧资金状态的历史解读,没有自动付费重算。
+              计划、资金或月结余依据已变化,以下为历史解读。
             </p>
             <p
               class="text-sm whitespace-pre-line mt-3"
@@ -490,7 +494,7 @@
             class="mt-4"
           >
             <button type="submit" class="btn-paper btn-accent text-xs">
-              生成月报
+              <span th:text="${report == null ? '立即生成月报' : '重新生成'}">立即生成月报</span>
             </button>
           </form>
         </section>
