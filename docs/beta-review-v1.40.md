@@ -1,6 +1,6 @@
 # v1.40 · 财务目标多指标与按月结余的达成时间
 
-状态:2026-11-10目标小i计算摘要已实现、完成自验及公网三档复验,已更新beta待维护者验收。需求及技术设计已获维护者明确通过,本次范围为实现、自验并部署beta;不包含合并或生产发布。
+状态:2026-11-11维护者回复“发布吧”,beta验收通过。现准备v1.40.0发布预检;预检后按release-prod流程等待精确版本确认,随后才打tag与部署生产。
 
 验收入口:[仪表盘](https://beta.dixi-token.top/dashboard) · [财务目标](https://beta.dixi-token.top/goals) · [原退休目标](https://beta.dixi-token.top/goals/1055/retirement)。
 
