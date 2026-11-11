@@ -1,14 +1,21 @@
 # v1.40 · 财务目标多指标与按月结余的达成时间
 
-状态:2026-11-11维护者回复“发布吧”,beta验收通过。现准备v1.40.0发布预检;预检后按release-prod流程等待精确版本确认,随后才打tag与部署生产。
+状态:2026-11-11维护者验收并在预检后精确回复release v1.40.0。生产部署、镜像验证和Release发布均完成。
 
 验收入口:[仪表盘](https://beta.dixi-token.top/dashboard) · [财务目标](https://beta.dixi-token.top/goals) · [原退休目标](https://beta.dixi-token.top/goals/1055/retirement)。
 
-## 当前候选
+## 已验收beta候选
 
 - 程序版本1.40.0,应用源码`f2b1d97f`。
 - 本机验包与beta运行包SHA-256均为`2514abddb80140a6431ca09e7fb15fa08f8b5296bff3a9a6e2da35539ccc1f5f`。
 - 已备份后应用V80独立偏好字段,旧目标参数与旧投资情景不迁移。服务端模型保护保持开启,回归实际发送要求为0。
+
+## 发布记录
+
+- 发布tag为v1.40.0,源码提交e6c0d13c;GitLab/GitHub标签一致,应用源码与上述beta候选一致。发布预检再次通过1494单测,0失败/错误/跳过;README、主页数字带、版本徽记与部署脚本检查均通过。
+- 生产从同tag在beta本机编译的预编译包部署,两端SHA-256一致。生产先完成备份,再成功应用V80,旧参数保留;随后切换至1.40.0。生产本机与公网health/login均200,没有在生产运行写库回归或真实模型测试。
+- [Docker发布CI](https://github.com/LuoDi-Nate/financial-management/actions/runs/42961343403)全任务成功。v1.40.0与latest均可匿名拉取,索引摘要同为`sha256:78917e08e63960cc4c17f8d641e743be51a5b51d6bd0bba5c258df1330f2416e`;linux/amd64与linux/arm64的版本和源码提交均匹配本次tag。
+- [GitHub Release](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.40.0)已发布,含电脑与手机各三张JPEG。截图金额隐私开启,模型保护同epoch且实际发送0;截图不保存计划。
 
 ## 验收路径
 

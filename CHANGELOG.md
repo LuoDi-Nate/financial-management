@@ -2,7 +2,9 @@
 
 按 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 风格记录。每个版本详细需求见对应 [`prd/vX.Y.md`](prd/),技术设计见 [`tech-design/vX.Y.md`](tech-design/),QA case 见 [`docs/qa-cases.md`](docs/qa-cases.md)。
 
-## [v1.40.0] · 目标多指标与结余达成时间 · beta已验收,发布预检中
+## [v1.40.0] · 2026-11-11 · 目标多指标与结余达成时间
+
+- 维护者精确确认后发布。生产版本1.40.0,备份及V80迁移成功,本机与公网health/login均200;Docker双架构及latest同摘要验证通过,[Release](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.40.0)包含六张隐私截图。详细验证边界见[发布记录](docs/beta-review-v1.40.md)。
 
 - 发布截图覆盖计算摘要、时间指标与独立设置,导航后定位避开固定顶栏;默认金额隐私且不保存业务配置。
 
