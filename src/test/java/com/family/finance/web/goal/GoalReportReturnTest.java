@@ -30,10 +30,10 @@ class GoalReportReturnTest {
         when(reports.generateNowResult(7, 3)).thenReturn(GoalLlmService.AiResult.unavailable("测试保护已拦截"));
         assertThat(controller.generateReport(me, 3, ra))
                 .isEqualTo("redirect:/goals/3" + (retirement ? "/retirement" : "") + "#ai-report");
-        assertThat(ra.getFlashAttributes()).containsEntry("reportError", "测试保护已拦截");
+        assertThat(ra.getFlashAttributes().get("reportError")).isEqualTo("测试保护已拦截");
         when(reports.generateNowResult(7, 3)).thenReturn(GoalLlmService.AiResult.ok("合成月报", null));
         assertThat(controller.generateReport(me, 3, ra)).endsWith("#ai-report");
-        assertThat(ra.getFlashAttributes()).containsEntry("reportNote", "目标月报已更新。");
+        assertThat(ra.getFlashAttributes().get("reportNote")).isEqualTo("目标月报已更新。");
     }
 
     @Test void newRetirementReturnsDirectlyToInsightsAndPreservesFeedback() { check(true); }

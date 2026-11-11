@@ -48,8 +48,9 @@ class PromptUnchangedTest {
             // v1.28 有意改口径(PRD FR-920):调仓的账户清单改成代号,规矩第 3 条跟着说「原样用给定的账户名(代号)」
             "src/main/java/com/family/finance/service/allocation/RebalanceAdvisorService.java",
             "b35a1fcbccd5cf795c523525188db8fb763f11e530064f938ee61012d444e82b",
+            // v1.40.1: explicitly forbid inventing arithmetic/dates or monthly changes in goal insights.
             "src/main/java/com/family/finance/service/goal/GoalLlmService.java",
-            "a2d4c46ace047f8cf7bb6aecc4d67a6ca219f2206b61f33cdafbbafa66cd7e92");
+            "8e712d9d199bb0f1cbe935b9162b39b814065f2c947d8c494ce52e28e253b7f3");
 
     private static final Pattern TEXT_BLOCK = Pattern.compile("\"\"\"(.*?)\"\"\"", Pattern.DOTALL);
 

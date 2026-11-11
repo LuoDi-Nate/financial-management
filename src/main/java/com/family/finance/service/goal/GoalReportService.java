@@ -146,9 +146,7 @@ public class GoalReportService {
         }
     }
 
-    /**
-     * 简化版偏离检测 · 只看月储蓄能力是否过低(进度对比需要历史快照,v0.3 暂不做)。
-     */
+    /** Same saved context for report writes and the detail page's historical label. */
     public static String contextFingerprint(RetirementPlanService.View retirement, GoalForecastService.View forecast) {
         if (retirement == null) return null;
         String context = GoalLlmService.forecastContext(forecast);
@@ -161,6 +159,7 @@ public class GoalReportService {
         }
     }
 
+    /** 简化版偏离检测:历史进度对比尚未保存,仅检查当前月储蓄能力。 */
     private String detectAlertReason(GoalProgressService.GoalProgress p) {
         if (p.monthlyContribution() != null && p.monthlyContribution().signum() < 0) {
             return "近期月度支出 > 收入 · 储蓄能力为负";
