@@ -347,7 +347,7 @@ module.exports = {
     await coreProgress(ui,'固定预算独立保留',{assets:'¥6,100,000.00',target:'¥6,100,000.00',gap:'¥0.00',coverage:'100.00%'});
     db.raw(`INSERT INTO goal_ai_report(goal_id,period_id,report_type,content,validator_status) VALUES(${state.native},0,'MONTHLY','合成历史目标报告','PASS')`);
     await ui.goto(`/goals/${state.native}/retirement`);
-    await ui.seesText('旧计划或旧资金状态的历史解读','旧报告不冒充新算法结论');
+    await ui.seesText('计划、资金或月结余依据已变化,以下为历史解读','旧报告不冒充新算法结论');
     const downloadEvent=ui.page.waitForEvent('download');
     await ui.click('.retire-heading a[href$="/export"]','导出本次测算');
     const download=await downloadEvent, stream=await download.createReadStream(), chunks=[];

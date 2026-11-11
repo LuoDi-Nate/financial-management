@@ -41,6 +41,12 @@ async function insights(ui) {
         return r.top>=38 && r.bottom<=innerHeight && (top===el||el.contains(top));
       }),'手机'+width+'AI标题在视口且未被顶栏遮挡');
       await mobile.assert(await mobile.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'手机'+width+'洞察无横向溢出');
+      await mobile.page.locator('#ai-report button[type=submit]').last().scrollIntoViewIfNeeded();
+      await mobile.assert(await mobile.page.locator('#ai-report button[type=submit]').last().evaluate(el=>{
+        const r=el.getBoundingClientRect(),top=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
+        return top===el||el.contains(top);
+      }),'手机'+width+'生成按钮未被浮动工具遮挡');
+      await mobile.assert(await mobile.page.locator('#float-dock').evaluate(el=>getComputedStyle(el).position==='static'),'手机'+width+'阅读洞察时工具移到正文之后');
       await mobile.page.screenshot({path:'/tmp/finance-v140-review/ai-insights-mobile-'+width+'.png'});
     }
   });
