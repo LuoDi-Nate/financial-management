@@ -12,6 +12,7 @@
       "path": "/goals",
       "name": "goal-cashflow-time",
       "eval": "var a=Array.from(document.querySelectorAll('a[href^=\"/goals/\"]')).find(a=>a.textContent.includes('退休生活账'));if(!a)throw new Error('需要一个已保存的退休计划');a.href+='/retirement#goal-estimate-result';a.click();",
+      "afterEval": "var e=document.querySelector('#goal-estimate-result');if(!e)throw new Error('缺少时间估算');window.scrollTo({top:Math.max(0,e.getBoundingClientRect().top+scrollY-96),behavior:'instant'});",
       "wait": 3500,
       "selector": "#goal-estimate-result"
     },
@@ -19,6 +20,7 @@
       "path": "/goals",
       "name": "goal-estimate-settings",
       "eval": "var a=Array.from(document.querySelectorAll('a[href^=\"/goals/\"]')).find(a=>a.textContent.includes('退休生活账'));if(!a)throw new Error('需要一个已保存的退休计划');a.href+='/retirement?tab=plan#goal-estimate-settings';a.click();",
+      "afterEval": "var e=document.querySelector('#goal-estimate-settings');if(!e)throw new Error('缺少时间估算设置');window.scrollTo({top:Math.max(0,e.getBoundingClientRect().top+scrollY-96),behavior:'instant'});",
       "wait": 3500,
       "selector": "#goal-estimate-settings"
     }
@@ -35,6 +37,7 @@
       "path": "/goals",
       "name": "goal-cashflow-time",
       "eval": "var a=Array.from(document.querySelectorAll('a[href^=\"/goals/\"]')).find(a=>a.textContent.includes('退休生活账'));if(!a)throw new Error('需要一个已保存的退休计划');a.href+='/retirement#goal-estimate-result';a.click();",
+      "afterEval": "var e=document.querySelector('#goal-estimate-result');if(!e)throw new Error('缺少时间估算');window.scrollTo({top:Math.max(0,e.getBoundingClientRect().top+scrollY-96),behavior:'instant'});",
       "wait": 3500,
       "full": false
     },
@@ -42,6 +45,7 @@
       "path": "/goals",
       "name": "goal-estimate-settings",
       "eval": "var a=Array.from(document.querySelectorAll('a[href^=\"/goals/\"]')).find(a=>a.textContent.includes('退休生活账'));if(!a)throw new Error('需要一个已保存的退休计划');a.href+='/retirement?tab=plan#goal-estimate-settings';a.click();",
+      "afterEval": "var e=document.querySelector('#goal-estimate-settings');if(!e)throw new Error('缺少时间估算设置');window.scrollTo({top:Math.max(0,e.getBoundingClientRect().top+scrollY-96),behavior:'instant'});",
       "wait": 3500,
       "full": false
     }
