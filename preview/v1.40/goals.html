@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>财务目标 · v1.40 需求预览</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;500&family=JetBrains+Mono:wght@400;500&family=Noto+Serif+SC:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/style.css">
+  <link rel="stylesheet" href="goals.css">
+  <script src="goals.js" defer></script>
+</head>
+<body>
+  <svg class="symbols" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+    <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></symbol>
+    <symbol id="i-back" viewBox="0 0 24 24"><path d="m15 5-7 7 7 7"/></symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24"><path d="m16 3 5 5L8 21H3v-5ZM13 6l5 5"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+    <symbol id="i-reset" viewBox="0 0 24 24"><path d="M3 11a9 9 0 1 1 2 7M3 4v7h7"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  </svg>
+  <div class="review-toolbar">
+    <span>v1.40 需求预览 · 合成数据 · 未开发</span>
+    <details id="sample-menu" class="sample-menu">
+      <summary><span id="sample-label">正常结余</span><svg class="icon"><use href="#i-chevron"/></svg></summary>
+      <div class="sample-options" aria-label="示例情形">
+        <button type="button" data-sample="normal" aria-pressed="true">正常结余</button>
+        <button type="button" data-sample="missing" aria-pressed="false">收支来源不足</button>
+        <button type="button" data-sample="zero" aria-pressed="false">月结余为零</button>
+        <button type="button" data-sample="negative" aria-pressed="false">负结余</button>
+        <button type="button" data-sample="achieved" aria-pressed="false">资金已达成</button>
+        <button type="button" data-sample="funded-missing" aria-pressed="false">已达成且缺结余</button>
+        <button type="button" data-sample="long" aria-pressed="false">需要超过50年</button>
+      </div>
+    </details>
+  </div>
+  <header class="site-header">
+    <span class="brand font-display">家庭账房</span>
+    <nav aria-label="主导航"><a href="#list" class="current">财务目标</a></nav>
+    <span class="observation">观察日 <time datetime="2026-11-10">2026-11-10</time></span>
+  </header>
+  <main>
+    <section id="list-view">
+      <div class="eyebrow">目 · 标 · 追 · 踪</div>
+      <h1>财务目标</h1>
+      <p class="page-note">当前完成多少,按现在的结余还需多久。</p>
+      <p class="independent-note">各目标独立估算,同一笔家庭结余尚未在目标之间分配。</p>
+      <div id="goal-list" class="goal-list" aria-label="目标列表"></div>
+    </section>
+
+    <section id="detail-view" hidden>
+      <a href="#list" class="back-link"><svg class="icon"><use href="#i-back"/></svg>财务目标</a>
+      <div class="page-heading"><div><div class="eyebrow" id="goal-kind">退 · 休 · 生 · 活 · 账</div><h1 id="goal-title">退休生活账</h1></div><span class="saved-label" id="saved-label">配置已保存</span></div>
+      <div class="tabs" role="tablist" aria-label="目标视图">
+        <button type="button" id="tab-overview" role="tab" aria-selected="true" aria-controls="panel-overview" data-tab="overview">退休生活账</button>
+        <button type="button" id="tab-settings" role="tab" aria-selected="false" aria-controls="panel-settings" data-tab="settings" tabindex="-1">调整计划</button>
+        <button type="button" id="tab-principle" role="tab" aria-selected="false" aria-controls="panel-principle" data-tab="principle" tabindex="-1">怎么算的</button>
+      </div>
+      <p id="draft-message" class="draft-message" hidden>当前为未保存的时间试算 <button type="button" class="btn-ghost" data-goto="settings">回到设置</button></p>
+
+      <section id="panel-overview" role="tabpanel" aria-labelledby="tab-overview" class="tab-panel">
+        <div id="money-indicators" class="indicator-band">
+          <div class="indicator"><span class="metric-label">资金完成度</span><strong id="detail-progress" class="positive">50.0%</strong><div class="progress-track" role="progressbar" aria-label="资金完成度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50"><span id="detail-progress-fill"></span></div><span class="caption">所选资金 ÷ 所需资金</span></div>
+          <div class="indicator"><span class="metric-label">按当前结余预计达成</span><strong id="detail-date">2037年04月</strong><span id="date-basis" class="caption">每月 ¥40,000 · 仅按结余</span></div>
+          <div class="indicator"><span class="metric-label">从现在起还需</span><strong id="detail-duration">10年5个月</strong><button type="button" class="btn-ghost" data-goto="settings"><svg class="icon"><use href="#i-edit"/></svg>调整时间估算</button></div>
+        </div>
+        <div id="rate-indicators" class="indicator-band" hidden>
+          <div class="indicator"><span class="metric-label">当前年化收益率</span><strong>5.0%</strong><span class="caption">按目标绑定的投资范围</span></div>
+          <div class="indicator"><span class="metric-label">希望达到</span><strong>7.0%</strong><span class="caption">沿用原有目标</span></div>
+          <div class="indicator"><span class="metric-label">还差</span><strong>2.0 个百分点</strong><span class="caption">本金投入不会直接增加收益率</span></div>
+        </div>
+        <div class="financial-facts" id="financial-facts">
+          <div><span>当前资金</span><b id="detail-assets"></b></div>
+          <div><span>所需资金</span><b id="detail-target"></b></div>
+          <div><span>资金缺口</span><b id="detail-gap"></b></div>
+        </div>
+        <section class="content-section" id="timeline-section">
+          <div class="section-heading"><h2>时间对照</h2><span id="deadline-comparison" class="caption"></span></div>
+          <div class="time-comparison"><div><span>当前</span><b>2026年11月</b></div><div id="wish-column"><span>希望完成</span><b id="wish-date"></b></div><div><span>按结余预计</span><b id="timeline-date"></b></div></div>
+          <p class="caption">预计月份随账户金额和月结余更新,本次按当前目标金额不变估算。</p>
+        </section>
+        <section class="content-section" id="contribution-section">
+          <div class="section-heading"><h2>本次采用的月结余</h2><button type="button" class="btn-ghost" data-goto="settings"><svg class="icon"><use href="#i-edit"/></svg>调整</button></div>
+          <div class="source-heading"><b id="source-value">¥40,000 / 月</b><span id="source-label" class="caption">家庭近6个完整月净结余中位数</span></div>
+          <p id="source-assumption" class="caption">假设这些结余全部用于本目标,未分配给其它目标。</p>
+          <p id="source-warning" class="notice" hidden></p>
+          <details class="source-details"><summary id="contribution-reference-title">查看月结余来源</summary><div class="table-scroll"><table><thead><tr><th>账期</th><th>家庭收入</th><th>家庭支出</th><th>月结余</th></tr></thead><tbody id="month-rows"></tbody></table></div><p class="caption">先逐月收入减支出,再取中位数;本月仍在进行,不当作零收入参与。</p></details>
+        </section>
+        <section class="content-section" id="rate-note" hidden><h2>跟踪投资表现</h2><p class="caption">收益率不会随本金投入线性增长,不能由家庭月结余推算达到7%的日期。</p></section>
+        <details id="investment-note" class="source-details"><summary>原有投资回报情景</summary><p class="caption">原有预测按已保存的回报、通胀和准备金假设计算。上方新增日期只按月结余补齐当前资金缺口,不会修改或开启原来的投资情景。</p></details>
+      </section>
+
+      <section id="panel-settings" role="tabpanel" aria-labelledby="tab-settings" class="tab-panel" hidden>
+        <div class="settings-content">
+          <h2>调整时间估算</h2><p class="caption">只调整本目标的月可用结余,资金完成度和所需资金保持原口径。</p>
+          <form id="estimate-form" novalidate>
+            <fieldset><legend class="field-label">月可用结余来源</legend>
+              <label class="radio-option"><input type="radio" name="source" value="AUTO" checked><span>跟随家庭月结余<small id="auto-reference">近6个完整月 · 中位数 ¥40,000 / 月</small></span></label>
+              <label class="radio-option"><input type="radio" name="source" value="MANUAL"><span>自己填写本目标的月可用结余<small>适合只将一部分家庭结余用于这个目标</small></span></label>
+            </fieldset>
+            <div id="manual-field" class="form-field" hidden><label class="field-label" for="monthly-amount">每月可用结余 / 元</label><input id="monthly-amount" class="field-input field-input-num" type="number" step="0.01" min="-1000000000" max="1000000000" inputmode="decimal" value="40000" aria-describedby="amount-error amount-hint"><p id="amount-error" class="field-error" hidden></p><p id="amount-hint" class="caption">填0表示没有新增结余;负数表示每月净流出。</p></div>
+            <div class="form-field"><label class="field-label" for="wish-input">希望完成月份 <span class="caption">可选</span></label><input id="wish-input" class="field-input" type="text" placeholder="YYYY-MM" value="2036-11" inputmode="numeric" aria-describedby="wish-error"><p id="wish-error" class="field-error" hidden></p></div>
+            <div class="estimate-preview"><span>本次预计达成</span><b id="settings-preview">2037年04月 · 还需10年5个月</b><small>仅按结余估算,不计后续投资、加薪或物价变化。</small></div>
+            <div class="form-actions"><button type="submit" class="btn-ink"><svg class="icon"><use href="#i-check"/></svg>保存时间估算</button><button type="button" id="reset-draft" class="btn-paper"><svg class="icon"><use href="#i-reset"/></svg>还原已保存</button></div>
+            <p id="save-status" role="status" class="caption"></p>
+          </form>
+          <p id="settings-not-applicable" class="notice" hidden>这个目标追踪投资表现,不使用月结余预测日期。原有目标与期限继续保留。</p>
+        </div>
+      </section>
+
+      <section id="panel-principle" role="tabpanel" aria-labelledby="tab-principle" class="tab-panel" hidden>
+        <div class="settings-content"><h2>两个指标,分别回答两个问题</h2>
+          <dl class="explanations"><div><dt>已经完成多少</dt><dd id="progress-equation"></dd></div><div><dt>按结余还需多久</dt><dd id="time-equation"></dd></div><div><dt>预计日期</dt><dd id="date-equation"></dd></div></dl>
+          <p id="time-assumptions" class="caption">预计时间使用今天的资金缺口,不会再次扣准备金或负债。所需资金里的长期回报假设用于确定目标门槛,本次时间估算不再给未来资金计算复利。</p>
+          <details class="source-details" id="retirement-target-source"><summary>退休所需资金从哪里来</summary><dl class="explanations"><div><dt>生活本金</dt><dd>¥15,000 × 12 ÷ 2.5% = ¥7,200,000</dd></div><div><dt>大额支出准备金</dt><dd>¥800,000</dd></div><div><dt>全家庭负债</dt><dd>¥2,000,000</dd></div><div><dt>所需资金合计</dt><dd>¥10,000,000</dd></div></dl><p class="caption">2.5%为小Lin实际回报规划假设。准备金与负债在门槛中各计一次。</p></details>
+          <p class="caption">同一份家庭结余可以分别用于观察不同目标,这不是多个目标能够同时完成的资金分配方案。</p>
+        </div>
+      </section>
+    </section>
+  </main>
+  <footer>家庭账房 · v1.40 需求预览</footer>
+</body>
+</html>

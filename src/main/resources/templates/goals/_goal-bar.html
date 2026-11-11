@@ -28,6 +28,8 @@
     <span th:if="${st == 'BEHIND'}" style="color:var(--rust)">· 落后</span>
     <span th:if="${st == 'AHEAD'}" style="color:var(--forest)">· 良好</span>
   </div>
+  <p th:if="${gp.forecast!=null and gp.forecast.supported()}" class="text-xs text-ink-soft mt-2" data-estimate-list
+     th:text="${'按当前结余预计 · '+gp.forecast.dateLabel()+' · 还需'+gp.forecast.durationLabel()}"></p>
 </a>
 </body>
 </html>

@@ -78,6 +78,7 @@ const { chromium } = require(PW);
         }
         if (s.eval) { await p.evaluate(s.eval); await p.waitForTimeout(300); }
         await p.waitForTimeout(s.wait || 1200);   // 图表/字体/轮询首帧
+        if (s.afterEval) { await p.evaluate(s.afterEval); await p.waitForTimeout(300); }
         const f = path.join(outDir, `${prefix}_${s.name}.jpg`);
         let back = null;
         if (s.drag) {

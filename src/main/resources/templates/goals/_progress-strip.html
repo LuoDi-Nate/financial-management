@@ -29,6 +29,7 @@
     <div class="grid grid-cols-2 md:grid-cols-3 gap-1.5 sm:gap-2">
       <!-- v0.5.4 · 每个目标 = 主卡链接 + 右侧「AI 阅读总结」小入口(直达本期月报锚点)· 两个并列 <a> 不嵌套 -->
       <div th:each="gp, gpStat : ${goals}"
+           data-goal-strip-card
            th:classappend="${gpStat.index >= 2} ? 'hidden md:flex' : 'flex'"
            class="items-stretch border border-rule-soft hover:bg-paper transition group">
         <a th:href="@{|/goals/${gp.goal.id}|}"
@@ -40,21 +41,26 @@
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-1">
               <span class="text-sm text-ink truncate group-hover:text-brass-deep transition" th:text="${gp.goal.name}">退休</span>
-              <!-- 2026-07-19:ⓘ 换 kpi-info 组件 —— 点击弹描述(stopPropagation,不再误跳目标详情);热区随全局扩大 -->
-              <th:block th:insert="~{fragments/_kpi-info :: i(${gp.goal.description != null and !gp.goal.description.isBlank() ? gp.goal.description : gp.goal.name}, null)}"/>
+              <th:block th:insert="~{goals/_progress-strip :: summary(${gp.summary(goalsHistoricalReport != true)})}"/>
               <span class="font-mono text-xs text-ink-subtle ml-auto" style="max-width:50%;text-align:right" th:text="${gp.progressLabel()}">57.0%</span>
             </div>
-            <div th:if="${gp.progressAvailable()}" class="w-full bg-card-soft h-1.5 mt-1 overflow-hidden">
+            <div th:if="${gp.progressAvailable()}" class="w-full bg-card-soft h-1.5 mt-1 overflow-hidden" data-goal-strip-axis>
               <div class="h-full bg-brass-deep"
                    th:style="'width:' + ${gp.progressPct > 100 ? 100 : (gp.progressPct < 0 ? 0 : gp.progressPct)} + '%'"></div>
             </div>
-            <!-- 当前/目标(万/%缩写 · data-priv)+ 时间 · 一行分居左右不换行 -->
-            <div class="flex items-baseline justify-between gap-x-2 flex-wrap mt-0.5 font-mono text-[9px] text-ink-subtle">
+            <!-- 当前/目标在左,预计时间在右;窄屏换行后仍贴进度轴右缘。 -->
+            <div class="flex items-baseline justify-between gap-x-2 flex-wrap mt-0.5 font-mono text-[9px] text-ink-subtle"
+                 th:with="showCashflowDate=${goalsHistoricalReport != true and gp.forecast!=null and gp.forecast.supported()}">
               <span data-priv th:text="${gp.currentDisp()} + ' / ' + ${gp.targetDisp()}">15/50万</span>
-              <span th:if="${gp.isNewRetirement()}" th:text="${'当前退休计划 · 修订'+gp.retirement.plan.version+' · '+gp.configurationLabel()}">当前退休计划</span>
-              <span th:if="${!gp.isCustom() and gp.neutralDate != null}" th:text="'中性 ' + ${#temporals.format(gp.neutralDate, 'yyyy')}">中性 2053</span>
-              <span th:if="${gp.isCustom() and gp.daysLeft != null}" th:text="'还剩 ' + ${gp.daysLeft} + ' 天'">还剩 145 天</span>
-              <span th:if="${gp.isCustom() and gp.daysLeft == null}">长期</span>
+              <span th:if="${showCashflowDate}" class="ml-auto text-right" data-estimate-dashboard
+                    title="按当前月结余估算达成时间"
+                    th:text="${gp.forecast.result().state().name() == 'READY' ? '预计 '+gp.forecast.dateLabel() : gp.forecast.dateLabel()}"></span>
+              <th:block th:unless="${showCashflowDate}">
+                <span th:if="${goalsHistoricalReport == true and gp.isNewRetirement()}" th:text="${'当前退休计划 · 修订'+gp.retirement.plan.version+' · '+gp.configurationLabel()}">当前退休计划</span>
+                <span th:if="${!gp.isCustom() and gp.neutralDate != null}" class="ml-auto text-right" th:text="'中性 ' + ${#temporals.format(gp.neutralDate, 'yyyy')}">中性 2053</span>
+                <span th:if="${gp.isCustom() and gp.daysLeft != null}" class="ml-auto text-right" th:text="'还剩 ' + ${gp.daysLeft} + ' 天'">还剩 145 天</span>
+                <span th:if="${gp.isCustom() and gp.daysLeft == null}" class="ml-auto text-right">长期</span>
+              </th:block>
             </div>
           </div>
         </a>
@@ -75,6 +81,22 @@
     </div>
   </div>
 </section>
+
+<span th:fragment="summary(summary)" class="kpi-info-wrap">
+  <button type="button" class="kpi-info-btn" data-kpi-info aria-label="目标进度计算摘要" title="目标进度计算摘要">
+    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+  </button>
+  <span class="kpi-info-panel goal-progress-summary hidden" data-goal-progress-summary>
+    <span class="goal-summary-basis" th:text="${summary.basis()}"></span>
+    <span class="goal-summary-section" th:each="section : ${summary.sections()}">
+      <b th:text="${section.title()}"></b>
+      <span th:text="${section.formula()}"></span>
+      <span th:if="${section.values()!=null}" class="goal-summary-values" th:attr="data-priv=${section.privateValues() ? 'true' : null}" th:text="${section.values()}"></span>
+      <span class="goal-summary-note" th:text="${section.note()}"></span>
+    </span>
+    <span th:if="${!summary.assumption().isEmpty()}" class="goal-summary-note" th:text="${summary.assumption()}"></span>
+  </span>
+</span>
 
 <!-- 引导卡:无目标时 -->
 <section th:fragment="emptyHint" th:if="${goals == null or #lists.isEmpty(goals)}"

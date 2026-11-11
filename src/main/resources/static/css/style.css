@@ -459,6 +459,17 @@ select:not(.field-input), textarea:not(.field-input) { border-radius: var(--r-md
   white-space: pre-line;
   text-transform: none; letter-spacing: normal;
 }
+.goal-progress-summary {
+  width: 340px; min-width: 0; max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 110px); overflow-y: auto; overflow-wrap: anywhere;
+  white-space: normal; text-align: left;
+}
+.goal-summary-basis, .goal-summary-section, .goal-summary-section > span, .goal-summary-note { display: block; }
+.goal-summary-basis, .goal-summary-note { color: var(--ink-subtle); }
+.goal-summary-section { margin-top: 8px; padding-top: 7px; border-top: 1px solid var(--rule-soft); }
+.goal-summary-section > b { display: block; color: var(--ink); }
+.goal-summary-values { margin: 3px 0; white-space: pre-line; color: var(--ink); font-variant-numeric: tabular-nums; }
+.goal-progress-summary > .goal-summary-note { margin-top: 8px; }
 /* v0.5.5 · 报表「已关账」朱印章(横排小印 · 单行不换行 · 仅快照态显)*/
 .report-seal {
   display: inline-flex; align-items: center; justify-content: center;
@@ -3095,6 +3106,8 @@ body.adm-open #float-dock { display: none !important; }
 :is(a, button, summary, label)[class~="border"]:not([class*="rounded"]):not(.pill) { border-radius: var(--r-md); }
 span[class~="border"]:not([class*="rounded"]):not(.pill) { border-radius: var(--r-sm); }
 div.flex[class~="border"]:has(> :is(a, button, label)[class*="border-l"]) { border-radius: var(--r-md); overflow: hidden; }
+/* 目标摘要展开时允许浮层越过卡片边界。 */
+div.flex[data-goal-strip-card]:has([data-goal-progress-summary]:not(.hidden)) { overflow: visible; }
 :is(button, summary)[class*="tracking-"], :is(a, label)[class~="border"][class*="tracking-"] { letter-spacing: .02em; }
 :is(button, summary).uppercase, :is(a, label)[class~="border"].uppercase { text-transform: none; }
 

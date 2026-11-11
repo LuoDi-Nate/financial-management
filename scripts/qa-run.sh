@@ -6,6 +6,7 @@
 set -u
 RD="$(cd "$(dirname "$0")/.." && pwd)"   # 仓库根 · 2026-09-22 从 2900 多行提到这里:
 if [[ "${1:-}" == "--static-v139" ]]; then exec bash "$RD/scripts/qa-v139-static.sh"; fi
+if [[ "${1:-}" == "--static-v140" ]]; then exec bash "$RD/scripts/qa-v140-static.sh"; fi
                                           # 早期的护栏也要用它(诊断/洞察那几条改成静态判据之后)
 BASE="${BASE:-http://localhost:20000}"
 source "$RD/scripts/ai-test-guard.sh"
@@ -3973,7 +3974,10 @@ LSJ="$RD/src/main/resources/static/js/lens-select.js"
 #   ② 原来还断言 README 里有 `pc_lens.jpg?v=3` —— 那是 v0.11 时代「近期更新」段的一张截图热链,
 #      而 README 按维护规则只保留最近 1–2 个版本,那行早就正常滚掉了。护栏钉在会被正常维护搬走的
 #      字面量上 = 迟早假红。这条删掉,不换成别的字面量。
-{ grep -qF '_kpi-info :: i(${gp.goal.description' "$RD/src/main/resources/templates/goals/_progress-strip.html" \
+# 2026-11-10:维护者将目标小i内容改为计算摘要,守同源值与金额隐私,不再守旧备注字面量。
+{ grep -qF 'gp.summary(goalsHistoricalReport != true)' "$RD/src/main/resources/templates/goals/_progress-strip.html" \
+  && grep -q 'data-goal-progress-summary' "$RD/src/main/resources/templates/goals/_progress-strip.html" \
+  && grep -q 'section.privateValues()' "$RD/src/main/resources/templates/goals/_progress-strip.html" \
   && grep -q '.kpi-info-btn::after, .tap::after' "$RD/src/main/resources/static/css/style.css" \
   && grep -q 'inset: -12px' "$RD/src/main/resources/static/css/style.css" \
   && grep -q 'setDatasetVisibility' "$RD/src/main/resources/templates/dashboard/_region.html" \
@@ -3981,7 +3985,7 @@ LSJ="$RD/src/main/resources/static/js/lens-select.js"
   && grep -q 'CN_MIRROR' "$RD/Dockerfile" \
   && grep -q 'CN_MIRROR=0' "$RD/.github/workflows/docker-publish.yml" \
   && [ -f "$RD/deploy/maven-settings-central.xml" ]; } \
-  && log_ok "v11-R7 五项(目标ⓘ弹描述stopPropagation · 热区::after-12px · 图例toggle回归 · lens截图成员结构v3 · CI去aliyun单点)" \
+  && log_ok "v11-R7 五项(目标ⓘ同源计算摘要及金额隐私 · 热区::after-12px · 图例toggle回归 · lens截图成员结构v3 · CI去aliyun单点)" \
   || log_bad "v11-R7 五项缺件" "see _progress-strip/style.css/_region/EntryController/Dockerfile/workflow"
 
 # ===================== v1.2 · 归因复盘 + 再平衡闭环 + 性能底盘 =====================
@@ -7091,6 +7095,8 @@ MINOR=$(printf '%s' "$APPV" | cut -d. -f1,2)
 #   是 prod 实测。机器分不出来,硬扫会得到一条天天红的护栏,然后被人关掉(这一版刚为
 #   「误报会让告警被关掉」付过代价)。要收得先由维护者逐条裁定哪些是真的。
 QA111_SYNTH='4,800,000|4,896,000|6,000,000|53,210|48,765|61,234|40,000|35,000|1,234,567\.89|123,456\.78|1,234,567|1,234,568|1,000,000|2,000,000|1,140,000|1,520,000|99,999,999|10,950,000|1,200,000|1,500,000|1,140,580|4,917,500|7,745,000|1,552,823|1,628,895|3,181,718|3,762,836|17,901,892|0,891,892,893,890|7,747,000|111,221.91|111,222.95|1,280\.00|12,845\.30|3,182\.50|1,046\.03|5,000\.00|1,250\.00|1,000,022\.53|12,001\.89|5,000\.02|12,000\.00|1,190,000|1,195,600|1,186,700|3,886\.44|50,000\.00|2,480,000|2,426,756|101,102,106'
+# v1.40:GoalProgressSummaryTest内独立构造的合成家庭及其确定性演算结果。
+QA111_SYNTH+='|10,000,000\.00|15,000\.00|2,000,000\.00|2,200,000\.00|3,000\.00|5,000,000\.00|7,200,000\.00|800,000\.00'
 #   v1.33 登记的最后四项:删除确认面板 preview / 模板占位里编的「删前 → 删后」净资产、单测里编的划转金额,
 #   以及单测里「改写过的账期 id」逗号串(不是金额,形状恰好像)。
 #   v1.32 登记的最后四项:prd/v1.32.md 与 preview 里编的房贷示例(上月 / 上上月欠款、按年利率拆的那一笔),

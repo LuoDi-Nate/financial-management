@@ -38,6 +38,11 @@ public class Goal {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private LocalDateTime archivedAt;
+    private String forecastSource;
+    private BigDecimal forecastManualAmount;
+    private String forecastManualCurrency;
+    private String forecastWishMonth;
+    private Boolean forecastWishOverride;
 
     /** 追踪指标(空安全,默认金额合计)。 */
     public GoalMetric metricOrDefault() { return metric == null ? GoalMetric.AMOUNT_TOTAL : metric; }

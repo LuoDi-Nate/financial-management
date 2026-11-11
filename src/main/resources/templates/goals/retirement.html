@@ -185,6 +185,9 @@
               </strong>
             </div>
           </div>
+          <th:block th:if="${forecast!=null and forecast.supported()}">
+            <section th:replace="~{goals/_estimate :: result(${forecast})}"></section>
+          </th:block>
           <div class="retire-bridge">
             <div>
               <span>生活本金需求 T</span>
@@ -234,7 +237,7 @@
           th:object="${plan}"
           th:open="${plan.simulateFuture}"
         >
-          <summary>按现在的结余,什么时候能达到</summary>
+          <summary>原有投资回报情景 · 按结余与回报积累</summary>
           <p class="retire-field-hint">
             结余只改变达到时间,不改变当前目标进度。预测将准备金与负债先留出,仅模拟剩余生活本金的积累;结余还需考虑偿清后的家庭安排。
           </p>
@@ -1307,6 +1310,9 @@
                 </div>
               </div>
             </form>
+            <th:block th:if="${forecast!=null and forecast.supported()}">
+              <section th:replace="~{goals/_estimate :: editor(${forecast},${goal==null?null:goal.id})}"></section>
+            </th:block>
             <form
               th:if="${activePlan and priorPlan.previousRevisionJson != null}"
               th:action="@{|/goals/${goal.id}/retirement/restore-previous|}"
@@ -1369,6 +1375,7 @@
         <p class="text-sm text-ink-soft my-5">
           r≤0且生活费不为零时,不存在有限的永久本金门槛。零生活费仍保留负债与预留。每项金额先按分取整,缺失不当零。
         </p>
+        <div data-retire-live="estimate-math"><th:block th:if="${forecast!=null and forecast.supported()}"><section th:replace="~{goals/_estimate :: math(${forecast})}"></section></th:block></div>
         <h3 class="font-display text-xl mb-3">可选的未来积累</h3>
         <div class="retire-formulas">
           <p>q = ((1 + 名义年回报) ÷ (1 + π))^(1/12) − 1</p>

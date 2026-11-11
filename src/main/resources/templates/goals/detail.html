@@ -173,6 +173,11 @@
     </div>
   </section>
 
+  <th:block th:if="${progress.forecast!=null and progress.forecast.supported()}">
+    <section th:replace="~{goals/_estimate :: result(${progress.forecast})}"></section>
+    <section th:replace="~{goals/_estimate :: editor(${progress.forecast},${goal.id})}"></section>
+    <section th:replace="~{goals/_estimate :: math(${progress.forecast})}"></section>
+  </th:block>
   <!-- 三情景大图(预设三类;CUSTOM 无三情景)-->
   <section th:unless="${progress.isCustom()}" class="paper-card p-5 sm:p-8 mb-6">
     <div class="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-3 mb-6">

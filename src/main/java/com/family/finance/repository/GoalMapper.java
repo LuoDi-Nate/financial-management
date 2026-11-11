@@ -19,21 +19,18 @@ import java.util.Optional;
  */
 @Mapper
 public interface GoalMapper {
+    String COLUMNS = "id, family_id, goal_type, name, description, target_value, target_date, "
+            + "metric, comparator, time_mode, params_json, created_at, updated_at, archived_at, "
+            + "forecast_source, forecast_manual_amount, forecast_manual_currency, forecast_wish_month, forecast_wish_override ";
 
-    @Select("""
-            SELECT id, family_id, goal_type, name, description, target_value, target_date,
-                   metric, comparator, time_mode,
-                   params_json, created_at, updated_at, archived_at
+    @Select("SELECT " + COLUMNS + """
               FROM family_goal
              WHERE family_id = #{familyId}
                AND id = #{id}
             """)
     Optional<Goal> findById(@Param("familyId") long familyId, @Param("id") long id);
 
-    @Select("""
-            SELECT id, family_id, goal_type, name, description, target_value, target_date,
-                   metric, comparator, time_mode,
-                   params_json, created_at, updated_at, archived_at
+    @Select("SELECT " + COLUMNS + """
               FROM family_goal
              WHERE family_id = #{familyId}
                AND archived_at IS NULL
@@ -41,10 +38,10 @@ public interface GoalMapper {
             """)
     List<Goal> findActiveByFamily(@Param("familyId") long familyId);
 
-    @Select("""
-            SELECT id, family_id, goal_type, name, description, target_value, target_date,
-                   metric, comparator, time_mode,
-                   params_json, created_at, updated_at, archived_at
+    @Select("SELECT " + COLUMNS + " FROM family_goal WHERE family_id=#{familyId} ORDER BY id")
+    List<Goal> findAllByFamily(@Param("familyId") long familyId);
+
+    @Select("SELECT " + COLUMNS + """
               FROM family_goal
              WHERE family_id = #{familyId}
                AND goal_type = #{goalType}
@@ -78,6 +75,19 @@ public interface GoalMapper {
                AND archived_at IS NULL
             """)
     int update(Goal goal);
+
+    @Update("""
+            UPDATE family_goal
+               SET forecast_source = #{source},
+                   forecast_manual_amount = CASE WHEN #{source} = 'MANUAL' THEN #{amount} ELSE forecast_manual_amount END,
+                   forecast_manual_currency = CASE WHEN #{source} = 'MANUAL' THEN #{currency} ELSE forecast_manual_currency END,
+                   forecast_wish_month = #{wishMonth}, forecast_wish_override = #{wishOverride}
+             WHERE family_id = #{familyId} AND id = #{goalId} AND archived_at IS NULL
+            """)
+    int updateForecast(@Param("familyId") long familyId, @Param("goalId") long goalId,
+                       @Param("source") String source, @Param("amount") java.math.BigDecimal amount,
+                       @Param("currency") String currency, @Param("wishMonth") String wishMonth,
+                       @Param("wishOverride") boolean wishOverride);
 
     @Update("""
             UPDATE family_goal

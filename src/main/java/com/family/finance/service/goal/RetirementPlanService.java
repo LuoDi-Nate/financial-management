@@ -27,6 +27,8 @@ public class RetirementPlanService {
     private final ObjectMapper json;
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.family.finance.service.AuditLogService audit;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private GoalForecastService forecasts;
 
     public record View(RetirementPlan plan, RetirementCalculator.Result result, RetirementDataService.Data data,
                        LocalDateTime updatedAt, boolean createdForPlan, boolean active, String fingerprint,
@@ -209,6 +211,13 @@ public class RetirementPlanService {
 
     @Transactional
     public Goal save(long familyId, Long goalId, RetirementPlan p, boolean adoptionConfirmed, boolean revisionConfirmed, Long actorId) {
+        return save(familyId,goalId,p,adoptionConfirmed,revisionConfirmed,actorId,null);
+    }
+
+    @Transactional
+    public Goal save(long familyId, Long goalId, RetirementPlan p, boolean adoptionConfirmed, boolean revisionConfirmed, Long actorId,
+                     GoalForecastForm estimate) {
+        if(estimate!=null && !estimate.errors().isEmpty()) throw new IllegalArgumentException(estimate.errors().values().iterator().next());
         Goal goal = goalId == null ? null : goalService.require(familyId, goalId);
         if (goal != null && goal.getArchivedAt() != null) throw new IllegalArgumentException("请先恢复目标再修改计划");
         var existing = goal == null ? Optional.<RetirementPlanMapper.Row>empty() : mapper.find(familyId, goalId);
@@ -250,6 +259,7 @@ public class RetirementPlanService {
         }
         int written = mapper.save(familyId, goal.getId(), encode(p), true, goalId == null);
         if (written == 0 && mapper.find(familyId, goal.getId()).isEmpty()) throw new IllegalArgumentException("退休计划写入失败");
+        if(estimate!=null) forecasts.save(familyId,goal.getId(),estimate);
         if (audit != null && actorId != null) audit.record(familyId, actorId, com.family.finance.domain.audit.AuditLogType.SYSTEM,
                 "family_goal", goal.getId(), "保存退休生活账 修订"+p.getVersion()+" · " + (goalId == null ? "新建" : "调整/采用") + " · 不修改旧算法参数");
         return goal;

@@ -30,6 +30,7 @@ public class RetirementController {
     private final GoalAiReportMapper reports;
     private final NavService nav;
     private final com.family.finance.service.llmtrace.PromptPeekLinks promptPeek;
+    private final GoalForecastService forecasts;
 
     @InitBinder("plan")
     void bind(WebDataBinder binder) {
@@ -59,6 +60,7 @@ public class RetirementController {
     @PostMapping({"/goals/retirement/new/preview", "/goals/{id:[0-9]+}/retirement/preview"})
     String preview(@AuthenticationPrincipal MemberPrincipal me, @PathVariable(required = false) Long id,
                    @ModelAttribute("plan") RetirementPlan plan, org.springframework.validation.BindingResult binding,
+                   @ModelAttribute("estimate") GoalForecastForm estimate,
                    @RequestParam(required = false) String ccy, Model model) {
         Goal goal = id == null ? null : retirementGoal(me, id);
         trustedBasis(me, goal, plan);
@@ -67,23 +69,27 @@ public class RetirementController {
             return page(me, goal, plans.draft(me.getFamilyId(), goal), "plan", ccy, model);
         }
         model.addAttribute("previewing", true);
+        if (estimate.getEstimateSource()!=null) model.addAttribute("estimateDraft",estimate);
         return page(me, goal, plan, "overview", ccy, model);
     }
 
     @PostMapping({"/goals/retirement/new", "/goals/{id:[0-9]+}/retirement"})
     String save(@AuthenticationPrincipal MemberPrincipal me, @PathVariable(required = false) Long id,
                 @ModelAttribute("plan") RetirementPlan plan, org.springframework.validation.BindingResult binding,
+                @ModelAttribute("estimate") GoalForecastForm estimate,
                 @RequestParam(defaultValue = "false") boolean adoptionConfirmed,
                 @RequestParam(defaultValue = "false") boolean revisionConfirmed, Model model, RedirectAttributes ra) {
         Goal goal = id == null ? null : retirementGoal(me, id);
         trustedBasis(me, goal, plan);
         try {
             if (binding.hasErrors()) throw new IllegalArgumentException("金额或选择格式无效,请检查后重试");
-            Goal saved = plans.save(me.getFamilyId(), id, plan, adoptionConfirmed, revisionConfirmed, me.getMemberId());
+            Goal saved = plans.save(me.getFamilyId(), id, plan, adoptionConfirmed, revisionConfirmed, me.getMemberId(),
+                    estimate.getEstimateSource()==null?null:estimate);
             ra.addFlashAttribute("note", "退休计划已保存,未修改账户、流水或旧算法参数。");
             return "redirect:/goals/" + saved.getId() + "/retirement";
         } catch (IllegalArgumentException e) {
             model.addAttribute("error", e.getMessage());
+            if(estimate.getEstimateSource()!=null)model.addAttribute("estimateDraft",estimate);
             return page(me, goal, plan, "plan", plan.getBaseCurrency(), model);
         }
     }
@@ -105,6 +111,13 @@ public class RetirementController {
                 + "\n" + view.result().aiSummary() + "\n回报来源:" + view.returnBasis() + "\n来源月份:" + view.data().months()
                 + "\n动态来源:"+view.data().sources()+"\n本次有效参数:\n"+plans.encode(view.effective())+"\n保存参数:\n" + plans.encode(view.plan())
                 + "\n原节目:https://www.bilibili.com/video/BV1yUHP6rEYD/\n480=12/2.5%;名义模式实际回报=(1+R)/(1+通胀)-1。\n";
+        var forecast=forecasts.evaluate(goal,view.progressAssets(),view.progressTarget(),view.result().coverage(),view,null,
+                forecasts.context(me.getFamilyId(),view.result().asOf()));
+        if(forecast.supported())text += "\n按当前结余预计达成:"+forecast.dateLabel()+" · 还需"+forecast.durationLabel()
+                +"\n月可用结余:"+forecast.amount(forecast.result().contribution())+"\n结余来源:"+forecast.sourceLabel()
+                +"\n观察日:"+forecast.result().asOf()+"\n估算说明:"+forecast.reason()
+                +"\n独立估算设置:"+goal.getForecastSource()+";手填币种="+goal.getForecastManualCurrency()
+                +";希望月份="+goal.getForecastWishMonth()+";显式覆盖="+goal.getForecastWishOverride()+"\n";
         return ResponseEntity.ok().header("Content-Type", "text/plain; charset=UTF-8")
                 .header("Content-Disposition", "attachment; filename=retirement-" + id + ".txt")
                 .header("Cache-Control", "no-store").body(text);
@@ -156,6 +169,9 @@ public class RetirementController {
         model.addAttribute("nativePlan", active.map(RetirementPlanService.View::createdForPlan).orElse(goal == null));
         model.addAttribute("nav", nav.load(me)); model.addAttribute("goal", goal); model.addAttribute("plan", p);
         model.addAttribute("view", view); model.addAttribute("r", view.result()); model.addAttribute("tab", tab);
+        Goal estimateGoal=goal==null?Goal.builder().familyId(familyId).goalType(GoalType.RETIREMENT).build():goal;
+        model.addAttribute("forecast",forecasts.evaluate(estimateGoal,view.progressAssets(),view.progressTarget(),view.result().coverage(),
+                view,(GoalForecastForm)model.getAttribute("estimateDraft"),forecasts.context(familyId,LocalDate.now())));
         model.addAttribute("previewing", Boolean.TRUE.equals(model.getAttribute("previewing")));
         if (goal != null && active.isEmpty()) model.addAttribute("legacy", progress.compute(familyId, goal));
         String requested = ccy == null ? p.getBaseCurrency() : ccy.toUpperCase(java.util.Locale.ROOT);
@@ -178,6 +194,11 @@ public class RetirementController {
             model.addAttribute("budgetChanged", p.getBudgetFingerprint() != null && !p.getBudgetFingerprint().equals(snapshot.data().budgetFingerprint()));
         }
         return "goals/retirement";
+    }
+
+    @InitBinder("estimate")
+    void bindEstimate(WebDataBinder binder) {
+        binder.setAllowedFields("estimateSource","estimateMonthlyAmount","estimateWishMonth","estimateWishOverride");
     }
 
     public record Money(String currency, BigDecimal factor) {

@@ -35,6 +35,7 @@
 
   <!-- 目标紧凑条(列表 · 一屏多条 · 点开进详情)· v0.16 移动端瘦身 -->
   <div class="max-w-3xl" th:unless="${#lists.isEmpty(goals)}">
+    <p class="text-xs text-ink-soft mb-4">各目标独立估算,同一笔家庭结余尚未在目标之间分配。</p>
     <th:block th:each="gp : ${goals}">
       <div th:replace="~{goals/_goal-bar :: bar(${gp})}"></div>
     </th:block>

@@ -1,74 +1,52 @@
 {
-  "_comment": "v1.39.0:退休进度、共用设置表单、算法说明、贷款设置及服务端模型测试保护。沿目标列表进入第一个已有退休计划,不固定本地目标编号;只读取beta页面,默认隐私模式,不保存配置或调用模型。",
+  "_comment": "v1.40.0:目标计算摘要、按月结余达成时间与独立估算设置。只读取beta已有退休计划,不固定本地目标编号;默认金额隐私,不保存配置或调用模型。",
   "pc": [
     {
-      "path": "/goals",
-      "name": "retirement-progress",
-      "eval": "var a=Array.from(document.querySelectorAll('a[href^=\"/goals/\"]')).find(a=>a.textContent.includes('退休生活账'));if(!a)throw new Error('需要一个已保存的退休计划');a.click();",
-      "wait": 3500,
-      "selector": "#retire-overview [data-retire-live=\"result\"]"
-    },
-    {
-      "path": "/goals/retirement/new",
-      "name": "retirement-settings",
-      "waitFor": "#retire-assets",
-      "wait": 2500,
-      "selector": "#retire-assets"
+      "path": "/dashboard",
+      "name": "goal-summary",
+      "eval": "var c=Array.from(document.querySelectorAll('[data-goal-strip-card]')).find(e=>e.querySelector('[data-estimate-dashboard]'));if(!c)throw new Error('需要一个支持时间估算的目标');c.scrollIntoView({block:'center'});c.querySelector('[data-kpi-info]').click();",
+      "wait": 2000,
+      "clipUnion": ["[data-goal-strip-card]:has([data-goal-progress-summary]:not(.hidden))", "[data-goal-progress-summary]:not(.hidden)"]
     },
     {
       "path": "/goals",
-      "name": "retirement-formula",
-      "eval": "var a=Array.from(document.querySelectorAll('a[href^=\"/goals/\"]')).find(a=>a.textContent.includes('退休生活账'));if(!a)throw new Error('需要一个已保存的退休计划');a.href+='/retirement?tab=principle';a.click();",
+      "name": "goal-cashflow-time",
+      "eval": "var a=Array.from(document.querySelectorAll('a[href^=\"/goals/\"]')).find(a=>a.textContent.includes('退休生活账'));if(!a)throw new Error('需要一个已保存的退休计划');a.href+='/retirement#goal-estimate-result';a.click();",
+      "afterEval": "var e=document.querySelector('#goal-estimate-result');if(!e)throw new Error('缺少时间估算');window.scrollTo({top:Math.max(0,e.getBoundingClientRect().top+scrollY-96),behavior:'instant'});",
       "wait": 3500,
-      "selector": "#retire-principle"
+      "selector": "#goal-estimate-result"
     },
     {
-      "path": "/admin/fixed-flows",
-      "name": "loan-settings",
-      "waitFor": "#loan-setup",
-      "selector": "#loan-setup"
-    },
-    {
-      "path": "/admin/ai-access",
-      "name": "ai-test-protection",
-      "waitFor": "#test-mode",
-      "selector": "#test-mode"
+      "path": "/goals",
+      "name": "goal-estimate-settings",
+      "eval": "var a=Array.from(document.querySelectorAll('a[href^=\"/goals/\"]')).find(a=>a.textContent.includes('退休生活账'));if(!a)throw new Error('需要一个已保存的退休计划');a.href+='/retirement?tab=plan#goal-estimate-settings';a.click();",
+      "afterEval": "var e=document.querySelector('#goal-estimate-settings');if(!e)throw new Error('缺少时间估算设置');window.scrollTo({top:Math.max(0,e.getBoundingClientRect().top+scrollY-96),behavior:'instant'});",
+      "wait": 3500,
+      "selector": "#goal-estimate-settings"
     }
   ],
   "mobile": [
     {
-      "path": "/goals",
-      "name": "retirement-progress",
-      "eval": "var a=Array.from(document.querySelectorAll('a[href^=\"/goals/\"]')).find(a=>a.textContent.includes('退休生活账'));if(!a)throw new Error('需要一个已保存的退休计划');a.click();",
-      "wait": 3500,
-      "full": false
-    },
-    {
-      "path": "/goals/retirement/new",
-      "name": "retirement-settings",
-      "waitFor": "#retire-assets",
-      "wait": 2500,
+      "path": "/dashboard",
+      "name": "goal-summary",
+      "eval": "var c=Array.from(document.querySelectorAll('[data-goal-strip-card]')).find(e=>e.getBoundingClientRect().width>0&&e.querySelector('[data-estimate-dashboard]'));if(!c)throw new Error('需要一个支持时间估算的目标');c.scrollIntoView({block:'center'});c.querySelector('[data-kpi-info]').click();",
+      "wait": 2000,
       "full": false
     },
     {
       "path": "/goals",
-      "name": "retirement-formula",
-      "eval": "var a=Array.from(document.querySelectorAll('a[href^=\"/goals/\"]')).find(a=>a.textContent.includes('退休生活账'));if(!a)throw new Error('需要一个已保存的退休计划');a.href+='/retirement?tab=principle';a.click();",
+      "name": "goal-cashflow-time",
+      "eval": "var a=Array.from(document.querySelectorAll('a[href^=\"/goals/\"]')).find(a=>a.textContent.includes('退休生活账'));if(!a)throw new Error('需要一个已保存的退休计划');a.href+='/retirement#goal-estimate-result';a.click();",
+      "afterEval": "var e=document.querySelector('#goal-estimate-result');if(!e)throw new Error('缺少时间估算');window.scrollTo({top:Math.max(0,e.getBoundingClientRect().top+scrollY-96),behavior:'instant'});",
       "wait": 3500,
       "full": false
     },
     {
-      "path": "/admin/fixed-flows#loan-setup",
-      "name": "loan-settings",
-      "waitFor": "#loan-setup",
-      "eval": "document.querySelector('#loan-setup').scrollIntoView();",
-      "full": false
-    },
-    {
-      "path": "/admin/ai-access#test-mode",
-      "name": "ai-test-protection",
-      "waitFor": "#test-mode",
-      "eval": "document.querySelector('#test-mode').scrollIntoView();",
+      "path": "/goals",
+      "name": "goal-estimate-settings",
+      "eval": "var a=Array.from(document.querySelectorAll('a[href^=\"/goals/\"]')).find(a=>a.textContent.includes('退休生活账'));if(!a)throw new Error('需要一个已保存的退休计划');a.href+='/retirement?tab=plan#goal-estimate-settings';a.click();",
+      "afterEval": "var e=document.querySelector('#goal-estimate-settings');if(!e)throw new Error('缺少时间估算设置');window.scrollTo({top:Math.max(0,e.getBoundingClientRect().top+scrollY-96),behavior:'instant'});",
+      "wait": 3500,
       "full": false
     }
   ]

@@ -1,0 +1,16 @@
+.goal-estimate-result{padding:24px 0;border-top:1px solid var(--rule-soft);border-bottom:1px solid var(--rule-soft);margin:20px 0}
+.goal-estimate-band{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:24px;align-items:start}
+.goal-estimate-band>div{min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:8px}
+.goal-estimate-label{font-size:calc(13px * var(--fs-scale,1));color:var(--ink-soft)}
+.goal-estimate-band strong{font-family:"Fraunces","Noto Serif SC",serif;font-size:calc(24px * var(--fs-scale,1));font-weight:500;line-height:1.6;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.goal-estimate-band b{font-size:calc(15px * var(--fs-scale,1));font-weight:500;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.goal-estimate-caption{font-size:calc(13px * var(--fs-scale,1));line-height:1.8;color:var(--ink-soft);margin-top:8px}
+.goal-estimate-reference{margin-top:12px}.goal-estimate-reference summary{min-height:36px;cursor:pointer;font-size:calc(13px * var(--fs-scale,1));color:var(--ink-soft)}
+.goal-estimate-reference table{margin-top:12px}.goal-estimate-reference td,.goal-estimate-reference th{padding:8px;text-align:right}.goal-estimate-reference td:first-child,.goal-estimate-reference th:first-child{text-align:left}
+.goal-estimate-settings{padding:24px 0;max-width:800px;border-top:1px solid var(--rule-soft);margin-top:24px;scroll-margin-top:80px}
+.goal-estimate-settings .field-input{max-width:100%;width:100%}.goal-estimate-radio{display:flex;align-items:flex-start;gap:12px;min-height:52px;padding:8px 0;cursor:pointer;font-size:calc(15px * var(--fs-scale,1));line-height:1.7}
+.goal-estimate-radio input{width:18px;height:18px;accent-color:var(--forest);flex-shrink:0;margin-top:4px}.goal-estimate-radio small{display:block;font-size:calc(13px * var(--fs-scale,1));color:var(--ink-soft)}
+.goal-estimate-field-error,.goal-estimate-draft{font-size:calc(13px * var(--fs-scale,1));color:var(--rust);line-height:1.8;margin:8px 0}.goal-estimate-field-error:empty{display:none}
+.goal-estimate-settings [aria-invalid=true]{border-color:var(--rust)}.goal-estimate-actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:20px}
+.goal-estimate-line{font-size:calc(12px * var(--fs-scale,1));line-height:1.7;color:var(--ink-soft);margin-top:8px;overflow-wrap:anywhere}.goal-estimate-math{font-size:calc(14px * var(--fs-scale,1));line-height:1.8}
+@media(max-width:640px){.goal-estimate-band{grid-template-columns:1fr 1fr;gap:20px 16px}.goal-estimate-band>div:first-child{grid-column:1/-1}.goal-estimate-band strong{font-size:calc(24px * var(--fs-scale,1))}.goal-estimate-actions{gap:8px}.goal-estimate-actions button{flex:1;min-width:0}.goal-estimate-reference summary{min-height:44px}.goal-estimate-reference td{text-align:left}}
