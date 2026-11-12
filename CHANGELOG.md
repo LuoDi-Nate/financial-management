@@ -2,8 +2,9 @@
 
 按 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 风格记录。每个版本详细需求见对应 [`prd/vX.Y.md`](prd/),技术设计见 [`tech-design/vX.Y.md`](tech-design/),QA case 见 [`docs/qa-cases.md`](docs/qa-cases.md)。
 
-## [v1.40.1] · beta已验收,待发布 · 目标 AI 洞察
+## [v1.40.1] · 2026-11-12 · 目标 AI 洞察
 
+- 维护者精确确认后发布。生产版本1.40.1,备份与迁移幂等检查通过,本机及公网health/login均200;Docker双架构版本/源码标签匹配,新版与latest同摘要,[Release](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.40.1)已发布。无新增迁移。
 - 补齐新退休目标的 AI 洞察标题入口、仪表盘直达、跨页签定位及未确认偏离预警。
 - 解读增加同源的结余达成时间和来源;计划、资金与结余依据变化后标明历史解读,生成失败保留原报告。未自动重算或调用真实模型。
 - 1501单测、77静态、退休494项、目标125项、完整守护1037项、数据187项与原目标公网双端9项通过;已更新beta,实际模型发送0。手机阅读时工具移到正文后,不遮住洞察。详见 [beta验收记录](docs/beta-review-v1.40.1.md)。

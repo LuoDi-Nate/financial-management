@@ -94,11 +94,11 @@
 
 ## 近期更新 · Releases
 
+**[v1.40.1](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.40.1) · 补齐新目标 AI 洞察**
+新退休目标恢复清晰的AI洞察入口、月报与偏离预警,解读同步引用月结余达成时间及来源。生成失败保留旧报告,窄屏阅读无遮挡;无新增数据库迁移。见 [补丁PRD](prd/v1.40.1.md)与[验收及发布记录](docs/beta-review-v1.40.1.md)。
+
 **[v1.40.0](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.40.0) · 目标多指标与按月结余的达成时间**
 保留资金进度,增加按当前月结余估算的达成月份与剩余时长,支持家庭自动来源和本目标手填。仪表盘预计月份位于进度轴右下角,小i说明门槛组成、资金进度和达成月份的计算依据;独立保存估算不冲掉主计划草稿。见 [PRD](prd/v1.40.md)、[技术设计](tech-design/v1.40.md)与[验收及发布记录](docs/beta-review-v1.40.md)。
-
-**[v1.39.0](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.39.0) · 退休目标、贷款设置与 AI 可用性修复**
-退休进度按所选账户当前合计除以所需总资金计算,配置保存与运行数据分开;历史回报不足时明确采用小Lin2.5%实际回报规划,旧目标需比较后采用。一并交付贷款固定还款设置、服务端模型测试保护与AI主备路由修复。见 [PRD](prd/v1.39.md)、[技术设计](tech-design/v1.39.md)与[原节目调研](docs/research/retirement-xiaolin-2026-11.md)。
 
 > 完整发布记录与截图见 [Releases](https://github.com/LuoDi-Nate/financial-management/releases)(本段每版只留 2–4 行,细节不搬过来)。
 
@@ -350,7 +350,7 @@ bash scripts/regression-data.sh # 数据层/口径回归(原 e2e.sh · curl 端�
 
 ## 文档
 
-- 待发布补丁:[v1.40.1 新目标 AI 洞察修复](prd/v1.40.1.md),[技术方案附录](tech-design/v1.40.md)。
+- 已发布补丁:[v1.40.1 新目标 AI 洞察修复](prd/v1.40.1.md),[技术方案附录](tech-design/v1.40.md)。
 
 **新手先看**
 

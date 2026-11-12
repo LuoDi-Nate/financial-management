@@ -1,6 +1,16 @@
-# v1.40.1 · 目标 AI 洞察 beta 验收
+# v1.40.1 · 目标 AI 洞察验收及发布记录
 
-状态:维护者已通过beta验收并要求发布;准备发布预检,尚未发布prod。
+状态:维护者通过beta验收并精确确认`release v1.40.1`后,于2026-11-12完成生产发布。
+
+## 发布验证
+
+- 合并后的master在提交`b6a50dbe`通过发布预检,1501项单测零失败/错误/跳过;README、主页数字带、版本徽记与部署脚本语法检查通过。
+- 从同一标签`v1.40.1`在本机编译jar,生产端SHA-256一致;数据库已备份,80项既有迁移幂等跳过,无新增迁移。
+- 生产返回版本1.40.1,本机与公网`/health`及`/login`均200。发布过程中未在生产执行写库回归或触发真实模型测试。
+- [Docker CI 43170251460](https://github.com/LuoDi-Nate/financial-management/actions/runs/43170251460)的应用、网关launcher与MySQL镜像任务均成功。新版及latest匿名可拉,索引摘要同为`sha256:d3dfb0bae4a977d5606442dbeb7efb5ebd4749398dc31beb1c7bacd83c74832f`;amd64/arm64的版本均为v1.40.1、源码标签均匹配提交`b6a50dbe`。
+- [GitHub Release](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.40.1)已公开,按补丁发布规则提供简洁升级说明。
+
+## beta验收
 
 入口:[目标列表](https://beta.dixi-token.top/goals) → 退休目标 → 标题区「AI 洞察」。从「调整计划」「怎么算的」点击同一入口,应切回并定位到洞察正文。电脑仪表盘的AI洞察链接直接进入新退休详情。
 
