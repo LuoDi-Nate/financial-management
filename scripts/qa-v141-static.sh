@@ -24,6 +24,7 @@ check rg -q 'Transactional' "$java/web/admin/AiModelController.java"
 check rg -q 'LlmFailure.describe' "$java/service/holdingimport/VisionLlmClient.java"
 check rg -q 'LlmFailure.describe' "$java/service/ask/runtime/LocalToolLoopRuntime.java"
 check rg -q 'data-lsel' "$tpl"
+check rg -q '/js/lens-select.js' "$tpl"
 check rg -q 'data-model-pattern' "$tpl"
 check node --check src/main/resources/static/js/llm-settings.js
 check test -f src/test/java/com/family/finance/service/checkup/llm/LlmIntegrationV141Test.java

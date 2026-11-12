@@ -35,7 +35,7 @@
             <th:block th:switch="${card.code()}">
               <p th:case="'dashscope'">百炼免费额度按型号分别计算。请在控制台设置“免费额度用完即停”;自动型号沿用原池轮询,也可手填固定型号。</p>
               <p th:case="'deepseek'">DeepSeek官方按账户额度计费,只有文字能力。截图识别需另配支持图片的平台。</p>
-              <p th:case="'ark'">先完成实名认证,并在“开通管理”开通所用型号。可直接复制模型广场的Model ID,也保留ep-接入点ID;带日期的型号失效后需更新。</p>
+              <p th:case="'ark'">先完成实名认证,并在<a href="https://console.volcengine.com/ark/region:ark+cn-beijing/openManagement" target="_blank" rel="noreferrer">开通管理</a>开通所用型号。可直接复制<a href="https://console.volcengine.com/ark/region:ark+cn-beijing/model" target="_blank" rel="noreferrer">模型广场</a>的Model ID,也保留ep-接入点ID;带日期的型号失效后需更新。</p>
               <p th:case="'siliconflow'">使用硅基流动中国站自己的密钥与账户额度。复制完整型号,保留组织/Pro前缀及大小写;图片和工具能力依具体型号,不与DeepSeek官方共用密钥。</p>
             </th:block>
             <a href="https://github.com/LuoDi-Nate/financial-management/blob/master/docs/llm-api-keys-setup.md" target="_blank" rel="noreferrer">完整申请指南</a>
@@ -116,6 +116,9 @@
     </div>
   </div>
 </div>
-<th:block th:fragment="script"><script th:src="@{/js/llm-settings.js}" defer></script></th:block>
+<th:block th:fragment="script">
+  <script th:src="@{/js/lens-select.js}" defer></script>
+  <script th:src="@{/js/llm-settings.js}" defer></script>
+</th:block>
 </body>
 </html>
