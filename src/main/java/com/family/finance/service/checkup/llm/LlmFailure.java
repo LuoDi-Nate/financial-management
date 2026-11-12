@@ -29,8 +29,12 @@ public final class LlmFailure {
             return "该型号尚未开通或无权使用,请到本平台核对";
         if (status == 404 || m.contains("model not found") || m.contains("modelnotfound")
                 || m.contains("invalidendpointormodel") || m.contains("does not exist")) {
-            return "型号不存在或无权使用,请从本平台复制完整型号"
-                    + (LlmCatalog.P_ARK.equals(platform) ? ";方舟也可填写ep-接入点ID,带日期型号失效时可改用不带日期的豆包别名" : "");
+            String hint = LlmCatalog.P_ARK.equals(platform)
+                    ? ";带日期型号可能已失效,可改用不带日期的 "
+                        + LlmCatalog.ARK.family("doubao").map(LlmCatalog.Family::defaultModel).orElse("")
+                        + ",或到方舟模型广场复制当前Model ID;也可填写ep-接入点ID"
+                    : "";
+            return "型号不存在或无权使用,请从本平台复制完整型号" + hint;
         }
         if (m.contains("realname") || m.contains("real name") || m.contains("实名"))
             return "平台账号需要完成实名认证,请到本平台核对";

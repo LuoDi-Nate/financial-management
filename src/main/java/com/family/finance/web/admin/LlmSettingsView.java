@@ -88,6 +88,7 @@ public class LlmSettingsView {
         model.addAttribute("llmVisionFamily",   s.vision().family());
         model.addAttribute("llmVisionModelId",  s.vision().model() == null ? "" : s.vision().model());
         model.addAttribute("llmVisionDisplay",  s.vision().display());
+        model.addAttribute("llmVisionEffectiveDisplay", s.visionEnabled() ? s.vision().display() : "截图识别关闭");
         // 型号目录(级联下拉的唯一数据源 · FR-364)· 服务端注入,模板里不再有第二份写死清单
         model.addAttribute("llmCatalogJson", catalogJson());
         // 平台下拉的 option 仍由服务端渲染(而不是全交给 JS):JS 挂了的话至少还能提交一组合法平台,

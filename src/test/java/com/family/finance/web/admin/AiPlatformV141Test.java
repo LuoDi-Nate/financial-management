@@ -67,12 +67,28 @@ class AiPlatformV141Test {
         var bad=save("siliconflow","other","sk-SECRET WITH SPACE",false,"","","");
         assertThat(values).isEqualTo(before);assertThat(bad.getFlashAttributes()).containsKey("llmDraft");
         assertThat(bad.getFlashAttributes().toString()).doesNotContain("SECRET");
+        var manager=mock(org.springframework.transaction.PlatformTransactionManager.class);
+        var status=mock(org.springframework.transaction.TransactionStatus.class);
+        when(manager.getTransaction(any())).thenReturn(status);
+        var interceptor=new org.springframework.transaction.interceptor.TransactionInterceptor();
+        interceptor.setTransactionManager(manager);
+        interceptor.setTransactionAttributeSource(new org.springframework.transaction.annotation.AnnotationTransactionAttributeSource());
+        var factory=new org.springframework.aop.framework.ProxyFactory(controller);factory.addAdvice(interceptor);
+        var proxied=(AiModelController)factory.getProxy();
+        doAnswer(a->{throw new IllegalStateException("synthetic-write-failure");}).when(cfg).set(eq(1L),eq("llm_family"),anyString());
+        assertThatThrownBy(()->proxied.saveLlmModels(me(),"siliconflow","deepseek","Org/Model",null,null,null,false,"","","",0.5,2000,25,new RedirectAttributesModelMap()))
+                .hasMessage("synthetic-write-failure");
+        verify(manager).rollback(status);verify(manager,never()).commit(any());
     }
     @Test void disabledVisionPreservesPreviousSettingAndDoesNotBlockTextOnly() {
         values.put("llm_deepseek_api_key","synthetic-key");values.put("llm_vision_model_id","Previous/Vision");
         assertThat(save("deepseek","deepseek","",false,"siliconflow","other-vision","bad model").getFlashAttributes()).doesNotContainKey("flashError");
         assertThat(values.get("llm_vision_model_id")).isEqualTo("Previous/Vision");
         var model=new ExtendedModelMap();view.addLlmAttributes(1,model);assertThat(model.get("visionCapableReady")).isEqualTo(false);
+        values.put("llm_vision_enabled","true");
+        var draft=new ExtendedModelMap();draft.addAttribute("llmDraft",Map.of("llmVisionEnabled",false));view.addLlmAttributes(1,draft);
+        assertThat(draft.get("llmVisionEnabled")).isEqualTo(false);
+        assertThat(draft.get("llmVisionEffectiveDisplay")).isEqualTo(LlmSettings.load(cfg,1).vision().display());
     }
     @Test void siliconflowVisionIsAvailableWithoutAnyOriginalPlatformKey() {
         values.put("llm_siliconflow_api_key","synthetic-key");

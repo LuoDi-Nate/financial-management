@@ -71,7 +71,7 @@
         <div data-llm-vision>
           <th:block th:replace="~{admin/_llm-settings :: triple('vision','截图识别 · 独立型号',${llmVisionPlatform},${llmVisionFamily},${llmVisionModelId},${llmPlatformsVision},false)}"></th:block>
         </div>
-        <p class="text-xs text-ink-soft">当前生效 · <span th:text="${llmVisionEnabled} ? ${llmVisionDisplay} : '截图识别关闭'"></span>。截图失败不切文字备选,识别内容仍由你确认后入账。</p>
+        <p class="text-xs text-ink-soft">当前生效 · <span th:text="${llmVisionEffectiveDisplay}"></span>。截图失败不切文字备选,识别内容仍由你确认后入账。</p>
       </div>
       <div class="border-t border-rule-soft pt-5">
         <div class="eyebrow-ink text-[11px] mb-3">调 · 用 · 参 · 数</div>

@@ -119,10 +119,11 @@ class LlmIntegrationV141Test {
     }
     @ParameterizedTest @MethodSource("platforms")
     void safeErrorsHaveNoRawSecretsAndPlatformAdviceDoesNotLeak(LlmCatalog.Platform p) {
-        for(int status:List.of(401,402,403,404,429,503)) {
+        for(int status:List.of(401, 402, 403, 404, 429, 503)) {
             String message=LlmFailure.describe(p.code(),status,"synthetic-SECRET model not found");
             assertThat(message).doesNotContain("synthetic-SECRET");
             if(!p.code().equals("ark")) assertThat(message).doesNotContain("方舟","豆包");
+            else assertThat(message).contains(LlmCatalog.ARK.family("doubao").orElseThrow().defaultModel());
         }
         assertThat(LlmFailure.describe(p.code(),402,"insufficient balance")).contains("余额").doesNotContain("免费");
     }

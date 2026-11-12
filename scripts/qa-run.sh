@@ -4211,7 +4211,7 @@ ABS="$RD/src/main/java/com/family/finance/service/checkup/llm/AbstractOpenAiComp
   && grep -q 'LlmSettings.load' "$RD/src/main/java/com/family/finance/service/checkup/llm/LlmRouter.java" \
   && grep -q 'currentTemperature' "$ABS" \
   && grep -q 'parseTriple' "$ICF" \
-  && grep -q 'name="platform"' "$INTG" && grep -q 'name="modelId"' "$INTG" \
+  && grep -q "triple('primary'" "$INTG" && grep -q "'modelId'" "$INTG" \
   && grep -q 'data-catalog' "$INTG"; } \
   && log_ok "v14-LLM-VENDOR 主选可配(平台/系列/型号三级)+ 温度可配 + 级联下拉数据源来自目录" \
   || log_bad "v14-LLM-VENDOR LLM 自选链路缺" "see FamilyConfigService/LlmRouter/AbstractOpenAiCompatibleClient/AiModelController/LlmSettingsView/_llm-settings.html"
@@ -6264,6 +6264,7 @@ K_LLM_PRIMARY_VENDOR:旧版键·同上
 K_LLM_MODEL:旧版键·同上
 K_LLM_VISION_MODEL:旧版键·同上
 K_LLM_TEST_MODE:管理→AI接入→测试环境保护,由LlmTestGate封装读写;页面入口由v1.38专用守护及flow60覆盖
+K_LLM_SILICONFLOW_KEY:管理→AI接入→硅基流动凭据卡,由LlmCatalog.keyName驱动共同读写;AiPlatformV141Test及flow62验证独立保存与回读
 K_ANALYSIS_SCOPE_DEFAULT:经 AnalysisScopeService 在「分析设置」页①配(体检页「设为家里的默认」也写它)
 K_ANALYSIS_TEMPLATE_DEFAULT:经 AnalysisTemplateService 在「分析设置」页②配(超级 Agent 确认卡「切到某模板」也写它)
 K_ANALYSIS_HINT_DISMISSED:用户操作的结果·体检页关掉「分析角度不合适?」首次提示时写入(按成员)
@@ -8140,13 +8141,13 @@ QA1185_BARE="$(grep -rnE 'getType\(\) == AccountType\.[A-Z]+|type == AccountType
 # v1.18.4 给方舟预置了推荐型号,默认那个不带日期所以不会失效;但用户若选了带日期的几个,
 # 总有一天会 404 —— 那时报错必须说清「是型号过期了 / 去哪换 / 换成什么」,而不是让他自己猜。
 QA1185_INT="$QA_LLM_JAVA"   # v1.24.5 · 大模型那一节已挪到 AI 接入(原 IntegrationsController.java)
-{ grep -q 'static boolean looksDateStamped' "$QA1185_INT" \
-  && grep -q 'static String staleModelHint' "$QA1185_INT" \
-  && grep -q 'doubao-seed-evolving' "$QA1185_INT" \
-  && grep -q 'classifyLlmError(e.getMessage(), inv.resolvedModel())' "$QA1185_INT" \
-  && ! grep -q '方舟需到控制台复制接入点 ID / 模型 ID' "$QA1185_INT"; } \
+{ grep -qF 'LlmFailure.describe(p.code(), e)' "$QA1185_INT" \
+  && grep -q 'LlmCatalog.P_ARK.equals(platform)' "$RD/src/main/java/com/family/finance/service/checkup/llm/LlmFailure.java" \
+  && grep -qF 'LlmCatalog.ARK.family("doubao")' "$RD/src/main/java/com/family/finance/service/checkup/llm/LlmFailure.java" \
+  && grep -q '方舟模型广场' "$RD/src/main/java/com/family/finance/service/checkup/llm/LlmFailure.java" \
+  && grep -q 'defaultModel()' "$RD/src/test/java/com/family/finance/service/checkup/llm/LlmIntegrationV141Test.java"; } \
   && log_ok "v1185-MODEL-STALE-HINT(型号不存在时点名型号 + 带日期的指向 evolving/模型广场)" \
-  || log_bad "v1185-MODEL-STALE-HINT 型号失效时没给出下一步" "classifyLlmError 要收 model 参数并走 staleModelHint"
+  || log_bad "v1185-MODEL-STALE-HINT 型号失效时没给出下一步" "实际连接检查须走按平台分类,方舟给目录默认型号和模型广场指引"
 
 # ═══════════════════════════════════════════════════════════════════
 # v1.19 · 超级 Agent(资产对话)· tech-design/v1.19.md §五.3
