@@ -215,6 +215,8 @@ worktree 的工作目录里没有 `.githooks/`(那是 master 上的文件),hook 
 
 ## 7. 联动不变量登记表(改 X → 必须同步 Y,否则下游静默错)
 
+v1.41新增AI平台必须同时覆盖LlmCatalog/独立密钥fallback/文字Client/视觉/本地工具SSE/四平台共同配置交互/测试保护。凭据卡与计数由目录生成;完整Model ID保留前缀和大小写。百炼auto仍为原池轮询,连接探测单独固定一次型号,不要用统一外观改默认策略。页面与POST探测共用LlmProbeTarget,禁用视觉不参与;错误按实际平台给指引。保护下各出口零发送,工具可见产出后不重放。守护qa-run.sh --static-v141、LlmIntegrationV141Test、AiPlatformV141Test、LocalToolLoopSiliconflowTest及e2e62。
+
 v1.40.1目标新详情必须接齐旧AI能力:可见洞察入口、月报/失败反馈、未确认预警、提示词来源与隐私。月报/预警引用同一Forecast结果,保存与读回共用GoalReportService.contextFingerprint,涵盖结余来源;旧报告仅标历史,不自动重算。e2e61真点跨页签/仪表盘/手机入口与生成失败保留,模型出口依旧由服务端保护。
 
 v1.40目标小i摘要只读同一GoalProgress/退休有效Result/Forecast,不能另查或重算;R1与R2的本金/进度口径分开说明,报表不混入今日预计日期。摘要金额行带非空data-priv值(动态空串会被模板移除),展开时目标卡片解除圆角裁切。e2e61必须真点正文、检查命中/视口/隐私,不能只看DOM有文字。

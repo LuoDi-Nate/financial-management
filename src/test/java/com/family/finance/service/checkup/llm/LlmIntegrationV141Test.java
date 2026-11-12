@@ -69,6 +69,20 @@ class LlmIntegrationV141Test {
             .andRespond(withSuccess("{\"choices\":[{\"message\":{\"content\":\"[{\\\"name\\\":\\\"合成持仓\\\",\\\"marketValue\\\":\\\"100\\\"}]\"}}]}",MediaType.APPLICATION_JSON));
         assertThat(c.extract(new byte[]{1,2,3},"image/png")).hasSize(1);wire.verify();
     }
+    @Test void visionBoundaryStopsTransportUnderProtection() {
+        var c=new VisionLlmClient(config(Map.of("llm_vision_platform","siliconflow","llm_vision_family","kimi","llm_vision_enabled","true")),new RestTemplateBuilder());
+        var wire=MockRestServiceServer.createServer((RestTemplate)ReflectionTestUtils.getField(c,"rt"));
+        var gate=mock(LlmTestGate.class);doThrow(new LlmTestGate.Blocked()).when(gate).beforeSend(anyString());ReflectionTestUtils.setField(c,"testGate",gate);
+        assertThatThrownBy(()->c.extract(new byte[]{1},"image/png")).isInstanceOf(LlmTestGate.Blocked.class);wire.verify();verify(gate,never()).observedSend(anyString(),any());
+    }
+    @Test void feedbackCategoriesDistinguishCredentialsAccountModelBusyAndTimeout() {
+        assertThat(LlmFailure.describe("siliconflow",401,"Invalid token")).contains("Key 无效");
+        assertThat(LlmFailure.describe("siliconflow",402,"insufficient balance")).contains("余额").doesNotContain("免费");
+        assertThat(LlmFailure.describe("siliconflow",403,"Forbidden")).contains("权限");
+        assertThat(LlmFailure.describe("siliconflow",404,"model not found")).contains("型号");
+        assertThat(LlmFailure.describe("siliconflow",429,"")).contains("限流");
+        assertThat(LlmFailure.describe("siliconflow",0,"SocketTimeoutException")).contains("超时");
+    }
     @Test void failingSiliconflowPrimaryUsesOriginalBackup() {
         var cfg=config(Map.of("llm_platform","siliconflow","llm_family","deepseek","llm_model_id","Org/Text",
             "llm_backup_platform","deepseek","llm_backup_family","deepseek","llm_backup_model_id","deepseek-chat"));
