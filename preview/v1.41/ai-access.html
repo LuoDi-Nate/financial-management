@@ -105,7 +105,7 @@
 截图识别:关闭</div>
       </form>
       <section class="section-band"><div class="agent-band"><h2>超级 Agent</h2><div class="agent-choices"><label><input type="radio" name="runtime" value="local" checked>本地运行</label><label><input type="radio" name="runtime" value="managed">百炼托管</label></div></div><p class="section-note" id="agent-note">本地运行使用上面的文字主选和备选,所选型号需支持工具调用。</p></section>
-      <details class="review-tools"><summary>预览场景</summary><div class="tool-fields"><label for="probe-outcome">连接反馈</label><select id="probe-outcome" class="field-input" data-lsel><option value="success">本次连接成功</option><option value="key">密钥无效</option><option value="model">型号不存在</option><option value="busy">限流或繁忙</option><option value="timeout">连接超时</option><option value="blocked">测试环境 · 未调用</option></select></div><p class="hint">此处只切换静态反馈,不会向任何平台发送请求。</p></details>
+      <details class="review-tools"><summary>预览场景</summary><div class="tool-fields"><label for="probe-outcome">连接反馈</label><select id="probe-outcome" class="field-input" data-lsel><option value="success">本次连接成功</option><option value="key">密钥无效</option><option value="account">余额或权限不足</option><option value="model">型号不存在</option><option value="busy">限流或繁忙</option><option value="timeout">连接超时</option><option value="blocked">测试环境 · 未调用</option></select></div><p class="hint">此处只切换静态反馈,不会向任何平台发送请求。</p></details>
       <footer class="page-footer">v1.41 需求预览 · 家庭账房</footer>
     </main>
   </div>
@@ -181,7 +181,7 @@
         if(!platforms[p].ready){notice('key-feedback',platforms[p].label+'未配置密钥,请先保存。','error');return;}
         const selected=ids.find(id=>saved[id].platform===p&&(id!=='vision'||saved.visionEnabled));
         const model=selected?saved[selected].model:platforms[p].text[0][2];
-        const outcomes={success:platforms[p].label+' · '+model+' · '+(selected?'已保存型号':'参考文字型号')+' · 本次连接成功',key:'密钥无效,请核对并重新保存'+platforms[p].label+'密钥',model:'型号不存在或无权使用,请从平台复制当前完整型号',busy:'平台限流或繁忙,请稍后重试',timeout:'连接超时,请稍后重试或选用可用备选'};
+        const outcomes={success:platforms[p].label+' · '+model+' · '+(selected?'已保存型号':'参考文字型号')+' · 本次连接成功',key:'密钥无效,请核对并重新保存'+platforms[p].label+'密钥',account:'平台账户余额或权限不足,请到平台核对后重试',model:'型号不存在或无权使用,请从平台复制当前完整型号',busy:'平台限流或繁忙,请稍后重试',timeout:'连接超时,请稍后重试或选用可用备选'};
         const kind=document.getElementById('probe-outcome').value;notice('key-feedback',outcomes[kind],kind==='success'?'':'error');
         document.getElementById('key-feedback').scrollIntoView({block:'center',behavior:'smooth'});
       }
