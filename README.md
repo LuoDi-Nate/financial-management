@@ -350,7 +350,7 @@ bash scripts/regression-data.sh # 数据层/口径回归(原 e2e.sh · curl 端�
 
 ## 文档
 
-- 在研需求:[v1.41 硅基流动 AI 接入](prd/v1.41.md) · [交互预览](preview/v1.41/ai-access.html) · [技术设计](tech-design/v1.41.md)(需求及设计已确认,开发/自验中)。
+- beta待验收:[v1.41 硅基流动 AI 接入](prd/v1.41.md) · [交互预览](preview/v1.41/ai-access.html) · [技术设计](tech-design/v1.41.md) · [验收记录](docs/beta-review-v1.41.md)。四平台共同配置交互,文字/图片/本地工具SSE接入,旧配置与百炼轮询保留;尚未发布。
 
 - 已发布补丁:[v1.40.1 新目标 AI 洞察修复](prd/v1.40.1.md),[技术方案附录](tech-design/v1.40.md)。
 
@@ -493,7 +493,7 @@ financial-management/
 
 ## 配置项
 
-> 想接 **AI(Qwen/DeepSeek)/ 阿里云短信** 等外部服务?一站式步骤见 **[配置与接入指南](docs/configuration.md)**(全部可选,核心功能零配置即用)。下面是系统级 env 与管理页参数的分工说明。
+> 想接 **AI(百炼/DeepSeek官方/方舟/硅基流动)/ 阿里云短信** 等外部服务?一站式步骤见 **[配置与接入指南](docs/configuration.md)**(全部可选,核心功能零配置即用)。下面是系统级 env 与管理页参数的分工说明。
 
 **v0.4.18 起 · 运营参数沉淀到管理页 · 实时生效不重启**(详 [`prd/v0.4.md`](prd/v0.4.md) §22)。读取链:**DB 优先 → env(@Value)→ 代码常量**。
 
@@ -515,9 +515,11 @@ financial-management/
 
 | 配置 | 入口 | env 兜底 |
 |---|---|---|
-| **LLM Qwen API key** | `/admin/integrations` ① 段(私密 · 留空保原值) | `FINANCE_LLM_QWEN_API_KEY` 仍可用作 fallback |
-| **LLM DeepSeek API key** | 同上 | `FINANCE_LLM_DEEPSEEK_API_KEY` |
-| **LLM max_tokens / timeout** | `/admin/integrations` | — |
+| **LLM 百炼 API key** | `/admin/ai-access#llm`(私密 · 独立保存 · 留空保原值) | `FINANCE_LLM_QWEN_API_KEY` |
+| **LLM DeepSeek官方 API key** | 同上 | `FINANCE_LLM_DEEPSEEK_API_KEY` |
+| **LLM 方舟 API key** | 同上 | `FINANCE_LLM_ARK_API_KEY` |
+| **LLM 硅基流动 API key** | 同上 | `FINANCE_LLM_SILICONFLOW_API_KEY` |
+| **LLM 型号 / temperature / max_tokens / timeout** | `/admin/ai-access#llm` · 与密钥分开保存 | — |
 | **股票自动拉取开关** | `/admin/integrations` ② 段 · checkbox | `FINANCE_STOCK_FETCH_ENABLED=true/false` |
 | **行情 4 市场 cron**(美 06:05 / A 16:10 / 港 16:30 / 加密 06:15) | `/admin/integrations` ② 段 · 各自 cron 表达式 · 改即 cancel 旧 future + 重排 | 代码默认 |
 | **FX 拉取 cron**(月初 02:30) | `/admin/integrations` ③ 段 | 代码默认 |
