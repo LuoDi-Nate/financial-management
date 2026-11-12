@@ -272,7 +272,7 @@ public class LocalToolLoopRuntime implements AgentRuntime {
                 if (connection.getErrorStream() != null) try (var error = connection.getErrorStream()) {
                     detail = new String(error.readNBytes(16_384), StandardCharsets.UTF_8);
                 }
-                throw new UpstreamException(status, detail);
+                throw new UpstreamException(platform.code(), status, detail);
             }
             try (BufferedReader r = new BufferedReader(
                     new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
@@ -287,7 +287,7 @@ public class LocalToolLoopRuntime implements AgentRuntime {
                 if ("[DONE]".equals(payload)) { complete = true; break; }
 
                 var node = json.readTree(payload);
-                if (node.has("error")) throw new UpstreamException(502, "流式回答返回错误");
+                if (node.has("error")) throw new UpstreamException(platform.code(), 502, "流式回答返回错误");
                 var choices = node.path("choices");
                 if (!choices.isArray() || choices.isEmpty()) continue;
                 if (choices.get(0).hasNonNull("finish_reason")) complete = true;
@@ -405,16 +405,8 @@ public class LocalToolLoopRuntime implements AgentRuntime {
         if (e instanceof com.family.finance.service.checkup.llm.LlmTestGate.Blocked)
             return com.family.finance.service.checkup.llm.LlmTestGate.MESSAGE;
         if (e instanceof UpstreamException u) {
-            String b = u.body == null ? "" : u.body.toLowerCase(java.util.Locale.ROOT);
-            if (u.status == 401 || b.contains("invalid_api_key")) {
-                return "大模型密钥不对。去「AI 接入」页确认一下。";
-            }
-            if (u.status == 402 || b.contains("arrearage") || b.contains("insufficient_quota")
-                    || b.contains("allocationquota")) {
-                return "大模型这边额度用完了或者欠费了。充值后再试,或者在「AI 接入」换一个模型。";
-            }
-            if (u.status == 429) return "问得太频繁,模型那边限流了。等一会儿再问。";
-            return "模型那边返回了错误(" + u.status + ")。稍后再试试。";
+            return LlmCatalog.labelOf(u.platform) + " · "
+                    + com.family.finance.service.checkup.llm.LlmFailure.describe(u.platform, u.status, u.body);
         }
         if (e instanceof java.net.http.HttpTimeoutException
                 || e instanceof java.net.SocketTimeoutException) {
@@ -424,10 +416,12 @@ public class LocalToolLoopRuntime implements AgentRuntime {
     }
 
     private static final class UpstreamException extends RuntimeException {
+        final String platform;
         final int status;
         final String body;
-        UpstreamException(int status, String body) {
+        UpstreamException(String platform, int status, String body) {
             super("upstream " + status);
+            this.platform = platform;
             this.status = status;
             this.body = body;
         }

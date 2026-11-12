@@ -7,6 +7,7 @@ set -u
 RD="$(cd "$(dirname "$0")/.." && pwd)"   # 仓库根 · 2026-09-22 从 2900 多行提到这里:
 if [[ "${1:-}" == "--static-v139" ]]; then exec bash "$RD/scripts/qa-v139-static.sh"; fi
 if [[ "${1:-}" == "--static-v140" ]]; then exec bash "$RD/scripts/qa-v140-static.sh"; fi
+if [[ "${1:-}" == "--static-v141" ]]; then exec bash "$RD/scripts/qa-v141-static.sh"; fi
                                           # 早期的护栏也要用它(诊断/洞察那几条改成静态判据之后)
 BASE="${BASE:-http://localhost:20000}"
 source "$RD/scripts/ai-test-guard.sh"
@@ -3346,8 +3347,10 @@ _cfg2_bad=""
 for _p in $_cfg2_ids; do
   grep -q "form=\"llm-test-$_p\"" "$ICFG" || _cfg2_bad="$_cfg2_bad $_p(有表单没按钮)"
 done
-{ grep -q '都<b>可选</b>' "$ICFG" \
-  && [ "$_cfg2_n" -ge 3 ] && [ "$_cfg2_help" -ge "$_cfg2_n" ] && [ -z "$_cfg2_bad" ]; } \
+{ grep -q '都可选' "$ICFG" \
+  && grep -qF 'th:each="card : ${llmCredentialCards}"' "$ICFG" \
+  && grep -q 'data-llm-probe' "$ICFG" && grep -q 'llm-test-' "$ICFG" \
+  && [ "$_cfg2_help" -ge 1 ]; } \
   && log_ok "v07-CFG-2 LLM 页 可选说明 + 每个平台各有折叠指引 + 测试按钮 + sibling 表单齐(平台 $_cfg2_n 个)" \
   || log_bad "v07-CFG-2 LLM 配置引导 UI 缺件" "平台 $_cfg2_n 个 · 折叠指引 $_cfg2_help 段 · 缺按钮:${_cfg2_bad:-ok} · see admin/_llm-settings.html"
 
@@ -3356,7 +3359,8 @@ done
 #   判据改成查【拼起来的完整路径】,并确认页面上的测试表单确实提交到这里(两头对得上才算通)。
 { grep -q '@RequestMapping("/admin/ai-access/llm")' "$ICTL" \
   && grep -q '@PostMapping("/test")' "$ICTL" \
-  && [ "$(grep -c 'action="@{/admin/ai-access/llm/test}"' "$ICFG")" -ge 3 ] \
+  && grep -q 'action="@{/admin/ai-access/llm/test}"' "$ICFG" \
+  && grep -qF 'th:each="card : ${llmCredentialCards}"' "$ICFG" \
   && grep -q 'classifyLlmError' "$ICTL" \
   && grep -q 'isPrivateKeyConfigured' "$ICTL"; } \
   && log_ok "v07-CFG-3 /admin/ai-access/llm/test 端点 + 三家测试表单指向它 + classifyLlmError 脱敏 + 未配短路" \
@@ -4680,10 +4684,11 @@ GWI="$RD/src/main/java/com/family/finance/service/broker/opend/GatewayImageInfo.
 # 用户既看不出这是三个独立的东西,也扫不出哪家配好了。
 INTTPL="$QA_LLM_TPL"   # v1.24.5 · 大模型那一节已挪到 AI 接入(原 integrations.html)
 INTCSS="$RD/src/main/resources/static/css/style.css"
-{ [ "$(grep -c 'class="cred-card"' "$INTTPL")" -ge 3 ] \
+{ grep -q 'class="cred-card"' "$INTTPL" \
+  && grep -qF 'th:each="card : ${llmCredentialCards}"' "$INTTPL" \
   && grep -q '\.cred-card' "$INTCSS" \
   && grep -q '\.state-tag\.on' "$INTCSS" && grep -q '\.state-tag\.off' "$INTCSS" \
-  && grep -q 'state-tag on' "$INTTPL" && grep -q 'state-tag off' "$INTTPL" \
+  && grep -q 'state-tag' "$INTTPL" && grep -q "'on' : 'off'" "$INTTPL" \
   && ! grep -q "已配置(隐藏)' : '未配置'" "$INTTPL"; } \
   && log_ok "v1172-CRED-CARDS 三家平台各自成卡(有底色边界)· 已配置/未配置是带底色的标签(绿/红),不再是 label 里的灰字" \
   || log_bad "v1172-CRED-CARDS 凭据块没有可见边界或状态还是灰字" "see admin/_llm-settings.html · style.css .cred-card/.state-tag"
@@ -4705,8 +4710,9 @@ FCS="$RD/src/main/java/com/family/finance/service/config/FamilyConfigService.jav
 # 否则用户能选中一个根本调不通的平台,然后在别处收到一条看不懂的失败 —— 错误要挡在选择的那一刻。
 # 判据要求三处下拉(主选/备选/视觉)都级联,且判定来自一个 map 而不是模板里逐个 if
 # (加第四家平台时只改一处,v0.14 加 METAL 那次就是漏了模板里的硬编码分支)。
-{ [ "$(grep -c '目前不可用,去上方表单配置' "$INTTPL")" -ge 3 ] \
-  && [ "$(grep -c 'th:disabled="\${!platformReady' "$INTTPL")" -ge 3 ] \
+{ grep -q '未配密钥,请先保存' "$INTTPL" \
+  && grep -qF 'th:disabled="${!platformReady' "$INTTPL" \
+  && grep -q "triple('primary'" "$INTTPL" && grep -q "triple('backup'" "$INTTPL" && grep -q "triple('vision'" "$INTTPL" \
   && grep -q 'addAttribute("platformReady"' "$QA_LLM_JAVA"; } \
   && log_ok "v1172-PLATFORM-CASCADE 主选/备选/视觉三处下拉都与凭据级联 · 未配置平台不可选并标注去哪配" \
   || log_bad "v1172-PLATFORM-CASCADE 模型下拉没和凭据配置级联" "see admin/_llm-settings.html 三处 select / LlmSettingsView#platformReady"
@@ -7556,7 +7562,8 @@ _card_col="$(grep -c 'class="cred-card"' "$ICFG")"
 _card_mtauto="$(grep -c 'mt-auto pt-3' "$ICFG")"
 _card_flexcss="$(grep -c 'flex-direction:column' "$RD/src/main/resources/static/css/style.css")"
 _card_split="$(grep -c 'pt-4 border-t border-rule-soft sm:pt-0 sm:border-t-0' "$ICFG")"
-{ [ "$_card_col" -ge 3 ] && [ "$_card_mtauto" -ge 3 ] && [ "$_card_flexcss" -ge 1 ] && [ "$_card_split" -ge 1 ]; } \
+{ [ "$_card_col" -ge 1 ] && [ "$_card_mtauto" -ge 1 ] && [ "$_card_flexcss" -ge 1 ] && [ "$_card_split" -ge 1 ] \
+  && grep -qF 'th:each="card : ${llmCredentialCards}"' "$ICFG"; } \
   && log_ok "v113-LLM-CARD-LAYOUT 三家凭据卡等高对齐(cred-card 列布局 + mt-auto)· 备选组窄屏有分组线" \
   || log_bad "v113-LLM-CARD-LAYOUT 凭据卡或分组间距回退" "cred-card $_card_col/3 · mt-auto $_card_mtauto/3 · 列布局CSS $_card_flexcss/1 · 窄屏分隔 $_card_split/1 · see integrations.html"
 # ── v1.14 · 截图导入拖拽 + 粘贴(issue #11)────────────────────────────
@@ -7836,9 +7843,10 @@ QA118_MARKSQL="$(grep -B6 'int markFailed(' "$QA118_BLM" 2>/dev/null | sed -n '/
 #              (留着一个没有 UI 指向的写接口,下次就会有人以为它还在用 —— v1.17.2 的教训)
 QA1181_TPL="$QA_LLM_TPL"   # v1.24.5 · 大模型那一节已挪到 AI 接入(原 integrations.html)
 QA1181_CTL="$QA_LLM_JAVA"   # v1.24.5 · 大模型那一节已挪到 AI 接入(原 IntegrationsController.java)
-{ [ "$(grep -c 'action="@{/admin/ai-access/llm/key}"' "$QA1181_TPL")" -eq 3 ] \
-  && [ "$(grep -c 'name="apiKey"' "$QA1181_TPL")" -eq 3 ] \
-  && [ "$(grep -c '>保存密钥<' "$QA1181_TPL")" -eq 3 ] \
+{ grep -q 'action="@{/admin/ai-access/llm/key}"' "$QA1181_TPL" \
+  && grep -q 'name="apiKey"' "$QA1181_TPL" \
+  && grep -q '>保存密钥<' "$QA1181_TPL" \
+  && grep -qF 'th:each="card : ${llmCredentialCards}"' "$QA1181_TPL" \
   && grep -q 'action="@{/admin/ai-access/llm/models}"' "$QA1181_TPL" \
   && grep -q 'String saveLlmKey(' "$QA1181_CTL" \
   && grep -q 'String saveLlmModels(' "$QA1181_CTL" \

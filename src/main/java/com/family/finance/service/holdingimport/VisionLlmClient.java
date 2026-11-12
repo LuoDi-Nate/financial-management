@@ -118,7 +118,16 @@ public class VisionLlmClient {
 
         String dataUrl = "data:" + (mime == null ? "image/jpeg" : mime) + ";base64,"
                 + java.util.Base64.getEncoder().encodeToString(imageBytes);
-        String content = callVision(p, key, model, dataUrl);
+        String content;
+        try {
+            content = callVision(p, key, model, dataUrl);
+        } catch (com.family.finance.service.checkup.llm.LlmTestGate.Blocked e) {
+            throw e;
+        } catch (RuntimeException e) {
+            throw new IllegalStateException(p.label() + " · 图片识别失败 · "
+                    + com.family.finance.service.checkup.llm.LlmFailure.describe(p.code(), e)
+                    + ";请确认所选型号支持图片输入");
+        }
         return parse(content);
     }
 

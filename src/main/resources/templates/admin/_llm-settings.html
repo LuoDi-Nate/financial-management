@@ -1,427 +1,121 @@
 <!DOCTYPE html>
 <html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
 <body>
-<!--/* v1.24.5 · 「AI 大模型」这一节从「数据源接入」挪到了「AI 接入」(维护者定:AI 的东西放一处)。
-       原来它和超级 Agent 的配置分在两页:百炼的 Key、型号在数据源接入,Agent / MCP / 口令在 AI 接入,
-       排查一个问题要在两页之间来回切,代码里的错误提示也在两页之间互相指。
-       表单端点跟着页面走:/admin/integrations/llm/* → /admin/ai-access/llm/*(AiModelController)。
-       内容逐字搬过来,只改了三处:端点路径、外层去掉 max-w-3xl(与本页其它卡片同宽)、挂锚点 #llm。 */-->
 <th:block th:fragment="section">
-    <!-- ① LLM · v1.13 三级(平台 / 系列 / 型号)· 主备 + 截图识别 -->
-    <!-- v1.18.1 BUG-FIX · 这里原来是【一个大 form】:三把 key + 模型选取一起提交到 /admin/integrations/llm。
-         而那个端点「校验先全跑完再落库」,于是全新装机(一家都没配)时死锁 ——
-         模型下拉与凭据级联(没配 key 的平台 disabled)→ 一家都没配则平台选项全禁用 →
-         提交上来 platform 为空 → 抛「请选择平台」→ 整单退回,key 一个字都没存进去。
-         用户卡在「要存 key 得先选平台、要能选平台得先存 key」,主流程走不下去。
-         现在:每张凭据卡是自己的 form(POST /llm/key,只认 platform + apiKey),
-         模型选取是另一个 form(POST /llm/models,压根不接收 key)。 -->
-    <section id="llm" class="bracket-card space-y-5 mb-8 scroll-mt-24"
-          th:with="keyCount=${(qwenKeyConfigured?1:0)+(deepseekKeyConfigured?1:0)+(arkKeyConfigured?1:0)}">
-      <div class="flex items-baseline justify-between">
-        <div class="eyebrow-ink">AI 大模型 · 资产体检 / 月报 / 调仓建议 / 截图识别 / 超级 Agent</div>
-        <span class="pill text-[10px]"
-              th:classappend="${keyCount > 0} ? ' pill-forest' : ' pill-rust'"
-              th:text="${keyCount} + ' / 3 家已配密钥'">未配置</span>
-      </div>
+  <section id="llm" class="bracket-card space-y-5 mb-8 scroll-mt-24" th:with="keyCount=${llmKeyCount}">
+    <div class="flex items-center justify-between gap-3">
+      <div class="eyebrow-ink">AI 大模型 · 资产体检 / 月报 / 调仓建议 / 截图识别 / 超级 Agent</div>
+      <span class="pill text-[10px] shrink-0" th:classappend="${keyCount > 0} ? ' pill-forest' : ' pill-rust'"
+            th:text="${keyCount} + ' / ' + ${llmPlatformCount} + ' 家已配密钥'" data-llm-key-count></span>
+    </div>
+    <p class="text-sm text-ink-soft leading-loose">这些都可选。配一家即可使用AI,配两家可以设故障备选。不配密钥时,记账、净资产、收益与图表仍正常。</p>
+    <p th:if="${llmLegacy}" class="text-sm text-ink-soft">当前使用旧配置推导的设置,调用保持原样;确认下面选型并保存后固化为三级配置。</p>
+    <p class="text-xs text-ink-soft">密钥仅用于对应平台,不进入日志或明文回显。留空保持原值;密钥与模型各自保存。</p>
 
-      <div class="border-l-2 border-brass bg-brass/[0.05] px-4 py-3">
-        <p class="text-[13px] text-ink leading-relaxed">
-          这些都<b>可选</b>。不配 → AI 资产体检 / 月报 / 调仓建议 / 截图识别不可用,<b>其余功能(记账 / 净资产 / 真实年化 / 图表)全部正常</b>。
-          配<b>一家</b>就能用;配两家可以设「备选」,主选故障时自动兜底。
-          <a class="text-brass-deep underline" href="https://github.com/LuoDi-Nate/financial-management/blob/master/docs/configuration.md" target="_blank" rel="noreferrer">完整申请步骤见「配置与接入指南」→</a>
-        </p>
-      </div>
-
-      <div th:if="${llmLegacy}" class="border-l-2 border-brass bg-brass/[0.05] px-4 py-3">
-        <p class="text-[13px] text-ink leading-relaxed">
-          你当前跑的是<b>从旧版本配置推导出来</b>的设置(主选 <span class="font-mono" th:text="${llmPrimaryDisplay}">阿里云百炼 · 通义千问 · 自动</span>)。
-          调用一切正常,不用着急改;下面确认一下再点「保存」,就会固化成新的平台/系列/型号三级配置。
-        </p>
-      </div>
-
-      <div class="border-l-2 border-rust bg-rust/[0.04] px-4 py-3">
-        <p class="font-mono text-[10px] text-rust tracking-wider leading-relaxed">
-          <svg class="inline-block align-[-2px] mr-1" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>API key 为私密信息 · 仅用于调 LLM · 绝不进入 audit_log 明文 / 前端明文回显 · 留空 = 保持原值
-        </p>
-      </div>
-
-      <!-- 凭据 · 一个平台一把 key
-           三列各自 flex-col + 按钮 mt-auto:三家的说明行数不一样(百炼两行、方舟一行),
-           不这么钉的话「测试连接」会跟着各自内容浮动,PC 上三个按钮差十几像素高 —— 并列同类
-           元素必须对齐(v1.13 双端审视时实测 726/726/710)。 -->
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
-        <form th:action="@{/admin/ai-access/llm/key}" method="post"
-              class="cred-card" th:classappend="${qwenKeyConfigured} ? 'is-on' : ''">
-          <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-          <input type="hidden" name="platform" value="dashscope"/>
-          <div class="cred-head">
-            <span class="cred-name">阿里云百炼</span>
-            <span th:if="${qwenKeyConfigured}" class="state-tag on">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>已配置</span>
-            <span th:unless="${qwenKeyConfigured}" class="state-tag off">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>未配置</span>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-5" data-llm-credentials>
+      <form th:each="card : ${llmCredentialCards}" th:action="@{/admin/ai-access/llm/key}" method="post"
+            class="cred-card" th:classappend="${card.ready()} ? 'is-on' : ''"
+            th:attr="data-llm-key=${card.code()}" th:id="'llm-key-' + ${card.code()}">
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+        <input type="hidden" name="platform" th:value="${card.code()}">
+        <div class="cred-head">
+          <span class="cred-name" th:text="${card.label()}"></span>
+          <span class="state-tag" th:classappend="${card.ready()} ? 'on' : 'off'" th:text="${card.ready()} ? '已配置' : '未配置'"></span>
+        </div>
+        <div class="cred-mask" th:if="${card.ready()}" th:text="${card.masked()}"></div>
+        <label class="field-label" th:for="'llm-key-input-' + ${card.code()}">API Key</label>
+        <input class="field-input" type="password" name="apiKey" autocomplete="new-password"
+               th:id="'llm-key-input-' + ${card.code()}" th:placeholder="${card.ready()} ? '留空 = 不改;要换就粘新的' : '粘贴 API Key'">
+        <span class="text-xs text-rust" data-llm-error role="status"></span>
+        <details class="help-fold">
+          <summary>如何获取密钥?</summary>
+          <div class="help-body">
+            <p><a th:href="${card.consoleUrl()}" target="_blank" rel="noreferrer" th:text="${card.label()} + '控制台'"></a><span th:text="' · ' + ${card.howTo()}"></span></p>
+            <p>创建API Key后粘贴到上方,点「保存密钥」。模型选择在下面单独保存。</p>
+            <th:block th:switch="${card.code()}">
+              <p th:case="'dashscope'">百炼免费额度按型号分别计算。请在控制台设置“免费额度用完即停”;自动型号沿用原池轮询,也可手填固定型号。</p>
+              <p th:case="'deepseek'">DeepSeek官方按账户额度计费,只有文字能力。截图识别需另配支持图片的平台。</p>
+              <p th:case="'ark'">先完成实名认证,并在“开通管理”开通所用型号。可直接复制模型广场的Model ID,也保留ep-接入点ID;带日期的型号失效后需更新。</p>
+              <p th:case="'siliconflow'">使用硅基流动中国站自己的密钥与账户额度。复制完整型号,保留组织/Pro前缀及大小写;图片和工具能力依具体型号,不与DeepSeek官方共用密钥。</p>
+            </th:block>
+            <a href="https://github.com/LuoDi-Nate/financial-management/blob/master/docs/llm-api-keys-setup.md" target="_blank" rel="noreferrer">完整申请指南</a>
           </div>
-          <div th:if="${qwenKeyConfigured}" class="cred-mask" th:text="${qwenKeyMasked}">sk-abc••••••wxyz</div>
-          <input class="field-input" type="password" name="apiKey" autocomplete="new-password"
-                 th:placeholder="${qwenKeyConfigured} ? '留空 = 不改;要换就粘新的' : '粘贴 API Key'"/>
-          <p class="font-mono text-[10px] text-ink-subtle mt-1 tracking-wider">通义千问 / 千问 VL(视觉)· sk-xxxxxxxx</p>
-          <details class="help-fold">
-            <summary>如何获取百炼 Key?</summary>
-            <div class="help-body">
-              <ol>
-                <li>打开 <a href="https://bailian.console.aliyun.com" target="_blank" rel="noreferrer">百炼控制台</a>,用阿里云账号登录</li>
-                <li>右上角头像 → <b>API-KEY</b> → 创建我的 API-KEY</li>
-                <li>复制 <code>sk-</code> 开头的串,粘到上方,点「保存 LLM 配置」</li>
-                <li>免费额度:百炼给<b>每个模型各一份</b>,够家庭用;务必在「费用 → 免费额度用完即停」兜底,避免用超被静默计费</li>
-              </ol>
-              <div class="font-mono text-[10px] text-ink-subtle mt-2">详见 <a href="https://github.com/LuoDi-Nate/financial-management/blob/master/docs/llm-api-keys-setup.md" target="_blank" rel="noreferrer">配置指南 · LLM Key 申请</a></div>
-            </div>
-          </details>
-          <div class="flex items-center gap-2 mt-auto pt-3">
-            <button type="submit" class="btn-ink text-[12px] py-1.5 px-3">保存密钥</button>
-            <button type="submit" form="llm-test-dashscope" class="btn-ghost text-[12px] py-1.5 px-3">测试连接</button>
-          </div>
-        </form>
-        <form th:action="@{/admin/ai-access/llm/key}" method="post"
-              class="cred-card" th:classappend="${deepseekKeyConfigured} ? 'is-on' : ''">
-          <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-          <input type="hidden" name="platform" value="deepseek"/>
-          <div class="cred-head">
-            <span class="cred-name">DeepSeek 官方</span>
-            <span th:if="${deepseekKeyConfigured}" class="state-tag on">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>已配置</span>
-            <span th:unless="${deepseekKeyConfigured}" class="state-tag off">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>未配置</span>
-          </div>
-          <div th:if="${deepseekKeyConfigured}" class="cred-mask" th:text="${deepseekKeyMasked}">sk-abc••••••wxyz</div>
-          <input class="field-input" type="password" name="apiKey" autocomplete="new-password"
-                 th:placeholder="${deepseekKeyConfigured} ? '留空 = 不改;要换就粘新的' : '粘贴 API Key'"/>
-          <p class="font-mono text-[10px] text-ink-subtle mt-1 tracking-wider">deepseek-chat / reasoner · 无视觉能力</p>
-          <details class="help-fold">
-            <summary>如何获取 DeepSeek Key?</summary>
-            <div class="help-body">
-              <ol>
-                <li>打开 <a href="https://platform.deepseek.com" target="_blank" rel="noreferrer">platform.deepseek.com</a> 注册 / 登录</li>
-                <li>左侧 <b>API keys</b> → 创建 API key,复制 <code>sk-</code> 串</li>
-                <li>充值少量余额(按量计费,体检一次几分钱),粘到上方保存</li>
-              </ol>
-              <div class="font-mono text-[10px] text-ink-subtle mt-2">详见 <a href="https://github.com/LuoDi-Nate/financial-management/blob/master/docs/llm-api-keys-setup.md" target="_blank" rel="noreferrer">配置指南 · LLM Key 申请</a></div>
-            </div>
-          </details>
-          <div class="flex items-center gap-2 mt-auto pt-3">
-            <button type="submit" class="btn-ink text-[12px] py-1.5 px-3">保存密钥</button>
-            <button type="submit" form="llm-test-deepseek" class="btn-ghost text-[12px] py-1.5 px-3">测试连接</button>
-          </div>
-        </form>
-        <form th:action="@{/admin/ai-access/llm/key}" method="post"
-              class="cred-card" th:classappend="${arkKeyConfigured} ? 'is-on' : ''">
-          <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-          <input type="hidden" name="platform" value="ark"/>
-          <div class="cred-head">
-            <span class="cred-name">火山方舟</span>
-            <span th:if="${arkKeyConfigured}" class="state-tag on">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>已配置</span>
-            <span th:unless="${arkKeyConfigured}" class="state-tag off">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>未配置</span>
-          </div>
-          <div th:if="${arkKeyConfigured}" class="cred-mask" th:text="${arkKeyMasked}">sk-abc••••••wxyz</div>
-          <input class="field-input" type="password" name="apiKey" autocomplete="new-password"
-                 th:placeholder="${arkKeyConfigured} ? '留空 = 不改;要换就粘新的' : '粘贴 API Key'"/>
-          <p class="font-mono text-[10px] text-ink-subtle mt-1 tracking-wider">豆包 / 方舟托管的 DeepSeek · 已预置推荐型号</p>
-          <details class="help-fold">
-            <summary>如何获取火山方舟 Key?</summary>
-            <div class="help-body">
-              <ol>
-                <li>打开 <a href="https://console.volcengine.com/ark" target="_blank" rel="noreferrer">火山方舟控制台</a> 注册 / 登录</li>
-                <li><b>先完成实名认证</b> —— 没实名的账号建不了 API Key,这一步绕不过去</li>
-                <li>左侧 <b>API Key 管理</b> → 创建,复制后粘到上方保存</li>
-                <li>在 <a href="https://console.volcengine.com/ark/region:ark+cn-beijing/openManagement" target="_blank" rel="noreferrer"><b>开通管理</b></a> 里开通要用的模型(不开通会报「模型未开通」)</li>
-                <li><b>型号下拉里已经预置了几个可用的豆包模型</b>,直接选即可 —— 方舟现在支持直接填 Model ID,<b>不必再建接入点</b>。
-                    默认那个 <code>doubao-seed-evolving</code> 不带日期、平台自动跟进版本。
-                    想换别的去 <a href="https://console.volcengine.com/ark/region:ark+cn-beijing/model" target="_blank" rel="noreferrer">模型广场</a> 复制 Model ID;
-                    老的接入点 ID(<code>ep-</code> 开头)也照样能填。</li>
-              </ol>
-              <div class="font-mono text-[10px] text-ink-subtle mt-2">详见 <a href="https://github.com/LuoDi-Nate/financial-management/blob/master/docs/llm-api-keys-setup.md" target="_blank" rel="noreferrer">配置指南 · LLM Key 申请</a></div>
-            </div>
-          </details>
-          <div class="flex items-center gap-2 mt-auto pt-3">
-            <button type="submit" class="btn-ink text-[12px] py-1.5 px-3">保存密钥</button>
-            <button type="submit" form="llm-test-ark" class="btn-ghost text-[12px] py-1.5 px-3">测试连接</button>
-          </div>
-        </form>
-      </div>
-      <p class="font-mono text-[10px] text-ink-subtle tracking-wider">测试连接 = 用<b>已保存</b>的密钥 + 下面选中的型号发一次最小探测,不烧额度</p>
+        </details>
+        <p class="text-xs text-ink-soft break-words" th:text="'测试型号:' + ${card.probe()}"></p>
+        <div class="flex items-center gap-2 mt-auto pt-3">
+          <button type="submit" class="btn-ink text-xs">保存密钥</button>
+          <button type="submit" th:attr="form='llm-test-' + ${card.code()}" class="btn-ghost text-xs">测试连接</button>
+        </div>
+      </form>
+    </div>
+    <p class="text-xs text-ink-soft">测试连接使用已保存密钥与上方显示的测试型号;没有选用此平台时采用参考文字型号。会产生少量用量,不使用未保存草稿,也不证明所有图片或工具能力均可用。</p>
 
-      <!-- 用哪个模型 · 独立表单(v1.18.1):与上面的密钥各自保存,互不阻塞 -->
-      <form th:action="@{/admin/ai-access/llm/models}" method="post" class="space-y-5">
-      <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-
-      <!-- 一家都没配密钥时,这个表单没有任何可选平台 —— 说清楚该先做什么,
-           而不是让用户提交上来再收一句「请选择平台」(那就是原来那个死锁的体感)。 -->
-      <div th:if="${keyCount == 0}" class="border-l-2 border-rust bg-rust/[0.04] px-4 py-3">
-        <p class="text-[13px] text-ink leading-relaxed">
-          还没有任何平台配好密钥,所以下面暂时没有可选的模型。
-          <b>先在上面任选一家、粘上 API Key 点「保存密钥」</b>,这一段就会解锁。
-        </p>
-      </div>
-
-      <!-- 用哪个模型 · 主选 / 备选 各一组「平台 → 系列 → 型号」 -->
+    <form th:action="@{/admin/ai-access/llm/models}" method="post" class="space-y-5" id="llm-models"
+          th:attr="data-model-pattern=${llmModelPattern},data-model-max=${llmModelMaxLength}">
+      <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+      <p th:if="${keyCount == 0}" class="text-sm text-rust">还没有任何平台配好密钥。先在上面任选一家保存API Key,再选择模型。</p>
       <div class="border-t border-rule-soft pt-5" id="llm-catalog" th:attr="data-catalog=${llmCatalogJson}">
         <div class="eyebrow-ink text-[11px] mb-3">用 · 哪 · 个 · 模 · 型</div>
-
-        <div class="mb-4">
-          <div class="font-mono text-[10px] text-ink-subtle tracking-wider mb-1">主选 · 平时都走它</div>
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-x-5 gap-y-3">
-            <div>
-              <label class="field-label" for="primaryPlatform">平台</label>
-              <select class="field-input" id="primaryPlatform" name="platform">
-                <option th:each="p : ${llmPlatformsText}" th:value="${p.code()}"
-                        th:text="${platformReady[p.code()]} ? ${p.label()} : ${p.label()} + ' · 目前不可用,去上方表单配置'"
-                        th:disabled="${!platformReady[p.code()]}"
-                        th:selected="${p.code() == llmPlatform}">阿里云百炼</option>
-              </select>
-            </div>
-            <div>
-              <label class="field-label" for="primaryFamily">模型系列</label>
-              <select class="field-input" id="primaryFamily" name="family" th:attr="data-current=${llmFamily}">
-                <option th:value="${llmFamily}" th:text="${llmFamily}" selected>qwen</option>
-              </select>
-            </div>
-            <div>
-              <label class="field-label" for="primaryModelId">型号</label>
-              <input class="field-input" id="primaryModelId" name="modelId" list="primaryModels"
-                     th:value="${llmModelId}" placeholder="留空 = 自动" autocomplete="off"/>
-              <datalist id="primaryModels"></datalist>
-              <p class="font-mono text-[10px] text-ink-subtle mt-1 tracking-wider" id="primaryHint"></p>
-            </div>
-          </div>
-        </div>
-
-        <!-- 窄屏补一条分隔:PC 上「主选/备选」各占一行三列,行本身就是分组;手机一堆叠就变成
-             连着的六个下拉,组内 11px / 组间 15px —— 差 4px,看不出哪三个是一组(v1.13 实测)。
-             sm: 以上还原成原样,PC 观感不变。 -->
+        <th:block th:replace="~{admin/_llm-settings :: triple('primary','主选 · 平时都走它',${llmPlatform},${llmFamily},${llmModelId},${llmPlatformsText},false)}"></th:block>
         <div class="pt-4 border-t border-rule-soft sm:pt-0 sm:border-t-0">
-          <div class="font-mono text-[10px] text-ink-subtle tracking-wider mb-1">备选 · 主选失败时自动兜底(可不设)</div>
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-x-5 gap-y-3">
-            <div>
-              <label class="field-label" for="backupPlatform">平台</label>
-              <select class="field-input" id="backupPlatform" name="backupPlatform">
-                <option value="" th:selected="${#strings.isEmpty(llmBackupPlatform)}">不设备选</option>
-                <option th:each="p : ${llmPlatformsText}" th:value="${p.code()}"
-                        th:text="${platformReady[p.code()]} ? ${p.label()} : ${p.label()} + ' · 目前不可用,去上方表单配置'"
-                        th:disabled="${!platformReady[p.code()]}"
-                        th:selected="${p.code() == llmBackupPlatform}">DeepSeek 官方</option>
-              </select>
-            </div>
-            <div>
-              <label class="field-label" for="backupFamily">模型系列</label>
-              <select class="field-input" id="backupFamily" name="backupFamily" th:attr="data-current=${llmBackupFamily}">
-                <option th:value="${llmBackupFamily}" th:text="${llmBackupFamily}" selected>deepseek</option>
-              </select>
-            </div>
-            <div>
-              <label class="field-label" for="backupModelId">型号</label>
-              <input class="field-input" id="backupModelId" name="backupModelId" list="backupModels"
-                     th:value="${llmBackupModelId}" placeholder="留空 = 自动" autocomplete="off"/>
-              <datalist id="backupModels"></datalist>
-              <p class="font-mono text-[10px] text-ink-subtle mt-1 tracking-wider" id="backupHint"></p>
-            </div>
-          </div>
+          <th:block th:replace="~{admin/_llm-settings :: triple('backup','备选 · 主选失败时自动兜底(可不设)',${llmBackupPlatform},${llmBackupFamily},${llmBackupModelId},${llmPlatformsText},true)}"></th:block>
         </div>
-
-        <p class="font-mono text-[10px] text-ink-subtle mt-3 tracking-wider">
-          当前生效 · 主选 <span th:text="${llmPrimaryDisplay}">阿里云百炼 · 通义千问 · 自动</span>
-          · 备选 <span th:text="${llmBackupDisplay}">未设置</span>
-        </p>
+        <p class="text-xs text-ink-soft mt-3" data-llm-effective>当前生效 · 主选 <span th:text="${llmPrimaryDisplay}"></span> · 备选 <span th:text="${llmBackupDisplay}"></span></p>
       </div>
-
-      <!-- 截图识别 · 独立开关 + 自己的一组三元组(视觉不做主备兜底) -->
       <div class="border-t border-rule-soft pt-5">
-        <div class="flex items-baseline justify-between mb-3">
-          <div class="eyebrow-ink text-[11px]">截 · 图 · 识 · 别</div>
-          <!-- v1.18.4 · 没有「已配密钥 + 有视觉能力」的平台时,这个开关直接禁用。
-               此前它照样可勾,勾了必然存不下去,而且报的是「请选择平台」——
-               指向一个他根本选不了的下拉。能力不具备就说清楚去配哪家,别让人对着空下拉猜。 -->
-          <label class="flex items-center gap-2 text-[12px]"
-                 th:classappend="${visionCapableReady} ? ' cursor-pointer' : ' opacity-50 cursor-not-allowed'">
-            <input type="checkbox" name="visionEnabled" value="true" id="visionEnabled"
-                   th:checked="${llmVisionEnabled and visionCapableReady}"
-                   th:disabled="${!visionCapableReady}"/>
-            <span>启用持仓截图导入</span>
-          </label>
+        <label class="flex items-center gap-2 text-sm min-h-11">
+          <input type="checkbox" id="visionEnabled" name="visionEnabled" value="true"
+                 th:checked="${llmVisionEnabled and visionCapableReady}" th:disabled="${!visionCapableReady}">启用持仓截图导入
+        </label>
+        <p th:unless="${visionCapableReady}" class="text-xs text-ink-soft mb-3" th:text="'截图识别暂不可用,请为' + ${llmVisionPlatformsLabel} + '保存密钥。不影响文字模型配置。'"></p>
+        <div data-llm-vision>
+          <th:block th:replace="~{admin/_llm-settings :: triple('vision','截图识别 · 独立型号',${llmVisionPlatform},${llmVisionFamily},${llmVisionModelId},${llmPlatformsVision},false)}"></th:block>
         </div>
-        <div th:unless="${visionCapableReady}" class="border-l-2 border-brass bg-brass/[0.05] px-4 py-3 mb-3">
-          <p class="text-[13px] text-ink leading-relaxed">
-            你已配密钥的平台<b>都没有视觉能力</b>,所以截图导入暂时开不了。
-            要用它,请在上面为<b>阿里云百炼</b>或<b>火山方舟</b>保存一把 API Key —— DeepSeek 只有文本能力。
-            <span class="text-ink-soft">不用截图导入的话,这一段可以完全不管,不影响保存。</span>
-          </p>
-        </div>
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-x-5 gap-y-3">
-          <div>
-            <label class="field-label" for="visionPlatform">平台</label>
-            <select class="field-input" id="visionPlatform" name="visionPlatform">
-              <option th:each="p : ${llmPlatformsVision}" th:value="${p.code()}"
-                      th:text="${platformReady[p.code()]} ? ${p.label()} : ${p.label()} + ' · 目前不可用,去上方表单配置'"
-                      th:disabled="${!platformReady[p.code()]}"
-                      th:selected="${p.code() == llmVisionPlatform}">阿里云百炼</option>
-            </select>
-          </div>
-          <div>
-            <label class="field-label" for="visionFamily">模型系列</label>
-            <select class="field-input" id="visionFamily" name="visionFamily" th:attr="data-current=${llmVisionFamily}">
-              <option th:value="${llmVisionFamily}" th:text="${llmVisionFamily}" selected>qwen-vl</option>
-            </select>
-          </div>
-          <div>
-            <label class="field-label" for="visionModelId">型号</label>
-            <input class="field-input" id="visionModelId" name="visionModelId" list="visionModels"
-                   th:value="${llmVisionModelId}" placeholder="留空 = 自动" autocomplete="off"/>
-            <datalist id="visionModels"></datalist>
-            <p class="font-mono text-[10px] text-ink-subtle mt-1 tracking-wider" id="visionHint"></p>
-          </div>
-        </div>
-        <p class="font-mono text-[10px] text-ink-subtle mt-2 tracking-wider">
-          当前生效 · <span th:text="${llmVisionDisplay}">阿里云百炼 · 通义千问 VL · qwen-vl-max</span>
-        </p>
-        <p class="font-mono text-[10px] text-ink-subtle mt-1 tracking-wider">截图识别在你等结果的路上,失败<b>不切备选</b>(再等一轮太久)· 单张几分钱,免费额度内≈0</p>
+        <p class="text-xs text-ink-soft">当前生效 · <span th:text="${llmVisionEnabled} ? ${llmVisionDisplay} : '截图识别关闭'"></span>。截图失败不切文字备选,识别内容仍由你确认后入账。</p>
       </div>
-
-      <!-- 调用参数 -->
       <div class="border-t border-rule-soft pt-5">
         <div class="eyebrow-ink text-[11px] mb-3">调 · 用 · 参 · 数</div>
-        <div class="grid grid-cols-2 md:grid-cols-3 gap-x-5 gap-y-4">
-          <div>
-            <label class="field-label">采样温度 · temperature</label>
-            <input class="field-input" type="number" name="temperature" th:value="${llmTemperature}" step="0.1" min="0" max="1"/>
-            <p class="font-mono text-[10px] text-ink-subtle mt-1 tracking-wider">0 确定 ~ 1 发散 · 默认 0.5</p>
-          </div>
-          <div>
-            <label class="field-label">max_tokens · 输出上限</label>
-            <input class="field-input" type="number" name="maxTokens" th:value="${llmMaxTokens}" min="500" max="8000"/>
-            <p class="font-mono text-[10px] text-ink-subtle mt-1 tracking-wider">默认 2000 · 改小可能截断</p>
-          </div>
-          <div>
-            <label class="field-label">超时秒 · timeout</label>
-            <input class="field-input" type="number" name="timeoutSeconds" th:value="${llmTimeoutSeconds}" min="5" max="120"/>
-            <p class="text-[10px] text-ink-subtle mt-1">默认 25 秒 · 下一次请求生效。流式回答指等待下一段内容的上限,不是整轮工具对话的总时长。</p>
-          </div>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-5">
+          <label class="field-label">采样温度 · temperature<input class="field-input field-input-num" name="temperature" type="number" th:value="${llmTemperature}" step="0.1" min="0" max="1"><span class="text-xs text-rust" data-llm-error></span></label>
+          <label class="field-label">max_tokens · 输出上限<input class="field-input field-input-num" name="maxTokens" type="number" th:value="${llmMaxTokens}" min="500" max="8000" required><span class="text-xs text-rust" data-llm-error></span></label>
+          <label class="field-label">超时秒 · timeout<input class="field-input field-input-num" name="timeoutSeconds" type="number" th:value="${llmTimeoutSeconds}" min="5" max="120" required><span class="text-xs text-rust" data-llm-error></span></label>
         </div>
+        <p class="text-xs text-ink-soft mt-2">温度默认0.5,输出上限默认2000,超时默认25秒。流式超时指等待下一段内容,不是整轮工具对话总时长。</p>
       </div>
-
-      <div class="flex justify-end">
-        <button type="submit" class="btn-ink" th:disabled="${keyCount == 0}">保存模型配置</button>
-      </div>
-      </form>
-    </section>
-
-    <!-- 测试连接 sibling forms(只提交 platform + CSRF · 测已保存的 key · 结果回显到顶部 flash)-->
-    <form id="llm-test-dashscope" th:action="@{/admin/ai-access/llm/test}" method="post" class="hidden">
-      <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-      <input type="hidden" name="platform" value="dashscope"/>
+      <div class="flex justify-end"><button type="submit" class="btn-ink" th:disabled="${keyCount == 0}">保存模型配置</button></div>
     </form>
-    <form id="llm-test-deepseek" th:action="@{/admin/ai-access/llm/test}" method="post" class="hidden">
-      <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-      <input type="hidden" name="platform" value="deepseek"/>
+    <form th:each="card : ${llmCredentialCards}" th:id="'llm-test-' + ${card.code()}"
+          th:action="@{/admin/ai-access/llm/test}" method="post" class="hidden" data-llm-probe>
+      <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+      <input type="hidden" name="platform" th:value="${card.code()}">
     </form>
-    <form id="llm-test-ark" th:action="@{/admin/ai-access/llm/test}" method="post" class="hidden">
-      <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
-      <input type="hidden" name="platform" value="ark"/>
-    </form>
+  </section>
 </th:block>
 
-<th:block th:fragment="script">
-<script th:inline="none">
-  // v1.13 · 平台 → 系列 → 型号 三级级联(目录来自服务端 LlmCatalog,前端不再硬编码任何型号)
-  //   目录挂在 #llm-catalog 的 data-catalog 上而不是塞进内联脚本里 —— 属性走 HTML 转义,
-  //   不会像脚本正文那样被一个结束标签字面量提前截断。
-  (function () {
-    var host = document.getElementById('llm-catalog');
-    if (!host) return;
-    var CATALOG;
-    try { CATALOG = JSON.parse(host.getAttribute('data-catalog') || '[]'); } catch (e) { CATALOG = []; }
-    function platformOf(code) {
-      for (var i = 0; i < CATALOG.length; i++) if (CATALOG[i].code === code) return CATALOG[i];
-      return null;
-    }
-    function familiesOf(code, modality) {
-      var p = platformOf(code);
-      if (!p) return [];
-      return (p.families || []).filter(function (f) { return f.modality === modality; });
-    }
-
-    // prefix: 三个 id 前缀(primary / backup / vision)· allowNone: 平台可以选「不设备选」
-    function initTriple(prefix, modality, allowNone) {
-      var pSel  = document.getElementById(prefix + 'Platform');
-      var fSel  = document.getElementById(prefix + 'Family');
-      var mIn   = document.getElementById(prefix + 'ModelId');
-      var dList = document.getElementById(prefix + 'Models');
-      var hint  = document.getElementById(prefix + 'Hint');
-      if (!pSel || !fSel || !mIn) return;
-
-      function currentFamily() {
-        var fam = familiesOf(pSel.value, modality);
-        for (var i = 0; i < fam.length; i++) if (fam[i].code === fSel.value) return fam[i];
-        return null;
-      }
-      function renderModels() {
-        var f = currentFamily();
-        while (dList && dList.firstChild) dList.removeChild(dList.firstChild);
-        if (!f) { mIn.placeholder = ''; if (hint) hint.textContent = ''; return; }
-        (f.models || []).forEach(function (m) {
-          if (!dList) return;
-          var o = document.createElement('option');
-          o.value = m.id; o.label = m.label;
-          dList.appendChild(o);
-        });
-        if (f.mustFillModel) {
-          mIn.placeholder = '必填 · 如 ep-2026xxxx';
-          if (hint) hint.textContent = '这一家没有可预置的型号 · 到控制台复制接入点 ID 或模型 ID 填进来';
-        } else {
-          mIn.placeholder = '留空 = 自动';
-          if (hint) hint.textContent = '留空 = 用推荐型号 ' + (f.defaultModel || '') + ' · 也可手工填别的';
-        }
-      }
-      function renderFamilies(keep) {
-        var want = keep ? (fSel.getAttribute('data-current') || fSel.value) : null;
-        var fam = familiesOf(pSel.value, modality);
-        while (fSel.firstChild) fSel.removeChild(fSel.firstChild);
-        fam.forEach(function (f) {
-          var o = document.createElement('option');
-          o.value = f.code; o.textContent = f.label;
-          if (f.code === want) o.selected = true;
-          fSel.appendChild(o);
-        });
-        fSel.disabled = fam.length === 0;
-        renderModels();
-      }
-
-      pSel.addEventListener('change', function () {
-        if (allowNone && !pSel.value) {         // 不设备选 → 系列/型号一起清掉,免得提交半截三元组
-          while (fSel.firstChild) fSel.removeChild(fSel.firstChild);
-          fSel.disabled = true; mIn.value = ''; mIn.disabled = true;
-          if (hint) hint.textContent = '';
-          return;
-        }
-        mIn.disabled = false;
-        mIn.value = '';                          // 换平台后旧型号必然不适用(方舟的 ep- 拿到百炼是废的)
-        renderFamilies(false);
-      });
-      fSel.addEventListener('change', function () { mIn.value = ''; renderModels(); });
-
-      if (allowNone && !pSel.value) {
-        fSel.disabled = true; mIn.disabled = true;
-        if (hint) hint.textContent = '';
-      } else {
-        renderFamilies(true);                    // 首屏保留服务端回显的系列/型号
-      }
-    }
-
-    initTriple('primary', 'TEXT',  false);
-    initTriple('backup',  'TEXT',  true);
-    initTriple('vision',  'VISION', false);
-  })();
-</script>
-</th:block>
+<div th:fragment="triple(prefix,title,platform,family,model,platforms,allowNone)" class="mb-4" th:attr="data-llm-triple=${prefix}">
+  <div class="text-xs text-ink-soft mb-2" th:text="${title}"></div>
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-x-5 gap-y-3">
+    <div><label class="field-label" th:for="${prefix} + 'Platform'">平台</label>
+      <select class="field-input" data-lsel th:id="${prefix} + 'Platform'" th:name="${prefix == 'primary'} ? 'platform' : ${prefix} + 'Platform'">
+        <option th:if="${allowNone}" value="" th:selected="${#strings.isEmpty(platform)}">不设备选</option>
+        <option th:each="p : ${platforms}" th:value="${p.code()}" th:disabled="${!platformReady[p.code()]}"
+                th:selected="${p.code() == platform}" th:text="${p.label()} + (${platformReady[p.code()]} ? '' : ' · 未配密钥,请先保存')"></option>
+      </select>
+    </div>
+    <div><label class="field-label" th:for="${prefix} + 'Family'">模型系列</label>
+      <select class="field-input" data-lsel th:id="${prefix} + 'Family'" th:name="${prefix == 'primary'} ? 'family' : ${prefix} + 'Family'" th:attr="data-current=${family}">
+        <option th:value="${family}" th:text="${family}"></option>
+      </select>
+    </div>
+    <div><label class="field-label" th:for="${prefix} + 'ModelId'">型号</label>
+      <input class="field-input" th:id="${prefix} + 'ModelId'" th:name="${prefix == 'primary'} ? 'modelId' : ${prefix} + 'ModelId'"
+             th:value="${model}" th:list="${prefix} + 'Models'" autocomplete="off" th:maxlength="${llmModelMaxLength}" placeholder="留空 = 自动">
+      <datalist th:id="${prefix} + 'Models'"></datalist>
+      <span class="text-xs text-rust block" data-llm-error role="status"></span>
+      <p class="text-xs text-ink-soft mt-1 break-words" th:id="${prefix} + 'Hint'"></p>
+    </div>
+  </div>
+</div>
+<th:block th:fragment="script"><script th:src="@{/js/llm-settings.js}" defer></script></th:block>
 </body>
 </html>

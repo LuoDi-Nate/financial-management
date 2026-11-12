@@ -135,8 +135,8 @@ class LlmModelFormatTest {
     }
 
     @Test
-    void modelLongerThan64Chars_isRejected() {
-        assertThat(flashError(saveWithPrimaryModel("ark", "doubao", "e".repeat(65)))).contains("型号格式不合法");
+    void modelLongerThanLimit_isRejected() {
+        assertThat(flashError(saveWithPrimaryModel("ark", "doubao", "e".repeat(LlmCatalog.MAX_MODEL_LENGTH + 1)))).contains("型号格式不合法");
         verify(config, never()).set(anyLong(), anyString(), anyString());
     }
 

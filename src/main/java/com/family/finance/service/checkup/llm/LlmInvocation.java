@@ -22,6 +22,13 @@ public record LlmInvocation(String platform, String family, String model) {
 
     public boolean auto() { return model == null; }
 
+    public boolean sameStrategy(LlmInvocation other) {
+        if (other == null || !platform.equals(other.platform) || !family.equals(other.family)) return false;
+        if (platformDef().map(LlmCatalog.Platform::modelRotation).orElse(false))
+            return java.util.Objects.equals(model, other.model);
+        return java.util.Objects.equals(resolvedModel(), other.resolvedModel());
+    }
+
     public Optional<LlmCatalog.Platform> platformDef() { return LlmCatalog.platform(platform); }
 
     public Optional<LlmCatalog.Family> familyDef() {

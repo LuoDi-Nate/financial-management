@@ -3,6 +3,7 @@ package com.family.finance.web.admin;
 import com.family.finance.service.checkup.llm.LlmCatalog;
 import com.family.finance.service.checkup.llm.LlmInvocation;
 import com.family.finance.service.checkup.llm.LlmSettings;
+import com.family.finance.service.checkup.llm.LlmProbeTarget;
 import com.family.finance.service.config.FamilyConfigService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -24,6 +25,9 @@ public class LlmSettingsView {
     private final FamilyConfigService configService;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
+    public record CredentialCard(String code, String label, boolean ready, String masked,
+                                 String consoleUrl, String howTo, String probe) {}
+
     
 
     /**
@@ -37,6 +41,17 @@ public class LlmSettingsView {
         model.addAttribute("llmTimeoutSeconds", configService.getInt(fid,  FamilyConfigService.K_LLM_TIMEOUT_SECS, 25));
         model.addAttribute("llmTemperature",    configService.getString(fid, FamilyConfigService.K_LLM_TEMPERATURE, "0.5"));
         LlmSettings s = LlmSettings.load(configService, fid);
+        var cards = LlmCatalog.PLATFORMS.stream().map(p -> new CredentialCard(p.code(), p.label(),
+                configService.isPrivateKeyConfigured(fid, p.keyName()), configService.maskedSecret(fid, p.keyName()),
+                p.keyConsoleUrl(), p.keyHowTo(), LlmProbeTarget.resolve(s, p).map(LlmProbeTarget::display)
+                        .orElse("请先选择型号并保存"))).toList();
+        model.addAttribute("llmCredentialCards", cards);
+        model.addAttribute("llmKeyCount", cards.stream().filter(CredentialCard::ready).count());
+        model.addAttribute("llmPlatformCount", cards.size());
+        model.addAttribute("llmModelPattern", LlmCatalog.MODEL_PATTERN);
+        model.addAttribute("llmModelMaxLength", LlmCatalog.MAX_MODEL_LENGTH);
+        model.addAttribute("llmVisionPlatformsLabel", platformsWith(LlmCatalog.Modality.VISION).stream()
+                .map(LlmCatalog.Platform::label).collect(java.util.stream.Collectors.joining(" / ")));
         model.addAttribute("llmLegacy", s.legacy());   // 还没保存过新配置 → 页面提示「保存一次即可固化」
         // 三把 key 各自的「已配/未配」(永不回显值)
         model.addAttribute("qwenKeyConfigured",     configService.isPrivateKeyConfigured(fid, FamilyConfigService.K_LLM_QWEN_KEY));
@@ -54,10 +69,8 @@ public class LlmSettingsView {
         //   此前那个 checkbox 照样可勾,勾了必然存不下去(而且报的是「请选择平台」,
         //   指向一个他根本选不了的下拉)。现在直接禁用并说清去配哪家。
         model.addAttribute("visionCapableReady", !visionCapablePlatforms(fid).isEmpty());
-        model.addAttribute("platformReady", java.util.Map.of(
-                "dashscope", configService.isPrivateKeyConfigured(fid, FamilyConfigService.K_LLM_QWEN_KEY),
-                "deepseek",  configService.isPrivateKeyConfigured(fid, FamilyConfigService.K_LLM_DEEPSEEK_KEY),
-                "ark",       configService.isPrivateKeyConfigured(fid, FamilyConfigService.K_LLM_ARK_KEY)));
+        model.addAttribute("platformReady", cards.stream().collect(java.util.stream.Collectors.toMap(
+                CredentialCard::code, CredentialCard::ready)));
         // 主选三元组
         model.addAttribute("llmPlatform",       s.primary().platform());
         model.addAttribute("llmFamily",         s.primary().family());
@@ -81,6 +94,8 @@ public class LlmSettingsView {
         // 而且「哪些平台能做视觉」这件事按目录如实过滤 —— DeepSeek 官方没有视觉系列,就不该出现在截图识别里。
         model.addAttribute("llmPlatformsText",   platformsWith(LlmCatalog.Modality.TEXT));
         model.addAttribute("llmPlatformsVision", platformsWith(LlmCatalog.Modality.VISION));
+        Object draft = model.asMap().get("llmDraft");
+        if (draft instanceof java.util.Map<?, ?> values) values.forEach((key, value) -> model.addAttribute(key.toString(), value));
     }
 
     /** 支持该形态的平台(视觉:DeepSeek 官方没有视觉系列 → 不出现在截图识别的平台下拉里) */
