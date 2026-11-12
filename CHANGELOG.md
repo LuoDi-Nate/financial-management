@@ -2,7 +2,7 @@
 
 按 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 风格记录。每个版本详细需求见对应 [`prd/vX.Y.md`](prd/),技术设计见 [`tech-design/vX.Y.md`](tech-design/),QA case 见 [`docs/qa-cases.md`](docs/qa-cases.md)。
 
-## [v1.40.1] · beta待验收 · 目标 AI 洞察
+## [v1.40.1] · beta已验收,待发布 · 目标 AI 洞察
 
 - 补齐新退休目标的 AI 洞察标题入口、仪表盘直达、跨页签定位及未确认偏离预警。
 - 解读增加同源的结余达成时间和来源;计划、资金与结余依据变化后标明历史解读,生成失败保留原报告。未自动重算或调用真实模型。

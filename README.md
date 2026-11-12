@@ -350,7 +350,7 @@ bash scripts/regression-data.sh # 数据层/口径回归(原 e2e.sh · curl 端�
 
 ## 文档
 
-- 在研补丁:[v1.40.1 新目标 AI 洞察修复](prd/v1.40.1.md),[技术方案附录](tech-design/v1.40.md)。
+- 待发布补丁:[v1.40.1 新目标 AI 洞察修复](prd/v1.40.1.md),[技术方案附录](tech-design/v1.40.md)。
 
 **新手先看**
 
