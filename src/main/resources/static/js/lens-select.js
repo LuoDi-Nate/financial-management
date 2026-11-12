@@ -19,7 +19,8 @@
   function buildItems(sel) {
     return Array.prototype.map.call(sel.options, function (o) {
       var py = o.getAttribute('data-py') || '';
-      return { value: o.value, label: o.textContent.trim(), pyFull: norm(py), pyInit: initials(py) };
+      return { value: o.value, label: o.textContent.trim(), pyFull: norm(py), pyInit: initials(py),
+        disabled: o.disabled || o.parentElement.tagName === 'OPTGROUP' && o.parentElement.disabled };
     });
   }
 
@@ -59,6 +60,7 @@
     var active = -1;
 
     function syncBtn() {
+      btn.disabled = sel.disabled;
       var o = sel.options[sel.selectedIndex];
       btn.textContent = o ? o.textContent.trim() : '';
       btn.classList.toggle('lsel-empty', !sel.value);
@@ -69,6 +71,7 @@
       if (OPEN === panel) OPEN = null;
     }
     function open() {
+      if (sel.disabled) return;
       if (OPEN && OPEN !== panel) { OPEN.hidden = true; if (OPEN.parentNode === document.body) OPEN._lselWrap.appendChild(OPEN); }
       OPEN = panel; panel.hidden = false;
       /* 移动端 bottom sheet:祖先(卡片/表格)可能创建层叠上下文困住 z-index → portal 到 body,
@@ -82,6 +85,8 @@
     }
     panel._lselWrap = wrap;
     function pick(v) {
+      var item = items.find(function (it) { return it.value === v; });
+      if (sel.disabled || !item || item.disabled) return;
       sel.value = v;
       sel.dispatchEvent(new Event('change', { bubbles: true }));
       syncBtn(); close();
@@ -99,7 +104,8 @@
         li.setAttribute('data-v', it.value);
         li.setAttribute('data-i', String(i));
         if (it.value === sel.value) li.classList.add('lsel-cur');
-        li.addEventListener('mousedown', function (e) { e.preventDefault(); pick(it.value); });
+        if (it.disabled) { li.classList.add('lsel-disabled'); li.setAttribute('aria-disabled', 'true'); }
+        else li.addEventListener('mousedown', function (e) { e.preventDefault(); pick(it.value); });
         list.appendChild(li); shown++;
       });
       if (!shown) {
@@ -109,7 +115,7 @@
       }
     }
     function move(delta) {
-      var lis = list.querySelectorAll('li[data-v]');
+      var lis = list.querySelectorAll('li[data-v]:not([aria-disabled=true])');
       if (!lis.length) return;
       active = (active + delta + lis.length) % lis.length;
       lis.forEach(function (li, i) { li.classList.toggle('lsel-act', i === active); });
@@ -124,7 +130,7 @@
       else if (e.key === 'ArrowUp') { e.preventDefault(); move(-1); }
       else if (e.key === 'Enter' && active >= 0) {
         e.preventDefault();
-        var li = list.querySelectorAll('li[data-v]')[active];
+        var li = list.querySelectorAll('li[data-v]:not([aria-disabled=true])')[active];
         if (li) pick(li.getAttribute('data-v'));
       } else if (e.key === 'Escape') { close(); }
     });
@@ -134,7 +140,7 @@
       else if (e.key === 'ArrowUp') { e.preventDefault(); move(-1); }
       else if (e.key === 'Enter') {
         e.preventDefault();
-        var lis = list.querySelectorAll('li[data-v]');
+        var lis = list.querySelectorAll('li[data-v]:not([aria-disabled=true])');
         var li = active >= 0 ? lis[active] : lis[0];
         if (li) pick(li.getAttribute('data-v'));
       } else if (e.key === 'Escape') { close(); }
@@ -172,14 +178,15 @@
     '.lsel-q{display:block;width:100%;box-sizing:border-box;border:0;border-bottom:1px solid var(--rule,#d8cfba);' +
       'background:transparent;padding:7px 10px;font-size:13px;outline:none}' +
     '.lsel-list{list-style:none;margin:0;padding:4px 0;max-height:240px;overflow-y:auto}' +
-    '.lsel-list li{padding:6px 12px;font-size:13px;cursor:pointer;white-space:nowrap}' +
+    '.lsel-list li{padding:6px 12px;font-size:13px;cursor:pointer;white-space:normal;overflow-wrap:anywhere}' +
+    '.lsel-btn:disabled,.lsel-list li.lsel-disabled{opacity:.55;cursor:not-allowed}' +
     '.lsel-list li:hover,.lsel-list li.lsel-act{background:var(--card-soft,#f3ecdb)}' +
     '.lsel-list li.lsel-cur{font-weight:600}' +
     '.lsel-list li.lsel-none{color:var(--ink-subtle,#8a8172);cursor:default}' +
     /* 移动端:面板改贴底 bottom sheet(面板在按钮下方会跑出视口);搜索框 ≥16px —— iOS Safari 对
        <16px 的 input 聚焦时会自动放大整页(用户主诉"点击后被放大很多"),16px 起不触发 zoom */
     '@media (max-width:640px){' +
-      '.lsel-panel{position:fixed;left:10px;right:10px;bottom:10px;top:auto;width:auto;min-width:0;max-width:none;' +
+      '.lsel-panel{position:fixed;left:10px;right:10px;bottom:10px;top:auto;width:auto;min-width:0;max-width:calc(100vw - 20px);box-sizing:border-box;' +
         'max-height:62vh;z-index:10050;box-shadow:0 -8px 28px rgba(33,30,23,.22);border-radius:4px 4px 0 0}' +   /* z 高于隐私/目录浮钮 */
       '.lsel-q{font-size:16px !important;width:100% !important;flex:none !important;padding:11px 14px}' +   /* !important:打标页 .tags-table td input(优先级更高)会压回 12px 重新触发 iOS zoom / flex:1 挤窄输入框 */
       '.lsel-list{max-height:46vh;padding:6px 0}' +

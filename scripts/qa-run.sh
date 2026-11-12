@@ -3351,7 +3351,7 @@ done
   && grep -qF 'th:each="card : ${llmCredentialCards}"' "$ICFG" \
   && grep -q 'data-llm-probe' "$ICFG" && grep -q 'llm-test-' "$ICFG" \
   && [ "$_cfg2_help" -ge 1 ]; } \
-  && log_ok "v07-CFG-2 LLM 页 可选说明 + 每个平台各有折叠指引 + 测试按钮 + sibling 表单齐(平台 $_cfg2_n 个)" \
+  && log_ok "v07-CFG-2 LLM 页 可选说明 + 目录循环渲染每个平台的折叠帮助/测试按钮/sibling表单" \
   || log_bad "v07-CFG-2 LLM 配置引导 UI 缺件" "平台 $_cfg2_n 个 · 折叠指引 $_cfg2_help 段 · 缺按钮:${_cfg2_bad:-ok} · see admin/_llm-settings.html"
 
 # v07-CFG-3 后端测试端点 + 脱敏分类

@@ -27,6 +27,9 @@ check rg -q 'data-lsel' "$tpl"
 check rg -q '/js/lens-select.js' "$tpl"
 check rg -q 'data-model-pattern' "$tpl"
 check node --check src/main/resources/static/js/llm-settings.js
+check node --check src/main/resources/static/js/lens-select.js
+check rg -q 'btn.disabled = sel.disabled' src/main/resources/static/js/lens-select.js
+check rg -q 'gap-y-8 md:gap-8' src/main/resources/templates/admin/ai-access.html
 check test -f src/test/java/com/family/finance/service/checkup/llm/LlmIntegrationV141Test.java
 check test -f src/test/java/com/family/finance/web/admin/AiPlatformV141Test.java
 check test -f src/test/java/com/family/finance/service/ask/runtime/LocalToolLoopSiliconflowTest.java

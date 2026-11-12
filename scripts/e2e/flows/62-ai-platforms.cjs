@@ -11,7 +11,7 @@ const where="family_id=1 AND key_name IN ("+keys.map(k=>"'"+k+"'").join(',')+")"
 let baseline;
 async function saveModels(ui){await ui.click('#llm-models button[type=submit]','保存模型配置');await ui.page.waitForLoadState('networkidle');}
 async function pick(ui,name,value){if(!await ui.pickLsel(name,value))throw new Error('选择器不可操作:'+name);}
-async function center(ui,selector,label){const el=ui.page.locator(selector);await ui.page.evaluate(()=>document.activeElement.blur());await el.scrollIntoViewIfNeeded();await ui.page.waitForTimeout(350);await ui.assert(await el.evaluate(n=>{const r=n.getBoundingClientRect();const top=document.elementsFromPoint(r.x+r.width/2,r.y+r.height/2)[0];return top===n||n.contains(top);}),label);}
+async function center(ui,selector,label){const el=ui.page.locator(selector);await ui.page.evaluate(()=>document.activeElement.blur());await el.evaluate(n=>n.scrollIntoView({block:'center'}));await ui.page.waitForTimeout(350);await ui.assert(await el.evaluate(n=>{const r=n.getBoundingClientRect();const top=document.elementsFromPoint(r.x+r.width/2,r.y+r.height/2)[0];return top===n||n.contains(top);}),label);}
 module.exports={
   name:'62-ai-platforms',title:'四平台凭据与模型同规则 · 完整ID · 服务端保护 · 手机实点',
   async run(ui){
@@ -22,6 +22,16 @@ module.exports={
     const modelBefore=db.raw("SELECT key_name,HEX(value_text) FROM family_runtime_config WHERE family_id=1 AND key_name IN ('llm_platform','llm_family','llm_model_id') ORDER BY key_name");
     await ui.goto('/admin');await ui.click('a[href="/admin/ai-access"]','从管理首页进入AI接入');
     await ui.assert(await ui.page.locator('[data-llm-key]').count()===platforms.length,'目录每个平台都有一张凭据卡');
+    const disabled=await ui.page.locator('#primaryPlatform option[value=siliconflow]').isDisabled();
+    await ui.page.locator('.lsel:has(select[name=platform]) .lsel-btn').click();
+    await ui.assert((await ui.page.locator('.lsel-panel:not([hidden]) li[data-v=siliconflow]').getAttribute('aria-disabled')==='true')===disabled,'增强选择器继承原生平台禁用状态');
+    if(disabled){
+      const original=await ui.page.locator('#primaryPlatform').inputValue();
+      const item=ui.page.locator('.lsel-panel:not([hidden]) li[data-v=siliconflow]');await item.scrollIntoViewIfNeeded();const box=await item.boundingBox();
+      await ui.page.mouse.click(box.x+box.width/2,box.y+box.height/2);
+      await ui.assert(await ui.page.locator('#primaryPlatform').inputValue()===original,'点击未配平台不会改变选型');
+    }
+    await ui.page.locator('.lsel:has(select[name=platform]) .lsel-btn').click();
     for(let i=0;i<platforms.length;i++){
       const p=platforms[i][0],scope='[data-llm-key="'+p+'"]';
       await ui.click(scope+' button[type=submit]:not([form])','空密钥保存给字段提示');
@@ -61,7 +71,7 @@ module.exports={
     await ui.page.locator('#llm').screenshot({path:'/tmp/issue-42-beta-desktop.png'});
     for(const width of [390,320])await ui.device(width,844,async mobile=>{
       await mobile.goto('/admin/ai-access');
-      await mobile.assert(await mobile.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'手机'+width+'无横向溢出');
+      await mobile.assert(await mobile.page.evaluate(expected=>document.documentElement.scrollWidth<=expected&&innerWidth===expected,width),'手机'+width+'无横向溢出或缩放');
       await pick(mobile,'platform','siliconflow');await mobile.fill('#primaryModelId','bad model');await saveModels(mobile);
       await mobile.assert(await mobile.page.evaluate(()=>document.activeElement.id==='primaryModelId'),'手机'+width+'首错定位');
       await center(mobile,'[data-llm-key=siliconflow] button:not([form])','手机'+width+'保存密钥中心命中');
