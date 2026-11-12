@@ -2,6 +2,11 @@
 
 按 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 风格记录。每个版本详细需求见对应 [`prd/vX.Y.md`](prd/),技术设计见 [`tech-design/vX.Y.md`](tech-design/),QA case 见 [`docs/qa-cases.md`](docs/qa-cases.md)。
 
+## [v1.41] · 需求待评审 · 硅基流动 AI 接入
+
+- issue #42恢复处理;已准备独立密钥、文字主备、截图识别及本地Agent能力范围的[PRD](prd/v1.41.md)与[静态预览](preview/v1.41/ai-access.html)。
+- 当前仅设计与版本元数据,尚未开发、部署或进行真实模型调用;技术设计在需求评审后单独提交。
+
 ## [v1.40.1] · 2026-11-12 · 目标 AI 洞察
 
 - 维护者精确确认后发布。生产版本1.40.1,备份与迁移幂等检查通过,本机及公网health/login均200;Docker双架构版本/源码标签匹配,新版与latest同摘要,[Release](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.40.1)已发布。无新增迁移。

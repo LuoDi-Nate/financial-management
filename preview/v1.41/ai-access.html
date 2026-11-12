@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>硅基流动 AI 接入 · v1.41 需求预览</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500&family=Source+Serif+4:wght@400;500&family=JetBrains+Mono:wght@400;500&family=Noto+Serif+SC:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/style.css">
+  <link rel="stylesheet" href="../../src/main/resources/static/css/style.css">
+  <style>
+    * {letter-spacing:0!important}
+    body {margin:0;--ink-subtle:#706657;--fs-scale:1}
+    [hidden] {display:none!important}
+    a {color:var(--brass-deep);text-decoration:none}
+    button,input,select {box-sizing:border-box}
+    svg.icon {width:14px;height:14px;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+    .review-bar {padding:9px 24px;background:var(--ink);color:var(--card);font:12px var(--ui-sans);display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+    .review-bar a {color:var(--card)}
+    .top-nav {border-bottom:1px solid var(--rule);padding:18px 26px;display:flex;align-items:center;gap:26px;background:var(--card)}
+    .brand {font-size:22px;color:var(--ink);font-family:Fraunces,'Noto Serif SC',serif;white-space:nowrap}
+    .nav-links {display:flex;gap:22px;font:13px var(--ui-sans);flex-wrap:wrap}
+    .nav-links span {color:var(--ink-soft)}
+    .nav-links .active {color:var(--brass-deep);font-weight:600}
+    .page {max-width:1400px;margin:0 auto;padding:32px 26px 64px;display:grid;grid-template-columns:190px minmax(0,1fr);gap:38px;position:relative;z-index:2}
+    .sidebar {padding-top:6px;font:13px var(--ui-sans)}
+    .sidebar p {color:var(--ink-subtle);font-size:12px;margin:18px 0 8px}
+    .sidebar a,.sidebar span {display:block;padding:9px 12px;color:var(--ink-soft)}
+    .sidebar .active {border-left:2px solid var(--brass);background:var(--brass-soft);color:var(--ink)}
+    main {min-width:0}
+    h1 {font-size:30px;margin:5px 0 22px}
+    h2 {font-size:21px;margin:0}
+    h3 {font-size:17px;margin:0}
+    p {margin:8px 0;line-height:1.75}
+    .section-head {display:flex;align-items:center;justify-content:space-between;gap:12px;margin:22px 0 14px}
+    .section-note,.hint {font:12px/1.75 var(--ui-sans);color:var(--ink-soft)}
+    .hint {display:block;margin-top:7px;overflow-wrap:anywhere}
+    .credentials {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+    .cred-card {padding:18px;display:flex;flex-direction:column;gap:10px;border:1px solid var(--rule);border-radius:8px;background:var(--card);min-width:0;box-shadow:none}
+    .cred-head {display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:26px}
+    .cred-card .field-label {margin:0;font-size:12px}
+    .cred-card .field-input {padding:8px 2px;font-size:16px}
+    .cred-card .hint {margin:0;min-height:42px}
+    .cred-actions {display:flex;align-items:center;gap:8px;margin-top:auto;padding-top:4px;flex-wrap:wrap}
+    .key-state {font:12px var(--ui-sans);white-space:nowrap;color:var(--ink-soft)}
+    .key-state.on {color:var(--forest)}
+    .key-state::before {content:'○';margin-right:5px}
+    .key-state.on::before {content:'✓'}
+    .section-band {border-top:1px solid var(--rule);padding:24px 0;margin-top:26px}
+    .model-row {display:grid;grid-template-columns:90px minmax(135px,1fr) minmax(140px,1fr) minmax(240px,2fr);gap:15px;align-items:start;padding:18px 0;border-bottom:1px solid var(--rule-soft)}
+    .row-name {font:600 13px var(--ui-sans);padding-top:31px}
+    .field-label {font-size:12px!important}
+    .model-row .field-input {font-size:14px;font-family:var(--ui-sans);min-height:36px}
+    .lsel-btn {min-height:40px;border-radius:6px;font-family:var(--ui-sans)}
+    .model-id {font-family:'JetBrains Mono',monospace!important;font-size:13px!important}
+    .field-error {display:block;color:var(--rust);font:12px/1.65 var(--ui-sans);margin-top:6px}
+    .field-error:empty {display:none}
+    [aria-invalid=true] {border-color:var(--rust)!important}
+    .form-actions {display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:20px}
+    .toggle-line {display:flex;gap:10px;align-items:center;font:14px var(--ui-sans);min-height:44px;margin:12px 0 0}
+    input[type=checkbox],input[type=radio] {width:17px;height:17px;accent-color:var(--brass-deep)}
+    .effective {font:13px/1.9 var(--ui-sans);border-left:2px solid var(--brass);padding:10px 14px;margin:18px 0 0;background:var(--card-soft);overflow-wrap:anywhere;white-space:pre-line}
+    .notice {font:13px/1.7 var(--ui-sans);padding:12px 14px;border-left:3px solid var(--forest);background:var(--forest-soft);margin:14px 0;overflow-wrap:anywhere;scroll-margin-top:20px}
+    .notice.error {border-color:var(--rust);background:var(--rust-soft)}
+    .notice.neutral {border-color:var(--brass);background:var(--brass-soft)}
+    .agent-band {display:flex;align-items:flex-start;gap:18px;justify-content:space-between;flex-wrap:wrap}
+    .agent-choices {display:flex;gap:22px;flex-wrap:wrap}
+    .agent-choices label {display:flex;align-items:center;gap:8px;min-height:44px;font:13px var(--ui-sans)}
+    .review-tools {border-top:1px dashed var(--rule);margin-top:18px;padding:16px 0;font:12px var(--ui-sans)}
+    .review-tools summary {cursor:pointer;min-height:32px;color:var(--ink-soft)}
+    .review-tools .tool-fields {display:grid;grid-template-columns:120px minmax(0,280px);gap:12px;align-items:center;margin-top:12px}
+    .advanced {padding-top:18px;font:13px var(--ui-sans)}
+    .advanced-grid {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;margin-top:14px}
+    .page-footer {font:12px var(--ui-sans);color:var(--ink-subtle);margin-top:24px}
+    @media(max-width:1100px) {.page{grid-template-columns:160px minmax(0,1fr);gap:25px}.model-row{grid-template-columns:75px 1fr 1fr}.model-field{grid-column:2/4}.row-name{grid-row:1/3}}
+    @media(max-width:760px) {.page{display:block;padding:22px 18px 48px}.sidebar{display:none}.top-nav{padding:14px 18px}.nav-links{gap:14px}.model-row{grid-template-columns:1fr 1fr;gap:13px}.row-name{grid-column:1/-1;grid-row:auto;padding:0}.model-field{grid-column:1/-1}.review-bar{padding:9px 18px}.advanced-grid{grid-template-columns:1fr}}
+    @media(max-width:580px) {.credentials{grid-template-columns:1fr}.top-nav{align-items:flex-start;flex-direction:column;gap:12px}.cred-card{padding:16px}.section-head{align-items:flex-start}.model-row{grid-template-columns:1fr}.model-field{grid-column:auto}.row-name{grid-column:auto}.field-input{font-size:16px!important}.review-tools .tool-fields{grid-template-columns:1fr}.form-actions{align-items:flex-start;flex-direction:column}.btn-ink,.btn-paper,.btn-ghost{min-height:40px}.model-id{font-size:13px!important}.page{padding-inline:14px}.section-note{font-size:13px}}
+  </style>
+</head>
+<body>
+  <div class="review-bar"><span>需求预览 · v1.41 · issue #42</span><a href="../../prd/v1.41.md">查看需求文档</a><span>合成设置 · 保存和连接均为模拟</span></div>
+  <header class="top-nav"><span class="brand">家庭账房</span><nav class="nav-links" aria-label="主导航"><span>仪表盘</span><span>填报</span><span>账户</span><span>报表</span><span>目标</span><span>资产体检</span><span class="active">管理</span></nav></header>
+  <div class="page">
+    <aside class="sidebar" aria-label="管理导航"><p>家庭与数据</p><span>家庭设置</span><span>成员管理</span><p>接入与分析</p><span>数据源接入</span><span>券商同步</span><a href="#llm" class="active" aria-current="page">AI 接入</a><span>分析设置</span><p>维护</p><span>备份</span><span>回收站</span></aside>
+    <main>
+      <div class="eyebrow">A I · 接 · 入</div><h1>AI 接入</h1>
+      <div class="section-head" id="llm"><h2>大模型</h2><span class="pill pill-forest" id="key-count">3 / 4 家已配密钥</span></div>
+      <p class="section-note">配一家即可使用。文字分析的主选与备选、截图识别的型号分别选择。</p>
+      <div class="credentials" id="credentials"></div>
+      <p class="hint">使用已保存密钥和生效型号测试,未选用时使用参考文字型号,可能产生少量用量。</p>
+      <div id="key-feedback" class="notice" role="status" aria-live="polite" hidden></div>
+      <form id="models-form" class="section-band" novalidate>
+        <div class="section-head"><h2>用哪个模型</h2><span class="section-note">密钥与模型各自保存</span></div>
+        <p class="hint" id="sf-hint">先保存硅基流动密钥,再选择这家平台的模型。</p>
+        <div id="text-rows"></div>
+        <label class="toggle-line"><input type="checkbox" id="vision-enabled" name="visionEnabled">启用持仓截图导入</label>
+        <div id="vision-row" hidden></div>
+        <details class="advanced"><summary>更多设置</summary><div class="advanced-grid"><label class="field-label">采样温度<input class="field-input field-input-num" type="number" value="0.5" min="0" max="1" step="0.1"></label><label class="field-label">回答长度上限<input class="field-input field-input-num" type="number" value="2000" min="500" max="8000"></label><label class="field-label">等待秒数<input class="field-input field-input-num" type="number" value="60" min="5" max="120"></label></div></details>
+        <div class="form-actions"><button class="btn-ink" type="submit"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>保存模型选择</button><span class="hint">完整型号保留组织前缀和大小写。</span></div>
+        <div id="model-feedback" class="notice" role="status" aria-live="polite" hidden></div>
+        <div class="effective" id="effective">当前生效
+主选:DeepSeek 官方 · deepseek-chat
+备选:阿里云百炼 · qwen-plus
+截图识别:关闭</div>
+      </form>
+      <section class="section-band"><div class="agent-band"><h2>超级 Agent</h2><div class="agent-choices"><label><input type="radio" name="runtime" value="local" checked>本地运行</label><label><input type="radio" name="runtime" value="managed">百炼托管</label></div></div><p class="section-note" id="agent-note">本地运行使用上面的文字主选和备选,所选型号需支持工具调用。</p></section>
+      <details class="review-tools"><summary>预览场景</summary><div class="tool-fields"><label for="probe-outcome">连接反馈</label><select id="probe-outcome" class="field-input" data-lsel><option value="success">本次连接成功</option><option value="key">密钥无效</option><option value="model">型号不存在</option><option value="busy">限流或繁忙</option><option value="timeout">连接超时</option><option value="blocked">测试环境 · 未调用</option></select></div><p class="hint">此处只切换静态反馈,不会向任何平台发送请求。</p></details>
+      <footer class="page-footer">v1.41 需求预览 · 家庭账房</footer>
+    </main>
+  </div>
+  <script src="../../src/main/resources/static/js/lens-select.js"></script>
+  <script>
+    (() => {
+      const platforms = {
+        dashscope:{label:'阿里云百炼',ready:true,help:'https://bailian.console.aliyun.com',text:[['qwen','通义千问','qwen-plus']],vision:[['qwen-vl','通义千问 VL','qwen-vl-max']]},
+        deepseek:{label:'DeepSeek 官方',ready:true,help:'https://platform.deepseek.com',text:[['deepseek','DeepSeek','deepseek-chat']],vision:[]},
+        ark:{label:'火山方舟',ready:true,help:'https://console.volcengine.com/ark',text:[['doubao','豆包','doubao-seed-evolving']],vision:[['doubao-vision','豆包视觉','doubao-seed-2-0-lite-260215']]},
+        siliconflow:{label:'硅基流动',ready:false,help:'https://cloud.siliconflow.cn/account/ak',text:[['deepseek','DeepSeek','deepseek-ai/DeepSeek-V4-Flash'],['other','其他对话模型','']],vision:[['kimi','Kimi 图片理解','moonshotai/Kimi-K2.7-Code'],['other','其他图片模型','']]}
+      };
+      const ids = ['primary','backup','vision'];
+      const drafts = {primary:{platform:'deepseek',family:'deepseek',model:'deepseek-chat'},backup:{platform:'dashscope',family:'qwen',model:'qwen-plus'},vision:{platform:'dashscope',family:'qwen-vl',model:'qwen-vl-max'}};
+      let saved = {...JSON.parse(JSON.stringify(drafts)),visionEnabled:false};
+      const memories = {};
+      const labels = {primary:'文字主选',backup:'故障备选',vision:'截图识别'};
+      const checkIcon='<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>';
+      const linkIcon='<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-2 2M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l2-2"/></svg>';
+      const families=(id,p)=>platforms[p][id==='vision'?'vision':'text'];
+      function notice(id,text,kind='') {const node=document.getElementById(id);node.textContent='预览 · '+text;node.className='notice '+kind;node.hidden=false;}
+      function options(select,rows,value) {select.replaceChildren(...rows.map(([v,t])=>new Option(t,v,false,v===value)));}
+      function card(p) {
+        const data=platforms[p];
+        const form=document.createElement('form');form.className='cred-card';form.id='key-'+p;form.noValidate=true;
+        form.innerHTML='<div class="cred-head"><h3>'+data.label+'</h3><span class="key-state '+(data.ready?'on':'')+'">'+(data.ready?'已配置':'未配置')+'</span></div><label class="field-label" for="key-input-'+p+'">API Key</label><input id="key-input-'+p+'" class="field-input" name="apiKey" type="password" autocomplete="new-password" placeholder="'+(data.ready?'留空不改,换密钥时粘贴新的':'粘贴 API Key')+'"><span class="field-error" aria-live="polite"></span><p class="hint">'+(p==='siliconflow'?'文字、图片与本地 Agent 共用这家平台的密钥。':'此平台的密钥独立保存。')+' <a href="'+data.help+'" target="_blank" rel="noreferrer">获取密钥</a></p><div class="cred-actions"><button class="btn-ink" type="submit">'+checkIcon+'保存密钥</button><button class="btn-ghost" type="button" data-probe="'+p+'">'+linkIcon+'测试连接</button></div>';
+        form.addEventListener('submit',e=>{
+          e.preventDefault();const input=form.querySelector('input');const error=form.querySelector('.field-error');
+          if(!input.value.trim()){error.textContent='没有输入新密钥,原密钥未改动';input.setAttribute('aria-invalid','true');input.focus();return;}
+          data.ready=true;input.value='';input.placeholder='留空不改,换密钥时粘贴新的';input.removeAttribute('aria-invalid');error.textContent='';
+          const state=form.querySelector('.key-state');state.className='key-state on';state.textContent='已配置';
+          document.getElementById('key-count').textContent=Object.values(platforms).filter(x=>x.ready).length+' / 4 家已配密钥';
+          document.getElementById('sf-hint').hidden=platforms.siliconflow.ready;refreshPlatforms();
+          notice('key-feedback',data.label+'的密钥已保存,模型选择尚未改动。');
+        });
+        form.querySelector('[data-probe]').addEventListener('click',()=>probe(p));
+        document.getElementById('credentials').appendChild(form);
+      }
+      function buildRow(id) {
+        const row=document.createElement('div');row.className='model-row';row.id=id+'-row';
+        row.innerHTML='<div class="row-name">'+labels[id]+'</div><div><label class="field-label" for="'+id+'-platform">平台</label><select class="field-input" data-lsel id="'+id+'-platform" name="'+id+'Platform"></select></div><div><label class="field-label" for="'+id+'-family">模型系列</label><select class="field-input" data-lsel id="'+id+'-family" name="'+id+'Family"></select></div><div class="model-field"><label class="field-label" for="'+id+'-model">具体型号</label><input class="field-input model-id" id="'+id+'-model" name="'+id+'Model" autocomplete="off"><span class="field-error" id="'+id+'-error" aria-live="polite"></span><span class="hint" id="'+id+'-hint"></span></div>';
+        (id==='vision'?document.getElementById('vision-row'):document.getElementById('text-rows')).appendChild(row);
+        row.querySelector('input').value=drafts[id].model;
+        row.querySelector('#'+id+'-platform').addEventListener('change',e=>{
+          const d=drafts[id];memories[id+'|'+d.platform]={...d};d.platform=e.target.value;
+          if(d.platform){const saved=memories[id+'|'+d.platform];const first=families(id,d.platform)[0];d.family=saved?saved.family:first[0];d.model=saved?saved.model:first[2];}
+          else{d.family='';d.model='';}renderFamily(id);
+        });
+        row.querySelector('#'+id+'-family').addEventListener('change',e=>{const d=drafts[id];d.family=e.target.value;d.model=families(id,d.platform).find(f=>f[0]===d.family)[2];renderModel(id);});
+        row.querySelector('input').addEventListener('input',e=>{drafts[id].model=e.target.value;e.target.removeAttribute('aria-invalid');document.getElementById(id+'-error').textContent='';});
+      }
+      function refreshPlatforms() {
+        ids.forEach(id=>{const list=Object.entries(platforms).filter(([p,x])=>x.ready&&families(id,p).length).map(([p,x])=>[p,x.label]);if(id==='backup')list.unshift(['','不设备选']);options(document.getElementById(id+'-platform'),list,drafts[id].platform);renderFamily(id);});
+      }
+      function renderFamily(id) {
+        const d=drafts[id];const select=document.getElementById(id+'-family');select.disabled=!d.platform;
+        options(select,d.platform?families(id,d.platform).map(f=>[f[0],f[1]]):[['','不设备选']],d.family);renderModel(id);
+      }
+      function renderModel(id) {
+        const d=drafts[id];const input=document.getElementById(id+'-model');input.value=d.model;input.disabled=!d.platform;
+        input.placeholder=d.platform==='siliconflow'?'复制完整型号,包含组织前缀':'选择参考型号或手填';
+        document.getElementById(id+'-hint').textContent=!d.platform?'':d.platform==='siliconflow'?(id==='vision'?'请选择支持图片输入的型号。':'本地 Agent 需选择支持工具调用的型号。'):'按此平台的型号填写。';
+        document.getElementById(id+'-error').textContent='';input.removeAttribute('aria-invalid');
+      }
+      function validate(id) {
+        const d=drafts[id];if(!d.platform)return true;const model=d.model.trim();
+        const valid=model.length>0&&model.length<=256&&(d.platform==='siliconflow'?/^[A-Za-z0-9._:-]+(?:\/[A-Za-z0-9._:-]+)+$/:/^[A-Za-z0-9._:-]+$/).test(model);
+        if(!valid){document.getElementById(id+'-error').textContent=d.platform==='siliconflow'?'请复制平台上的完整型号,保留组织前缀和大小写':'请填写有效的具体型号';document.getElementById(id+'-model').setAttribute('aria-invalid','true');}
+        return valid;
+      }
+      function probe(p) {
+        if(document.getElementById('probe-outcome').value==='blocked'){notice('key-feedback','测试环境 · 未调用','neutral');return;}
+        if(!platforms[p].ready){notice('key-feedback',platforms[p].label+'未配置密钥,请先保存。','error');return;}
+        const selected=ids.find(id=>saved[id].platform===p&&(id!=='vision'||saved.visionEnabled));
+        const model=selected?saved[selected].model:platforms[p].text[0][2];
+        const outcomes={success:platforms[p].label+' · '+model+' · '+(selected?'已保存型号':'参考文字型号')+' · 本次连接成功',key:'密钥无效,请核对并重新保存'+platforms[p].label+'密钥',model:'型号不存在或无权使用,请从平台复制当前完整型号',busy:'平台限流或繁忙,请稍后重试',timeout:'连接超时,请稍后重试或选用可用备选'};
+        const kind=document.getElementById('probe-outcome').value;notice('key-feedback',outcomes[kind],kind==='success'?'':'error');
+        document.getElementById('key-feedback').scrollIntoView({block:'center',behavior:'smooth'});
+      }
+      Object.keys(platforms).forEach(card);ids.forEach(buildRow);refreshPlatforms();
+      const vision=document.getElementById('vision-enabled');vision.addEventListener('change',()=>document.getElementById('vision-row').hidden=!vision.checked);
+      document.getElementById('models-form').addEventListener('submit',e=>{
+        e.preventDefault();const active=vision.checked?ids:ids.slice(0,2);const bad=active.filter(id=>!validate(id));
+        if(bad.length){document.getElementById(bad[0]+'-model').focus();notice('model-feedback','请修正字段旁的提示,当前生效设置未改动。','error');return;}
+        const a=drafts.primary,b=drafts.backup;
+        if(b.platform&&a.platform===b.platform&&a.family===b.family&&a.model.trim()===b.model.trim()){notice('model-feedback','备选与主选完全相同,请更换型号或清空备选。','error');return;}
+        saved={...JSON.parse(JSON.stringify(drafts)),visionEnabled:vision.checked};
+        ids.forEach(id=>saved[id].model=saved[id].model.trim());
+        const format=id=>drafts[id].platform?platforms[drafts[id].platform].label+' · '+drafts[id].model.trim():'未设置';
+        document.getElementById('effective').textContent='当前生效\n主选:'+format('primary')+'\n备选:'+format('backup')+'\n截图识别:'+(vision.checked?format('vision'):'关闭');
+        notice('model-feedback','模型选择已保存。未向任何平台发送请求。');
+      });
+      document.querySelectorAll('[name=runtime]').forEach(radio=>radio.addEventListener('change',()=>document.getElementById('agent-note').textContent=radio.value==='local'?'本地运行使用上面的文字主选和备选,所选型号需支持工具调用。':'百炼托管继续使用百炼账户与智能体,上面的硅基流动密钥不会替换它。'));
+      window.LensSelect.enhanceAll();
+    })();
+  </script>
+</body>
+</html>
