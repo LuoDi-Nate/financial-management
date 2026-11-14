@@ -51,7 +51,7 @@
       </div>
     </section>
     <form class="band" id="model-form" novalidate><div class="head"><h2>用哪个模型</h2><span class="hint">服务配置与模型各自保存</span></div><div id="text-models"></div>
-      <label class="inline-check"><input type="checkbox" id="vision-enabled">启用持仓截图导入</label><div id="vision-model" hidden></div>
+      <label class="inline-check"><input type="checkbox" id="vision-enabled">启用持仓截图导入</label><div id="vision-fields" hidden></div>
       <p class="hint">自有服务的截图型号需支持图片输入;本地Agent需支持工具调用和流式回答。</p>
       <details class="more"><summary>更多设置</summary><div class="advanced"><label class="field-label">采样温度<input class="field-input field-input-num" type="number" value="0.5" min="0" max="1" step="0.1"></label><label class="field-label">回答长度上限<input class="field-input field-input-num" type="number" value="2000" min="500" max="8000"></label><label class="field-label">等待秒数<input class="field-input field-input-num" type="number" value="25" min="5" max="120"></label></div></details>
       <div class="form-actions"><button class="btn-ink" type="submit"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>保存模型配置</button></div><div id="model-feedback" class="notice" role="status" aria-live="polite" hidden></div><div id="effective" class="effective"></div>
@@ -108,7 +108,7 @@
       function row(id){
         const n=document.createElement('div');n.className='model-row';n.id=id+'-row';
         n.innerHTML='<div class="row-title">'+labels[id]+'</div><div><label class="field-label" for="'+id+'-platform">平台</label><select class="field-input" data-lsel id="'+id+'-platform"></select></div><div><label class="field-label" for="'+id+'-family">模型系列</label><select class="field-input" data-lsel id="'+id+'-family"></select></div><div class="model-field"><label class="field-label" for="'+id+'-model">具体型号</label><input class="field-input model-id" id="'+id+'-model" autocomplete="off" maxlength="256"><span id="'+id+'-error" class="field-error" role="status"></span><p class="hint" id="'+id+'-hint"></p></div>';
-        $(id==='vision'?'vision-model':'text-models').append(n);
+        $(id==='vision'?'vision-fields':'text-models').append(n);
         $(id+'-platform').addEventListener('change',e=>{draft[id]={platform:e.target.value,model:''};$(id+'-error').textContent='';renderModel(id);});
         $(id+'-model').addEventListener('input',e=>{draft[id].model=e.target.value;e.target.removeAttribute('aria-invalid');$(id+'-error').textContent='';});
       }
@@ -122,7 +122,7 @@
       ids.forEach(row);
       $('base-url').addEventListener('input',previewEndpoint);
       $('auth-mode').addEventListener('change',()=>{const none=$('auth-mode').value==='none';$('key-field').hidden=none;$('custom-key').disabled=none;$('auth-note').hidden=!none;});
-      $('vision-enabled').addEventListener('change',()=>{$('vision-model').hidden=!$('vision-enabled').checked;});
+      $('vision-enabled').addEventListener('change',()=>{$('vision-fields').hidden=!$('vision-enabled').checked;});
       $('custom-form').addEventListener('submit',e=>{
         e.preventDefault();clearErrors();
         const name=$('service-name').value.trim()||'自有服务',raw=$('base-url').value.trim(),auth=$('auth-mode').value,allow=$('allow-local').checked;
