@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>自有服务 · v1.42 需求预览</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500&family=Source+Serif+4:wght@400;500&family=JetBrains+Mono:wght@400;500&family=Noto+Serif+SC:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/style.css">
+  <link rel="stylesheet" href="../../src/main/resources/static/css/style.css">
+  <style>
+    *{box-sizing:border-box;letter-spacing:0!important}body{margin:0;--fs-scale:1;--ink-subtle:#706657} [hidden]{display:none!important}
+    a{color:var(--brass-deep)}p{line-height:1.75;margin:8px 0}h1{font-size:30px;margin:6px 0 22px}h2{font-size:21px;margin:0}h3{font-size:17px;margin:0}
+    .review-bar{background:var(--ink);color:var(--card);padding:10px 24px;display:flex;gap:16px;flex-wrap:wrap;font:12px/1.7 var(--ui-sans)}.review-bar a{color:inherit}
+    header{display:flex;align-items:center;gap:28px;padding:18px 24px;border-bottom:1px solid var(--rule);background:var(--card)}.brand{font:22px Fraunces,'Noto Serif SC',serif;white-space:nowrap}nav{display:flex;gap:20px;flex-wrap:wrap;font:13px var(--ui-sans);color:var(--ink-soft)}nav .active{color:var(--brass-deep)}
+    .page{max-width:1360px;margin:auto;padding:30px 24px 60px;display:grid;grid-template-columns:170px minmax(0,1fr);gap:34px;position:relative;z-index:2}aside{font:13px/2 var(--ui-sans)}aside p{font-size:12px;color:var(--ink-subtle);margin-top:18px}aside span,aside a{display:block;padding:6px 12px}aside a{border-left:2px solid var(--brass);background:var(--brass-soft);text-decoration:none}main{min-width:0}
+    .head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}.hint{font:12px/1.75 var(--ui-sans);color:var(--ink-soft);overflow-wrap:anywhere}.credentials{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin-top:20px}.cred-card{display:flex;flex-direction:column;gap:12px;padding:18px;border:1px solid var(--rule);border-radius:8px;background:var(--card);min-width:0}.cred-card p{margin:0}.cred-head{display:flex;gap:12px;align-items:center;justify-content:space-between;min-height:26px}.state{font:12px var(--ui-sans);color:var(--ink-soft);white-space:nowrap}.state.on{color:var(--forest)}
+    .cred-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:auto;padding-top:8px}.field-label{font-size:12px!important}.field-input{width:100%;min-width:0}.custom{grid-column:1/-1}.custom-fields{display:grid;grid-template-columns:1fr 2fr;gap:20px}.custom-fields>*{min-width:0}.custom-fields .wide{grid-column:1/-1}.inline-check{display:flex;align-items:center;gap:10px;min-height:44px;font:13px/1.6 var(--ui-sans)}input[type=checkbox]{accent-color:var(--brass-deep);width:17px;height:17px;flex:none}
+    .endpoint{font:12px/1.8 'JetBrains Mono',monospace;overflow-wrap:anywhere;white-space:pre-line;margin-top:4px}.field-error{display:block;color:var(--rust);font:12px/1.7 var(--ui-sans);margin-top:5px}.field-error:empty{display:none}[aria-invalid=true]{border-color:var(--rust)!important}.notice{font:13px/1.8 var(--ui-sans);border-left:3px solid var(--forest);padding:10px 14px;background:var(--forest-soft);overflow-wrap:anywhere}.notice.error{border-color:var(--rust);background:var(--rust-soft)}.notice.neutral{border-color:var(--brass);background:var(--brass-soft)}
+    .band{border-top:1px solid var(--rule);margin-top:28px;padding-top:24px}.model-row{display:grid;grid-template-columns:85px 1.15fr 1fr 1.8fr;gap:16px;align-items:start;padding:18px 0;border-bottom:1px solid var(--rule-soft)}.row-title{font:600 13px/1.6 var(--ui-sans);padding-top:28px}.model-row>div{min-width:0}.model-id{font-family:'JetBrains Mono',monospace;font-size:13px}.form-actions{display:flex;justify-content:flex-end;margin-top:18px}.effective{font:13px/1.9 var(--ui-sans);white-space:pre-line;overflow-wrap:anywhere;border-left:2px solid var(--brass);padding:10px 14px;background:var(--card-soft);margin-top:18px}.lsel-btn{border-radius:6px;min-height:38px;font-family:var(--ui-sans)}.more{font:13px/1.8 var(--ui-sans)}.more summary{cursor:pointer;padding:12px 0}.advanced{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}.review-tools{margin-top:26px;border-top:1px dashed var(--rule);font:12px/1.8 var(--ui-sans)}.review-tools summary{cursor:pointer;padding:14px 0}.review-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}.footer{margin-top:24px;font:12px var(--ui-sans);color:var(--ink-soft)}
+    svg.icon{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+    @media(max-width:1000px){.page{grid-template-columns:140px minmax(0,1fr);gap:22px}.model-row{grid-template-columns:75px 1fr 1fr}.model-field{grid-column:2/4}.row-title{grid-row:1/3}}
+    @media(max-width:760px){.page{display:block;padding:24px 18px 48px}aside{display:none}header{align-items:flex-start;flex-direction:column;gap:12px}nav{gap:14px}.custom-fields{grid-template-columns:1fr}.model-row{grid-template-columns:1fr 1fr}.row-title{padding:0;grid-row:auto;grid-column:1/-1}.model-field{grid-column:1/-1}.review-grid{grid-template-columns:1fr}}
+    @media(max-width:580px){.credentials,.advanced,.model-row{grid-template-columns:1fr}.model-field,.row-title{grid-column:auto}.page{padding-inline:14px}.cred-card{padding:16px}.review-bar{padding-inline:14px}.head{align-items:flex-start}.field-input{font-size:16px!important}.model-id{font-size:13px!important}.btn-ink,.btn-paper,.btn-ghost{min-height:40px}.lsel-btn{min-height:44px}.custom-fields .wide{grid-column:auto}.hint{font-size:13px}.cred-head h3{font-size:16px}}
+  </style>
+</head>
+<body>
+  <div class="review-bar"><span>需求预览 · v1.42 · issue #43</span><a href="../../prd/v1.42.md">需求文档</a><span>合成设置 · 所有保存和连接均为模拟</span></div>
+  <header><span class="brand">家庭账房</span><nav aria-label="主导航"><span>仪表盘</span><span>填报</span><span>账户</span><span>报表</span><span>目标</span><span>资产体检</span><span class="active">管理</span></nav></header>
+  <div class="page"><aside aria-label="管理导航"><p>家庭与数据</p><span>家庭设置</span><span>成员管理</span><p>接入与分析</p><span>数据源接入</span><span>券商同步</span><a href="#llm">AI 接入</a><span>分析设置</span><p>维护</p><span>备份</span><span>回收站</span></aside>
+  <main><div class="eyebrow">A I · 接 · 入</div><h1>AI 接入</h1>
+    <section id="llm"><div class="head"><h2>大模型</h2><span class="pill" id="configured-count">2 / 5 项已配置</span></div><p class="hint">任选一家即可。主选、故障备选与截图识别分别选择。</p>
+      <div class="credentials" id="credentials">
+        <form id="custom-form" class="cred-card custom" novalidate>
+          <div class="cred-head"><h3>自有服务 · OpenAI 兼容</h3><span class="state" id="custom-state">未配置</span></div>
+          <div class="custom-fields">
+            <div><label class="field-label" for="service-name">显示名称</label><input class="field-input" id="service-name" name="serviceName" maxlength="40" placeholder="自有服务"><span class="field-error" id="name-error"></span></div>
+            <div><label class="field-label" for="base-url">基础地址 · Base URL</label><input class="field-input" id="base-url" name="baseUrl" type="url" placeholder="https://llm.example.com/v1" autocomplete="off"><span class="field-error" id="url-error" role="status"></span><p class="hint">填写服务提供的API前缀,不要包含/chat/completions。</p></div>
+            <div><label class="field-label" for="auth-mode">认证方式</label><select class="field-input" data-lsel id="auth-mode" name="authMode"><option value="bearer">API Key · Bearer</option><option value="none">不需要密钥</option></select></div>
+            <div id="key-field"><label class="field-label" for="custom-key">API Key</label><input class="field-input" id="custom-key" name="apiKey" type="password" autocomplete="new-password" placeholder="粘贴自有服务的密钥"><span class="field-error" id="key-error" role="status"></span><p class="hint" id="key-mask">尚未保存密钥</p></div>
+            <div class="wide"><label class="inline-check"><input type="checkbox" id="allow-local" name="allowLocal">允许本机/内网或HTTP服务</label><p class="hint">地址从家庭账房服务器访问;本机地址指应用所在环境。仅用于你确认的服务,HTTP传输不加密。</p><span class="field-error" id="network-error" role="status"></span></div>
+          </div>
+          <p class="hint" id="auth-note" hidden>仅用于确实不要求密钥的服务。保存后不会发送Authorization。</p>
+          <p class="endpoint" id="draft-endpoint">保存后调用地址:待填写</p>
+          <div class="cred-actions"><button type="submit" class="btn-ink"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>保存服务配置</button><button type="button" class="btn-ghost" id="test-custom"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-2 2M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l2-2"/></svg>测试连接</button></div>
+          <p class="hint" id="probe-target">测试型号:先保存服务配置</p>
+          <p class="hint">测试使用已保存配置和型号,只发固定测试文本,可能产生少量用量。</p>
+          <div class="notice" id="service-feedback" role="status" aria-live="polite" hidden></div>
+        </form>
+      </div>
+    </section>
+    <form class="band" id="model-form" novalidate><div class="head"><h2>用哪个模型</h2><span class="hint">服务配置与模型各自保存</span></div><div id="text-models"></div>
+      <label class="inline-check"><input type="checkbox" id="vision-enabled">启用持仓截图导入</label><div id="vision-model" hidden></div>
+      <p class="hint">自有服务的截图型号需支持图片输入;本地Agent需支持工具调用和流式回答。</p>
+      <details class="more"><summary>更多设置</summary><div class="advanced"><label class="field-label">采样温度<input class="field-input field-input-num" type="number" value="0.5" min="0" max="1" step="0.1"></label><label class="field-label">回答长度上限<input class="field-input field-input-num" type="number" value="2000" min="500" max="8000"></label><label class="field-label">等待秒数<input class="field-input field-input-num" type="number" value="25" min="5" max="120"></label></div></details>
+      <div class="form-actions"><button class="btn-ink" type="submit"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>保存模型配置</button></div><div id="model-feedback" class="notice" role="status" aria-live="polite" hidden></div><div id="effective" class="effective"></div>
+    </form>
+    <section class="band"><h2>超级 Agent</h2><p class="hint">当前:本地运行。使用文字主选与备选,权限沿用原设置。百炼托管继续独立配置。</p></section>
+    <details class="review-tools"><summary>评审场景 · 仅预览使用</summary><div class="review-grid"><label class="field-label" for="save-outcome">模拟保存<select class="field-input" id="save-outcome" data-lsel><option value="success">保存成功</option><option value="failure">保存失败,不改原配置</option></select></label><label class="field-label" for="test-outcome">模拟连接<select class="field-input" id="test-outcome" data-lsel><option value="blocked">测试环境 · 未调用</option><option value="success">文字连接成功</option><option value="network">服务地址无法访问</option><option value="auth">认证失败</option><option value="model">型号不存在</option><option value="protocol">响应协议不兼容</option><option value="timeout">等待超时</option></select></label></div><p class="hint">只演示交互,没有服务端对接,不会向填写的地址发请求。原平台的全部系列、轮询与托管字段在正式页面继续保留。</p></details>
+    <footer class="footer">v1.42 · 需求待评审</footer>
+  </main></div>
+  <script src="lens-select.js"></script>
+  <script>
+    (() => {
+      const $=id=>document.getElementById(id);
+      const platforms={
+        dashscope:{label:'阿里云百炼',ready:true,vision:true,textFamily:'通义千问',text:'qwen-plus',image:'qwen-vl-max'},
+        deepseek:{label:'DeepSeek 官方',ready:true,vision:false,textFamily:'DeepSeek',text:'deepseek-chat'},
+        ark:{label:'火山方舟',ready:false,vision:true,textFamily:'豆包',text:'doubao-seed-evolving',image:'doubao-seed-2-0-lite-260215'},
+        siliconflow:{label:'硅基流动',ready:false,vision:true,textFamily:'自定义完整型号',text:'',image:''},
+        custom:{label:'自有服务',ready:false,vision:true,textFamily:'自定义模型',text:'',image:''}
+      };
+      const ids=['primary','backup','vision'];
+      const labels={primary:'文字主选',backup:'故障备选',vision:'截图识别'};
+      const draft={primary:{platform:'deepseek',model:'deepseek-chat'},backup:{platform:'',model:''},vision:{platform:'dashscope',model:'qwen-vl-max'}};
+      let saved=structuredClone(draft), savedVision=false, service=null, hasKey=false;
+      const shape=/^[A-Za-z0-9._:-]+(?:\/[A-Za-z0-9._:-]+)*$/;
+      function options(node,rows,current){node.replaceChildren(...rows.map(([value,label,disabled])=>{const o=new Option(label,value,false,value===current);o.disabled=!!disabled;return o;}));}
+      function feedback(id,text,kind=''){const n=$(id);n.className='notice '+kind;n.textContent='预览 · '+text;n.hidden=false;}
+      function fail(input,error,message){$(error).textContent=message;$(input).setAttribute('aria-invalid','true');$(input).focus();}
+      function clearErrors(){['name-error','url-error','key-error','network-error'].forEach(id=>$(id).textContent='');$('custom-form').querySelectorAll('[aria-invalid]').forEach(n=>n.removeAttribute('aria-invalid'));}
+      function endpoint(base){try{const u=new URL(base);return u.origin+u.pathname.replace(/\/+$/,'')+'/chat/completions';}catch{return '';}}
+      function previewEndpoint(){const e=endpoint($('base-url').value.trim());$('draft-endpoint').textContent='保存后调用地址:'+(e||'待填写');}
+      function testTarget(){return ids.find(id=>saved[id].platform==='custom'&&(id!=='vision'||savedVision)&&saved[id].model);}
+      function update(){
+        platforms.custom.ready=!!service;platforms.custom.label=service?.name||'自有服务';
+        $('custom-state').textContent=service?'已配置':'未配置';$('custom-state').className='state'+(service?' on':'');
+        $('key-mask').textContent=hasKey?'已保存 · 密钥已隐藏':service?.auth==='none'?'免认证 · 不发送密钥':'尚未保存密钥';
+        $('custom-key').placeholder=hasKey?'留空不改,换服务地址需重新填写':'粘贴自有服务的密钥';
+        $('configured-count').textContent=Object.values(platforms).filter(p=>p.ready).length+' / 5 项已配置';
+        ids.forEach(id=>{
+          const available=Object.entries(platforms).filter(([,p])=>id!=='vision'||p.vision).map(([code,p])=>[code,code==='custom'?'自有服务 · '+p.label+(p.ready?'':' · 先配置'):p.label+(p.ready?'':' · 未配置'),!p.ready]);
+          if(id==='backup')available.unshift(['','不设备选',false]);
+          options($(id+'-platform'),available,draft[id].platform);renderModel(id);
+        });
+        const target=testTarget();$('probe-target').textContent=!service?'测试型号:先保存服务配置':target?'测试型号:'+saved[target].model+' · 已保存'+labels[target]:'测试型号:先在下方选择自有服务和型号,保存后再测试';
+        const format=id=>{const d=saved[id];return d.platform?platforms[d.platform].label+' · '+(d.model||'自动'):'未设置';};
+        $('effective').textContent='当前生效\n主选:'+format('primary')+'\n备选:'+format('backup')+'\n截图识别:'+(savedVision?format('vision'):'关闭')+(service?'\n自有服务:'+service.name+' · '+service.base:'');
+      }
+      function renderModel(id){
+        const code=draft[id].platform,p=platforms[code];
+        options($(id+'-family'),[[code||'',p?(code==='custom'?'自定义模型':id==='vision'?'图片理解':p.textFamily):'无需设置',false]],code||'');
+        $(id+'-family').disabled=!p||code==='custom';$(id+'-model').disabled=!p;$(id+'-model').value=draft[id].model;
+        $(id+'-model').placeholder=code==='custom'||code==='siliconflow'?'粘贴完整型号':'留空 = 自动';
+        $(id+'-hint').textContent=code==='custom'?'按服务提供的名称填写,保留组织路径和大小写':code==='dashscope'&&id!=='vision'?'自动沿用百炼型号池轮询':!p?'不设备选':'';
+      }
+      function row(id){
+        const n=document.createElement('div');n.className='model-row';n.id=id+'-row';
+        n.innerHTML='<div class="row-title">'+labels[id]+'</div><div><label class="field-label" for="'+id+'-platform">平台</label><select class="field-input" data-lsel id="'+id+'-platform"></select></div><div><label class="field-label" for="'+id+'-family">模型系列</label><select class="field-input" data-lsel id="'+id+'-family"></select></div><div class="model-field"><label class="field-label" for="'+id+'-model">具体型号</label><input class="field-input model-id" id="'+id+'-model" autocomplete="off" maxlength="256"><span id="'+id+'-error" class="field-error" role="status"></span><p class="hint" id="'+id+'-hint"></p></div>';
+        $(id==='vision'?'vision-model':'text-models').append(n);
+        $(id+'-platform').addEventListener('change',e=>{draft[id]={platform:e.target.value,model:''};$(id+'-error').textContent='';renderModel(id);});
+        $(id+'-model').addEventListener('input',e=>{draft[id].model=e.target.value;e.target.removeAttribute('aria-invalid');$(id+'-error').textContent='';});
+      }
+      Object.entries(platforms).filter(([code])=>code!=='custom').forEach(([code,p])=>{
+        const card=document.createElement('form');card.className='cred-card';card.id='card-'+code;card.noValidate=true;
+        card.innerHTML='<div class="cred-head"><h3>'+p.label+'</h3><span class="state'+(p.ready?' on':'')+'">'+(p.ready?'已配置':'未配置')+'</span></div><label class="field-label" for="key-'+code+'">API Key</label><input class="field-input" type="password" id="key-'+code+'" autocomplete="new-password" placeholder="'+(p.ready?'留空不改,换密钥时粘贴新的':'粘贴 API Key')+'"><p class="hint">'+(p.ready?'已保存 · 密钥已隐藏':'尚未保存密钥')+'</p><div class="cred-actions"><button type="submit" class="btn-ink">保存密钥</button><button type="button" class="btn-ghost" data-test>测试连接</button></div><div class="notice" role="status" hidden></div>';
+        card.addEventListener('submit',e=>{e.preventDefault();const key=$('key-'+code),n=card.querySelector('.notice');n.hidden=false;if(!key.value.trim()){n.textContent='预览 · 没有输入新密钥,原配置未改动';key.focus();return;}p.ready=true;key.value='';card.querySelector('.state').textContent='已配置';card.querySelector('.state').className='state on';card.querySelector('p').textContent='已保存 · 密钥已隐藏';n.textContent='预览 · 密钥已保存,模型选择未改动';update();});
+        card.querySelector('[data-test]').addEventListener('click',()=>{const n=card.querySelector('.notice');n.hidden=false;n.textContent='预览 · '+(p.ready?'测试环境 · 未调用':'请先保存这家平台的密钥');});
+        $('credentials').insertBefore(card,$('custom-form'));
+      });
+      ids.forEach(row);
+      $('base-url').addEventListener('input',previewEndpoint);
+      $('auth-mode').addEventListener('change',()=>{const none=$('auth-mode').value==='none';$('key-field').hidden=none;$('custom-key').disabled=none;$('auth-note').hidden=!none;});
+      $('vision-enabled').addEventListener('change',()=>{$('vision-model').hidden=!$('vision-enabled').checked;});
+      $('custom-form').addEventListener('submit',e=>{
+        e.preventDefault();clearErrors();
+        const name=$('service-name').value.trim()||'自有服务',raw=$('base-url').value.trim(),auth=$('auth-mode').value,allow=$('allow-local').checked;
+        let u;try{u=new URL(raw);}catch{fail('base-url','url-error','请输入完整的HTTP或HTTPS基础地址');return;}
+        if(!['https:','http:'].includes(u.protocol)||u.username||u.password||u.search||u.hash||/\/(chat\/completions|responses)\/?$/i.test(u.pathname)) {fail('base-url','url-error','请填基础地址,不要包含认证、参数或完整调用路径');return;}
+        const host=u.hostname.toLowerCase(),reserved=['169.254.169.254','metadata.google.internal','0.0.0.0','[::]'];
+        if(reserved.includes(host)){fail('base-url','url-error','此目标不可用于模型服务');return;}
+        const local=host==='localhost'||!host.includes('.')||/^(127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host)||host.startsWith('[')||host.endsWith('.internal')||host.endsWith('.local');
+        if((local||u.protocol==='http:')&&!allow){fail('allow-local','network-error','请确认允许本机/内网或HTTP服务');return;}
+        const base=u.origin+u.pathname.replace(/\/+$/,''),changed=service&&service.base!==base,key=$('custom-key').value.trim();
+        if(auth==='bearer'&&!key&&(!hasKey||changed)){fail('custom-key','key-error',changed?'服务地址已变更,请重新输入此服务的密钥':'首次使用请填写API Key,免认证服务请明确切换认证方式');return;}
+        if($('save-outcome').value==='failure'){feedback('service-feedback','保存失败,原配置未改动,非敏感草稿已保留','error');$('custom-key').value='';return;}
+        service={name,base,auth,allow};hasKey=auth==='bearer';$('custom-key').value='';$('base-url').value=base;
+        update();previewEndpoint();feedback('service-feedback','服务配置已保存,模型选择尚未改动。','neutral');
+      });
+      $('model-form').addEventListener('submit',e=>{
+        e.preventDefault();let first=null;
+        ids.filter(id=>id!=='vision'||$('vision-enabled').checked).forEach(id=>{
+          $(id+'-error').textContent='';const d=draft[id],input=$(id+'-model'),raw=d.model.trim();input.removeAttribute('aria-invalid');
+          if(!d.platform)return;
+          const required=['custom','siliconflow'].includes(d.platform);
+          if((required&&(!raw||raw.toLowerCase()==='auto'))||(raw&&(!shape.test(raw)||raw.length>256))){$(id+'-error').textContent=required?'请填写服务中的完整型号,不能留空或自动':'请检查完整型号格式';input.setAttribute('aria-invalid','true');first??=input;}
+        });
+        const p=draft.primary,b=draft.backup;
+        if(b.platform&&b.platform===p.platform&&b.model.trim()===p.model.trim()){$('backup-error').textContent='主选与备选相同,请更换型号或不设备选';first??=$('backup-model');}
+        if(first){first.focus();return;}
+        if($('save-outcome').value==='failure'){feedback('model-feedback','保存失败,当前生效配置未改动','error');return;}
+        saved=structuredClone(draft);ids.forEach(id=>saved[id].model=saved[id].model.trim());savedVision=$('vision-enabled').checked;update();
+        $('service-feedback').hidden=true;feedback('model-feedback','模型配置已保存,未自动发起连接测试。');
+      });
+      $('test-custom').addEventListener('click',()=>{
+        if(!service){feedback('service-feedback','先保存服务配置','neutral');return;}
+        const target=testTarget();if(!target){feedback('service-feedback','先在下方选择自有服务和型号,保存后再测试','neutral');return;}
+        const result=$('test-outcome').value,text={blocked:'测试环境 · 未调用',success:'本次文字连接成功',network:'服务地址无法访问,请检查服务器到该服务的网络',auth:'认证失败,请核对自有服务密钥',model:'型号不存在,请复制服务中的完整型号',protocol:'响应协议不兼容,服务需支持Chat Completions',timeout:'等待超时,请检查服务状态'}[result];
+        feedback('service-feedback',service.name+' · '+saved[target].model+' · '+text+(result==='success'?' · 未验证图片或工具能力':''),result==='success'?'':result==='blocked'?'neutral':'error');
+      });
+      update();previewEndpoint();window.LensSelect.enhanceAll();
+    })();
+  </script>
+</body>
+</html>
