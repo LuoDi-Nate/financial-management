@@ -8,8 +8,10 @@
 
 | 外部服务 | 配了解锁什么 | 是否必需 | 去哪配 | 详细步骤 |
 |---|---|---|---|---|
-| **通义 Qwen(阿里云百炼)** | AI 资产体检 / 月报 / 调仓建议(**主**源) | 可选 | `/admin/ai-access` · 大模型 | [LLM Key 申请](llm-api-keys-setup.md) |
-| **DeepSeek** | 同上的**兜底**源(主源熔断/欠费时自动切) | 可选 | `/admin/ai-access` · 大模型 | [LLM Key 申请](llm-api-keys-setup.md) |
+| **阿里云百炼** | AI文字/图片能力,可选主备;保留文字自动轮询 | 可选 | `/admin/ai-access#llm` | [LLM Key 申请](llm-api-keys-setup.md) |
+| **DeepSeek官方** | AI文字能力,可选主备 | 可选 | `/admin/ai-access#llm` | [LLM Key 申请](llm-api-keys-setup.md) |
+| **火山方舟** | AI文字/图片能力,按具体型号选择 | 可选 | `/admin/ai-access#llm` | [LLM Key 申请](llm-api-keys-setup.md) |
+| **硅基流动** | AI文字/图片/本地工具能力,按具体型号选择 | 可选 | `/admin/ai-access#llm` | [LLM Key 申请](llm-api-keys-setup.md) |
 | **阿里云短信** | 填报截止前的**短信强提醒** | 可选 | `/admin/reminders` ② | [阿里云短信接入](aliyun-sms-setup.md) |
 | 股票行情(新浪/腾讯) | 每日 T+1 自动估值 | **免配** · 内置 | — | 无需 key |
 | 加密货币行情(Binance/CoinGecko/Coinbase) | BTC/ETH/USDC 等自动估值 | **免配** · 内置 | — | 无需 key |
@@ -21,12 +23,12 @@
 
 ---
 
-## 1. AI(Qwen / DeepSeek)
+## 1. AI(百炼 / DeepSeek官方 / 方舟 / 硅基流动)
 
 **解锁**:资产体检、月报 AI 洞察、调仓建议。计算全部由工程算好再喂模型,**AI 只解读,不做数学、不荐产品、不预测涨跌**。
 
 **怎么配**:`/admin/ai-access`(管理 → AI 接入)→「大模型」那一节,填 API Key → 保存 → 点该 key 旁的「**测试连接**」验证通不通。
-- 主源 **Qwen**、兜底 **DeepSeek**,**配一个即可**用,两个都配则主源故障时自动 failover,更稳。
+- 四家各自保存密钥,主选与备选由你指定,**配一家即可**;截图独立选型,本地Agent沿用文字主备。硅基流动的托管DeepSeek不与官方平台共用密钥。
 - 每个 key 字段下有「**如何获取?**」折叠说明,3 步拿到 key;详版见 [LLM Key 申请与配置](llm-api-keys-setup.md)。
 - 选哪家、免费额度怎么省,见 [LLM 厂商选型对比](llm-vendor-comparison.md)。
 

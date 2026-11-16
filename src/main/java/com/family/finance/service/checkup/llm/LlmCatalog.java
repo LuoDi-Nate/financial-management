@@ -54,6 +54,16 @@ public final class LlmCatalog {
         /** chat-completions 完整端点 */
         public String chatEndpoint() { return baseUrl + "/chat/completions"; }
 
+        public String keyConsoleUrl() {
+            return switch (code) {
+                case P_DASHSCOPE -> "https://bailian.console.aliyun.com";
+                case P_DEEPSEEK -> "https://platform.deepseek.com";
+                case P_ARK -> "https://console.volcengine.com/ark";
+                case P_SILICONFLOW -> "https://cloud.siliconflow.cn/account/ak";
+                default -> throw new IllegalStateException("平台缺少密钥申请入口");
+            };
+        }
+
         public List<Family> families(Modality m) {
             return families.stream().filter(f -> f.modality() == m).toList();
         }
@@ -74,6 +84,7 @@ public final class LlmCatalog {
     public static final String P_DASHSCOPE = "dashscope";
     public static final String P_DEEPSEEK  = "deepseek";
     public static final String P_ARK       = "ark";
+    public static final String P_SILICONFLOW = "siliconflow";
 
     /**
      * 阿里云百炼(DashScope)· 承接 v0.14 的 `qwen`。
@@ -151,7 +162,21 @@ public final class LlmCatalog {
                             "doubao-seed-2-0-lite-260215")
             ));
 
-    public static final List<Platform> PLATFORMS = List.of(DASHSCOPE, DEEPSEEK, ARK);
+    public static final Platform SILICONFLOW = new Platform(
+            P_SILICONFLOW, "硅基流动", "https://api.siliconflow.cn/v1",
+            "llm_siliconflow_api_key", false, "硅基流动控制台 → API密钥 → 创建",
+            List.of(
+                    new Family("deepseek", "DeepSeek", Modality.TEXT,
+                            List.of(new Model("deepseek-ai/DeepSeek-V4-Flash", "DeepSeek-V4-Flash · 参考型号")),
+                            "deepseek-ai/DeepSeek-V4-Flash"),
+                    new Family("other", "其他对话模型", Modality.TEXT, List.of(), null),
+                    new Family("kimi", "Kimi · 图片理解", Modality.VISION,
+                            List.of(new Model("moonshotai/Kimi-K2.7-Code", "Kimi-K2.7-Code · 图片输入参考")),
+                            "moonshotai/Kimi-K2.7-Code"),
+                    new Family("other-vision", "其他图片模型", Modality.VISION, List.of(), null)
+            ));
+
+    public static final List<Platform> PLATFORMS = List.of(DASHSCOPE, DEEPSEEK, ARK, SILICONFLOW);
 
     public static Optional<Platform> platform(String code) {
         if (code == null) return Optional.empty();
@@ -174,10 +199,12 @@ public final class LlmCatalog {
      * 不进未转义的 HTML 位。字符集连引号和空格都不放行。填错的后果是对方返回
      * "model not found",经 classifyLlmError 归类后显示。</p>
      */
-    private static final Pattern MODEL_RE = Pattern.compile("^[A-Za-z0-9._:-]{1,64}$");
+    public static final int MAX_MODEL_LENGTH = 256;
+    public static final String MODEL_PATTERN = "^[A-Za-z0-9._:-]+(?:/[A-Za-z0-9._:-]+)*$";
+    private static final Pattern MODEL_RE = Pattern.compile(MODEL_PATTERN);
 
     public static boolean validModel(String model) {
-        return model != null && MODEL_RE.matcher(model).matches();
+        return model != null && model.length() <= MAX_MODEL_LENGTH && MODEL_RE.matcher(model).matches();
     }
 
     /** 归一化用户输入的型号:空 / "auto" → null(表示自动);其余原样 trim(不做大小写转换,型号大小写敏感)。 */

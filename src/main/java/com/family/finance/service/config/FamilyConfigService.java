@@ -85,6 +85,7 @@ public class FamilyConfigService {
     public static final String K_LLM_BACKUP_MODEL_ID = "llm_backup_model_id";
     /** 火山方舟 API Key(v1.13 新平台) */
     public static final String K_LLM_ARK_KEY         = "llm_ark_api_key";
+    public static final String K_LLM_SILICONFLOW_KEY = "llm_siliconflow_api_key";
     /** 视觉三元组(FR-362:与文本同一套解析,但各选各的) */
     public static final String K_LLM_VISION_PLATFORM = "llm_vision_platform";
     public static final String K_LLM_VISION_FAMILY   = "llm_vision_family";
@@ -210,6 +211,8 @@ public class FamilyConfigService {
     /** v1.13 · 火山方舟。官方 SDK 惯用环境变量名是 ARK_API_KEY,这里沿用同一条 env 通道对齐另外两家 */
     @Value("${finance.llm.ark.api-key:${ARK_API_KEY:}}")
     private String envArkKey;
+    @Value("${finance.llm.siliconflow.api-key:${FINANCE_LLM_SILICONFLOW_API_KEY:}}")
+    private String envSiliconflowKey;
     @Value("${finance.stock.fetch-enabled:false}")
     private boolean envStockEnabled;
     @Value("${app.remember-me-validity-seconds:2592000}")
@@ -260,6 +263,7 @@ public class FamilyConfigService {
             case K_LLM_QWEN_KEY     -> isBlank(envQwenKey)     ? codeDefault : envQwenKey;
             case K_LLM_DEEPSEEK_KEY -> isBlank(envDeepseekKey) ? codeDefault : envDeepseekKey;
             case K_LLM_ARK_KEY      -> isBlank(envArkKey)      ? codeDefault : envArkKey;
+            case K_LLM_SILICONFLOW_KEY -> isBlank(envSiliconflowKey) ? codeDefault : envSiliconflowKey;
             default -> codeDefault;
         };
     }

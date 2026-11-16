@@ -6,6 +6,8 @@ import com.family.finance.service.AuditLogService;
 import com.family.finance.service.checkup.llm.LlmCatalog;
 import com.family.finance.service.checkup.llm.LlmInvocation;
 import com.family.finance.service.checkup.llm.LlmSettings;
+import com.family.finance.service.checkup.llm.LlmProbeTarget;
+import com.family.finance.service.checkup.llm.LlmFailure;
 import com.family.finance.service.config.FamilyConfigService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -85,6 +87,7 @@ public class AiModelController {
      * 这条纪律对<b>模型</b>是对的;把它连带套在密钥上才是上面那个死锁的成因。</p>
      */
     @PostMapping("/models")
+    @org.springframework.transaction.annotation.Transactional
     public String saveLlmModels(@AuthenticationPrincipal MemberPrincipal me,
                           @RequestParam(value = "platform", required = false) String platform,
                           @RequestParam(value = "family", required = false) String family,
@@ -136,7 +139,10 @@ public class AiModelController {
                 if (view.visionCapablePlatforms(fid).isEmpty()) {
                     throw new IllegalArgumentException(
                             "截图识别需要有视觉能力的平台,而你已配密钥的平台都没有视觉能力 · "
-                            + "请先在上面为「阿里云百炼」或「火山方舟」保存密钥,或取消勾选「启用持仓截图导入」");
+                            + "请先在上面为「" + LlmCatalog.PLATFORMS.stream()
+                                    .filter(p -> !p.families(LlmCatalog.Modality.VISION).isEmpty())
+                                    .map(LlmCatalog.Platform::label).collect(java.util.stream.Collectors.joining(" / "))
+                            + "」保存密钥,或取消勾选「启用持仓截图导入」");
                 }
                 vision = parseTriple("截图识别", visionPlatform, visionFamily, visionModelId,
                         LlmCatalog.Modality.VISION, true);
@@ -144,10 +150,14 @@ public class AiModelController {
             }
         } catch (IllegalArgumentException e) {
             ra.addFlashAttribute("flashError", e.getMessage());
+            keepDraft(ra, platform, family, modelId, backupPlatform, backupFamily, backupModelId,
+                    visionEnabled, visionPlatform, visionFamily, visionModelId, temperature, maxTokens, timeoutSeconds);
             return BACK;
         }
-        if (backup != null && backup.equals(primary)) {
+        if (primary.sameStrategy(backup)) {
             ra.addFlashAttribute("flashError", "备选与主选完全相同,等于没有备选 · 请换一个平台/系列/型号,或清空备选平台");
+            keepDraft(ra, platform, family, modelId, backupPlatform, backupFamily, backupModelId,
+                    visionEnabled, visionPlatform, visionFamily, visionModelId, temperature, maxTokens, timeoutSeconds);
             return BACK;
         }
 
@@ -206,7 +216,8 @@ public class AiModelController {
         String m = LlmCatalog.normalizeModel(modelId);
         if (m != null && !LlmCatalog.validModel(m)) {
             // 不回显用户填的原串(可能是粘错的 key)· 只说格式要求
-            throw new IllegalArgumentException(what + ":型号格式不合法 · 只允许字母/数字/点/下划线/冒号/连字符,最长 64 位");
+            throw new IllegalArgumentException(what + ":型号格式不合法 · 请复制完整型号,保留前缀和大小写,最长 "
+                    + LlmCatalog.MAX_MODEL_LENGTH + " 位,不填网址或密钥");
         }
         if (m == null && requireModel && f.requiresExplicitModel()) {
             throw new IllegalArgumentException(what + ":" + p.label() + " 的「" + f.label()
@@ -320,7 +331,7 @@ public class AiModelController {
             reason = ok ? "可用" : "返回为空";
         } catch (Exception e) {
             ok = false;
-            reason = classifyLlmError(e.getMessage(), inv.resolvedModel());
+            reason = LlmFailure.describe(p.code(), e);
         }
 
         // 审计 · 不记 key 明文(§22.6 / 决策 82)· 只记调用坐标 + 结果归类
@@ -342,16 +353,27 @@ public class AiModelController {
      * "model not found",不如直接说「先去填型号」。
      */
     private LlmInvocation probeInvocation(long fid, LlmCatalog.Platform p) {
-        LlmSettings s = LlmSettings.load(configService, fid);
-        java.util.List<LlmInvocation> candidates = new java.util.ArrayList<>(s.chain());
-        candidates.add(s.vision());
-        for (LlmInvocation inv : candidates) {
-            if (p.code().equals(inv.platform()) && inv.resolvable()) return inv;
+        return LlmProbeTarget.resolve(LlmSettings.load(configService, fid), p)
+                .map(LlmProbeTarget::invocation).orElse(null);
+    }
+
+    private static void keepDraft(RedirectAttributes ra, String p, String f, String m,
+                                  String bp, String bf, String bm, boolean ve, String vp, String vf, String vm,
+                                  Double temperature, int maxTokens, int timeout) {
+        var draft = new java.util.LinkedHashMap<String, Object>();
+        String[] names = {"llmPlatform", "llmFamily", "llmModelId", "llmBackupPlatform", "llmBackupFamily",
+                "llmBackupModelId", "llmVisionPlatform", "llmVisionFamily", "llmVisionModelId"};
+        String[] values = {p, f, m, bp, bf, bm, vp, vf, vm};
+        for (int i = 0; i < names.length; i++) {
+            String value = values[i] == null ? "" : values[i].trim();
+            if (value.toLowerCase(java.util.Locale.ROOT).startsWith("sk-") || !value.isEmpty() && !LlmCatalog.validModel(value)) value = "";
+            draft.put(names[i], value);
         }
-        return p.firstFamily(LlmCatalog.Modality.TEXT)
-                .filter(f -> !f.requiresExplicitModel())
-                .map(f -> new LlmInvocation(p.code(), f.code(), null))
-                .orElse(null);
+        draft.put("llmVisionEnabled", ve);
+        draft.put("llmTemperature", temperature == null ? 0.5 : temperature);
+        draft.put("llmMaxTokens", maxTokens);
+        draft.put("llmTimeoutSeconds", timeout);
+        ra.addFlashAttribute("llmDraft", draft);
     }
 
     /**

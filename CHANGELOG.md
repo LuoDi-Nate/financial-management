@@ -2,6 +2,13 @@
 
 按 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 风格记录。每个版本详细需求见对应 [`prd/vX.Y.md`](prd/),技术设计见 [`tech-design/vX.Y.md`](tech-design/),QA case 见 [`docs/qa-cases.md`](docs/qa-cases.md)。
 
+## [v1.41] · beta待验收 · 硅基流动 AI 接入
+
+- issue #42恢复处理;已准备独立密钥、文字主备、截图识别及本地Agent能力范围的[PRD](prd/v1.41.md)与[静态预览](preview/v1.41/ai-access.html)。
+- 按维护者补充增加四平台一致性合同:凭据卡/帮助/保存/测试同规则,保留留空推荐与无默认项手填、未配平台禁用提示及视觉能力边界;预览同时覆盖旧平台,不另造新平台专用流程。
+- 11-12维护者分别确认需求及[技术设计](tech-design/v1.41.md),已实现并部署beta1.41.0。四平台共用凭据卡与选型,完整型号保留,文字/图片/本地工具SSE沿用原路由与保护;修正窄屏视口和选择器禁用语义,保留百炼轮询及方舟型号恢复指引。
+- 1540单测、29静态、完整QA1037项、数据187项、新配置浏览器136项、原退休494项、保护15项及公网10项通过;基线已还原,真实模型发送0。完整QA按原规则跳过6项。[beta验收记录](docs/beta-review-v1.41.md)。
+
 ## [v1.40.1] · 2026-11-12 · 目标 AI 洞察
 
 - 维护者精确确认后发布。生产版本1.40.1,备份与迁移幂等检查通过,本机及公网health/login均200;Docker双架构版本/源码标签匹配,新版与latest同摘要,[Release](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.40.1)已发布。无新增迁移。
