@@ -2,6 +2,8 @@
 
 状态:2026-11-17已部署beta1.42.0,等待维护者验收,未合并master、未发布或推公开源码。[issue #43](https://github.com/LuoDi-Nate/financial-management/issues/43) · [PRD](../prd/v1.42.md) · [技术设计](../tech-design/v1.42.md)。
 
+业务候选:`223e3491`。已部署jar与本工作区最终产物SHA-256一致(前缀`b335c4ee6314`);后续纯文档提交不改变该产物。
+
 入口:[beta的AI接入页](https://beta.dixi-token.top/admin/ai-access#llm)。从管理首页“AI接入”卡进入,下方“自有服务”卡与原四家平台同页。
 
 ## 交付行为
@@ -35,6 +37,8 @@
 V81仅新增`llm_prompt_record`、`review_ai_cache`、`rebalance_advice_cache`、`goal_ai_report`、`holding_import`、`ask_message`的可空来源列,不回填金额或改历史正文。迁移前保留本地私密基线,没有操作prod。
 
 配置回归只暂存原值于进程内,使用合成Key/地址/图片。结束核对配置摘要还原,合成导入和对话清理;完整QA与数据回归各自dump+EXIT还原并重启。模型计数表排除在还原之外,保护开关及计数未重置。维护者原主备、Key和Agent设置均保留,自有服务初始状态随原配置恢复。
+
+最终产物再次完整QA1037通过/0失败/6既有跳过、数据187通过/0失败/0跳过,还原后health为UP1.42.0且同epoch发送0。串联启动数据回归时曾因前一轮重启尚未就绪而在保护预检处停止,未执行写操作;确认health后单独重跑得到上述结果,没有把失败当通过。
 
 回滚到不认识custom或siliconflow的旧jar前,脚本检查主备及视觉(包括已关闭的视觉)是否属于该版本支持的平台;查不到、版本未知或仍有新平台则拒绝。需先在AI接入恢复旧版平台,新增来源列和私密JSON留库,不删除历史数据。
 
