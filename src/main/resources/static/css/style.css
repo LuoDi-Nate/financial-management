@@ -1743,9 +1743,12 @@ body.upd-open #priv-float { display: none !important; }
 .cred-card{ background:var(--card-soft); border:1px solid var(--rule-soft); border-radius:6px;
             padding:.9rem 1rem; display:flex; flex-direction:column; }
 .cred-card.is-on{ border-color:rgba(79,107,71,.42); background:rgba(79,107,71,.045); }
-.ai-access code{ overflow-wrap:anywhere; }
+.ai-access{ min-width:0; overflow-wrap:anywhere; }
 .cred-card .cred-head{ display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; margin-bottom:.55rem; }
 .cred-card .cred-name{ font-weight:600; font-size:13.5px; color:var(--ink); }
+/* Opaque service names and complete model IDs also determine a grid item's intrinsic width. */
+#llm, #llm form, #llm .cred-name, #llm [data-llm-triple] .grid > div { min-width:0; }
+#llm .cred-name, #llm p { overflow-wrap:anywhere; }
 
 /* 状态标签:配没配是这一页最该一眼看清的事,所以给底色 */
 .state-tag{ display:inline-flex; align-items:center; gap:.28rem; font-family:'JetBrains Mono',monospace;

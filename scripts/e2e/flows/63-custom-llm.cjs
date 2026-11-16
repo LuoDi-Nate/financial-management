@@ -12,16 +12,26 @@ const digest=s=>createHash('sha256').update(s).digest('hex');
 const own=()=>JSON.parse(db.one("SELECT value_text FROM family_runtime_config WHERE family_id=1 AND key_name='llm_custom_service_secret'"));
 let baseline,baselineHash,ownedImport,ownedAccount,questionPrefix;
 async function pick(ui,name,value){if(!await ui.pickLsel(name,value))throw new Error('选择器不可操作:'+name);}
-async function saveService(ui){await ui.click('#llm-custom-service button:not([form])','保存服务配置');await ui.page.waitForLoadState('networkidle');}
+async function saveService(ui){await ui.click('#llm-custom-service button[type=submit]:not([form])','保存服务配置');await ui.page.waitForLoadState('networkidle');}
 async function saveModels(ui){await ui.click('#llm-models button[type=submit]','保存模型配置');await ui.page.waitForLoadState('networkidle');}
 async function center(ui,selector,label){const e=ui.page.locator(selector);await e.evaluate(n=>n.scrollIntoView({block:'center'}));await ui.page.waitForTimeout(250);
   await ui.assert(await e.evaluate(n=>{const r=n.getBoundingClientRect(),top=document.elementsFromPoint(r.x+r.width/2,r.y+r.height/2)[0];return top===n||n.contains(top);}),label);}
+async function capture(ui,selector,path){
+  const original=ui.page.viewportSize(),element=ui.page.locator(selector);
+  const height=await element.evaluate(n=>Math.ceil(n.getBoundingClientRect().height));
+  try{
+    if(height+160>original.height)await ui.page.setViewportSize({width:original.width,height:height+160});
+    await element.evaluate(n=>n.scrollIntoView({block:'center'}));await ui.page.waitForTimeout(250);
+    await element.screenshot({path});
+  }finally{await ui.page.setViewportSize(original);}
+}
 async function protectedRun(ui,run){await ui.page.context().unroute(AI_ROUTE);try{return await run();}finally{await stubAi(ui.page.context());}}
 async function waitDb(sql,expected){for(let i=0;i<24;i++){if(db.one(sql)===expected)return;await new Promise(r=>setTimeout(r,250));}throw new Error('合成任务状态未按预期完成');}
 module.exports={
   name:'63-custom-llm',title:'自有服务真实表单 · 原子配置 · 主备/视觉 · 多入口保护 · 双端交互',
   async run(ui){
     ui.flow=this.name;const start=await guard.state(BASE);if(!start.enabled||start.sent!==0)throw new Error('必须保持服务端保护且实际发送0');
+    await ui.page.context().addInitScript(()=>{try{sessionStorage.setItem('privacy','1');}catch(e){}});
     // Original private values stay in process memory, never in a fixture file or report.
     const original=read();baseline=original.split('\n').filter(Boolean).map(r=>r.split('\t'));baselineHash=digest(original);
     const modelBefore=db.raw("SELECT key_name,HEX(value_text) FROM family_runtime_config WHERE family_id=1 AND key_name IN ('llm_platform','llm_family','llm_model_id') ORDER BY key_name");
@@ -54,7 +64,7 @@ module.exports={
     // Replace all visible masks with synthetic keys before taking any evidence screenshots.
     for(const p of ['dashscope','deepseek','ark','siliconflow']){
       await ui.fill('[data-llm-key='+p+'] [name=apiKey]','e2e-v142-synthetic-'+p,'填写原平台合成凭据 '+p);
-      await ui.click('[data-llm-key='+p+'] button:not([form])','独立保存原平台 '+p);await ui.page.waitForLoadState('networkidle');
+      await ui.click('[data-llm-key='+p+'] button[type=submit]:not([form])','独立保存原平台 '+p);await ui.page.waitForLoadState('networkidle');
     }
     await pick(ui,'platform','custom');await pick(ui,'family','custom');await pick(ui,'backupPlatform','');
     await ui.page.locator('#visionEnabled').check();await pick(ui,'visionPlatform','custom');await pick(ui,'visionFamily','custom-vision');
@@ -77,7 +87,7 @@ module.exports={
     try{
       await stale.goto(BASE+'/admin/ai-access',{waitUntil:'networkidle'});
       await ui.fill('#customName','新页合成名称');await saveService(ui);
-      await stale.fill('#customName','旧页合成名称');await stale.locator('#llm-custom-service button:not([form])').click();await stale.waitForLoadState('networkidle');
+      await stale.fill('#customName','旧页合成名称');await stale.locator('#llm-custom-service button[type=submit]:not([form])').click();await stale.waitForLoadState('networkidle');
       await ui.assert((await stale.locator('body').innerText()).includes('配置已更新')&&own().displayName==='新页合成名称','旧页提交不覆盖新配置');
     }finally{await stale.close();}
     const longModel='Org/'+'Case'.repeat(63);
@@ -88,15 +98,16 @@ module.exports={
         await m.fill('#customBaseUrl','https://fixture.example.com/'+ 'prefix'.repeat(24)+'/v1');
         await m.fill('#customKey','e2e-v142-layout-synthetic-key');await saveService(m);
         await m.fill('#primaryModelId',longModel);await saveModels(m);
-        await m.assert(await m.page.evaluate(w=>innerWidth===w&&document.documentElement.scrollWidth<=w,width),'实际视口'+width+'无横向溢出或缩放');
-        await center(m,'#llm-custom-service button:not([form])','视口'+width+'服务保存中心命中');
+        const bounds=await m.page.evaluate(()=>({viewport:innerWidth,document:document.documentElement.scrollWidth}));
+        await m.assert(bounds.viewport===width&&bounds.document<=width,'实际视口'+width+'无横向溢出或缩放',JSON.stringify(bounds));
+        await center(m,'#llm-custom-service button[type=submit]:not([form])','视口'+width+'服务保存中心命中');
         await center(m,'button[form=llm-test-custom]','视口'+width+'连接测试中心命中');
         await center(m,'#llm-models button[type=submit]','视口'+width+'模型保存中心命中');
         await m.fill('#primaryModelId','bad model');await saveModels(m);
         await m.assert(await m.page.evaluate(()=>document.activeElement.id==='primaryModelId'),'视口'+width+'型号首错定位');
         await m.fill('#primaryModelId',longModel);await saveModels(m);
-        await m.page.locator('#llm-custom-service').screenshot({path:'/tmp/issue-43-beta-'+width+'-service.png'});
-        await m.page.locator('#llm-models').screenshot({path:'/tmp/issue-43-beta-'+width+'-models.png'});
+        await capture(m,'#llm-custom-service','/tmp/issue-43-beta-'+width+'-service.png');
+        await capture(m,'#llm-models','/tmp/issue-43-beta-'+width+'-models.png');
         await m.noConsoleErrors();
       };
       if(width===1440)await verify(ui);else await ui.device(width,844,verify);
@@ -109,6 +120,8 @@ module.exports={
     });
     // Use an account with no unfinished import; no existing task or image is touched.
     await ui.click('a[href="/entry"]:visible >> nth=0','从顶栏进入填报');
+    await ui.page.waitForLoadState('networkidle');
+    await ui.page.locator('a[href^="/entry/import/"]').first().waitFor({state:'attached',timeout:30000});
     const candidates=ui.page.locator('a[href^="/entry/import/"]');
     for(let i=0;i<await candidates.count();i++){
       const href=await candidates.nth(i).getAttribute('href'),id=Number(href.match(/\/entry\/import\/(\d+)/)[1]);
