@@ -133,7 +133,7 @@
 | 前端 | Thymeleaf + HTMX 1.9 + Chart.js 4 + ECharts(无 SPA、无构建管线) |
 | 认证 | Spring Security + bcrypt + Session Cookie |
 | 部署 | **Docker compose 一键(v0.7,推荐)** · 或 Linux systemd + nginx 反代 :80 → :20000 · macOS launchd(可选)直连 :20000 |
-| 测试 | JUnit 5 · **1632 单元** / 44 条浏览器主线(真浏览器 + 真 DB,真实模型流程默认跳过)/ **1154 黑盒回归**护栏(含v1.39的53项、v1.40的24项、v1.41的29项及v1.42的10项只读静态守护) —— 每条护栏守的是哪个坑,见 [QA case 库](docs/qa-cases.md) |
+| 测试 | JUnit 5 · **1634 单元** / 44 条浏览器主线(真浏览器 + 真 DB,真实模型流程默认跳过)/ **1154 黑盒回归**护栏(含v1.39的53项、v1.40的24项、v1.41的29项及v1.42的10项只读静态守护) —— 每条护栏守的是哪个坑,见 [QA case 库](docs/qa-cases.md) |
 
 ## 快速开始(自托管部署)
 
@@ -341,7 +341,7 @@ mvn spring-boot:run
 测试:
 
 ```bash
-mvn test                       # JUnit 单元测试(1632)
+mvn test                       # JUnit 单元测试(1634)
 bash scripts/qa-run.sh         # 黑盒 endpoint + 模板渲染(见 README 上方测试行的黑盒回归数)
 bash scripts/qa-run.sh --static-v139 # v1.39 只读守护,不写数据库、不调模型
 node scripts/e2e/run.cjs       # 真 e2e:Playwright 开浏览器按用户路径点(失败自动截图)
@@ -350,7 +350,7 @@ bash scripts/regression-data.sh # 数据层/口径回归(原 e2e.sh · curl 端�
 
 ## 文档
 
-- 自测中:[v1.42 自有兼容服务](prd/v1.42.md) · [交互预览](preview/v1.42/custom-llm.html) · [技术设计](tech-design/v1.42.md)。同页原子服务配置、明确免认证与内网许可、文字/视觉/本地工具及来源留存;尚未发布。
+- beta待验收:[v1.42 自有兼容服务](prd/v1.42.md) · [交互预览](preview/v1.42/custom-llm.html) · [技术设计](tech-design/v1.42.md) · [验收记录](docs/beta-review-v1.42.md)。同页原子服务配置、明确免认证与内网许可、文字/视觉/本地工具及来源留存;当前beta1.42.0包含#42,尚未发布。
 - 依赖待验收:[v1.41 硅基流动 AI 接入](prd/v1.41.md) · [交互预览](preview/v1.41/ai-access.html) · [技术设计](tech-design/v1.41.md) · [验收记录](docs/beta-review-v1.41.md)。四平台共同配置交互,文字/图片/本地工具SSE接入,旧配置与百炼轮询保留;由v1.42开发分支承接,尚未合并master或发布。
 
 - 已发布补丁:[v1.40.1 新目标 AI 洞察修复](prd/v1.40.1.md),[技术方案附录](tech-design/v1.40.md)。
@@ -389,7 +389,7 @@ bash scripts/regression-data.sh # 数据层/口径回归(原 e2e.sh · curl 端�
 
 | 版本 | 文档 |
 |---|---|
-| `v1.42` | [PRD](prd/v1.42.md)· [技术设计](tech-design/v1.42.md)· [交互预览](preview/v1.42/custom-llm.html)· 自测中 |
+| `v1.42` | [PRD](prd/v1.42.md)· [技术设计](tech-design/v1.42.md)· [交互预览](preview/v1.42/custom-llm.html)· [beta验收记录](docs/beta-review-v1.42.md) |
 | `v1.41` | [PRD](prd/v1.41.md)· [技术设计](tech-design/v1.41.md)· [交互预览](preview/v1.41/ai-access.html)· [验收记录](docs/beta-review-v1.41.md) |
 | `v1.40` | [PRD](prd/v1.40.md)(已发布v1.40.0)· [技术设计](tech-design/v1.40.md)· [交互预览](preview/v1.40/goals.html)· [验收及发布记录](docs/beta-review-v1.40.md) |
 | `v1.39` | [PRD](prd/v1.39.md)(已发布v1.39.0)· [技术设计](tech-design/v1.39.md) · [预览](preview/v1.39/retirement-setup.html) · [原节目与算法调研](docs/research/retirement-xiaolin-2026-11.md) |

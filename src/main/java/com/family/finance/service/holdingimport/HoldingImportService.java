@@ -91,9 +91,8 @@ public class HoldingImportService {
     public String saveImage(HoldingImport imp, byte[] bytes, String contentType) throws IOException {
         if (bytes == null || bytes.length == 0) throw new IllegalArgumentException("空文件");
         if (bytes.length > 8 * 1024 * 1024) throw new IllegalArgumentException("单图超过 8MB");
-        String ct = contentType == null ? "" : contentType;
-        if (!ct.startsWith("image/")) throw new IllegalArgumentException("仅支持图片");
-        String ext = ct.contains("png") ? "png" : ct.contains("webp") ? "webp" : "jpg";
+        String actualMime = imageMime(bytes);
+        String ext = actualMime.equals("image/png") ? "png" : actualMime.equals("image/webp") ? "webp" : "jpg";
         Path root = Paths.get(props.uploadRoot()).toAbsolutePath().normalize();
         Path dir = root.resolve("family-" + imp.getFamilyId()).resolve("holdingshots");
         Files.createDirectories(dir);
@@ -376,6 +375,15 @@ public class HoldingImportService {
     private static String mimeOf(String fn) {
         String f = fn.toLowerCase();
         return f.endsWith(".png") ? "image/png" : f.endsWith(".webp") ? "image/webp" : "image/jpeg";
+    }
+
+    static String imageMime(byte[] bytes) {
+        if(bytes!=null && bytes.length>=8 && bytes[0]==(byte)0x89 && bytes[1]=='P' && bytes[2]=='N' && bytes[3]=='G'
+            && bytes[4]==13 && bytes[5]==10 && bytes[6]==26 && bytes[7]==10) return "image/png";
+        if(bytes!=null && bytes.length>=3 && bytes[0]==(byte)0xff && bytes[1]==(byte)0xd8 && bytes[2]==(byte)0xff) return "image/jpeg";
+        if(bytes!=null && bytes.length>=12 && bytes[0]=='R' && bytes[1]=='I' && bytes[2]=='F' && bytes[3]=='F'
+            && bytes[8]=='W' && bytes[9]=='E' && bytes[10]=='B' && bytes[11]=='P') return "image/webp";
+        throw new IllegalArgumentException("仅支持PNG、JPEG或WebP图片,文件内容与图片格式不符");
     }
 
     /** 归一化匹配键:去空格/全角、小写 · 仅用于匹配,展示名保留原文 */

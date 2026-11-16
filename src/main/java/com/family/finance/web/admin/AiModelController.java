@@ -150,10 +150,10 @@ public class AiModelController {
         LlmInvocation primary, backup, vision;
         String visionSkippedNote = "";
         try {
-            boolean selectsCustom = LlmCatalog.P_CUSTOM.equals(platform) || LlmCatalog.P_CUSTOM.equals(backupPlatform)
-                || visionEnabled && LlmCatalog.P_CUSTOM.equals(visionPlatform);
+            boolean selectsCustom = LlmCatalog.P_CUSTOM.equalsIgnoreCase(platform) || LlmCatalog.P_CUSTOM.equalsIgnoreCase(backupPlatform)
+                || visionEnabled && LlmCatalog.P_CUSTOM.equalsIgnoreCase(visionPlatform);
             if (selectsCustom && targets != null) {
-                runtimeConfig.lockFamily(fid);
+                if(runtimeConfig.lockFamily(fid)==null) throw new IllegalArgumentException("无法确认当前家庭配置,请刷新后重试");
                 if (!java.util.Objects.equals(custom.card(fid).revision(), customRevision))
                     throw new IllegalArgumentException("自有服务配置已更新,请刷新后重新保存模型");
             }

@@ -76,8 +76,8 @@ public class CustomLlmTransport {
                 if (cancelled.getAsBoolean()) throw new CustomLlmFailure(CANCELLED);
                 watcher = cancellations.scheduleWithFixedDelay(() -> { if (cancelled.getAsBoolean()) pending.cancel(); },0,100,TimeUnit.MILLISECONDS);
             }
-            beforeWire.run();
             targets.assertCurrent(target);
+            beforeWire.run();
             gate.beforeSend(stream ? "CUSTOM_STREAM" : "CUSTOM_JSON");
             LocalDateTime dispatched = LocalDateTime.now();
             Response response;

@@ -49,6 +49,7 @@ model(){
 surfaces(){
   rg -q 'transport.json' "$qa142_llm/CustomLlmClient.java" &&
   rg -q 'customTransport.json' "$qa142_java/service/holdingimport/VisionLlmClient.java" &&
+  rg -q 'actualMime = imageMime\(bytes\)' "$qa142_java/service/holdingimport/HoldingImportService.java" &&
   rg -q 'customTransport.open' "$qa142_java/service/ask/runtime/LocalToolLoopRuntime.java" &&
   rg -q 'targets.prepare' "$qa142_java/web/admin/AiModelController.java" &&
   test -f scripts/e2e/flows/63-custom-llm.cjs;
@@ -64,6 +65,7 @@ source(){
     rg -q 'source_json' "$qa142_java/repository/${qa142_mapper}Mapper.java" || return 1;
   done
   rg -q 'historical' "$qa142_java/service/llmtrace/LlmSource.java" &&
+  rg -q 'r.sourceLabel\(\),r.historical\(\)' "$qa142_java/web/report/ReportsController.java" &&
   rg -q 'sourceJson' "$qa142_java/service/llmtrace/PromptPeekView.java" &&
   node --check scripts/test-custom-llm-migration.cjs;
 }

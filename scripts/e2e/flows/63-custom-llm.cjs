@@ -90,6 +90,19 @@ module.exports={
       await stale.fill('#customName','旧页合成名称');await stale.locator('#llm-custom-service button[type=submit]:not([form])').click();await stale.waitForLoadState('networkidle');
       await ui.assert((await stale.locator('body').innerText()).includes('配置已更新')&&own().displayName==='新页合成名称','旧页提交不覆盖新配置');
     }finally{await stale.close();}
+    const editors=[await ui.page.context().newPage(),await ui.page.context().newPage()];
+    try{
+      for(const editor of editors)await editor.goto(BASE+'/admin/ai-access',{waitUntil:'networkidle'});
+      const oldRevision=own().revision;
+      await editors[0].fill('#customName','合成并发编辑A');await editors[1].fill('#customName','合成并发编辑B');
+      await Promise.all(editors.map(async editor=>{
+        await editor.locator('#llm-custom-service button[type=submit]:not([form])').click();
+        await editor.waitForLoadState('networkidle');
+      }));
+      const outcomes=await Promise.all(editors.map(editor=>editor.locator('body').innerText()));
+      await ui.assert(outcomes.filter(t=>t.includes('配置已更新,请刷新后重试')).length===1,'并发同版本提交只有一份成功,另一份明确冲突');
+      await ui.assert(['合成并发编辑A','合成并发编辑B'].includes(own().displayName)&&own().revision===oldRevision,'数据库保留完整胜出配置,改名不转连接版本');
+    }finally{for(const editor of editors)await editor.close();}
     const longModel='Org/'+'Case'.repeat(63);
     for(const width of [1440,390,320]){
       const verify=async m=>{

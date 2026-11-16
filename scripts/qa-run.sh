@@ -4711,7 +4711,7 @@ FCS="$RD/src/main/java/com/family/finance/service/config/FamilyConfigService.jav
 # 否则用户能选中一个根本调不通的平台,然后在别处收到一条看不懂的失败 —— 错误要挡在选择的那一刻。
 # 判据要求三处下拉(主选/备选/视觉)都级联,且判定来自一个 map 而不是模板里逐个 if
 # (加第四家平台时只改一处,v0.14 加 METAL 那次就是漏了模板里的硬编码分支)。
-{ grep -q '未配密钥,请先保存' "$INTTPL" \
+{ grep -q '未配置,请先保存' "$INTTPL" \
   && grep -qF 'th:disabled="${!platformReady' "$INTTPL" \
   && grep -q "triple('primary'" "$INTTPL" && grep -q "triple('backup'" "$INTTPL" && grep -q "triple('vision'" "$INTTPL" \
   && grep -q 'addAttribute("platformReady"' "$QA_LLM_JAVA"; } \
@@ -10988,7 +10988,8 @@ QA128_PV="$QA128_S/llmtrace/PromptPeekView.java"; QA128_PC="$RD/src/main/java/co
 QA128_SAVERS=$(grep -rlE 'promptRecorder\.save\(|recorder\.save\(' "$RD/src/main/java" | xargs -n1 basename 2>/dev/null | sort | tr '\n' ' ')
 { ! codeonly "$QA128_PV" | grep -qE 'PromptBuilder|InsightPromptBuilder|forAnalysis\(|userPromptFor' \
   && ! codeonly "$QA128_PC" | grep -qE 'PromptBuilder|InsightPromptBuilder|forAnalysis\(|userPromptFor|LlmDiagnoseService' \
-  && [ "$QA128_SAVERS" = "AiAccessController.java AskConversationService.java LlmRouter.java LlmTestGate.java " ] \
+  && [ "$QA128_SAVERS" = "AiAccessController.java AskConversationService.java LlmRouter.java LlmTestGate.java VisionLlmClient.java " ] \
+  && grep -q 'PromptSurface.VISION_IMPORT' "$RD/src/main/java/com/family/finance/service/holdingimport/VisionLlmClient.java" \
   && grep -q 'PromptRecorder.BLOCKED' "$RD/src/main/java/com/family/finance/service/checkup/llm/LlmTestGate.java"; } \
   && log_ok "v128-PEEK-STORED-NOT-REBUILT(面板只读记录 · 只有路由 / 超级 Agent 发出那一刻 / 推 Agent 那一刻写记录)" \
   || log_bad "v128-PEEK-STORED-NOT-REBUILT 面板在重拼提示词,或多了写记录的地方" "写记录的类=[$QA128_SAVERS]"

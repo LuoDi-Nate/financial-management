@@ -95,6 +95,12 @@ class CustomAiSettingsTest {
         service("https://other.example.com/v1","BEARER","new-key",custom.card(1).editToken());
         var before=new HashMap<>(values);
         assertThat(models("Org/Text",revision,null,false).getFlashAttributes()).containsKey("flashError");assertThat(values).isEqualTo(before);
+        var upper=new RedirectAttributesModelMap();
+        controller.saveLlmModels(me(1),"CUSTOM","custom","Org/Text","","","",false,"","","",0.5,2000,25,revision,upper);
+        assertThat(upper.getFlashAttributes().get("flashError").toString()).contains("配置已更新");assertThat(values).isEqualTo(before);
+        when(mapper.lockFamily(1)).thenReturn(null);
+        assertThat(models("Org/Text",custom.card(1).revision(),null,false).getFlashAttributes()).containsKey("flashError");
+        assertThat(values).isEqualTo(before);
     }
     @Test void probeHasNoDefaultAndUsesOnlySavedTargetNotAnotherModel() {
         initial();LlmClient wire=mock(LlmClient.class);when(router.clientFor("custom")).thenReturn(Optional.of(wire));

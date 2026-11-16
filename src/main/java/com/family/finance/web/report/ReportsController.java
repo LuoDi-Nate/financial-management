@@ -518,7 +518,7 @@ public class ReportsController {
         // v0.4 FR-62b · 调仓建议缓存渲染(若有)· v1.27 键按「范围 + 模板 + 偏好」(与生成时同一个键)
         var rebalanceCached = rebalanceAdvisorService.cached(me.getFamilyId(), analysis);
         RebalanceAdviceView rebalanceAdvice = rebalanceCached
-                .map(r -> new RebalanceAdviceView(r.narrative(), r.actions(), r.generatedAt()))
+                .map(r -> new RebalanceAdviceView(r.narrative(), r.actions(), r.generatedAt(),r.sourceLabel(),r.historical()))
                 .orElse(null);
         // v1.28 · 这份建议当时发给 AI 的是什么;本版之前生成的老建议照实说「那时还没开始记录」
         model.addAttribute("rebalancePeekSrc", rebalanceCached.map(r -> promptPeek.of(me.getFamilyId(), r.promptRecordId(),
@@ -895,8 +895,14 @@ public class ReportsController {
     public record RebalanceAdviceView(
         String narrative,
         java.util.List<java.util.Map<String, Object>> actions,
-        java.time.LocalDateTime generatedAt
-    ) {}
+        java.time.LocalDateTime generatedAt,
+        String sourceLabel,
+        boolean historical
+    ) {
+        public RebalanceAdviceView(String narrative,java.util.List<java.util.Map<String,Object>> actions,java.time.LocalDateTime at) {
+            this(narrative,actions,at,"旧版记录,未保存完整来源",false);
+        }
+    }
 
     /**
      * Reports 锚点 = 最新一期(无论 OPEN/CLOSED)。
