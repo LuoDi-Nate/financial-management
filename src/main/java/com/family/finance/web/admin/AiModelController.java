@@ -91,7 +91,7 @@ public class AiModelController {
                              RedirectAttributes ra) {
         long fid = me.getFamilyId();
         LlmCatalog.Platform p = LlmCatalog.platform(platform).orElse(null);
-        if (LlmCatalog.P_CUSTOM.equals(platform)) {
+        if (p != null && LlmCatalog.P_CUSTOM.equals(p.code())) {
             ra.addFlashAttribute("flashError", "自有服务请使用「保存服务配置」,地址与认证需同时保存");
             return BACK;
         }

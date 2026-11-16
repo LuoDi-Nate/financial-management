@@ -8,15 +8,14 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @org.springframework.stereotype.Component
 public class CustomLlmClient implements LlmClient {
-    private final LlmTargetResolver targets;
     private final CustomLlmTransport transport;
     private final ConcurrentHashMap<String, Instant> cooldown = new ConcurrentHashMap<>();
-    public CustomLlmClient(LlmTargetResolver targets, CustomLlmTransport transport) { this.targets = targets; this.transport = transport; }
+    public CustomLlmClient(CustomLlmTransport transport) { this.transport = transport; }
     @Override public String platform() { return LlmCatalog.P_CUSTOM; }
-    @Override public boolean available() { return targets.configured(1L, platform()); }
+    @Override public boolean available() { return false; }
     private String identity(LlmInvocation inv) { return inv.target().familyId() + "|" + inv.target().revision(); }
     @Override public boolean available(LlmInvocation inv) {
-        if (inv.target() == null) return available();
+        if (inv.target() == null) return false;
         Instant now = Instant.now();
         return cooldown.getOrDefault(identity(inv), Instant.EPOCH).isBefore(now)
             && cooldown.getOrDefault(identity(inv) + "|" + inv.family() + "|" + inv.model(), Instant.EPOCH).isBefore(now);
@@ -31,7 +30,8 @@ public class CustomLlmClient implements LlmClient {
         if (cooldown.size() > 256) cooldown.entrySet().removeIf(e -> e.getValue().isBefore(Instant.now()));
     }
     @Override public String chat(LlmInvocation invocation, String system, String user) {
-        LlmInvocation inv = invocation.target() == null ? targets.prepare(1L, invocation) : invocation;
+        if(invocation.target()==null || !invocation.target().custom()) throw new CustomLlmFailure(CustomLlmFailure.Kind.CONFIG);
+        LlmInvocation inv = invocation;
         ResolvedLlmTarget t = inv.target();
         try {
             Map<String, Object> response = transport.json(t, AbstractOpenAiCompatibleClient.textRequest(inv.resolvedModel(), system, user, t.temperature(), t.maxTokens()));

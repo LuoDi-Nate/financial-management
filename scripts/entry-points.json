@@ -138,6 +138,15 @@
       "note": "AI 的全部设置都在这一页。v1.24.5 之前大模型在「数据源接入」,超级 Agent 要用的配置分在两页。"
     },
     {
+      "id": "custom-llm",
+      "name": "自有兼容服务 · 同一AI接入页的独立服务配置卡",
+      "page": "/admin",
+      "hrefContains": "/admin/ai-access",
+      "level": "obvious",
+      "viewports": ["pc", "mobile"],
+      "note": "管理首页卡片点名自有兼容服务;进入后配置卡直接可见,不在更多菜单或折叠中。flow63继续实点其保存、选型与保护入口。"
+    },
+    {
       "id": "backup",
       "name": "备份与导出",
       "page": "/admin",

@@ -49,7 +49,11 @@ public class CustomLlmConfigService {
         if (raw == null || raw.isBlank()) return empty();
         try {
             var n = json.readTree(raw);
-            if (n.path("version").asInt() != 1) throw failure();
+            if (!n.isObject() || !n.path("version").isIntegralNumber() || n.path("version").asInt() != 1
+                    || !n.path("baseUrl").isTextual() || !n.path("authMode").isTextual()
+                    || n.has("allowLocalHttp") && !n.path("allowLocalHttp").isBoolean()
+                    || n.has("apiKey") && !n.path("apiKey").isTextual()
+                    || n.has("displayName") && !n.path("displayName").isTextual()) throw failure();
             String mode = n.path("authMode").asText();
             if (!mode.equals("NONE") && !mode.equals("BEARER")) throw failure();
             boolean local = n.path("allowLocalHttp").asBoolean(false);
@@ -94,7 +98,9 @@ public class CustomLlmConfigService {
                 "editToken", UUID.randomUUID().toString(), "displayName", label, "baseUrl", url,
                 "authMode", authMode, "apiKey", key, "allowLocalHttp", allowLocalHttp));
             mapper.upsert(fid, KEY, encoded);
-        } catch (com.fasterxml.jackson.core.JsonProcessingException | org.springframework.dao.DataAccessException e) { throw failure(); }
+        } catch (com.fasterxml.jackson.core.JsonProcessingException | org.springframework.dao.DataAccessException e) {
+            throw new CustomLlmFailure(CustomLlmFailure.Kind.SAVE_FAILED);
+        }
     }
 
     private static Snapshot empty() { return new Snapshot("", "", "自有服务", "", "BEARER", "", false); }

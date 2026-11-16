@@ -61,7 +61,7 @@
       </div>
 
       <!-- 历史消息 · v1.28 peekMap:每条回答 → 它前面那一问发出去的内容(FR-919) -->
-      <th:block th:with="peekMap=${@promptPeek.forAsk(askFamilyId, messages)}">
+      <th:block th:with="peekMap=${@promptPeek.forAsk(askFamilyId, messages)},sourceMap=${@llmSource.forAsk(messages)}">
       <div th:each="m : ${messages}" th:switch="${m.role}">
 
         <!-- 用户:右对齐 + 细下划线,**不用气泡** -->
@@ -115,6 +115,7 @@
             <div th:replace="~{ask/fragments/_remember :: card}"></div>
           </th:block>
 
+          <p class="ask-source text-xs text-ink-soft break-words mb-2" th:if="${sourceMap.containsKey(m.id)}" th:text="${sourceMap.get(m.id)}"></p>
           <div class="ask-tools-row" data-peek-host>
             <th:block th:replace="~{fragments/_prompt-peek :: btn(${peekMap.get(m.id)})}"></th:block>
             <button type="button" class="ask-mini" data-ask-copy

@@ -32,6 +32,7 @@ public interface LlmClient {
      *
      * @param invocation 调用坐标(平台/系列/型号)· {@code model} 为 null 表示「自动」:
      *                   支持轮询的平台走轮询,其余用系列默认型号
+     *                   自有服务必须带路由/探针准备的家庭快照,无归属的原始坐标拒绝发送
      * @return 模型返回的 content(非空)
      * @throws RuntimeException 调用失败 · 由 {@link LlmRouter} 决定是否切备选
      */

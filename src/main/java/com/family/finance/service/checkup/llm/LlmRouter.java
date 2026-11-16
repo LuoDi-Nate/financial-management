@@ -215,6 +215,17 @@ public class LlmRouter {
         if (trace == null) return invoke(familyId, systemPrompt, userPrompt, handler);
         if (testGate != null && testGate.block(familyId, trace, systemPrompt, userPrompt)) return null;
         List<LlmInvocation> planned = plan(familyId);
+        return tracedPlan(familyId,trace,systemPrompt,userPrompt,handler,planned);
+    }
+
+    public <T> T invokePrepared(long familyId, PromptTrace trace, String systemPrompt, String userPrompt,
+                                Handler<T> handler, List<LlmInvocation> planned) {
+        if (testGate != null && testGate.block(familyId,trace,systemPrompt,userPrompt)) return null;
+        return tracedPlan(familyId,trace,systemPrompt,userPrompt,handler,planned);
+    }
+
+    private <T> T tracedPlan(long familyId, PromptTrace trace, String systemPrompt, String userPrompt,
+                             Handler<T> handler, List<LlmInvocation> planned) {
         if (planned.isEmpty()) {
             trace.failed(unavailableReason(familyId));
             return null;
@@ -235,16 +246,17 @@ public class LlmRouter {
             public void onFailure(LlmInvocation inv, Exception e, long ms) {
                 vendor[0] = inv.badge();
                 trace.source(inv.sourceJson());
-                lastError[0] = LlmFailure.describe(inv.platform(),e);
+                lastError[0] = e.getMessage();
                 handler.onFailure(inv, e, ms);
             }
         }, planned);
-        String outcome = result != null ? PromptRecorder.OK : (gotOutput[0] ? PromptRecorder.REJECTED : PromptRecorder.FAILED);
+        boolean blocked=LlmTestGate.MESSAGE.equals(lastError[0]);
+        String outcome = blocked ? PromptRecorder.BLOCKED : result != null ? PromptRecorder.OK : (gotOutput[0] ? PromptRecorder.REJECTED : PromptRecorder.FAILED);
         String note = result != null ? null
                 : gotOutput[0] ? (trace.rejectReason() == null ? "回答没通过校验" : trace.rejectReason())
                 : lastError[0];
-        if (result == null) trace.failed(gotOutput[0] ? "AI 回答未通过校验,请重试。"
-                : "已尝试可用模型,本次调用失败。请稍后重试或到「AI 接入」检查连接与额度。");
+        if (result == null) trace.failed(blocked ? LlmTestGate.MESSAGE : gotOutput[0] ? "AI 回答未通过校验,请重试。"
+                : lastError[0] != null ? lastError[0] : "已尝试可用模型,本次调用失败。请稍后重试或到「AI 接入」检查连接与额度。");
         if (promptRecorder != null) promptRecorder.save(familyId, trace, systemPrompt, userPrompt, vendor[0], outcome, note);
         return result;
     }
@@ -277,7 +289,10 @@ public class LlmRouter {
                 if (accepted != null) return accepted;
                 log.warn("候选 {} 的输出未被接受 · 试下一个", inv.label());
             } catch (Exception e) {
-                if (e instanceof LlmTestGate.Blocked || e instanceof CustomLlmFailure f && f.stopPlan()) return null;
+                if (e instanceof LlmTestGate.Blocked || e instanceof CustomLlmFailure f && f.stopPlan()) {
+                    handler.onFailure(inv,e,System.currentTimeMillis()-start);
+                    return null;
+                }
                 long ms = System.currentTimeMillis() - start;
                 // 账户级故障(凭据/欠费/权限)不会自己好,必须有人去处理 —— 单独标出来,
                 // 好让管理页只在这一类上报警,不被偶发超时淹掉。

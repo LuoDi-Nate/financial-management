@@ -37,6 +37,8 @@ public class HoldingImportController {
     private final HoldingImportService importService;
     private final AccountMapper accountMapper;
     private final VisionLlmClient vision;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.family.finance.service.llmtrace.PromptPeekLinks promptPeek;
 
     private Account requireAccount(long familyId, long accountId) {
         Account a = accountMapper.findById(familyId, accountId).orElseThrow(() -> new IllegalArgumentException("账户不存在"));
@@ -66,14 +68,16 @@ public class HoldingImportController {
                        @RequestParam(required = false) String from, Model model) {
         Account account = requireAccount(me.getFamilyId(), accountId);
         model.addAttribute("from", safeLocalPath(from, "/entry"));   // v1.4.2 · 回来源页
-        if (!vision.available()) {
+        boolean available=vision.available();
+        var existing=importService.open(me.getFamilyId(),accountId);
+        if (!available && existing.isEmpty()) {
             model.addAttribute("account", account);
             model.addAttribute("visionUnavailable", true);
             return "holdingimport/import";
         }
         HoldingImport imp;
         try {
-            imp = importService.startOrResume(me.getFamilyId(), accountId);
+            imp = existing.orElseGet(() -> importService.startOrResume(me.getFamilyId(), accountId));
         } catch (IllegalStateException e) {
             // 没有开账期 → 友好提示,不 500
             model.addAttribute("account", account);
@@ -85,6 +89,8 @@ public class HoldingImportController {
         model.addAttribute("imageRels", importService.imageRels(me.getFamilyId(), imp.getId()));   // v1.4.2 · 查看/删除已上传图
         model.addAttribute("visionModel", vision.model());
         model.addAttribute("visionPlatform", vision.platformLabel());   // v1.13 · 让用户知道截图发去了哪家平台
+        model.addAttribute("visionPlatformCode",vision.platformCode());
+        source(me.getFamilyId(),imp,model);
         if (HoldingImport.REVIEW.equals(imp.getStatus())) {
             model.addAttribute("items", importService.items(me.getFamilyId(), imp.getId()));
             model.addAttribute("industryTags", com.family.finance.domain.lens.IndustryTag.values());
@@ -196,10 +202,20 @@ public class HoldingImportController {
         HoldingImport imp = requireImport(me.getFamilyId(), importId);
         model.addAttribute("imp", imp);
         model.addAttribute("account", requireAccount(me.getFamilyId(), imp.getAccountId()));
+        source(me.getFamilyId(),imp,model);
         java.util.List<HoldingImportItem> items = importService.items(me.getFamilyId(), importId);
         model.addAttribute("items", items);
         model.addAttribute("shots", items.stream().map(HoldingImportItem::getShotPath)
                 .filter(java.util.Objects::nonNull).distinct().toList());
         return "holdingimport/detail";
+    }
+
+    private void source(long fid,HoldingImport imp,Model model) {
+        String legacy=HoldingImport.UPLOADING.equals(imp.getStatus()) ? vision.platformLabel()+" · "+vision.model()
+            : "旧版型号 · "+(imp.getVisionModel()==null ? "未记录" : imp.getVisionModel());
+        model.addAttribute("visionSourceLabel",com.family.finance.service.llmtrace.LlmSource.label(imp.getSourceJson(),legacy));
+        if(promptPeek!=null) model.addAttribute("importPeekSrc",promptPeek.of(fid,
+            com.family.finance.service.llmtrace.LlmSource.recordId(imp.getSourceJson()),
+            com.family.finance.service.llmtrace.PromptSurface.VISION_IMPORT,imp.getUpdatedAt(),null));
     }
 }

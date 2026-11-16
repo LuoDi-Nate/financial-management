@@ -43,7 +43,9 @@ public class PromptPeekController {
                                                    @RequestParam("conv") long conversationId) {
         Long id = askMessageMapper.lastUserPromptRecord(me.getFamilyId(), conversationId);
         String src = links.of(me.getFamilyId(), id);
-        return java.util.Map.of("peek", src == null ? "" : src);
+        String source=askMessageMapper.lastUserSource(me.getFamilyId(),conversationId);
+        return java.util.Map.of("peek", src == null ? "" : src,
+            "sourceLabel",com.family.finance.service.llmtrace.LlmSource.label(source,""));
     }
 
     @GetMapping("/ai/prompt/none")

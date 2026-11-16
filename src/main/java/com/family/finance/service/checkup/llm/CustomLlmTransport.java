@@ -26,17 +26,25 @@ public class CustomLlmTransport {
     private final ThreadPoolExecutor dns = new ThreadPoolExecutor(2, 2, 0, TimeUnit.SECONDS,
         new ArrayBlockingQueue<>(4), r -> { Thread t = new Thread(r, "custom-llm-dns"); t.setDaemon(true); return t; },
         new ThreadPoolExecutor.AbortPolicy());
+    private final ScheduledExecutorService cancellations = Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread t = new Thread(r,"custom-llm-cancel"); t.setDaemon(true); return t;
+    });
 
     public CustomLlmTransport(CustomEndpointPolicy policy, LlmTargetResolver targets, LlmTestGate gate, ObjectMapper json) {
         this.policy = policy; this.targets = targets; this.gate = gate; this.json = json;
     }
-    @PreDestroy public void close() { dns.shutdownNow(); }
+    @PreDestroy public void close() { dns.shutdownNow(); cancellations.shutdownNow(); }
     protected List<InetAddress> lookup(String host) throws Exception { return Arrays.asList(InetAddress.getAllByName(host)); }
 
     public Result open(ResolvedLlmTarget target, Object body, boolean stream) {
         return open(target, body, stream, () -> { });
     }
     public Result open(ResolvedLlmTarget target, Object body, boolean stream, Runnable beforeWire) {
+        return open(target,body,stream,beforeWire,null);
+    }
+    public Result open(ResolvedLlmTarget target, Object body, boolean stream, Runnable beforeWire,
+                       java.util.function.BooleanSupplier cancelled) {
+        if (cancelled != null && cancelled.getAsBoolean()) throw new CustomLlmFailure(CANCELLED);
         gate.beforeSend(stream ? "CUSTOM_STREAM" : "CUSTOM_JSON");
         targets.assertCurrent(target);
         String host = target.endpoint().getHost();
@@ -55,16 +63,22 @@ public class CustomLlmTransport {
             .proxyAuthenticator(Authenticator.NONE).connectTimeout(5, TimeUnit.SECONDS)
             .readTimeout(target.timeout(), TimeUnit.SECONDS).writeTimeout(target.timeout(), TimeUnit.SECONDS)
             .callTimeout(target.timeout(), TimeUnit.SECONDS).connectionPool(new ConnectionPool(0, 1, TimeUnit.SECONDS)).build();
-        Call call;
+        Call call = null;
+        ScheduledFuture<?> watcher = null;
         try {
             Request.Builder request = new Request.Builder().url(target.endpoint().toString())
                 .header("Accept-Encoding", "identity").header("Accept", stream ? "text/event-stream" : "application/json")
                 .post(RequestBody.create(json.writeValueAsBytes(body), MediaType.get("application/json")));
             if (!target.apiKey().isBlank()) request.header("Authorization", "Bearer " + target.apiKey());
             gate.beforeSend(stream ? "CUSTOM_STREAM" : "CUSTOM_JSON");
-            targets.assertCurrent(target);
-            call = client.newCall(request.build());
+            Call pending = client.newCall(request.build()); call = pending;
+            if (cancelled != null) {
+                if (cancelled.getAsBoolean()) throw new CustomLlmFailure(CANCELLED);
+                watcher = cancellations.scheduleWithFixedDelay(() -> { if (cancelled.getAsBoolean()) pending.cancel(); },0,100,TimeUnit.MILLISECONDS);
+            }
             beforeWire.run();
+            targets.assertCurrent(target);
+            gate.beforeSend(stream ? "CUSTOM_STREAM" : "CUSTOM_JSON");
             LocalDateTime dispatched = LocalDateTime.now();
             Response response;
             try { response = call.execute(); }
@@ -81,9 +95,14 @@ public class CustomLlmTransport {
             if (response.body() == null || !(stream ? contentType.contains("text/event-stream") : contentType.contains("application/json"))) {
                 response.close(); throw new CustomLlmFailure(PROTOCOL);
             }
-            return new Result(response, call, client, stream ? 4 * 1024 * 1024 : 2 * 1024 * 1024);
-        } catch (LlmTestGate.Blocked | CustomLlmFailure e) { client.connectionPool().evictAll(); throw e; }
-        catch (Exception e) { client.connectionPool().evictAll(); throw safe(e); }
+            return new Result(response, call, client, stream ? 4 * 1024 * 1024 : 2 * 1024 * 1024, watcher);
+        } catch (LlmTestGate.Blocked | CustomLlmFailure e) {
+            if (call != null) call.cancel(); if(watcher != null) watcher.cancel(false); client.connectionPool().evictAll(); throw e;
+        } catch (Exception e) {
+            if (call != null) call.cancel(); if(watcher != null) watcher.cancel(false); client.connectionPool().evictAll();
+            if(cancelled != null && cancelled.getAsBoolean()) throw new CustomLlmFailure(CANCELLED);
+            throw safe(e);
+        }
     }
 
     public java.util.Map<String, Object> json(ResolvedLlmTarget target, Object body) {
@@ -98,8 +117,10 @@ public class CustomLlmTransport {
         private final Call call;
         private final OkHttpClient client;
         private final InputStream input;
-        Result(Response response, Call call, OkHttpClient client, int limit) {
+        private final ScheduledFuture<?> watcher;
+        Result(Response response, Call call, OkHttpClient client, int limit, ScheduledFuture<?> watcher) {
             this.response = response; this.call = call; this.client = client;
+            this.watcher = watcher;
             input = new FilterInputStream(response.body().byteStream()) {
                 int remaining = limit;
                 private int count(int n) { if (n > 0 && (remaining -= n) < 0) throw new CustomLlmFailure(RESPONSE_TOO_LARGE); return n; }
@@ -116,7 +137,7 @@ public class CustomLlmTransport {
         public InputStream input() { return input; }
         public BufferedReader reader() { return new BufferedReader(new InputStreamReader(input, StandardCharsets.UTF_8)); }
         public void cancel() { call.cancel(); }
-        @Override public void close() { response.close(); client.connectionPool().evictAll(); }
+        @Override public void close() { if(watcher != null) watcher.cancel(false); response.close(); client.connectionPool().evictAll(); }
     }
     private static CustomLlmFailure safe(Exception e) {
         for (Throwable t = e; t != null; t = t.getCause()) {

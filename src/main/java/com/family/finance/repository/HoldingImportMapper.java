@@ -56,7 +56,7 @@ public interface HoldingImportMapper {
     @Update("UPDATE holding_import SET status = 'REVIEW' WHERE family_id = #{familyId} AND id = #{id}")
     int markReview(@Param("familyId") long familyId, @Param("id") long id);
 
-    @Update("UPDATE holding_import SET status = 'SCANNING', scan_error = NULL WHERE family_id = #{familyId} AND id = #{id}")
+    @Update("UPDATE holding_import SET status = 'SCANNING', scan_error = NULL, source_json = NULL WHERE family_id = #{familyId} AND id = #{id}")
     int markScanning(@Param("familyId") long familyId, @Param("id") long id);
 
     @Update("UPDATE holding_import SET source_json=#{sourceJson}, vision_model=#{model} WHERE family_id=#{familyId} AND id=#{id}")

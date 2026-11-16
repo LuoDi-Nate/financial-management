@@ -524,11 +524,17 @@
             // v1.28 · 这一问发出去的内容:>_ 排在操作行最前(与历史消息同一位置)
             var convHost = turn.closest('[data-conv]');
             var cid = convHost ? convHost.getAttribute('data-conv') : '';
-            if (window.peekButton && cid) {
+            if (cid) {
               row.setAttribute('data-peek-host', '');
               fetch('/ai/prompt/ask-latest?conv=' + encodeURIComponent(cid), { credentials: 'same-origin' })
                 .then(function (r) { return r.ok ? r.json() : {}; })
-                .then(function (j) { if (j && j.peek) row.insertBefore(window.peekButton(j.peek), row.firstChild); })
+                .then(function (j) {
+                  if (j && j.peek && window.peekButton) row.insertBefore(window.peekButton(j.peek), row.firstChild);
+                  if (j && j.sourceLabel) {
+                    var source = document.createElement('p'); source.className = 'ask-source text-xs text-ink-soft break-words mb-2';
+                    source.textContent = j.sourceLabel; row.parentNode.insertBefore(source, row);
+                  }
+                })
                 .catch(function () { });
             }
           }

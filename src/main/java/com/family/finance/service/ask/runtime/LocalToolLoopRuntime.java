@@ -201,7 +201,12 @@ public class LocalToolLoopRuntime implements AgentRuntime {
                 return result;
             } catch (Exception e) {
                 if (sink.cancelled()) throw e;
-                if (e instanceof com.family.finance.service.checkup.llm.LlmTestGate.Blocked) throw e;
+                if (e instanceof com.family.finance.service.checkup.llm.LlmTestGate.Blocked) {
+                    if(turn.onPromptSent()!=null) try {
+                        turn.onPromptSent().sent(system,turn.question(),com.family.finance.service.checkup.llm.LlmTestGate.MESSAGE,false,inv.sourceJson());
+                    } catch(Exception ignored) { log.debug("记录未发送的准备内容失败"); }
+                    throw e;
+                }
                 if (e instanceof com.family.finance.service.checkup.llm.CustomLlmFailure f && f.stopPlan()) throw e;
                 router.externalFailure(inv, e);
                 if (sink.delivered) throw e;
@@ -257,7 +262,7 @@ public class LocalToolLoopRuntime implements AgentRuntime {
         }
 
         if (platform.code().equals(LlmCatalog.P_CUSTOM)) {
-            try (var result = customTransport.open(invocation.target(), body, true, record)) {
+            try (var result = customTransport.open(invocation.target(), body, true, record, sink::cancelled)) {
                 return readCompletion(result.reader(), platform, sink);
             } catch (com.family.finance.service.checkup.llm.CustomLlmFailure | com.family.finance.service.checkup.llm.LlmTestGate.Blocked e) { throw e; }
             catch (Exception e) { throw new com.family.finance.service.checkup.llm.CustomLlmFailure(com.family.finance.service.checkup.llm.CustomLlmFailure.Kind.PROTOCOL); }

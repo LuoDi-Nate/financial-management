@@ -61,12 +61,13 @@
   <div th:if="${imp != null}">
     <div class="flex items-baseline justify-between flex-wrap gap-2 mb-4">
       <h1 class="font-display text-2xl">截图导入持仓 · <span th:text="${account.displayName}">账户</span></h1>
-      <span class="font-mono text-[11px] text-ink-subtle">视觉模型 · <span th:text="${visionPlatform}">阿里云百炼</span> · <span th:text="${visionModel}">qwen-vl-max</span></span>
+      <span class="text-[11px] text-ink-subtle break-words min-w-0" th:text="'视觉模型 · ' + ${visionSourceLabel}"></span>
+      <th:block th:replace="~{fragments/_prompt-peek :: btn(${importPeekSrc})}"></th:block>
     </div>
 
     <!-- ===== 上传 + 识别(一步流)===== -->
     <section th:if="${imp.status == 'UPLOADING' or imp.status == 'SCANNING'}" class="paper-card p-5"
-             th:attr="data-import=${imp.id},data-model=${visionModel},data-status=${imp.status}" id="importSection">
+             th:attr="data-import=${imp.id},data-model=${visionModel},data-platform=${visionPlatformCode},data-status=${imp.status}" id="importSection">
       <ol class="flex items-center gap-2 font-mono text-[11px] text-ink-subtle mb-4">
         <li class="text-ink"><b>1</b> 选图</li><li class="text-rule">→</li>
         <li id="stepScan"><b>2</b> 开始识别</li><li class="text-rule">→</li>
@@ -105,7 +106,7 @@
       <div id="scanHint" class="hidden font-mono text-[12px] text-brass-deep mt-3">AI 扫描中… <span id="eta"></span> · 识别在后台跑,退出再进会回到这里,不用重来</div>
       <div id="scanErr" class="hidden font-mono text-[12px] text-rust mt-3"></div>
       <div class="mt-5 flex items-center justify-between flex-wrap gap-3">
-        <div class="font-mono text-[12px] text-ink-soft">本次 <b id="imgN">0</b> 张 · 预估 <b id="costV" class="text-brass-deep">≈ ¥0.00</b> <span class="text-ink-subtle">· 免费额度内≈0</span></div>
+        <div class="font-mono text-[12px] text-ink-soft">本次 <b id="imgN">0</b> 张 · 费用 <b id="costV" class="text-brass-deep">以服务账单为准</b> <span id="costKnownHint" class="text-ink-subtle">· 免费额度内≈0</span></div>
         <button id="scanBtn" class="btn-ink" disabled>开始识别</button>
       </div>
     </section>
@@ -281,7 +282,7 @@
        原来写死 0 的后果:传完图刷新一下(或退出再进),图明明还在、
        「开始识别」却是灰的 —— 用户只能再传一张才能点。 */
     var uploaded=thumbs.querySelectorAll('.gshot[data-rel]').length, uploading=0;
-    function upd(){imgN.textContent=uploaded;costV.textContent='≈ ¥'+(uploaded*(RATE[model]||0.01)).toFixed(2);scanBtn.disabled=uploaded===0||uploading>0;}
+    function upd(){var known=sec.getAttribute('data-platform')!=='custom'&&Object.prototype.hasOwnProperty.call(RATE,model);imgN.textContent=uploaded;costV.textContent=known?'≈ ¥'+(uploaded*RATE[model]).toFixed(2):'以服务账单为准';document.getElementById('costKnownHint').hidden=!known;scanBtn.disabled=uploaded===0||uploading>0;}
     /* 给画廊的删除回调用:删一张,本次计数和按钮状态跟着退回去 */
     window.setUploaded=function(n){uploaded=n;upd();};
     function compress(file){return new Promise(function(res){var img=new Image();img.onload=function(){var mx=2000,r=Math.min(mx/img.width,mx/img.height,1);var c=document.createElement('canvas');c.width=Math.round(img.width*r);c.height=Math.round(img.height*r);c.getContext('2d').drawImage(img,0,0,c.width,c.height);c.toBlob(function(b){res(b);},'image/jpeg',0.82);};img.onerror=function(){res(null);};img.src=URL.createObjectURL(file);});}

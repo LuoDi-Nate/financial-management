@@ -24,7 +24,28 @@ public class LlmSource {
     public String cacheSalt(long fid) { var c = context(fid); return c.custom ? c.fingerprint : ""; }
     public static String label(String raw, String legacy) {
         var source = parse(raw);
-        return source == null ? legacy : source.path("displayName").asText("自有服务") + " · " + source.path("model").asText();
+        return source == null || source.path("platform").asText().isBlank() ? legacy : source.path("displayName").asText("自有服务") + " · " + source.path("model").asText();
+    }
+    public static String withRecord(String raw, Long id) {
+        if(raw==null && id==null) return null;
+        try {
+            var value=raw==null ? JSON.createObjectNode() : (com.fasterxml.jackson.databind.node.ObjectNode)JSON.readTree(raw);
+            if(id != null) value.put("promptRecordId",id);
+            return JSON.writeValueAsString(value);
+        } catch(Exception e) { return raw; }
+    }
+    public static Long recordId(String raw) {
+        var source=parse(raw); if(source==null || !source.path("promptRecordId").canConvertToLong()) return null;
+        return source.path("promptRecordId").asLong();
+    }
+    public java.util.Map<Long,String> forAsk(java.util.List<com.family.finance.domain.ask.AskMessage> messages) {
+        java.util.Map<Long,String> labels=new java.util.HashMap<>();String source=null;
+        if(messages==null) return labels;
+        for(var m:messages) {
+            if("user".equals(m.getRole())) source=m.getSourceJson();
+            else if("assistant".equals(m.getRole()) && source!=null) labels.put(m.getId(),label(source,"未记录完整模型来源"));
+        }
+        return labels;
     }
     public static String legacyVendor(String badge) {
         if (badge != null && badge.startsWith("custom")) return "custom";

@@ -54,13 +54,20 @@ public class VisionLlmClient {
 
     private final FamilyConfigService config;
     private final RestTemplate rt;
+    private final RestTemplateBuilder builder;
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.family.finance.service.checkup.llm.LlmTargetResolver targets;
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private com.family.finance.service.checkup.llm.CustomLlmTransport customTransport;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.family.finance.service.llmtrace.PromptRecorder recorder;
+    public static final class Failure extends IllegalStateException {
+        public Failure(String safeMessage) { super(safeMessage); }
+    }
 
     public VisionLlmClient(FamilyConfigService config, RestTemplateBuilder builder) {
         this.config = config;
+        this.builder = builder;
         this.rt = builder.setConnectTimeout(Duration.ofSeconds(10)).setReadTimeout(Duration.ofSeconds(90)).build();
     }
 
@@ -91,6 +98,7 @@ public class VisionLlmClient {
     public String platformLabel() {
         return LlmCatalog.labelOf(invocation().platform());
     }
+    public String platformCode() { return invocation().platform(); }
 
     /** 视觉可用 = 开关打开 且 该平台 key 已配 且 型号能定下来(方舟没填型号 → 不可用) */
     public boolean available() {
@@ -103,10 +111,20 @@ public class VisionLlmClient {
     }
 
     public LlmInvocation prepareScan(long fid) {
+        var batch = prepareBatch(fid); return batch == null ? null : batch.vision();
+    }
+    public record Batch(LlmInvocation vision, java.util.List<LlmInvocation> text) { }
+    public Batch prepareBatch(long fid) {
         if (targets == null || testGate != null && testGate.enabled()) return null;
         var execution = targets.load(fid);
         if (!execution.settings.visionEnabled()) throw new IllegalStateException("截图识别已在管理页关闭");
-        return targets.prepare(fid, execution.settings.vision(), execution);
+        var text = execution.settings.chain().stream().filter(i -> i.resolvable() && targets.configured(execution,i.platform()))
+            .map(i -> targets.prepare(fid,i,execution)).toList();
+        return new Batch(targets.prepare(fid, execution.settings.vision(), execution),text);
+    }
+    public String compatibilityModel() {
+        var inv=invocation(); String model=inv.resolvedModel();
+        return inv.platform().equals(LlmCatalog.P_CUSTOM) || model != null && model.length()>32 ? inv.platform() : model;
     }
     public void checkCurrent(LlmInvocation inv) { if (targets != null && inv != null && inv.target() != null) targets.assertCurrent(inv.target()); }
 
@@ -119,10 +137,14 @@ public class VisionLlmClient {
         return extract(imageBytes,mime,frozen,frozen != null && frozen.target() != null ? frozen.target().familyId() : FAMILY_ID);
     }
     public List<ParsedRow> extract(byte[] imageBytes, String mime, LlmInvocation frozen, long fid) {
-        if (testGate != null && testGate.block(fid,
-                com.family.finance.service.llmtrace.PromptTrace.of(com.family.finance.service.llmtrace.PromptSurface.VISION_IMPORT),
+        return extract(imageBytes,mime,frozen,fid,trace -> { });
+    }
+    public List<ParsedRow> extract(byte[] imageBytes, String mime, LlmInvocation frozen, long fid,
+                                  java.util.function.Consumer<com.family.finance.service.llmtrace.PromptTrace> onTrace) {
+        var trace=com.family.finance.service.llmtrace.PromptTrace.of(com.family.finance.service.llmtrace.PromptSurface.VISION_IMPORT);
+        if (testGate != null && testGate.block(fid, trace,
                 SYS, PROMPT + "\n图片未发送"))
-            throw new com.family.finance.service.checkup.llm.LlmTestGate.Blocked();
+            { onTrace.accept(trace); throw new com.family.finance.service.checkup.llm.LlmTestGate.Blocked(); }
         LlmInvocation inv = frozen;
         if (inv == null) {
             var execution = targets == null ? null : targets.load(fid);
@@ -143,16 +165,38 @@ public class VisionLlmClient {
         String dataUrl = "data:" + (mime == null ? "image/jpeg" : mime) + ";base64,"
                 + java.util.Base64.getEncoder().encodeToString(imageBytes);
         String content;
+        List<ParsedRow> parsed;
         try {
             content = callVision(p, key, model, dataUrl, inv);
+            try {
+                int a=content.indexOf('['), b=content.lastIndexOf(']');
+                if(a<0 || b<a) throw new IllegalArgumentException();
+                var array=new com.fasterxml.jackson.databind.ObjectMapper().readTree(content.substring(a,b+1));
+                if(!array.isArray())
+                    throw new IllegalArgumentException();
+                parsed=parse(content);
+                if(!array.isEmpty() && parsed.isEmpty()) throw new IllegalArgumentException();
+            } catch(Exception e) { throw new com.family.finance.service.checkup.llm.CustomLlmFailure(com.family.finance.service.checkup.llm.CustomLlmFailure.Kind.PROTOCOL); }
+            trace.source(inv.sourceJson());
+            if(recorder != null) recorder.save(fid,trace,SYS,PROMPT,inv.badge(),com.family.finance.service.llmtrace.PromptRecorder.OK,"本次请求附带图片,记录中不保存图片内容");
+            onTrace.accept(trace);
         } catch (com.family.finance.service.checkup.llm.LlmTestGate.Blocked e) {
+            trace.source(inv.sourceJson());
+            if(recorder != null) recorder.save(fid,trace,SYS,PROMPT+"\n图片未发送",
+                com.family.finance.service.checkup.llm.LlmTestGate.MESSAGE,
+                com.family.finance.service.llmtrace.PromptRecorder.BLOCKED,com.family.finance.service.checkup.llm.LlmTestGate.MESSAGE);
+            onTrace.accept(trace);
             throw e;
         } catch (RuntimeException e) {
-            throw new IllegalStateException(p.label() + " · 图片识别失败 · "
-                    + com.family.finance.service.checkup.llm.LlmFailure.describe(p.code(), e)
+            trace.source(inv.sourceJson());
+            String safe=com.family.finance.service.checkup.llm.LlmFailure.describe(p.code(),e);
+            if(recorder != null) recorder.save(fid,trace,SYS,PROMPT,inv.badge(),com.family.finance.service.llmtrace.PromptRecorder.FAILED,safe);
+            onTrace.accept(trace);
+            throw new Failure(p.label() + " · 图片识别失败 · "
+                    + safe
                     + ";请确认所选型号支持图片输入");
         }
-        return parse(content);
+        return parsed;
     }
 
     @SuppressWarnings("unchecked")
@@ -177,15 +221,11 @@ public class VisionLlmClient {
         if (testGate != null) testGate.beforeSend("VISION_CLIENT");
         java.time.LocalDateTime dispatched = java.time.LocalDateTime.now();
         Map<String, Object> resp;
-        try { resp = rt.postForObject(invocation.target() == null ? java.net.URI.create(p.chatEndpoint()) : invocation.target().endpoint(), new HttpEntity<>(body, h), Map.class); }
+        var client=invocation.target()==null ? rt : builder.setConnectTimeout(Duration.ofSeconds(10))
+            .setReadTimeout(Duration.ofSeconds(invocation.target().timeout())).build();
+        try { resp = client.postForObject(invocation.target() == null ? java.net.URI.create(p.chatEndpoint()) : invocation.target().endpoint(), new HttpEntity<>(body, h), Map.class); }
         finally { if (testGate != null) testGate.observedSend("VISION_CLIENT", dispatched); }
-        if (resp == null) throw new RuntimeException("视觉服务返回空");
-        List<Map<String, Object>> choices = (List<Map<String, Object>>) resp.get("choices");
-        if (choices == null || choices.isEmpty()) throw new RuntimeException("视觉服务无结果");
-        Map<String, Object> msg = (Map<String, Object>) choices.get(0).get("message");
-        Object c = msg == null ? null : msg.get("content");
-        if (c == null) throw new RuntimeException("视觉服务空内容");
-        return c.toString();
+        return com.family.finance.service.checkup.llm.AbstractOpenAiCompatibleClient.responseContent(resp);
     }
 
     /** 抽首个 JSON 数组(容忍 ```json 围栏)· 逐项取字段 · 市值只做格式规整(去逗号/币符),不做运算 */

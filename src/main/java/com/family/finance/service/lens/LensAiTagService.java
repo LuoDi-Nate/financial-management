@@ -42,6 +42,10 @@ public class LensAiTagService {
      * 名称 → 建议标签。任一 client 成功即返回;全失败返回空 map(页面提示稍后再试)。
      */
     public Map<String, Tags> suggest(long familyId, List<String> names) {
+        return suggestPrepared(familyId,names,null);
+    }
+
+    public Map<String, Tags> suggestPrepared(long familyId, List<String> names, List<com.family.finance.service.checkup.llm.LlmInvocation> planned) {
         if (names == null || names.isEmpty()) return Map.of();
         String industries = java.util.Arrays.stream(IndustryTag.values())
                 .map(t -> t.name() + "=" + t.getLabel()).collect(Collectors.joining(", "));
@@ -85,14 +89,17 @@ public class LensAiTagService {
         // v1.13 · 走 LlmRouter:主备顺序统一由配置决定。这里必须用 Handler 形态而不是简单 invoke ——
         //   「解析出来一条白名单内的标签都没有」和「调用失败」对用户是同一件事(打标页空手而归),
         //   所以解析空要当成「这个候选没给出可用答案」继续试下一个,而不是就此收工。
-        Map<String, Tags> routed = llmRouter.invoke(familyId, system, user, (inv, raw, ms) -> {
+        LlmRouter.Handler<Map<String, Tags>> handler = (inv, raw, ms) -> {
             Map<String, Tags> out = parseAndWhitelist(raw, names);
             if (out.isEmpty()) {
                 log.warn("AI 打标 {} 输出解析后无可用标签 · 试下一个候选", inv.badge());
                 return null;
             }
             return out;
-        });
+        };
+        var trace = com.family.finance.service.llmtrace.PromptTrace.of(com.family.finance.service.llmtrace.PromptSurface.OTHER_TEXT);
+        Map<String, Tags> routed = planned == null ? llmRouter.invoke(familyId,trace,system,user,handler)
+            : llmRouter.invokePrepared(familyId,trace,system,user,handler,planned);
         return routed == null ? Map.of() : routed;
     }
 

@@ -20,7 +20,8 @@
   </div>
   <section class="paper-card p-6 mb-5">
     <h1 class="font-display text-2xl mb-1">截图导入明细</h1>
-    <p class="font-mono text-[12px] text-ink-subtle" th:text="${account.displayName} + ' · ' + ${#temporals.format(imp.confirmedAt, 'yyyy-MM-dd HH:mm')} + ' · 模型 ' + ${imp.visionModel}">…</p>
+    <p class="text-[12px] text-ink-subtle break-words" th:text="${account.displayName} + ' · ' + ${#temporals.format(imp.confirmedAt, 'yyyy-MM-dd HH:mm')} + ' · 模型 ' + ${visionSourceLabel}">…</p>
+    <th:block th:replace="~{fragments/_prompt-peek :: btn(${importPeekSrc})}"></th:block>
   </section>
 
   <section class="paper-card p-5 mb-5">

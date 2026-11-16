@@ -8,6 +8,7 @@ RD="$(cd "$(dirname "$0")/.." && pwd)"   # 仓库根 · 2026-09-22 从 2900 多�
 if [[ "${1:-}" == "--static-v139" ]]; then exec bash "$RD/scripts/qa-v139-static.sh"; fi
 if [[ "${1:-}" == "--static-v140" ]]; then exec bash "$RD/scripts/qa-v140-static.sh"; fi
 if [[ "${1:-}" == "--static-v141" ]]; then exec bash "$RD/scripts/qa-v141-static.sh"; fi
+if [[ "${1:-}" == "--static-v142" ]]; then exec bash "$RD/scripts/qa-v142-static.sh"; fi
                                           # 早期的护栏也要用它(诊断/洞察那几条改成静态判据之后)
 BASE="${BASE:-http://localhost:20000}"
 source "$RD/scripts/ai-test-guard.sh"

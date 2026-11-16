@@ -55,7 +55,7 @@ class CustomLlmConfigTest {
         assertThatThrownBy(() -> service.load(1)).isInstanceOf(CustomLlmFailure.class);
         assertThat(service.card(1).ready()).isFalse(); assertThat(service.card(1).error()).isNotBlank();
     }
-    @Test void completeExecutionIsImmutableAndStopsAfterServiceChange() {
+    @Test void completeExecutionIsImmutableAndStopsAfterServiceChange() throws Exception {
         initial(); store.putAll(Map.of("llm_platform","custom","llm_family","custom","llm_model_id","auto","llm_vision_enabled","false"));
         when(config.llmSnapshot(1)).thenAnswer(a -> new HashMap<>(store));
         var resolver = new LlmTargetResolver(config, service); var execution = resolver.load(1);
@@ -63,6 +63,7 @@ class CustomLlmConfigTest {
         assertThat(invocation.model()).isEqualTo("auto"); assertThat(invocation.auto()).isFalse();
         assertThat(invocation.target().endpoint().toString()).endsWith("/prefix/v1/chat/completions");
         assertThat(invocation.sourceJson()).contains("合成服务", "auto").doesNotContain("gateway.example.com", "synthetic-secret");
+        assertThat(json.writeValueAsString(invocation)).doesNotContain("apiKey","gateway.example.com","synthetic-secret");
         service.save(1,"","https://changed.example.com/v1","BEARER","new-key",false,service.load(1).editToken);
         assertThat(invocation.target().apiKey()).isEqualTo("synthetic-secret-original");
         assertThatThrownBy(() -> resolver.assertCurrent(invocation.target())).isInstanceOf(CustomLlmFailure.class).hasMessageContaining("已更新");

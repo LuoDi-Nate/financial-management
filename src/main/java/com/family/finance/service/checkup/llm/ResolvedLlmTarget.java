@@ -13,7 +13,7 @@ public final class ResolvedLlmTarget {
     private final boolean local;
     private final int timeout, tokens;
     private final double temperature;
-    public ResolvedLlmTarget(long fid, URI endpoint, String key, String revision, String fingerprint, String name,
+    ResolvedLlmTarget(long fid, URI endpoint, String key, String revision, String fingerprint, String name,
             String platform, boolean local, int timeout, int tokens, double temperature) {
         familyId = fid; this.endpoint = endpoint; this.key = key; this.revision = revision;
         this.fingerprint = fingerprint; this.name = name; this.platform = platform; this.local = local;

@@ -65,11 +65,26 @@ if [[ -n "$EXPECT_CURRENT" && "$CUR_VER" != "$EXPECT_CURRENT" ]]; then
   err "若照样回滚,会换成更老的 v${PREV_VER:-?}。已拒绝,什么都没动。"
   exit 3
 fi
+ver_lt() { [[ "$1" != "$2" && "$(printf '%s\n%s\n' "$1" "$2" | sort -V | head -1)" == "$1" ]]; }
+# A legacy jar treats unknown platform codes as old defaults. Never silently change the model destination.
+if [[ -n "$CUR_VER" ]] && ! ver_lt "$CUR_VER" '1.41.0' \
+    && { [[ -z "$PREV_VER" ]] || ver_lt "$PREV_VER" '1.42.0'; }; then
+  [[ -n "$PREV_VER" ]] || die "无法读取回滚目标版本,已拒绝回滚,没有改动jar"
+  model_supported="'','dashscope','deepseek','ark'"
+  if [[ -n "$PREV_VER" ]] && ! ver_lt "$PREV_VER" '1.41.0'; then model_supported+=",'siliconflow'"; fi
+  DB_NAME="${DB_NAME:-finance}"; DB_USER="${DB_USER:-finance}"
+  if [[ ! -v DB_PASS ]]; then DB_PASS=$(grep '^DB_PASS=' /etc/finance.env 2>/dev/null | cut -d= -f2- || true); fi
+  if ! model_unsupported=$(MYSQL_PWD="$DB_PASS" mysql --connect-timeout=5 -h127.0.0.1 -u"$DB_USER" "$DB_NAME" -sN -e \
+      "SELECT COUNT(*) FROM family_runtime_config WHERE family_id=1 AND key_name IN ('llm_platform','llm_backup_platform','llm_vision_platform') AND LOWER(TRIM(value_text)) NOT IN ($model_supported)" 2>/dev/null); then
+    die "无法确认模型选型,已拒绝回滚,没有改动jar"
+  fi
+  [[ "$model_unsupported" =~ ^[0-9]+$ ]] || die "无法确认模型选型结果,已拒绝回滚,没有改动jar"
+  [[ "$model_unsupported" == 0 ]] || die "回滚目标不支持当前模型平台;请先在AI接入将主选、备选及视觉恢复到旧版内置平台(包括已关闭的视觉),没有改动jar"
+fi
 if [[ "$CHECK_ONLY" == "1" ]]; then
   ok "可以回滚:v${CUR_VER:-?} → v${PREV_VER:-?}(--check-only,什么都没动)"
   exit 0
 fi
-ver_lt() { [[ "$1" != "$2" && "$(printf '%s\n%s\n' "$1" "$2" | sort -V | head -1)" == "$1" ]]; }
 if [[ -n "$PREV_VER" ]]; then
   echo "═══ 回滚前置 SQL(上一版 jar = v$PREV_VER)═══"
   DB_NAME="${DB_NAME:-finance}"; DB_USER="${DB_USER:-finance}"

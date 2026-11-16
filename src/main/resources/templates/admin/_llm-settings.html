@@ -8,7 +8,7 @@
       <span class="pill text-[10px] shrink-0" th:classappend="${keyCount > 0} ? ' pill-forest' : ' pill-rust'"
             th:text="${keyCount} + ' / ' + ${llmPlatformCount} + ' 家已配置'" data-llm-key-count></span>
     </div>
-    <p class="text-sm text-ink-soft leading-loose">这些都可选。配一家即可使用AI,配两家可以设故障备选。不配密钥时,记账、净资产、收益与图表仍正常。</p>
+    <p class="text-sm text-ink-soft leading-loose">这些都可选。配一家即可使用AI,配两家可以设故障备选。不配置模型时,记账、净资产、收益与图表仍正常。</p>
     <p th:if="${llmLegacy}" class="text-sm text-ink-soft">当前使用旧配置推导的设置,调用保持原样;确认下面选型并保存后固化为三级配置。</p>
     <p class="text-xs text-ink-soft">密钥仅用于对应平台,不进入日志或明文回显。留空保持原值;密钥与模型各自保存。</p>
 
@@ -84,7 +84,7 @@
         </div>
         <label class="flex items-center gap-2 text-sm min-h-11"><input type="checkbox" name="allowLocalHttp" value="true"
           th:checked="${customDraft != null} ? ${customDraft.allowLocalHttp} : ${llmCustom.allowLocalHttp()}">允许本机/内网或HTTP服务</label>
-        <p class="text-xs text-ink-soft">请求从家庭账房服务器发出;本机指应用所在环境。云元数据等保留目标始终拒绝。服务需支持Chat Completions,图片与工具能力由型号决定。</p>
+        <p class="text-xs text-ink-soft">请求从家庭账房服务器发出;本机指应用所在环境。HTTP不会加密传输,云元数据等保留目标始终拒绝。服务需支持Chat Completions,图片与工具能力由型号决定。</p>
         <p class="text-xs text-ink-soft break-words">调用地址:<span data-custom-endpoint th:text="${llmCustom.baseUrl().isEmpty()} ? '—' : ${llmCustom.baseUrl()} + '/chat/completions'"></span></p>
         <span class="text-xs text-rust block" data-custom-error="allowLocalHttp" role="status"></span>
         <p class="text-xs text-ink-soft">地址、认证和密钥一起保存;型号在下方单独保存。保存不会调用模型,改地址不能复用旧密钥。</p>
@@ -129,7 +129,7 @@
           <label class="field-label">max_tokens · 输出上限<input class="field-input field-input-num" name="maxTokens" type="number" th:value="${llmMaxTokens}" min="500" max="8000" required><span class="text-xs text-rust" data-llm-error></span></label>
           <label class="field-label">超时秒 · timeout<input class="field-input field-input-num" name="timeoutSeconds" type="number" th:value="${llmTimeoutSeconds}" min="5" max="120" required><span class="text-xs text-rust" data-llm-error></span></label>
         </div>
-        <p class="text-xs text-ink-soft mt-2">温度默认0.5,输出上限默认2000,超时默认25秒。流式超时指等待下一段内容,不是整轮工具对话总时长。</p>
+        <p class="text-xs text-ink-soft mt-2">温度默认0.5,输出上限默认2000,超时默认25秒。内置平台按等待下一段计时;自有服务单次响应也受总时限限制。工具对话按回合分别计时。</p>
       </div>
       <div class="flex justify-end"><button type="submit" class="btn-ink" th:disabled="${keyCount == 0}">保存模型配置</button></div>
     </form>

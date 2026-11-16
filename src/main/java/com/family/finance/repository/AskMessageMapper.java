@@ -96,4 +96,8 @@ public interface AskMessageMapper {
           + " WHERE v.family_id = #{familyId} AND m.conversation_id = #{cid} AND m.role = 'user'"
           + " AND m.prompt_record_id IS NOT NULL ORDER BY m.seq DESC LIMIT 1")
     Long lastUserPromptRecord(@Param("familyId") long familyId, @Param("cid") long conversationId);
+
+    @Select("SELECT m.source_json FROM ask_message m JOIN ask_conversation v ON v.id=m.conversation_id"
+        + " WHERE v.family_id=#{familyId} AND m.conversation_id=#{cid} AND m.role='user' ORDER BY m.seq DESC LIMIT 1")
+    String lastUserSource(@Param("familyId") long familyId,@Param("cid") long conversationId);
 }

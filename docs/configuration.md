@@ -12,6 +12,7 @@
 | **DeepSeek官方** | AI文字能力,可选主备 | 可选 | `/admin/ai-access#llm` | [LLM Key 申请](llm-api-keys-setup.md) |
 | **火山方舟** | AI文字/图片能力,按具体型号选择 | 可选 | `/admin/ai-access#llm` | [LLM Key 申请](llm-api-keys-setup.md) |
 | **硅基流动** | AI文字/图片/本地工具能力,按具体型号选择 | 可选 | `/admin/ai-access#llm` | [LLM Key 申请](llm-api-keys-setup.md) |
+| **自有兼容服务** | 自填Base URL、认证与完整型号;文字/图片/本地工具按实际兼容能力使用 | 可选 | `/admin/ai-access#llm` | [服务配置规则](llm-api-keys-setup.md#自有-openai-兼容服务) |
 | **阿里云短信** | 填报截止前的**短信强提醒** | 可选 | `/admin/reminders` ② | [阿里云短信接入](aliyun-sms-setup.md) |
 | 股票行情(新浪/腾讯) | 每日 T+1 自动估值 | **免配** · 内置 | — | 无需 key |
 | 加密货币行情(Binance/CoinGecko/Coinbase) | BTC/ETH/USDC 等自动估值 | **免配** · 内置 | — | 无需 key |
@@ -23,12 +24,14 @@
 
 ---
 
-## 1. AI(百炼 / DeepSeek官方 / 方舟 / 硅基流动)
+## 1. AI(百炼 / DeepSeek官方 / 方舟 / 硅基流动 / 自有兼容服务)
 
 **解锁**:资产体检、月报 AI 洞察、调仓建议。计算全部由工程算好再喂模型,**AI 只解读,不做数学、不荐产品、不预测涨跌**。
 
 **怎么配**:`/admin/ai-access`(管理 → AI 接入)→「大模型」那一节,填 API Key → 保存 → 点该 key 旁的「**测试连接**」验证通不通。
 - 四家各自保存密钥,主选与备选由你指定,**配一家即可**;截图独立选型,本地Agent沿用文字主备。硅基流动的托管DeepSeek不与官方平台共用密钥。
+- 自有服务在同页独立保存地址/认证/Key与内网许可,再单独保存原主备/视觉选型。默认Bearer或显式免认证,无默认型号;保存不调用模型,改地址须新Key。接口需支持当前Chat Completions形态,不兼容原生其它协议或任意请求头编辑。
+- 私网/HTTP须明确许可,证书仍校验、不跟重定向、不走系统代理;改配置停止旧操作后续回合,旧报告来源保留不自动重算。详细边界见配置指南,不用提供真实服务凭据给项目维护者作回归。
 - 每个 key 字段下有「**如何获取?**」折叠说明,3 步拿到 key;详版见 [LLM Key 申请与配置](llm-api-keys-setup.md)。
 - 选哪家、免费额度怎么省,见 [LLM 厂商选型对比](llm-vendor-comparison.md)。
 

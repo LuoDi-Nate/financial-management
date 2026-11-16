@@ -74,13 +74,14 @@ public class HoldingImportService {
                 .orElseThrow(() -> new IllegalStateException("没有开账期,无法导入"));
         HoldingImport imp = HoldingImport.builder()
                 .familyId(acc.getFamilyId()).accountId(accountId).periodId(period.getId())
-                .status(HoldingImport.UPLOADING).visionModel(vision.model())
+                .status(HoldingImport.UPLOADING).visionModel(vision.compatibilityModel())
                 .imgCount(0).build();
         importMapper.insert(imp);
         return imp;
     }
 
     public Optional<HoldingImport> get(long familyId, long importId) { return importMapper.findById(familyId, importId); }
+    public Optional<HoldingImport> open(long familyId, long accountId) { return importMapper.findOpenByAccount(familyId,accountId); }
 
     public List<HoldingImportItem> items(long familyId, long importId) { return itemMapper.findByImport(familyId, importId); }
 
@@ -164,7 +165,8 @@ public class HoldingImportService {
         importMapper.markScanning(familyId, importId);
         try {
             List<Path> images = listImages(imp);
-            var frozenVision = vision.prepareScan(familyId);
+            var batch = vision.prepareBatch(familyId);
+            var frozenVision = batch == null ? null : batch.vision();
             // 1. 逐图视觉转写 + 记来源图
             record Parsed(VisionLlmClient.ParsedRow row, String shot) {}
             List<Parsed> parsedAll = new ArrayList<>();
@@ -177,7 +179,11 @@ public class HoldingImportService {
                     byte[] b = Files.readAllBytes(p);
                     String mime = mimeOf(p.getFileName().toString());
                     String rel = relOf(imp, p);
-                    for (VisionLlmClient.ParsedRow r : vision.extract(b, mime, frozenVision, familyId)) parsedAll.add(new Parsed(r, rel));
+                    for (VisionLlmClient.ParsedRow r : vision.extract(b, mime, frozenVision, familyId, trace -> {
+                        String source=com.family.finance.service.llmtrace.LlmSource.withRecord(trace.sourceJson(),trace.recordId());
+                        if(source != null) importMapper.source(familyId,importId,source,frozenVision == null ? vision.compatibilityModel()
+                            : frozenVision.platform().equals("custom") || frozenVision.resolvedModel().length()>32 ? frozenVision.platform() : frozenVision.resolvedModel());
+                    })) parsedAll.add(new Parsed(r, rel));
                 } catch (Exception e) {
                     failedImages++;
                     lastError = e;
@@ -197,9 +203,6 @@ public class HoldingImportService {
             }
             // 2. 合并去重(按 code 优先,否则归一化名称;保留第一条有市值的)
             vision.checkCurrent(frozenVision);
-            if (frozenVision != null && frozenVision.sourceJson() != null)
-                importMapper.source(familyId,importId,frozenVision.sourceJson(),
-                    frozenVision.platform().equals("custom") ? "custom" : frozenVision.resolvedModel().length() <= 32 ? frozenVision.resolvedModel() : frozenVision.platform());
             Map<String, Parsed> merged = new LinkedHashMap<>();
             for (Parsed p : parsedAll) {
                 String key = dedupKey(p.row());
@@ -212,7 +215,8 @@ public class HoldingImportService {
             // 3. 白名单打标(复用 LensAiTag · 文本)
             List<String> names = rows.stream().map(x -> x.row().name()).collect(Collectors.toList());
             Map<String, LensAiTagService.Tags> tags;
-            try { tags = tagService.available(imp.getFamilyId()) ? tagService.suggest(imp.getFamilyId(), names) : Map.of(); }
+            try { tags = tagService.available(imp.getFamilyId()) ? (batch == null ? tagService.suggest(imp.getFamilyId(),names)
+                : tagService.suggestPrepared(imp.getFamilyId(),names,batch.text())) : Map.of(); }
             catch (Exception e) { tags = Map.of(); }
             // 4. 三态匹配(只比对本账户 SCREENSHOT 活持仓)
             List<StockHolding> existing = holdingMapper.findActiveByAccount(imp.getFamilyId(), imp.getAccountId()).stream()
@@ -415,6 +419,10 @@ public class HoldingImportService {
      * 阿里云的配额错误本身就是 403,先匹配 403 的话会退化成一句笼统的「被拒绝」。</p>
      */
     static String friendly(Exception e) {
+        if(e instanceof com.family.finance.service.checkup.llm.LlmTestGate.Blocked)
+            return com.family.finance.service.checkup.llm.LlmTestGate.MESSAGE;
+        if(e instanceof VisionLlmClient.Failure || e instanceof com.family.finance.service.checkup.llm.CustomLlmFailure)
+            return e.getMessage();
         String m = e == null ? null : e.getMessage();
         if (m == null) return "识别失败,请重试";
         // 配额/欠费:重试无用,只能去控制台。必须在 403/401 之前判(它自己就是 403)

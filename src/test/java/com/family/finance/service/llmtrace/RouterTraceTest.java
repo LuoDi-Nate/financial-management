@@ -87,15 +87,15 @@ class RouterTraceTest {
     }
 
     @Test
-    void 调用失败_记FAILED与上游原话() {
-        var s = setup(client(null, new IllegalStateException("Arrearage: Access denied")));
+    void 调用失败_记FAILED与安全分类不保留上游敏感原文() {
+        var s = setup(client(null, new IllegalStateException("Arrearage: Access denied synthetic-secret")));
         assertThat(s.router().plan(1L)).isNotEmpty();
         PromptTrace t = PromptTrace.of(PromptSurface.LENS_INSIGHT);
         s.router().invoke(1L, t, "S", "U", (inv, raw, ms) -> raw);
         ArgumentCaptor<PromptRecordMapper.Row> cap = ArgumentCaptor.forClass(PromptRecordMapper.Row.class);
         verify(s.mapper()).insert(cap.capture());
         assertThat(cap.getValue().outcome).isEqualTo(PromptRecorder.FAILED);
-        assertThat(cap.getValue().outcomeNote).contains("Arrearage: Access denied");
+        assertThat(cap.getValue().outcomeNote).contains("余额或权限").doesNotContain("Arrearage: Access denied","synthetic-secret");
     }
 
     @Test
