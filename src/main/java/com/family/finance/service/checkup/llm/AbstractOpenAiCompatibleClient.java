@@ -185,15 +185,7 @@ public abstract class AbstractOpenAiCompatibleClient implements LlmClient {
         HttpHeaders h = new HttpHeaders();
         h.setContentType(MediaType.APPLICATION_JSON);
         h.setBearerAuth(key);
-        Map<String, Object> body = Map.of(
-                "model", model,
-                "messages", List.of(
-                        Map.of("role", "system", "content", systemPrompt),
-                        Map.of("role", "user", "content", userPrompt)
-                ),
-                "temperature", currentTemperature(),
-                "max_tokens", currentMaxTokens()
-        );
+        Map<String, Object> body = textRequest(model, systemPrompt, userPrompt, currentTemperature(), currentMaxTokens());
 
         if (testGate != null) testGate.beforeSend("TEXT_CLIENT");
         java.time.LocalDateTime dispatched = java.time.LocalDateTime.now();
@@ -203,18 +195,34 @@ public abstract class AbstractOpenAiCompatibleClient implements LlmClient {
         } finally {
             if (testGate != null) testGate.observedSend("TEXT_CLIENT", dispatched);
         }
-        if (resp == null) throw new RuntimeException(label + " 返回 null");
+        return responseContent(resp);
+    }
+
+    static Map<String, Object> textRequest(String model, String systemPrompt, String userPrompt, double temperature, int maxTokens) {
+        return Map.of(
+                "model", model,
+                "messages", List.of(
+                        Map.of("role", "system", "content", systemPrompt),
+                        Map.of("role", "user", "content", userPrompt)
+                ),
+                "temperature", temperature,
+                "max_tokens", maxTokens
+        );
+    }
+
+    public static String responseContent(Map<String, Object> resp) {
+        if (resp == null || resp.containsKey("error")) throw new CustomLlmFailure(CustomLlmFailure.Kind.PROTOCOL);
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> choices = (List<Map<String, Object>>) resp.get("choices");
-        if (choices == null || choices.isEmpty()) throw new RuntimeException(label + " 无 choices");
+        if (choices == null || choices.isEmpty()) throw new CustomLlmFailure(CustomLlmFailure.Kind.PROTOCOL);
         @SuppressWarnings("unchecked")
         Map<String, Object> msg = (Map<String, Object>) choices.get(0).get("message");
-        if (msg == null) throw new RuntimeException(label + " 无 message");
+        if (msg == null) throw new CustomLlmFailure(CustomLlmFailure.Kind.PROTOCOL);
         String content = (String) msg.get("content");
-        if (content == null || content.isBlank()) throw new RuntimeException(label + " 空 content");
+        if (content == null || content.isBlank()) throw new CustomLlmFailure(CustomLlmFailure.Kind.PROTOCOL);
 
         if ("length".equals(choices.get(0).get("finish_reason"))) {
-            log.warn("{}[{}] 输出因 max_tokens 截断 · content.len={}", label, model, content.length());
+            log.warn("模型输出因 max_tokens 截断 · content.len={}", content.length());
         }
         return content;
     }

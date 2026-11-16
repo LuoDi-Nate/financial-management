@@ -19,6 +19,9 @@ public interface LlmClient {
 
     /** 凭据已配 且 未处于熔断冷却 */
     boolean available();
+    default boolean available(LlmInvocation invocation) { return available(); }
+    default void recordSuccess(LlmInvocation invocation) { recordExternalSuccess(); }
+    default void recordFailure(LlmInvocation invocation, Exception failure) { recordExternalFailure(); }
 
     /** 工具流与普通文本共享平台冷却,流式协议仍由 Agent runtime 负责。 */
     default void recordExternalSuccess() { }

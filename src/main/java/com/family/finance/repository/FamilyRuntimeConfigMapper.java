@@ -15,6 +15,9 @@ import java.util.Optional;
 @Mapper
 public interface FamilyRuntimeConfigMapper {
 
+    @Select("SELECT id FROM family WHERE id = #{familyId} FOR UPDATE")
+    Long lockFamily(@Param("familyId") long familyId);
+
     /** 取单个 key 的值(原始字符串)· 配合 FamilyConfigService 做类型转换 */
     @Select("""
             SELECT value_text

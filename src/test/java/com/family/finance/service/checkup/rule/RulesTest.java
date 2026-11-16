@@ -24,6 +24,7 @@ class RulesTest {
 
     /** v0.4.18 · 测试桩 · DB 永远空 → 业务代码默认值生效 · 等价于 v0.4.17 之前的行为 */
     private static final FamilyConfigService STUB_CONFIG = new FamilyConfigService(new FamilyRuntimeConfigMapper() {
+        @Override public Long lockFamily(long familyId) { throw new UnsupportedOperationException(); }
         @Override public Optional<String> findValue(long familyId, String keyName) { return Optional.empty(); }
         @Override public List<FamilyRuntimeConfig> findByFamily(long familyId) { return List.of(); }
         @Override public int upsert(long familyId, String keyName, String valueText) { return 0; }

@@ -35,27 +35,35 @@ public record LlmSettings(
             new LlmInvocation(LlmCatalog.P_DASHSCOPE, "qwen-vl", null);
 
     public static LlmSettings load(FamilyConfigService cfg, long familyId) {
-        String newPlatform = cfg.getString(familyId, K_LLM_PLATFORM, "");
+        return load((key, fallback) -> cfg.getString(familyId, key, fallback));
+    }
+
+    public static LlmSettings from(java.util.Map<String, String> values) {
+        return load((key, fallback) -> values.getOrDefault(key, fallback));
+    }
+
+    private static LlmSettings load(java.util.function.BiFunction<String, String, String> read) {
+        String newPlatform = read.apply(K_LLM_PLATFORM, "");
         boolean legacy = LlmCatalog.normalizePlatform(newPlatform) == null;
 
         LlmInvocation primary;
         Optional<LlmInvocation> backup;
         if (!legacy) {
-            primary = triple(cfg, familyId, K_LLM_PLATFORM, K_LLM_FAMILY, K_LLM_MODEL_ID,
+            primary = triple(read, K_LLM_PLATFORM, K_LLM_FAMILY, K_LLM_MODEL_ID,
                     LlmCatalog.Modality.TEXT);
-            String bp = LlmCatalog.normalizePlatform(cfg.getString(familyId, K_LLM_BACKUP_PLATFORM, ""));
+            String bp = LlmCatalog.normalizePlatform(read.apply(K_LLM_BACKUP_PLATFORM, ""));
             backup = bp == null ? Optional.empty()
-                    : Optional.of(triple(cfg, familyId, K_LLM_BACKUP_PLATFORM, K_LLM_BACKUP_FAMILY,
+                    : Optional.of(triple(read, K_LLM_BACKUP_PLATFORM, K_LLM_BACKUP_FAMILY,
                             K_LLM_BACKUP_MODEL_ID, LlmCatalog.Modality.TEXT));
         } else {
             // 旧配置:vendor 决定主选,另一家自动成为备选(等价于 v0.14 orderByPrimaryVendor 的两家排序)
             boolean deepSeekFirst = "deepseek".equalsIgnoreCase(
-                    cfg.getString(familyId, K_LLM_PRIMARY_VENDOR, "qwen"));
+                    read.apply(K_LLM_PRIMARY_VENDOR, "qwen"));
             LlmInvocation head = deepSeekFirst ? LEGACY_DEEPSEEK : LEGACY_QWEN;
             LlmInvocation tail = deepSeekFirst ? LEGACY_QWEN : LEGACY_DEEPSEEK;
             // 旧 llm_model 只在「确实属于主选那一家」时承接。旧代码里 pinnedModel() 是按前缀判断的,
             // 不匹配就退回轮询/默认 —— 这里保持同样结果,免得升级后突然拿一个 qwen 的 key 去调 deepseek 的型号。
-            String legacyModel = LlmCatalog.normalizeModel(cfg.getString(familyId, K_LLM_MODEL, ""));
+            String legacyModel = LlmCatalog.normalizeModel(read.apply(K_LLM_MODEL, ""));
             String carried = LlmCatalog.inRecommended(head.familyDef().orElse(null), legacyModel)
                     ? legacyModel : null;
             primary = new LlmInvocation(head.platform(), head.family(), carried);
@@ -64,16 +72,16 @@ public record LlmSettings(
 
         LlmInvocation vision;
         boolean visionEnabled;
-        String newVisionPlatform = cfg.getString(familyId, K_LLM_VISION_PLATFORM, "");
+        String newVisionPlatform = read.apply(K_LLM_VISION_PLATFORM, "");
         if (LlmCatalog.normalizePlatform(newVisionPlatform) != null) {
-            vision = triple(cfg, familyId, K_LLM_VISION_PLATFORM, K_LLM_VISION_FAMILY,
+            vision = triple(read, K_LLM_VISION_PLATFORM, K_LLM_VISION_FAMILY,
                     K_LLM_VISION_MODEL_ID, LlmCatalog.Modality.VISION);
-            visionEnabled = cfg.getBoolean(familyId, K_LLM_VISION_ENABLED, true);
+            visionEnabled = Boolean.parseBoolean(read.apply(K_LLM_VISION_ENABLED, "true"));
         } else {
             // 旧配置把「关闭」编码在型号里(llm_vision_model=off)。拆开:关掉时型号仍保留默认,
             // 这样用户重新打开不用再选一次。
             // 缺省不在这里写型号名(那是目录的事):读不到 = 没钉死 = 走系列默认,与 v1.12 的默认值同解
-            String vm = cfg.getString(familyId, K_LLM_VISION_MODEL, "");
+            String vm = read.apply(K_LLM_VISION_MODEL, "");
             visionEnabled = !"off".equalsIgnoreCase(vm == null ? "" : vm.trim());
             String model = visionEnabled && LlmCatalog.validModel(LlmCatalog.normalizeModel(vm))
                     ? LlmCatalog.normalizeModel(vm) : null;
@@ -84,15 +92,15 @@ public record LlmSettings(
     }
 
     /** 读一组三元组键;系列缺失时退回该平台该形态的第一个系列(平台一定存在,调用前已校验) */
-    private static LlmInvocation triple(FamilyConfigService cfg, long familyId,
+    private static LlmInvocation triple(java.util.function.BiFunction<String, String, String> read,
                                         String platformKey, String familyKey, String modelKey,
                                         LlmCatalog.Modality modality) {
-        String platform = LlmCatalog.normalizePlatform(cfg.getString(familyId, platformKey, ""));
+        String platform = LlmCatalog.normalizePlatform(read.apply(platformKey, ""));
         LlmCatalog.Platform p = LlmCatalog.platform(platform).orElse(LlmCatalog.DASHSCOPE);
-        String family = cfg.getString(familyId, familyKey, "");
+        String family = read.apply(familyKey, "");
         String resolvedFamily = p.family(family).map(LlmCatalog.Family::code)
                 .orElseGet(() -> p.firstFamily(modality).map(LlmCatalog.Family::code).orElse(family));
-        String model = LlmCatalog.normalizeModel(cfg.getString(familyId, modelKey, ""));
+        String model = LlmCatalog.normalizeModel(p.code(), read.apply(modelKey, ""));
         return new LlmInvocation(p.code(), resolvedFamily, model);
     }
 

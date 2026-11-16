@@ -252,6 +252,17 @@ public class FamilyConfigService {
         return result;
     }
 
+    /** One committed read, with the existing environment fallback applied without per-key cache reads. */
+    public Map<String, String> llmSnapshot(long familyId) {
+        Map<String, String> values = getAll(familyId);
+        String[] names = {K_LLM_QWEN_KEY, K_LLM_DEEPSEEK_KEY, K_LLM_ARK_KEY, K_LLM_SILICONFLOW_KEY};
+        String[] fallback = {envQwenKey, envDeepseekKey, envArkKey, envSiliconflowKey};
+        for (int i = 0; i < names.length; i++)
+            if ((values.get(names[i]) == null || values.get(names[i]).isEmpty()) && fallback[i] != null)
+                values.put(names[i], fallback[i]);
+        return values;
+    }
+
     // ========== 类型化访问 ==========
 
     /** 字符串 · DB > env(部分 key)> codeDefault */

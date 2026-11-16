@@ -2,6 +2,11 @@
 
 按 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 风格记录。每个版本详细需求见对应 [`prd/vX.Y.md`](prd/),技术设计见 [`tech-design/vX.Y.md`](tech-design/),QA case 见 [`docs/qa-cases.md`](docs/qa-cases.md)。
 
+## [v1.42] · 开发中 · 自有 OpenAI 兼容服务
+
+- 维护者分别通过[PRD](prd/v1.42.md)、[预览](preview/v1.42/custom-llm.html)与[TDD](tech-design/v1.42.md),授权开发;在独立#43分支承接#42共享设置基线,不合并master或公开发布。
+- 实施自有服务原子配置、明确免认证/内网许可、请求快照和受控HTTP出口;业务入口、来源、缓存及完整回归仍在接入中,尚未部署beta。
+
 ## [v1.41] · beta待验收 · 硅基流动 AI 接入
 
 - issue #42恢复处理;已准备独立密钥、文字主备、截图识别及本地Agent能力范围的[PRD](prd/v1.41.md)与[静态预览](preview/v1.41/ai-access.html)。

@@ -14,10 +14,21 @@ import java.util.Optional;
  * @param family   模型系列 code · 决定「自动」时的默认型号与可选清单
  * @param model    型号;<b>null = 自动</b>(百炼走多型号轮询,其余用系列默认)
  */
-public record LlmInvocation(String platform, String family, String model) {
+public record LlmInvocation(String platform, String family, String model,
+        @com.fasterxml.jackson.annotation.JsonIgnore ResolvedLlmTarget target) {
+
+    public LlmInvocation(String platform, String family, String model) { this(platform, family, model, null); }
+    public LlmInvocation withTarget(ResolvedLlmTarget value) { return new LlmInvocation(platform, family, model, value); }
+    public String sourceJson() { return target == null ? null : target.sourceJson(resolvedModel(), family); }
+    @Override public String toString() { return "LlmInvocation[" + label() + "]"; }
+    @Override public boolean equals(Object other) {
+        return other instanceof LlmInvocation x && java.util.Objects.equals(platform, x.platform)
+            && java.util.Objects.equals(family, x.family) && java.util.Objects.equals(model, x.model);
+    }
+    @Override public int hashCode() { return java.util.Objects.hash(platform, family, model); }
 
     public static LlmInvocation of(String platform, String family, String model) {
-        return new LlmInvocation(platform, family, LlmCatalog.normalizeModel(model));
+        return new LlmInvocation(platform, family, LlmCatalog.normalizeModel(platform, model));
     }
 
     public boolean auto() { return model == null; }

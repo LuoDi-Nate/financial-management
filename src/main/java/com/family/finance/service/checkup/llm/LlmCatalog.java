@@ -85,6 +85,7 @@ public final class LlmCatalog {
     public static final String P_DEEPSEEK  = "deepseek";
     public static final String P_ARK       = "ark";
     public static final String P_SILICONFLOW = "siliconflow";
+    public static final String P_CUSTOM = "custom";
 
     /**
      * 阿里云百炼(DashScope)· 承接 v0.14 的 `qwen`。
@@ -176,7 +177,11 @@ public final class LlmCatalog {
                     new Family("other-vision", "其他图片模型", Modality.VISION, List.of(), null)
             ));
 
-    public static final List<Platform> PLATFORMS = List.of(DASHSCOPE, DEEPSEEK, ARK, SILICONFLOW);
+    public static final Platform CUSTOM = new Platform(P_CUSTOM, "自有服务", "", "llm_custom_service_secret", false,
+            "填写服务提供的基础地址与认证方式", List.of(
+                new Family("custom", "自定义模型", Modality.TEXT, List.of(), null),
+                new Family("custom-vision", "自定义模型", Modality.VISION, List.of(), null)));
+    public static final List<Platform> PLATFORMS = List.of(DASHSCOPE, DEEPSEEK, ARK, SILICONFLOW, CUSTOM);
 
     public static Optional<Platform> platform(String code) {
         if (code == null) return Optional.empty();
@@ -213,6 +218,11 @@ public final class LlmCatalog {
         String m = raw.trim();
         if (m.isEmpty() || m.equalsIgnoreCase("auto")) return null;
         return m;
+    }
+
+    public static String normalizeModel(String platform, String raw) {
+        if (!P_CUSTOM.equals(platform)) return normalizeModel(raw);
+        return raw == null || raw.isBlank() ? null : raw.trim();
     }
 
     /** 该型号是否属于某系列的推荐清单(用于旧配置承接时判断「是不是这一家的型号」)。 */

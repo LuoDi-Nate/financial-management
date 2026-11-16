@@ -27,6 +27,17 @@
     </properties>
 
     <dependencies>
+        <dependency>
+            <groupId>com.squareup.okhttp3</groupId>
+            <artifactId>okhttp</artifactId>
+            <version>4.12.0</version>
+        </dependency>
+        <!-- Retain the annotation version already present in the deployed dependency graph. -->
+        <dependency>
+            <groupId>org.jetbrains</groupId>
+            <artifactId>annotations</artifactId>
+            <version>17.0.0</version>
+        </dependency>
         <!-- Web + Thymeleaf -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

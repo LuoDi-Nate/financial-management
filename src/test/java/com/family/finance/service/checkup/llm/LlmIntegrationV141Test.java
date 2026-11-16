@@ -21,7 +21,7 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.*;
 
 class LlmIntegrationV141Test {
-    static Stream<LlmCatalog.Platform> platforms() { return LlmCatalog.PLATFORMS.stream(); }
+    static Stream<LlmCatalog.Platform> platforms() { return LlmCatalog.PLATFORMS.stream().filter(p -> !p.code().equals(LlmCatalog.P_CUSTOM)); }
     private FamilyConfigService config(Map<String,String> values) {
         var cfg = mock(FamilyConfigService.class);
         when(cfg.getString(anyLong(), anyString(), anyString())).thenAnswer(a -> {

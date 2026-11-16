@@ -136,6 +136,7 @@ class AnalysisScopeTest {
     void familyDefaultFollowsSavedValueThenDerives() {
         Map<String, String> store = new HashMap<>();
         FamilyConfigService cfg = new FamilyConfigService(new FamilyRuntimeConfigMapper() {
+            @Override public Long lockFamily(long familyId) { throw new UnsupportedOperationException(); }
             @Override public Optional<String> findValue(long familyId, String keyName) { return Optional.ofNullable(store.get(keyName)); }
             @Override public List<FamilyRuntimeConfig> findByFamily(long familyId) { return List.of(); }
             @Override public int upsert(long familyId, String keyName, String valueText) { store.put(keyName, valueText); return 1; }
