@@ -15,6 +15,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 public class GoalAiReport {
+    private String sourceJson;
     private Long id;
     private Long goalId;
     private Long periodId;

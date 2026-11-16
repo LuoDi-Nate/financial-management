@@ -85,7 +85,7 @@ class ReviewCacheStalenessTest {
         svc(cache, router).review(1L, 163L, "2026-09", "acct",
                 EMPTY_ATTR, new LinkedHashMap<>(), false, false);
 
-        verify(cache, never()).upsert(anyLong(), anyLong(), anyString(), anyString(), anyString(), any());
+        verify(cache, never()).upsert(anyLong(), anyLong(), anyString(), anyString(), anyString(), any(), any());
     }
 
     @Test

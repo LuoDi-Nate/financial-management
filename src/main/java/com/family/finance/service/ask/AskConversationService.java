@@ -284,7 +284,14 @@ public class AskConversationService {
                         log.debug("ctx_note 写入失败(不影响回答):{}", e.toString());
                     }
                 },
-                (system, input, vendor, managed) -> recordSent(familyId, noteTarget, system, input, vendor, managed));
+                new com.family.finance.service.ask.runtime.AgentRuntime.PromptSent() {
+                    public void sent(String system, String input, String vendor, boolean managed) {
+                        recordSent(familyId, noteTarget, system, input, vendor, managed, null);
+                    }
+                    public void sent(String system, String input, String vendor, boolean managed, String sourceJson) {
+                        recordSent(familyId, noteTarget, system, input, vendor, managed, sourceJson);
+                    }
+                });
 
         runtime().run(turn, collector);
     }
@@ -296,7 +303,7 @@ public class AskConversationService {
      * ({@link FamilyConfigService#K_ASK_AGENT_PROMPT_RECORD})。这里取那一份当「规矩」,并写明推送时间;
      * 取不到(Agent 是本版之前建的)就照实说。记录失败不影响回答。</p>
      */
-    private void recordSent(long familyId, Long target, String system, String input, String vendor, boolean managed) {
+    private void recordSent(long familyId, Long target, String system, String input, String vendor, boolean managed, String sourceJson) {
         if (promptRecorder == null || target == null) return;
         try {
             String sys = system;
@@ -320,6 +327,8 @@ public class AskConversationService {
                     .of(com.family.finance.service.llmtrace.PromptSurface.ASK_TURN).legend(legend)
                     .settings(analysisContextService == null ? null
                             : analysisContextService.familyDefaults(familyId).settingsNote());
+            trace.source(sourceJson);
+            if (sourceJson != null) messageMapper.updateSource(familyId, target, sourceJson);
             Long id = promptRecorder.save(familyId, trace, sys, input, vendor,
                     com.family.finance.service.checkup.llm.LlmTestGate.MESSAGE.equals(vendor)
                             ? com.family.finance.service.llmtrace.PromptRecorder.BLOCKED

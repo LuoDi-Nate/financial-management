@@ -56,6 +56,10 @@ public class LocalToolLoopRuntime implements AgentRuntime {
     private final LlmRouter router;
     @org.springframework.beans.factory.annotation.Autowired
     private com.family.finance.service.checkup.llm.LlmTestGate testGate;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.family.finance.service.checkup.llm.CustomLlmTransport customTransport;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.family.finance.service.checkup.llm.LlmTargetResolver targets;
     private final ObjectMapper json = new ObjectMapper();
 
     @Override public String code() { return CODE; }
@@ -104,10 +108,11 @@ public class LocalToolLoopRuntime implements AgentRuntime {
         messages.add(Map.of("role", "user", "content", turn.question()));
         List<Map<String, Object>> tools = registry.openAiToolList();
         int citeSeq = 0;
+        List<LlmInvocation> planned = router.plan(turn.familyId());
 
         try {
             for (int round = 1; round <= MAX_ROUNDS; round++) {
-                Completion c = routedStream(turn, system, messages, tools, sink);
+                Completion c = routedStream(turn, system, messages, tools, sink, planned);
 
                 if (sink.cancelled()) { sink.stopped(); return; }
 
@@ -158,7 +163,7 @@ public class LocalToolLoopRuntime implements AgentRuntime {
                     messages.add(Map.of("role", "user", "content",
                             "已经查了 " + MAX_ROUNDS + " 轮,不要再调工具了。"
                           + "用现在手上的数据回答;确实没查到的部分,如实说没查到。"));
-                    Completion last = routedStream(turn, system, messages, List.of(), sink);
+                    Completion last = routedStream(turn, system, messages, List.of(), sink, planned);
                     if (sink.cancelled()) { sink.stopped(); return; }
                     if (last.text.isBlank()) sink.textDelta("这个问题我查了几轮还是没凑齐材料,换个问法试试?");
                     sink.done();
@@ -173,27 +178,31 @@ public class LocalToolLoopRuntime implements AgentRuntime {
     }
 
     private Completion routedStream(AskTurn turn, String system, List<Map<String, Object>> messages,
-                                    List<Map<String, Object>> tools, TrackingSink sink) throws Exception {
+                                    List<Map<String, Object>> tools, TrackingSink sink, List<LlmInvocation> planned) throws Exception {
         Exception last = null;
-        for (LlmInvocation inv : router.plan(turn.familyId())) {
+        for (LlmInvocation inv : planned) {
+            if (sink.selected != null && !sink.selected.equals(inv)) continue;
             if (sink.cancelled()) return new Completion();
-            if (router.clientFor(inv.platform()).filter(c -> c.available()).isEmpty()) continue;
+            if (router.clientFor(inv.platform()).filter(c -> inv.platform().equals(LlmCatalog.P_CUSTOM) ? c.available(inv) : c.available()).isEmpty()) continue;
             LlmCatalog.Platform platform = inv.platformDef().orElseThrow();
-            String key = configService.getString(turn.familyId(), platform.keyName(), "");
-            try {
+            if (targets != null && inv.target() != null) targets.assertCurrent(inv.target());
+            String key = inv.target() == null ? configService.getString(turn.familyId(), platform.keyName(), "") : inv.target().apiKey();
+            Runnable record = () -> { try {
                 if (turn.onPromptSent() != null)
-                    turn.onPromptSent().sent(system, turn.question(), inv.badge(), false);
+                    turn.onPromptSent().sent(system, turn.question(), inv.badge(), false, inv.sourceJson());
             } catch (Exception e) {
                 log.debug("记录 Agent 提示词失败:{}", e.getClass().getSimpleName());
-            }
+            } };
             try {
                 Completion result = streamOnce(platform, key, inv.resolvedModel(), messages, tools, sink,
-                        LlmRouter.timeoutSeconds(configService, turn.familyId()));
+                        inv.target() == null ? LlmRouter.timeoutSeconds(configService, turn.familyId()) : inv.target().timeout(), inv, record);
+                sink.selected = inv;
                 if (!sink.cancelled()) router.externalSuccess(inv);
                 return result;
             } catch (Exception e) {
                 if (sink.cancelled()) throw e;
                 if (e instanceof com.family.finance.service.checkup.llm.LlmTestGate.Blocked) throw e;
+                if (e instanceof com.family.finance.service.checkup.llm.CustomLlmFailure f && f.stopPlan()) throw e;
                 router.externalFailure(inv, e);
                 if (sink.delivered) throw e;
                 last = e;
@@ -207,6 +216,7 @@ public class LocalToolLoopRuntime implements AgentRuntime {
     private static final class TrackingSink implements AskSink {
         private final AskSink target;
         private boolean delivered;
+        private LlmInvocation selected;
         TrackingSink(AskSink target) { this.target = target; }
         public void status(String text) { target.status(text); }
         public void toolStart(String name, String label, String args) { delivered = true; target.toolStart(name, label, args); }
@@ -234,7 +244,7 @@ public class LocalToolLoopRuntime implements AgentRuntime {
 
     private Completion streamOnce(LlmCatalog.Platform platform, String key, String model,
                                   List<Map<String, Object>> messages,
-                                  List<Map<String, Object>> tools, AskSink sink, int timeoutSeconds) throws Exception {
+                                  List<Map<String, Object>> tools, AskSink sink, int timeoutSeconds, LlmInvocation invocation, Runnable record) throws Exception {
         if (testGate != null) testGate.beforeSend("LOCAL_STREAM");
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("model", model);
@@ -246,7 +256,13 @@ public class LocalToolLoopRuntime implements AgentRuntime {
             body.put("tool_choice", "auto");
         }
 
-        var connection = (java.net.HttpURLConnection) URI.create(endpoint(platform)).toURL().openConnection();
+        if (platform.code().equals(LlmCatalog.P_CUSTOM)) {
+            try (var result = customTransport.open(invocation.target(), body, true, record)) {
+                return readCompletion(result.reader(), platform, sink);
+            } catch (com.family.finance.service.checkup.llm.CustomLlmFailure | com.family.finance.service.checkup.llm.LlmTestGate.Blocked e) { throw e; }
+            catch (Exception e) { throw new com.family.finance.service.checkup.llm.CustomLlmFailure(com.family.finance.service.checkup.llm.CustomLlmFailure.Kind.PROTOCOL); }
+        }
+        var connection = (java.net.HttpURLConnection) (invocation.target() == null ? URI.create(endpoint(platform)) : invocation.target().endpoint()).toURL().openConnection();
         connection.setConnectTimeout(5_000);
         connection.setReadTimeout(timeoutSeconds * 1000);
         connection.setRequestMethod("POST");
@@ -254,13 +270,9 @@ public class LocalToolLoopRuntime implements AgentRuntime {
         connection.setRequestProperty("Authorization", "Bearer " + key);
         connection.setRequestProperty("Accept", "text/event-stream");
         connection.setDoOutput(true);
-        Completion c = new Completion();
-        // 累积中的 tool_call:流式协议按 index 分片送达,name 和 arguments 分开来
-        Map<Integer, String[]> pending = new LinkedHashMap<>();   // index → [id, name, argsBuf]
-
-        boolean complete = false;
         try {
             if (testGate != null) testGate.beforeSend("LOCAL_STREAM");
+            record.run();
             java.time.LocalDateTime dispatched = java.time.LocalDateTime.now();
             try (var output = connection.getOutputStream()) {
                 output.write(json.writeValueAsBytes(body));
@@ -276,8 +288,20 @@ public class LocalToolLoopRuntime implements AgentRuntime {
             }
             try (BufferedReader r = new BufferedReader(
                     new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
+                return readCompletion(r, platform, sink);
+            }
+        } finally {
+            connection.disconnect();
+        }
+    }
+
+    private Completion readCompletion(BufferedReader r, LlmCatalog.Platform platform, AskSink sink) throws Exception {
+        Completion c = new Completion();
+        Map<Integer, String[]> pending = new LinkedHashMap<>();
+        boolean complete = false;
             String line;
             while ((line = r.readLine()) != null) {
+                if (line.length() > 128 * 1024) throw new com.family.finance.service.checkup.llm.CustomLlmFailure(com.family.finance.service.checkup.llm.CustomLlmFailure.Kind.RESPONSE_TOO_LARGE);
                 // 每一行都问一次:按下停止到真的停下,最多差一个 token 的时间。
                 // 放在外层循环检查的话,用户得等这一整轮流完 —— 那正是他想跳过的东西。
                 if (sink.cancelled()) break;
@@ -311,10 +335,6 @@ public class LocalToolLoopRuntime implements AgentRuntime {
                     }
                 }
             }
-            }
-        } finally {
-            connection.disconnect();
-        }
         if (!sink.cancelled() && (!complete || (c.textBuf.isEmpty() && pending.isEmpty())))
             throw new java.io.IOException("模型回答未完整结束");
 
@@ -402,6 +422,7 @@ public class LocalToolLoopRuntime implements AgentRuntime {
 
     /** 上游错误翻成人话 —— 直接展示给用户,不能是一串状态码 */
     private String humanError(Exception e) {
+        if (e instanceof com.family.finance.service.checkup.llm.CustomLlmFailure custom) return custom.getMessage();
         if (e instanceof com.family.finance.service.checkup.llm.LlmTestGate.Blocked)
             return com.family.finance.service.checkup.llm.LlmTestGate.MESSAGE;
         if (e instanceof UpstreamException u) {

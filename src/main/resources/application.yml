@@ -61,6 +61,8 @@ logging:
   level:
     root: INFO
     com.family.finance: DEBUG
+    com.family.finance.repository.FamilyRuntimeConfigMapper: INFO
+    com.family.finance.repository.PromptRecordMapper: INFO
     org.springframework.security: INFO
     org.mybatis: INFO
 

@@ -12,6 +12,7 @@ public final class LlmFailure {
         int status = 0;
         Throwable cause = failure;
         for (int i = 0; cause != null && i < 8; i++, cause = cause.getCause()) {
+            if (cause instanceof CustomLlmFailure custom) return custom.getMessage();
             if (cause instanceof LlmTestGate.Blocked) return LlmTestGate.MESSAGE;
             if (cause instanceof RestClientResponseException response) {
                 status = response.getStatusCode().value();

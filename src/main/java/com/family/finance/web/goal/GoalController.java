@@ -73,6 +73,8 @@ public class GoalController {
     private final NavService navService;
     /** v1.28 · 目标 AI(月报 / 预警 / 推荐参数)的 >_(PRD FR-900) */
     private final com.family.finance.service.llmtrace.PromptPeekLinks promptPeek;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.family.finance.service.llmtrace.LlmSource sources;
 
     // ---------- 列表 ----------
 
@@ -258,9 +260,12 @@ public class GoalController {
             });
         }
         // v0.3 FR-53b/c · AI 月报 + 偏离预警(null safe)
+        var sourceContext = sources == null ? null : sources.context(me.getFamilyId());
         aiReportMapper.findLatestByGoalAndType(me.getFamilyId(), id, "MONTHLY")
             .ifPresent(r -> {
                 model.addAttribute("aiMonthlyReport", r);
+                model.addAttribute("reportSourceLabel", com.family.finance.service.llmtrace.LlmSource.label(r.getSourceJson(),"旧版记录,未保存完整来源"));
+                model.addAttribute("reportSourceStale", sourceContext != null && sourceContext.historical(r.getSourceJson()));
                 model.addAttribute("reportPeekSrc", promptPeek.of(me.getFamilyId(), r.getPromptRecordId(),
                         com.family.finance.service.llmtrace.PromptSurface.GOAL_REPORT, r.getGeneratedAt(), null));
             });
@@ -268,6 +273,8 @@ public class GoalController {
             .filter(r -> r.getDismissedAt() == null)
             .ifPresent(r -> {
                 model.addAttribute("aiAlert", r);
+                model.addAttribute("alertSourceLabel", com.family.finance.service.llmtrace.LlmSource.label(r.getSourceJson(),"旧版记录,未保存完整来源"));
+                model.addAttribute("alertSourceStale", sourceContext != null && sourceContext.historical(r.getSourceJson()));
                 model.addAttribute("alertPeekSrc", promptPeek.of(me.getFamilyId(), r.getPromptRecordId(),
                         com.family.finance.service.llmtrace.PromptSurface.GOAL_ALERT, r.getGeneratedAt(), null));
             });

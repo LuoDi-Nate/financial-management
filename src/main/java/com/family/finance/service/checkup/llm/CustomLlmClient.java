@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-@Service
+@org.springframework.stereotype.Component
 public class CustomLlmClient implements LlmClient {
     private final LlmTargetResolver targets;
     private final CustomLlmTransport transport;

@@ -36,6 +36,8 @@ public class ReviewInsightService {
      */
     private final MemberDirectory memberDirectory;
     private final ReviewAiCacheMapper cacheMapper;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.family.finance.service.llmtrace.LlmSource sources;
     private final com.family.finance.service.expense.NormalExpenseService normalExpenseService; // v1.24 FR-653
 
     /**
@@ -56,7 +58,11 @@ public class ReviewInsightService {
      * @param promptRecordId v1.28 · 生成这份复盘的那次调用(null = 本版之前的老缓存 / 没调用)
      * @param generatedAt    v1.28 · 生成时刻(老缓存在面板上说「生成于 X,那时还没开始记录」)
      */
-    public record Review(String text, String vendor, boolean cached, Long promptRecordId, java.time.LocalDateTime generatedAt) {
+    public record Review(String text, String vendor, boolean cached, Long promptRecordId, java.time.LocalDateTime generatedAt,
+                         String sourceJson, boolean historical) {
+        public Review(String text, String vendor, boolean cached, Long id, java.time.LocalDateTime at) {
+            this(text, vendor, cached, id, at, null, false);
+        }
         public Review(String text, String vendor, boolean cached) {
             this(text, vendor, cached, null, null);
         }
@@ -96,7 +102,8 @@ public class ReviewInsightService {
         String cacheDim = cacheDim(dim, viewContext, prefs);
         if (periodClosed && !force) {
             ReviewAiCacheMapper.Row hit = cacheMapper.find(familyId, periodId, cacheDim);
-            if (hit != null) return new Review(hit.text(), hit.vendor(), true, hit.promptRecordId(), hit.createdAt());
+            if (hit != null) return new Review(hit.text(), com.family.finance.service.llmtrace.LlmSource.label(hit.sourceJson(),hit.vendor()),
+                true, hit.promptRecordId(), hit.createdAt(), hit.sourceJson(), sources != null && !sources.current(familyId,hit.sourceJson()));
         }
         // v1.28 FR-920 · 按账户切时,分组名里的账户名换代号(账户组名不是账户,原样)
         var codes = com.family.finance.service.llmtrace.AccountCodenames.of(
@@ -130,8 +137,10 @@ public class ReviewInsightService {
                 com.family.finance.service.checkup.llm.PromptBuilder.reverseMapping(raw.trim(), legend), inv.badge(), false));
         if (r == null) return null;
         // 只有已关账的期才落缓存 —— 进行中的期数据还在动,存下来必然过期
-        if (periodClosed) cacheMapper.upsert(familyId, periodId, cacheDim, r.text(), r.vendor(), trace.recordId());
-        return new Review(r.text(), r.vendor(), false, trace.recordId(), java.time.LocalDateTime.now());
+        if (periodClosed) cacheMapper.upsert(familyId, periodId, cacheDim, r.text(),
+            com.family.finance.service.llmtrace.LlmSource.legacyVendor(r.vendor()), trace.recordId(), trace.sourceJson());
+        return new Review(r.text(), com.family.finance.service.llmtrace.LlmSource.label(trace.sourceJson(),r.vendor()), false,
+            trace.recordId(), java.time.LocalDateTime.now(), trace.sourceJson(), false);
     }
 
     /**

@@ -228,6 +228,8 @@
             <th:block th:replace="~{fragments/_prompt-peek :: btn(${alertPeekSrc})}"></th:block>
           </span>
         </div>
+        <p class="text-xs text-ink-soft break-words mb-2" th:text="${alertSourceLabel}"></p>
+        <p th:if="${alertSourceStale == true}" class="text-sm text-brass-deep mb-2">模型服务或选型已变更,这是保留的历史预警。</p>
         <p class="text-sm text-ink-soft leading-relaxed font-serif mb-3" th:utext="${@aiText.priv(aiAlert.content)}">预警内容...</p>
         <form th:action="@{|/goals/${goal.id}/alert/dismiss|}" method="post">
           <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
@@ -258,6 +260,8 @@
           <div class="flex justify-end -mt-1 mb-2" data-peek-host>
             <th:block th:replace="~{fragments/_prompt-peek :: btn(${reportPeekSrc})}"></th:block>
           </div>
+          <p class="text-xs text-ink-soft break-words mb-2" th:text="${reportSourceLabel}"></p>
+          <p th:if="${reportSourceStale == true}" class="text-sm text-brass-deep mb-2">模型服务或选型已变更,这是保留的历史解读。</p>
           <p class="whitespace-pre-line" th:utext="${@aiText.priv(aiMonthlyReport.content)}">月报内容...</p>
           <!-- v0.5.4 · 复用已生成月报(缓存)· 需要时可重新生成(同 checkup AI 诊断 ↻ 语义) -->
           <form th:action="@{|/goals/${goal.id}/report/generate|}" method="post" class="mt-4 pt-3 border-t border-rule-soft">

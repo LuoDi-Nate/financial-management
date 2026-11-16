@@ -21,6 +21,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 public class HoldingImport {
+    private String sourceJson;
     public static final String UPLOADING = "UPLOADING";
     public static final String SCANNING  = "SCANNING";
     public static final String REVIEW    = "REVIEW";

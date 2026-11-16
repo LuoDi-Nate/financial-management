@@ -45,6 +45,7 @@ public class GoalReportService {
                             .content(r.value())
                             .validatorStatus("PASS")
                             .promptRecordId(r.promptRecordId())
+                            .sourceJson(r.sourceJson())
                             .contextFingerprint(contextFingerprint(progress.retirement(), progress.forecast()))
                             .build();
                         reportMapper.upsertOwned(familyId, report);
@@ -86,6 +87,7 @@ public class GoalReportService {
                     .content(r.value())
                     .validatorStatus("PASS")
                     .promptRecordId(r.promptRecordId())
+                    .sourceJson(r.sourceJson())
                     .contextFingerprint(contextFingerprint(progress.retirement(), progress.forecast()))
                     .build();
                 reportMapper.upsertOwned(familyId, report);
@@ -132,6 +134,7 @@ public class GoalReportService {
                             .content(r.value())
                             .validatorStatus("PASS")
                             .promptRecordId(r.promptRecordId())
+                            .sourceJson(r.sourceJson())
                             .contextFingerprint(contextFingerprint(progress.retirement(), progress.forecast()))
                             .build();
                         reportMapper.upsertOwned(familyId, report);

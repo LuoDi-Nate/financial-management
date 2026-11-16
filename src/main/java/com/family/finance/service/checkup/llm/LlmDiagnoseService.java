@@ -70,6 +70,8 @@ public class LlmDiagnoseService {
 
     /** 内存 cache:key = SHA-256(prompt context),TTL 1h */
     private final ConcurrentHashMap<String, CacheEntry> cache = new ConcurrentHashMap<>();
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.family.finance.service.llmtrace.LlmSource sources;
     private static final long TTL_MS = 60L * 60 * 1000;
 
     /**
@@ -313,7 +315,8 @@ public class LlmDiagnoseService {
         // 1. 查 cache(forceRefresh 跳过)
         // v1.27 · 键里带上系统提示词:范围内有没有房产 / 有没有贷款会换系统提示词(FR-872),
         //   模板 / 范围 / 偏好都在用户提示词里 —— 两者都进键,改了哪一样都不复用旧结论(FR-848)
-        String cacheKey = sha256(scope + "|" + entityId + "|" + sha256(systemPrompt) + "|" + userPrompt);
+        String cacheKey = sha256(scope + "|" + entityId + "|" + sha256(systemPrompt) + "|" + userPrompt
+            + (sources == null ? "" : sources.cacheSalt(familyId)));
         if (!forceRefresh) {
             CacheEntry hit = cache.get(cacheKey);
             if (hit != null && System.currentTimeMillis() - hit.timestamp < TTL_MS) {
@@ -333,7 +336,7 @@ public class LlmDiagnoseService {
                 new LlmRouter.Handler<DiagnoseResult>() {
                     @Override
                     public DiagnoseResult onOutput(LlmInvocation inv, String raw, long elapsed) {
-                        String badge = inv.badge();
+                        String badge = com.family.finance.service.llmtrace.LlmSource.label(inv.sourceJson(), inv.badge());
                         // 校验(JSON 模式 · 把 JSON 里的所有 string 拼起来过 validator)
                         //   v0.4.9:LLM 输出 JSON · 把 user-facing 字段(narrative/finding/evidence/actions)
                         //   join 后过 OutputValidator,行为等价于老的纯文本校验

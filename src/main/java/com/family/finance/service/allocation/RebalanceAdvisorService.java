@@ -73,6 +73,8 @@ public class RebalanceAdvisorService {
     private final FactViewService factViewService;
     private final AllocationService allocationService;
     private final RebalanceAdviceCacheMapper cacheMapper;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.family.finance.service.llmtrace.LlmSource sources;
     /** v1.28 · 记下发出去的内容(PRD FR-909)· 字段注入,单测的八参构造不用管它 */
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private PromptRecorder promptRecorder;
@@ -117,7 +119,8 @@ public class RebalanceAdvisorService {
                     if (days <= CACHE_TTL_DAYS) {
                         log.info("rebalance advice cache hit · family={} anchor={} age={}d", familyId, anchor, days);
                         return parseFromJson(cached.get().getContentJson(), cached.get().getGeneratedAt(), true)
-                                .withRecord(cached.get().getPromptRecordId());
+                                .withRecord(cached.get().getPromptRecordId())
+                                .withSource(cached.get().getSourceJson(), sources != null && !sources.current(familyId,cached.get().getSourceJson()));
                     }
                 }
             } else {
@@ -243,12 +246,13 @@ public class RebalanceAdvisorService {
                 .anchorCode(anchor)
                 .contentJson(cleanContent)
                 .promptRecordId(trace.recordId())
+                .sourceJson(trace.sourceJson())
                 .build());
             if (promptRecorder != null && oldRecord != null && !oldRecord.equals(trace.recordId())) {
                 promptRecorder.forget(familyId, oldRecord);
             }
 
-            return new AdviceResult(true, narrative, sanitized, LocalDateTime.now(), false, null, trace.recordId());
+            return new AdviceResult(true, narrative, sanitized, LocalDateTime.now(), false, null, trace.recordId()).withSource(trace.sourceJson(), false);
         } catch (Exception e) {
             log.warn("rebalance advise failed family={}: {}", familyId, e.toString());
             return AdviceResult.unavailable("调仓建议暂时无法生成,请稍后重试。");
@@ -282,7 +286,8 @@ public class RebalanceAdvisorService {
         return cacheMapper.findByFamilyAndAnchor(familyId, cacheKey(f, ctx == null
                         ? com.family.finance.service.analysis.AnalysisContext.baseline() : ctx))
                 .filter(r -> Duration.between(r.getGeneratedAt(), LocalDateTime.now()).toDays() <= CACHE_TTL_DAYS)
-                .map(r -> parseFromJson(r.getContentJson(), r.getGeneratedAt(), true).withRecord(r.getPromptRecordId()))
+                .map(r -> parseFromJson(r.getContentJson(), r.getGeneratedAt(), true).withRecord(r.getPromptRecordId())
+                    .withSource(r.getSourceJson(), sources != null && !sources.current(familyId,r.getSourceJson())))
                 .filter(AdviceResult::ok);
     }
 
@@ -401,8 +406,12 @@ public class RebalanceAdvisorService {
         LocalDateTime generatedAt,
         boolean fromCache,
         String errorReason,
-        Long promptRecordId
+        Long promptRecordId,
+        String sourceJson,
+        boolean historical
     ) {
+        public AdviceResult(boolean ok, String narrative, java.util.List<java.util.Map<String,Object>> actions,
+                LocalDateTime at, boolean cached, String reason, Long id) { this(ok,narrative,actions,at,cached,reason,id,null,false); }
         /** v1.28 · 六参老构造(不带记录编号) */
         public AdviceResult(boolean ok, String narrative, java.util.List<java.util.Map<String, Object>> actions,
                             LocalDateTime generatedAt, boolean fromCache, String errorReason) {
@@ -411,8 +420,12 @@ public class RebalanceAdvisorService {
 
         /** v1.28 · 带上「这份建议是哪一次调用生成的」(PRD FR-909) */
         public AdviceResult withRecord(Long id) {
-            return new AdviceResult(ok, narrative, actions, generatedAt, fromCache, errorReason, id);
+            return new AdviceResult(ok, narrative, actions, generatedAt, fromCache, errorReason, id, sourceJson, historical);
         }
+        public AdviceResult withSource(String source, boolean old) {
+            return new AdviceResult(ok,narrative,actions,generatedAt,fromCache,errorReason,promptRecordId,source,old);
+        }
+        public String sourceLabel() { return com.family.finance.service.llmtrace.LlmSource.label(sourceJson, "旧版记录,未保存完整来源"); }
 
         public static AdviceResult unavailable(String reason) {
             return new AdviceResult(false, null, java.util.List.of(), null, false, reason);

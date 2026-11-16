@@ -100,7 +100,7 @@ public class GoalLlmService {
                 rejected(familyId, trace, "回答解析不出参数");
                 return AiResult.<GoalParams>unavailable("LLM 输出解析失败").withRecord(trace.recordId());
             }
-            return AiResult.ok(params, extractRationale(raw)).withRecord(trace.recordId());
+            return AiResult.ok(params, extractRationale(raw)).withRecord(trace.recordId()).withSource(trace.sourceJson());
         } catch (Exception e) {
             log.warn("recommendParams failed · type={} family={}: {}", type, familyId, e.toString());
             return AiResult.unavailable("目标参数暂时无法生成,请稍后重试。");
@@ -145,7 +145,7 @@ public class GoalLlmService {
             }
             // v0.5.4 修 · 反向映射 成员A/成员B → 真名供用户阅读(原 v0.3 漏做 → 月报里出现「成员A与成员B」)
             String mapped = PromptBuilder.reverseMapping(raw.trim(), mapping.codenameToReal());
-            return AiResult.ok(mapped, null).withRecord(trace.recordId());
+            return AiResult.ok(mapped, null).withRecord(trace.recordId()).withSource(trace.sourceJson());
         } catch (Exception e) {
             log.warn("generateMonthlyReport failed: {}", e.toString());
             return AiResult.unavailable("目标月报生成失败,原报告已保留,请稍后重试。");
@@ -180,7 +180,7 @@ public class GoalLlmService {
             }
             // v0.5.4 修 · 同月报:反向映射 成员A/成员B → 真名供用户阅读
             String mapped = PromptBuilder.reverseMapping(raw.trim(), mapping.codenameToReal());
-            return AiResult.ok(mapped, null).withRecord(trace.recordId());
+            return AiResult.ok(mapped, null).withRecord(trace.recordId()).withSource(trace.sourceJson());
         } catch (Exception e) {
             log.warn("generateAlertAdvice failed: {}", e.toString());
             return AiResult.unavailable("目标预警暂时无法生成,请稍后重试。");
@@ -385,15 +385,17 @@ public class GoalLlmService {
     /**
      * AI 调用结果 · 成功携带 value · 失败携带原因。
      */
-    public record AiResult<T>(boolean ok, T value, String rationale, String error, Long promptRecordId) {
+    public record AiResult<T>(boolean ok, T value, String rationale, String error, Long promptRecordId, String sourceJson) {
+        public AiResult(boolean ok, T value, String rationale, String error, Long id) { this(ok,value,rationale,error,id,null); }
         /** v1.28 · 四参老构造(不带记录编号) */
         public AiResult(boolean ok, T value, String rationale, String error) {
             this(ok, value, rationale, error, null);
         }
         /** v1.28 · 带上「这份结果是哪一次调用生成的」 */
         public AiResult<T> withRecord(Long id) {
-            return new AiResult<>(ok, value, rationale, error, id);
+            return new AiResult<>(ok, value, rationale, error, id, sourceJson);
         }
+        public AiResult<T> withSource(String source) { return new AiResult<>(ok,value,rationale,error,promptRecordId,source); }
         public static <T> AiResult<T> ok(T value, String rationale) {
             return new AiResult<>(true, value, rationale, null);
         }

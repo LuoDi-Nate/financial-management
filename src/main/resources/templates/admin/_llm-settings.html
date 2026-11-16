@@ -6,7 +6,7 @@
     <div class="flex items-center justify-between gap-3">
       <div class="eyebrow-ink">AI 大模型 · 资产体检 / 月报 / 调仓建议 / 截图识别 / 超级 Agent</div>
       <span class="pill text-[10px] shrink-0" th:classappend="${keyCount > 0} ? ' pill-forest' : ' pill-rust'"
-            th:text="${keyCount} + ' / ' + ${llmPlatformCount} + ' 家已配密钥'" data-llm-key-count></span>
+            th:text="${keyCount} + ' / ' + ${llmPlatformCount} + ' 家已配置'" data-llm-key-count></span>
     </div>
     <p class="text-sm text-ink-soft leading-loose">这些都可选。配一家即可使用AI,配两家可以设故障备选。不配密钥时,记账、净资产、收益与图表仍正常。</p>
     <p th:if="${llmLegacy}" class="text-sm text-ink-soft">当前使用旧配置推导的设置,调用保持原样;确认下面选型并保存后固化为三级配置。</p>
@@ -47,12 +47,61 @@
           <button type="submit" th:attr="form='llm-test-' + ${card.code()}" class="btn-ghost text-xs">测试连接</button>
         </div>
       </form>
+      <th:block th:if="${llmCustom != null}">
+      <form th:action="@{/admin/ai-access/llm/custom/service}" method="post" id="llm-custom-service"
+            class="cred-card md:col-span-2" th:classappend="${llmCustom.ready()} ? 'is-on' : ''"
+            th:attr="data-saved-url=${llmCustom.baseUrl()},data-saved-auth=${llmCustom.authMode()},data-ready=${llmCustom.ready()}">
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+        <input type="hidden" name="expectedEditToken" th:value="${llmCustom.editToken()}">
+        <div class="cred-head"><span class="cred-name" th:text="${llmCustom.name()} + ' · OpenAI兼容'">自有服务 · OpenAI兼容</span>
+          <span class="state-tag" th:classappend="${llmCustom.ready()} ? 'on' : 'off'" th:text="${llmCustom.ready()} ? '已保存' : '未配置'"></span>
+        </div>
+        <p th:if="${llmCustom.error() != null}" class="text-sm text-rust" th:text="${llmCustom.error()}"></p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <div><label class="field-label" for="customName">显示名称</label>
+            <input id="customName" name="displayName" class="field-input" maxlength="50" placeholder="自有服务"
+                   th:value="${customDraft != null} ? ${customDraft.displayName} : ${llmCustom.name()}">
+            <span class="text-xs text-rust block" data-custom-error="displayName" role="status"></span>
+          </div>
+          <div><label class="field-label" for="customBaseUrl">基础地址 · Base URL</label>
+            <input id="customBaseUrl" name="baseUrl" class="field-input" type="url" maxlength="2048" required autocomplete="off"
+                   placeholder="https://llm.example.com/v1" th:value="${customDraft != null} ? ${customDraft.baseUrl} : ${llmCustom.baseUrl()}">
+            <span class="text-xs text-rust block" data-custom-error="baseUrl" role="status"></span>
+          </div>
+          <div><label class="field-label" for="customAuth">认证方式</label>
+            <select id="customAuth" name="authMode" class="field-input" data-lsel th:with="mode=${customDraft != null} ? ${customDraft.authMode} : ${llmCustom.authMode()}">
+              <option value="BEARER" th:selected="${mode == 'BEARER'}">Bearer密钥</option>
+              <option value="NONE" th:selected="${mode == 'NONE'}">不需要密钥</option>
+            </select>
+            <p class="text-xs text-ink-soft mt-1">免认证仅用于确实不要求密钥的服务。</p>
+          </div>
+          <div data-custom-key><label class="field-label" for="customKey">API Key</label>
+            <input id="customKey" name="apiKey" class="field-input" type="password" autocomplete="new-password" maxlength="8192"
+                   th:placeholder="${llmCustom.ready()} ? '同一服务留空保留;改地址需新密钥' : '首次配置请填写密钥'">
+            <span class="text-xs text-rust block" data-custom-error="apiKey" role="status"></span>
+            <span class="text-xs text-ink-soft" th:text="${llmCustom.masked()}"></span>
+          </div>
+        </div>
+        <label class="flex items-center gap-2 text-sm min-h-11"><input type="checkbox" name="allowLocalHttp" value="true"
+          th:checked="${customDraft != null} ? ${customDraft.allowLocalHttp} : ${llmCustom.allowLocalHttp()}">允许本机/内网或HTTP服务</label>
+        <p class="text-xs text-ink-soft">请求从家庭账房服务器发出;本机指应用所在环境。云元数据等保留目标始终拒绝。服务需支持Chat Completions,图片与工具能力由型号决定。</p>
+        <p class="text-xs text-ink-soft break-words">调用地址:<span data-custom-endpoint th:text="${llmCustom.baseUrl().isEmpty()} ? '—' : ${llmCustom.baseUrl()} + '/chat/completions'"></span></p>
+        <span class="text-xs text-rust block" data-custom-error="allowLocalHttp" role="status"></span>
+        <p class="text-xs text-ink-soft">地址、认证和密钥一起保存;型号在下方单独保存。保存不会调用模型,改地址不能复用旧密钥。</p>
+        <p class="text-xs text-ink-soft break-words" data-custom-probe th:text="'测试型号:' + ${llmCustomProbe}"></p>
+        <div class="flex items-center gap-2 mt-auto pt-3">
+          <button type="submit" class="btn-ink text-xs">保存服务配置</button>
+          <button type="submit" form="llm-test-custom" class="btn-ghost text-xs">测试连接</button>
+        </div>
+      </form>
+      </th:block>
     </div>
     <p class="text-xs text-ink-soft">测试连接使用已保存密钥与上方显示的测试型号;没有选用此平台时采用参考文字型号。会产生少量用量,不使用未保存草稿,也不证明所有图片或工具能力均可用。</p>
 
     <form th:action="@{/admin/ai-access/llm/models}" method="post" class="space-y-5" id="llm-models"
           th:attr="data-model-pattern=${llmModelPattern},data-model-max=${llmModelMaxLength}">
       <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+      <input th:if="${llmCustom != null}" type="hidden" name="customRevision" th:value="${llmCustom.revision()}">
       <p th:if="${keyCount == 0}" class="text-sm text-rust">还没有任何平台配好密钥。先在上面任选一家保存API Key,再选择模型。</p>
       <div class="border-t border-rule-soft pt-5" id="llm-catalog" th:attr="data-catalog=${llmCatalogJson}">
         <div class="eyebrow-ink text-[11px] mb-3">用 · 哪 · 个 · 模 · 型</div>
@@ -84,6 +133,10 @@
       </div>
       <div class="flex justify-end"><button type="submit" class="btn-ink" th:disabled="${keyCount == 0}">保存模型配置</button></div>
     </form>
+    <form id="llm-test-custom" th:action="@{/admin/ai-access/llm/test}" method="post" class="hidden" data-llm-probe>
+      <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+      <input type="hidden" name="platform" value="custom">
+    </form>
     <form th:each="card : ${llmCredentialCards}" th:id="'llm-test-' + ${card.code()}"
           th:action="@{/admin/ai-access/llm/test}" method="post" class="hidden" data-llm-probe>
       <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
@@ -99,7 +152,7 @@
       <select class="field-input" data-lsel th:id="${prefix} + 'Platform'" th:name="${prefix == 'primary'} ? 'platform' : ${prefix} + 'Platform'">
         <option th:if="${allowNone}" value="" th:selected="${#strings.isEmpty(platform)}">不设备选</option>
         <option th:each="p : ${platforms}" th:value="${p.code()}" th:disabled="${!platformReady[p.code()]}"
-                th:selected="${p.code() == platform}" th:text="${p.label()} + (${platformReady[p.code()]} ? '' : ' · 未配密钥,请先保存')"></option>
+                th:selected="${p.code() == platform}" th:text="${p.label()} + (${platformReady[p.code()]} ? '' : ' · 未配置,请先保存')"></option>
       </select>
     </div>
     <div><label class="field-label" th:for="${prefix} + 'Family'">模型系列</label>

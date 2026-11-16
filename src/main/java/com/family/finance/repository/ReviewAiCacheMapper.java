@@ -12,13 +12,16 @@ public interface ReviewAiCacheMapper {
 
     /** v1.28 · 多带「生成这份复盘的那次调用」与生成时刻(老缓存 promptRecordId 为空) */
     record Row(Long id, Long familyId, Long periodId, String dim, String text, String vendor,
-               Long promptRecordId, java.time.LocalDateTime createdAt) {
+               Long promptRecordId, java.time.LocalDateTime createdAt, String sourceJson) {
+        public Row(Long id, Long familyId, Long periodId, String dim, String text, String vendor, Long recordId, java.time.LocalDateTime at) {
+            this(id, familyId, periodId, dim, text, vendor, recordId, at, null);
+        }
         public Row(Long id, Long familyId, Long periodId, String dim, String text, String vendor) {
             this(id, familyId, periodId, dim, text, vendor, null, null);
         }
     }
 
-    @Select("SELECT id, family_id AS familyId, period_id AS periodId, dim, text, vendor, prompt_record_id AS promptRecordId, created_at AS createdAt FROM review_ai_cache WHERE family_id=#{familyId} AND period_id=#{periodId} AND dim=#{dim}")
+    @Select("SELECT id, family_id AS familyId, period_id AS periodId, dim, text, vendor, prompt_record_id AS promptRecordId, created_at AS createdAt, source_json AS sourceJson FROM review_ai_cache WHERE family_id=#{familyId} AND period_id=#{periodId} AND dim=#{dim}")
     Row find(@Param("familyId") long familyId, @Param("periodId") long periodId, @Param("dim") String dim);
 
     /**
@@ -33,12 +36,15 @@ public interface ReviewAiCacheMapper {
     int deleteByPeriod(@Param("familyId") long familyId, @Param("periodId") long periodId);
 
     @Insert("""
-            INSERT INTO review_ai_cache (family_id, period_id, dim, text, vendor, prompt_record_id)
-            VALUES (#{familyId}, #{periodId}, #{dim}, #{text}, #{vendor}, #{promptRecordId})
+            INSERT INTO review_ai_cache (family_id, period_id, dim, text, vendor, prompt_record_id, source_json)
+            VALUES (#{familyId}, #{periodId}, #{dim}, #{text}, #{vendor}, #{promptRecordId}, #{sourceJson})
             ON DUPLICATE KEY UPDATE text=VALUES(text), vendor=VALUES(vendor), prompt_record_id=VALUES(prompt_record_id),
-                                    created_at=CURRENT_TIMESTAMP
+                                    source_json=VALUES(source_json), created_at=CURRENT_TIMESTAMP
             """)
     int upsert(@Param("familyId") long familyId, @Param("periodId") long periodId,
                @Param("dim") String dim, @Param("text") String text, @Param("vendor") String vendor,
-               @Param("promptRecordId") Long promptRecordId);
+               @Param("promptRecordId") Long promptRecordId, @Param("sourceJson") String sourceJson);
+    default int upsert(long familyId, long periodId, String dim, String text, String vendor, Long recordId) {
+        return upsert(familyId, periodId, dim, text, vendor, recordId, null);
+    }
 }

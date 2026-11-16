@@ -38,6 +38,38 @@ public class AiModelController {
     private final AuditLogService auditLogService;
     private final com.family.finance.service.checkup.llm.LlmRouter llmRouter;
     private final LlmSettingsView view;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.family.finance.service.config.CustomLlmConfigService custom;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.family.finance.service.checkup.llm.LlmTargetResolver targets;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.family.finance.repository.FamilyRuntimeConfigMapper runtimeConfig;
+
+    @PostMapping("/custom/service")
+    public String saveCustom(@AuthenticationPrincipal MemberPrincipal me,
+            @RequestParam(defaultValue = "") String displayName, @RequestParam(defaultValue = "") String baseUrl,
+            @RequestParam(defaultValue = "BEARER") String authMode, @RequestParam(defaultValue = "") String apiKey,
+            @RequestParam(defaultValue = "false") boolean allowLocalHttp,
+            @RequestParam(defaultValue = "") String expectedEditToken, RedirectAttributes ra) {
+        var before = custom.card(me.getFamilyId());
+        try {
+            custom.save(me.getFamilyId(), displayName, baseUrl, authMode, apiKey, allowLocalHttp, expectedEditToken);
+            if (!before.revision().equals(custom.card(me.getFamilyId()).revision())) llmRouter.resetCustomHealth();
+            auditLogService.record(me.getFamilyId(), me.getMemberId(), AuditLogType.FAMILY_UPDATE,
+                "family_runtime_config", me.getFamilyId(), "自有模型服务配置已更新");
+            ra.addFlashAttribute("flash", "服务配置已保存 · 模型在下方单独选择并保存;尚未测试连接");
+        } catch (IllegalArgumentException | com.family.finance.service.checkup.llm.CustomLlmFailure e) {
+            ra.addFlashAttribute("flashError", e.getMessage());
+            // Do not echo URL credentials/query or a pasted secret into flash/session state.
+            String safeUrl = "";
+            try { safeUrl = new com.family.finance.service.checkup.llm.CustomEndpointPolicy().normalize(baseUrl, allowLocalHttp); }
+            catch (Exception ignored) { }
+            String safeName = displayName == null || displayName.length() > 50 || displayName.chars().anyMatch(Character::isISOControl) ? "" : displayName;
+            ra.addFlashAttribute("customDraft", java.util.Map.of("displayName", safeName, "baseUrl", safeUrl,
+                "authMode", "NONE".equals(authMode) ? "NONE" : "BEARER", "allowLocalHttp", allowLocalHttp));
+        }
+        return BACK;
+    }
 
     /**
      * ①-a LLM 凭据 · <b>一个平台一把 key,单独保存</b>(v1.18.1 BUG-FIX)。
@@ -59,6 +91,10 @@ public class AiModelController {
                              RedirectAttributes ra) {
         long fid = me.getFamilyId();
         LlmCatalog.Platform p = LlmCatalog.platform(platform).orElse(null);
+        if (LlmCatalog.P_CUSTOM.equals(platform)) {
+            ra.addFlashAttribute("flashError", "自有服务请使用「保存服务配置」,地址与认证需同时保存");
+            return BACK;
+        }
         if (p == null) {
             ra.addFlashAttribute("flashError", "未知平台:" + platform);
             return BACK;
@@ -102,6 +138,7 @@ public class AiModelController {
                           @RequestParam(value = "temperature", required = false) Double temperature,
                           @RequestParam("maxTokens") int maxTokens,
                           @RequestParam("timeoutSeconds") int timeoutSeconds,
+                          @RequestParam(value = "customRevision", required = false) String customRevision,
                           RedirectAttributes ra) {
         long fid = me.getFamilyId();
 
@@ -113,6 +150,13 @@ public class AiModelController {
         LlmInvocation primary, backup, vision;
         String visionSkippedNote = "";
         try {
+            boolean selectsCustom = LlmCatalog.P_CUSTOM.equals(platform) || LlmCatalog.P_CUSTOM.equals(backupPlatform)
+                || visionEnabled && LlmCatalog.P_CUSTOM.equals(visionPlatform);
+            if (selectsCustom && targets != null) {
+                runtimeConfig.lockFamily(fid);
+                if (!java.util.Objects.equals(custom.card(fid).revision(), customRevision))
+                    throw new IllegalArgumentException("自有服务配置已更新,请刷新后重新保存模型");
+            }
             // ① 主选:必填,而且平台必须【已配密钥】—— 只靠前端 disabled 挡不住,
             //    存进一个没密钥的平台等于存了一份必然调不通的配置。
             primary = parseTriple("主选", platform, family, modelId, LlmCatalog.Modality.TEXT, true);
@@ -191,7 +235,24 @@ public class AiModelController {
         ra.addFlashAttribute("flash", "模型配置已保存 · 主选 " + primary.display()
                 + (backup == null ? " · 无备选" : " · 备选 " + backup.display()) + " · 下次调用生效"
                 + visionSkippedNote);
+        if (targets != null) {
+            var action = new org.springframework.transaction.support.TransactionSynchronization() {
+                @Override public void afterCommit() { llmRouter.resetCustomHealth(); }
+            };
+            if (org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive())
+                org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(action);
+            else action.afterCommit();
+        }
         return BACK;
+    }
+
+    @org.springframework.transaction.annotation.Transactional
+    public String saveLlmModels(MemberPrincipal me, String platform, String family, String modelId,
+            String backupPlatform, String backupFamily, String backupModelId, boolean visionEnabled,
+            String visionPlatform, String visionFamily, String visionModelId, Double temperature,
+            int maxTokens, int timeoutSeconds, RedirectAttributes ra) {
+        return saveLlmModels(me, platform, family, modelId, backupPlatform, backupFamily, backupModelId,
+            visionEnabled, visionPlatform, visionFamily, visionModelId, temperature, maxTokens, timeoutSeconds, null, ra);
     }
 
     /**
@@ -213,7 +274,7 @@ public class AiModelController {
                         what + ":「" + (family == null || family.isBlank() ? "(未选)" : family)
                         + "」不是 " + p.label() + " 的"
                         + (modality == LlmCatalog.Modality.VISION ? "视觉" : "文本") + "模型系列"));
-        String m = LlmCatalog.normalizeModel(modelId);
+        String m = LlmCatalog.normalizeModel(p.code(), modelId);
         if (m != null && !LlmCatalog.validModel(m)) {
             // 不回显用户填的原串(可能是粘错的 key)· 只说格式要求
             throw new IllegalArgumentException(what + ":型号格式不合法 · 请复制完整型号,保留前缀和大小写,最长 "
@@ -247,9 +308,13 @@ public class AiModelController {
      * 且失败信息落在别的页面上,用户根本关联不回这里。当面拒绝比事后报错好。</p>
      */
     private void requireKeyConfigured(long fid, LlmInvocation inv, String what) {
+        if (targets != null) {
+            if (!targets.configured(fid, inv.platform())) throw new IllegalArgumentException(what + ":平台尚未配置完整,请先保存上方服务配置或密钥");
+            return;
+        }
         LlmCatalog.Platform p = LlmCatalog.platform(inv.platform()).orElse(null);
         if (p == null) return;
-        if (!configService.isPrivateKeyConfigured(fid, p.keyName())) {
+        if (targets != null ? !targets.configured(fid, p.code()) : !configService.isPrivateKeyConfigured(fid, p.keyName())) {
             throw new IllegalArgumentException(what + ":" + p.label() + " 还没有配密钥 · 请先在上面那张卡里粘上 API Key 点「保存密钥」");
         }
     }
@@ -306,7 +371,7 @@ public class AiModelController {
             ra.addFlashAttribute("flashError", "未知平台:" + platform);
             return BACK;
         }
-        if (!configService.isPrivateKeyConfigured(fid, p.keyName())) {
+        if (targets != null ? !targets.configured(fid, p.code()) : !configService.isPrivateKeyConfigured(fid, p.keyName())) {
             ra.addFlashAttribute("flashError", p.label() + " 未配置 Key · 请先填好并保存,再测试连接");
             return BACK;
         }
@@ -320,7 +385,8 @@ public class AiModelController {
             ra.addFlashAttribute("flashError", p.label() + " 还没有可测的型号 · 请先在上面选好系列并填写型号(控制台复制接入点/模型 ID),保存后再测试");
             return BACK;
         }
-        String label = p.label() + " · " + inv.resolvedModel();
+        if (targets != null) inv = targets.prepare(fid, inv);
+        String label = (LlmCatalog.P_CUSTOM.equals(platform) && custom != null ? custom.card(fid).name() : p.label()) + " · " + inv.resolvedModel();
 
         boolean ok;
         String reason;
@@ -339,7 +405,9 @@ public class AiModelController {
                 "family_runtime_config", fid,
                 "LLM 测试连接 · " + inv.label() + " · " + (ok ? "成功" : "失败:" + reason));
         if (ok) {
-            ra.addFlashAttribute("flash", label + " 测试连接成功 · " + reason);
+            if (LlmCatalog.P_CUSTOM.equals(platform)) llmRouter.externalSuccess(inv);
+            ra.addFlashAttribute("flash", label + " 测试连接成功 · " + reason + " · " + java.time.LocalDateTime.now()
+                + (LlmCatalog.P_CUSTOM.equals(platform) ? " · 本次只验证文字请求,未验证图片或工具能力" : ""));
         } else {
             ra.addFlashAttribute("flashError", label + " 测试失败 · " + reason);
         }

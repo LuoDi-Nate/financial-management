@@ -54,8 +54,10 @@ class LlmCatalogConsistencyTest {
 
     /** 只为读 {@code platform()}:构造函数不出网,拿一个 mock 配置即可 */
     private static LlmClient instantiate(Class<?> c) throws Exception {
-        return (LlmClient) c.getConstructor(FamilyConfigService.class, RestTemplateBuilder.class)
-                .newInstance(mock(FamilyConfigService.class), new RestTemplateBuilder());
+        var constructor = c.getConstructors()[0];
+        Object[] args = java.util.Arrays.stream(constructor.getParameterTypes())
+            .map(t -> t == RestTemplateBuilder.class ? new RestTemplateBuilder() : mock(t)).toArray();
+        return (LlmClient) constructor.newInstance(args);
     }
 
     @Test
@@ -96,6 +98,12 @@ class LlmCatalogConsistencyTest {
                 .as("两个平台共用一把 key 配置项 · 改一个会把另一个也改掉")
                 .doesNotHaveDuplicates();
         for (LlmCatalog.Platform p : LlmCatalog.PLATFORMS) {
+            if (p.code().equals(LlmCatalog.P_CUSTOM)) {
+                assertThat(p.baseUrl()).isEmpty();
+                org.assertj.core.api.Assertions.assertThatThrownBy(p::chatEndpoint).isInstanceOf(CustomLlmFailure.class);
+                assertThat(p.families()).allMatch(LlmCatalog.Family::requiresExplicitModel);
+                continue;
+            }
             assertThat(p.baseUrl()).as("%s 的端点必须是 https(key 要随请求头出网)", p.code())
                     .startsWith("https://");
             assertThat(p.baseUrl()).as("%s 的 baseUrl 带了尾斜杠 · 拼出来会是 //chat/completions", p.code())

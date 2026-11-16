@@ -33,7 +33,8 @@ public final class ResolvedLlmTarget {
         try {
             Map<String, Object> source = new LinkedHashMap<>();
             source.put("platform", platform); source.put("displayName", name); source.put("model", model == null ? "auto" : model);
-            source.put("modality", family != null && (family.endsWith("vision") || family.contains("vl")) ? "VISION" : "TEXT");
+            source.put("modality", LlmCatalog.platform(platform).flatMap(p -> p.family(family))
+                .map(f -> f.modality().name()).orElse("TEXT"));
             source.put("customRevision", revision); source.put("selectionFingerprint", fingerprint);
             return new ObjectMapper().writeValueAsString(source);
         } catch (Exception e) { throw new IllegalStateException("无法记录模型来源"); }

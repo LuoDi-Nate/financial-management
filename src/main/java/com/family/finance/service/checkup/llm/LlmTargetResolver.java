@@ -18,6 +18,10 @@ public class LlmTargetResolver {
         private final Map<String, String> values;
         private final CustomLlmConfigService.Snapshot service;
         public final String fingerprint;
+        public boolean usesCustom() {
+            return settings.chain().stream().anyMatch(i -> i.platform().equals(LlmCatalog.P_CUSTOM))
+                || settings.visionEnabled() && settings.vision().platform().equals(LlmCatalog.P_CUSTOM);
+        }
         Execution(LlmSettings settings, Map<String, String> values, CustomLlmConfigService.Snapshot service, String fingerprint) {
             this.settings = settings; this.values = values; this.service = service; this.fingerprint = fingerprint;
         }
@@ -58,9 +62,7 @@ public class LlmTargetResolver {
     }
     public String fingerprint(long fid) { return load(fid).fingerprint; }
     public boolean usesCustom(long fid) {
-        var s = load(fid).settings;
-        return s.chain().stream().anyMatch(i -> i.platform().equals(LlmCatalog.P_CUSTOM))
-            || s.visionEnabled() && s.vision().platform().equals(LlmCatalog.P_CUSTOM);
+        return load(fid).usesCustom();
     }
     private static int integer(Map<String, String> m, String key, int d, int min, int max) {
         try { return Math.max(min, Math.min(max, Integer.parseInt(m.getOrDefault(key, String.valueOf(d))))); }

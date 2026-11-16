@@ -52,7 +52,10 @@ public final class LlmCatalog {
                            boolean modelRotation, String keyHowTo, List<Family> families) {
 
         /** chat-completions 完整端点 */
-        public String chatEndpoint() { return baseUrl + "/chat/completions"; }
+        public String chatEndpoint() {
+            if (code.equals(P_CUSTOM)) throw new CustomLlmFailure(CustomLlmFailure.Kind.CONFIG);
+            return baseUrl + "/chat/completions";
+        }
 
         public String keyConsoleUrl() {
             return switch (code) {
@@ -60,6 +63,7 @@ public final class LlmCatalog {
                 case P_DEEPSEEK -> "https://platform.deepseek.com";
                 case P_ARK -> "https://console.volcengine.com/ark";
                 case P_SILICONFLOW -> "https://cloud.siliconflow.cn/account/ak";
+                case P_CUSTOM -> null;
                 default -> throw new IllegalStateException("平台缺少密钥申请入口");
             };
         }

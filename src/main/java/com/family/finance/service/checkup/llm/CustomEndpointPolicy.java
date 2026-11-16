@@ -32,6 +32,7 @@ public class CustomEndpointPolicy {
             String host = parsed.host().toLowerCase(Locale.ROOT);
             if (host.endsWith(".")) host = host.substring(0, host.length() - 1);
             if (host.isBlank() || deniedHost(host)) throw denied();
+            if (!allowLocalHttp && (host.equals("localhost") || host.endsWith(".localhost"))) throw denied();
             if (!host.contains(":")) {
                 host = IDN.toASCII(host, IDN.USE_STD3_ASCII_RULES);
                 if (host.matches("[0-9.]+") && !host.matches("(?:0|[1-9][0-9]{0,2})(?:\\.(?:0|[1-9][0-9]{0,2})){3}")) throw denied();
@@ -44,7 +45,8 @@ public class CustomEndpointPolicy {
             if (lower.matches(".*%(?:2f|5c|0[0-9a-f]|1[0-9a-f]|7f).*")) throw denied();
             for (String part : uri.getPath().split("/")) if (part.equals(".") || part.equals("..")) throw denied();
             String path = rawPath.replaceAll("/+$", "");
-            if (path.toLowerCase(Locale.ROOT).endsWith("/chat/completions") || path.toLowerCase(Locale.ROOT).endsWith("/responses")) throw denied();
+            String decodedPath = uri.getPath().replaceAll("/+$", "").toLowerCase(Locale.ROOT);
+            if (decodedPath.endsWith("/chat/completions") || decodedPath.endsWith("/responses")) throw denied();
             if (!parsed.encodedPath().replaceAll("/+$", "").equals(path)) throw denied();
             HttpUrl normalized = parsed.newBuilder().host(host).encodedPath(path.isEmpty() ? "/" : path).build();
             String result = normalized.toString().replaceAll("/+$", "");

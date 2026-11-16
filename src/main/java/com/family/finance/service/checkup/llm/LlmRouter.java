@@ -69,6 +69,8 @@ public class LlmRouter {
     private PromptRecorder promptRecorder;
     @org.springframework.beans.factory.annotation.Autowired
     private LlmTestGate testGate;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private LlmTargetResolver targets;
 
     public boolean testMode() { return testGate != null && testGate.enabled(); }
 
@@ -94,9 +96,11 @@ public class LlmRouter {
 
     /** 按配置编出本次可用的候选链(主 → 备)· 已剔除不可能成功的 */
     public List<LlmInvocation> plan(long familyId) {
-        LlmSettings settings = LlmSettings.load(configService, familyId);
+        LlmTargetResolver.Execution execution = targets == null ? null : targets.load(familyId);
+        LlmSettings settings = execution == null ? LlmSettings.load(configService, familyId) : execution.settings;
         List<LlmInvocation> usable = new ArrayList<>();
-        for (LlmInvocation inv : settings.chain()) {
+        for (LlmInvocation candidate : settings.chain()) {
+            LlmInvocation inv = candidate;
             if (!inv.resolvable()) {
                 log.debug("跳过候选 {} · 配置不自洽(平台/系列不存在,或该平台要求手填型号但未填)", inv.label());
                 continue;
@@ -106,7 +110,11 @@ public class LlmRouter {
                 log.warn("跳过候选 {} · 没有对应的客户端实现", inv.label());
                 continue;
             }
-            if (!c.get().available()) {
+            if (execution != null) {
+                if (!targets.configured(execution, inv.platform())) continue;
+                inv = targets.prepare(familyId, inv, execution);
+            }
+            if (!(inv.platform().equals(LlmCatalog.P_CUSTOM) ? c.get().available(inv) : c.get().available())) {
                 log.debug("跳过候选 {} · 当前不可用(key 未配 / 熔断中 / 型号额度冷却)", inv.label());
                 continue;
             }
@@ -133,6 +141,7 @@ public class LlmRouter {
     public String unavailableReason(long familyId) {
         if (testMode()) return LlmTestGate.MESSAGE;
         if (available(familyId)) return null;
+        if (targets != null && targets.usesCustom(familyId)) return "自有服务或型号配置不完整,或正在故障冷却;请到AI接入检查服务与已保存型号。";
         boolean keyPresent = false, resolvable = false;
         for (LlmInvocation inv : LlmSettings.load(configService, familyId).chain()) {
             var p = inv.platformDef();
@@ -148,13 +157,13 @@ public class LlmRouter {
     }
 
     public void externalSuccess(LlmInvocation inv) {
-        clientFor(inv.platform()).ifPresent(LlmClient::recordExternalSuccess);
-        healthTracker.recordOk(inv.platform());
+        clientFor(inv.platform()).ifPresent(c -> { if (inv.platform().equals(LlmCatalog.P_CUSTOM)) c.recordSuccess(inv); else c.recordExternalSuccess(); });
+        if (current(inv)) healthTracker.recordOk(inv.platform());
     }
 
     public void externalFailure(LlmInvocation inv, Exception failure) {
-        clientFor(inv.platform()).ifPresent(LlmClient::recordExternalFailure);
-        healthTracker.recordFail(inv.platform(), false, "工具对话调用失败");
+        clientFor(inv.platform()).ifPresent(c -> { if (inv.platform().equals(LlmCatalog.P_CUSTOM)) c.recordFailure(inv,failure); else c.recordExternalFailure(); });
+        if (current(inv)) healthTracker.recordFail(inv.platform(), false, "工具对话调用失败");
         log.warn("本地 Agent 候选 {} 调用失败 · {}", inv.label(), failure.getClass().getSimpleName());
     }
 
@@ -167,6 +176,13 @@ public class LlmRouter {
     /** 已装载的平台 code(诊断 / 一致性护栏用) */
     public List<String> platforms() {
         return clients.stream().map(LlmClient::platform).toList();
+    }
+
+    public void resetCustomHealth() { healthTracker.forget(LlmCatalog.P_CUSTOM); }
+    private boolean current(LlmInvocation inv) {
+        if (targets == null || inv.target() == null || !inv.target().custom()) return true;
+        try { targets.assertCurrent(inv.target()); return true; }
+        catch (CustomLlmFailure e) { return false; }
     }
 
     /**
@@ -198,17 +214,19 @@ public class LlmRouter {
     public <T> T invoke(long familyId, PromptTrace trace, String systemPrompt, String userPrompt, Handler<T> handler) {
         if (trace == null) return invoke(familyId, systemPrompt, userPrompt, handler);
         if (testGate != null && testGate.block(familyId, trace, systemPrompt, userPrompt)) return null;
-        if (plan(familyId).isEmpty()) {
+        List<LlmInvocation> planned = plan(familyId);
+        if (planned.isEmpty()) {
             trace.failed(unavailableReason(familyId));
             return null;
         }
         String[] vendor = {null};
         String[] lastError = {null};
         boolean[] gotOutput = {false};
-        T result = invoke(familyId, systemPrompt, userPrompt, new Handler<T>() {
+        T result = invokePlan(familyId, systemPrompt, userPrompt, new Handler<T>() {
             @Override
             public T onOutput(LlmInvocation inv, String raw, long ms) {
                 vendor[0] = inv.badge();
+                trace.source(inv.sourceJson());
                 gotOutput[0] = true;
                 return handler.onOutput(inv, raw, ms);
             }
@@ -216,10 +234,11 @@ public class LlmRouter {
             @Override
             public void onFailure(LlmInvocation inv, Exception e, long ms) {
                 vendor[0] = inv.badge();
-                lastError[0] = e.getMessage();
+                trace.source(inv.sourceJson());
+                lastError[0] = LlmFailure.describe(inv.platform(),e);
                 handler.onFailure(inv, e, ms);
             }
-        });
+        }, planned);
         String outcome = result != null ? PromptRecorder.OK : (gotOutput[0] ? PromptRecorder.REJECTED : PromptRecorder.FAILED);
         String note = result != null ? null
                 : gotOutput[0] ? (trace.rejectReason() == null ? "回答没通过校验" : trace.rejectReason())
@@ -237,30 +256,37 @@ public class LlmRouter {
      */
     public <T> T invoke(long familyId, String systemPrompt, String userPrompt, Handler<T> handler) {
         if (testGate != null && testGate.block(familyId, null, systemPrompt, userPrompt)) return null;
-        for (LlmInvocation inv : plan(familyId)) {
+        return invokePlan(familyId, systemPrompt, userPrompt, handler, plan(familyId));
+    }
+
+    private <T> T invokePlan(long familyId, String systemPrompt, String userPrompt, Handler<T> handler, List<LlmInvocation> planned) {
+        for (LlmInvocation inv : planned) {
             LlmClient client = clientFor(inv.platform()).orElse(null);
-            if (client == null || !client.available()) continue;
+            if (client == null || !(inv.platform().equals(LlmCatalog.P_CUSTOM) ? client.available(inv) : client.available())) continue;
             long start = System.currentTimeMillis();
             try {
+                if (targets != null && inv.target() != null) targets.assertCurrent(inv.target());
                 String raw = client.chat(inv, systemPrompt, userPrompt);
                 long ms = System.currentTimeMillis() - start;
                 if (raw == null || raw.isBlank()) {
                     handler.onFailure(inv, new IllegalStateException("空输出"), ms);
                     continue;
                 }
-                healthTracker.recordOk(inv.platform());
+                if (current(inv)) healthTracker.recordOk(inv.platform());
                 T accepted = handler.onOutput(inv, raw, ms);
                 if (accepted != null) return accepted;
                 log.warn("候选 {} 的输出未被接受 · 试下一个", inv.label());
             } catch (Exception e) {
-                if (e instanceof LlmTestGate.Blocked) return null;
+                if (e instanceof LlmTestGate.Blocked || e instanceof CustomLlmFailure f && f.stopPlan()) return null;
                 long ms = System.currentTimeMillis() - start;
                 // 账户级故障(凭据/欠费/权限)不会自己好,必须有人去处理 —— 单独标出来,
                 // 好让管理页只在这一类上报警,不被偶发超时淹掉。
-                boolean accountFatal = String.valueOf(e.getMessage()).contains("账户级故障");
-                healthTracker.recordFail(inv.platform(), accountFatal, e.getMessage());
-                log.warn("候选 {} 调用失败 · {}", inv.label(), e.toString());
-                handler.onFailure(inv, e, ms);
+                boolean accountFatal = String.valueOf(e.getMessage()).contains("账户级故障")
+                    || e instanceof CustomLlmFailure f && f.accountFatal();
+                String safe = LlmFailure.describe(inv.platform(),e);
+                if (current(inv)) healthTracker.recordFail(inv.platform(), accountFatal, safe);
+                log.warn("候选 {} 调用失败 · {}", inv.label(), safe);
+                handler.onFailure(inv, e instanceof CustomLlmFailure ? e : new IllegalStateException(safe), ms);
             }
         }
         return null;

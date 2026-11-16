@@ -128,7 +128,7 @@ public abstract class AbstractOpenAiCompatibleClient implements LlmClient {
     public String chat(LlmInvocation inv, String systemPrompt, String userPrompt) {
         if (testGate != null) testGate.beforeSend("TEXT_CLIENT");
         String label = platformDef().label();
-        String key = currentApiKey();
+        String key = inv.target() == null ? currentApiKey() : inv.target().apiKey();
         if (key.isBlank()) throw new IllegalStateException(label + " API key 未配置");
 
         List<String> models = new ArrayList<>(attemptModels(inv));
@@ -144,7 +144,8 @@ public abstract class AbstractOpenAiCompatibleClient implements LlmClient {
             if (!modelAvailable(model)) continue;
             anyTried = true;
             try {
-                String content = callOnce(key, model, systemPrompt, userPrompt);
+                String content = inv.target() == null ? callOnce(key, model, systemPrompt, userPrompt)
+                    : callPrepared(inv.target(), key, model, systemPrompt, userPrompt);
                 consecutiveFailures = 0;      // 成功 → 复位熔断
                 return content;
             } catch (RestClientResponseException e) {
@@ -198,6 +199,19 @@ public abstract class AbstractOpenAiCompatibleClient implements LlmClient {
         return responseContent(resp);
     }
 
+    private String callPrepared(ResolvedLlmTarget target, String key, String model, String system, String user) {
+        HttpHeaders headers = new HttpHeaders(); headers.setContentType(MediaType.APPLICATION_JSON); headers.setBearerAuth(key);
+        var factory = new org.springframework.http.client.SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(5_000); factory.setReadTimeout(target.timeout() * 1000);
+        var client = new RestTemplate(factory);
+        if (testGate != null) testGate.beforeSend("TEXT_CLIENT");
+        var dispatched = java.time.LocalDateTime.now();
+        try {
+            return responseContent(client.postForObject(target.endpoint(), new HttpEntity<>(
+                textRequest(model, system, user, target.temperature(), target.maxTokens()), headers), Map.class));
+        } finally { if (testGate != null) testGate.observedSend("TEXT_CLIENT", dispatched); }
+    }
+
     static Map<String, Object> textRequest(String model, String systemPrompt, String userPrompt, double temperature, int maxTokens) {
         return Map.of(
                 "model", model,
@@ -212,16 +226,12 @@ public abstract class AbstractOpenAiCompatibleClient implements LlmClient {
 
     public static String responseContent(Map<String, Object> resp) {
         if (resp == null || resp.containsKey("error")) throw new CustomLlmFailure(CustomLlmFailure.Kind.PROTOCOL);
-        @SuppressWarnings("unchecked")
-        List<Map<String, Object>> choices = (List<Map<String, Object>>) resp.get("choices");
-        if (choices == null || choices.isEmpty()) throw new CustomLlmFailure(CustomLlmFailure.Kind.PROTOCOL);
-        @SuppressWarnings("unchecked")
-        Map<String, Object> msg = (Map<String, Object>) choices.get(0).get("message");
-        if (msg == null) throw new CustomLlmFailure(CustomLlmFailure.Kind.PROTOCOL);
-        String content = (String) msg.get("content");
-        if (content == null || content.isBlank()) throw new CustomLlmFailure(CustomLlmFailure.Kind.PROTOCOL);
+        if (!(resp.get("choices") instanceof List<?> choices) || choices.isEmpty()
+                || !(choices.getFirst() instanceof Map<?,?> first) || !(first.get("message") instanceof Map<?,?> msg)
+                || !(msg.get("content") instanceof String content) || content.isBlank())
+            throw new CustomLlmFailure(CustomLlmFailure.Kind.PROTOCOL);
 
-        if ("length".equals(choices.get(0).get("finish_reason"))) {
+        if ("length".equals(first.get("finish_reason"))) {
             log.warn("模型输出因 max_tokens 截断 · content.len={}", content.length());
         }
         return content;

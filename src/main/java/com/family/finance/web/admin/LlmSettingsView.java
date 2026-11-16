@@ -24,6 +24,10 @@ public class LlmSettingsView {
 
     private final FamilyConfigService configService;
     private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.family.finance.service.config.CustomLlmConfigService custom;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.family.finance.service.checkup.llm.LlmTargetResolver targets;
 
     public record CredentialCard(String code, String label, boolean ready, String masked,
                                  String consoleUrl, String howTo, String probe) {}
@@ -41,13 +45,17 @@ public class LlmSettingsView {
         model.addAttribute("llmTimeoutSeconds", configService.getInt(fid,  FamilyConfigService.K_LLM_TIMEOUT_SECS, 25));
         model.addAttribute("llmTemperature",    configService.getString(fid, FamilyConfigService.K_LLM_TEMPERATURE, "0.5"));
         LlmSettings s = LlmSettings.load(configService, fid);
-        var cards = LlmCatalog.PLATFORMS.stream().map(p -> new CredentialCard(p.code(), p.label(),
+        var cards = LlmCatalog.PLATFORMS.stream().filter(p -> !p.code().equals(LlmCatalog.P_CUSTOM)).map(p -> new CredentialCard(p.code(), p.label(),
                 configService.isPrivateKeyConfigured(fid, p.keyName()), configService.maskedSecret(fid, p.keyName()),
                 p.keyConsoleUrl(), p.keyHowTo(), LlmProbeTarget.resolve(s, p).map(LlmProbeTarget::display)
                         .orElse("请先选择型号并保存"))).toList();
         model.addAttribute("llmCredentialCards", cards);
-        model.addAttribute("llmKeyCount", cards.stream().filter(CredentialCard::ready).count());
-        model.addAttribute("llmPlatformCount", cards.size());
+        var own = custom == null ? null : custom.card(fid);
+        model.addAttribute("llmCustom", own);
+        model.addAttribute("llmCustomProbe", LlmProbeTarget.resolve(s,LlmCatalog.CUSTOM).map(LlmProbeTarget::display)
+            .orElse("先在下方选择自有服务和型号,保存后再测试"));
+        model.addAttribute("llmKeyCount", cards.stream().filter(CredentialCard::ready).count() + (own != null && own.ready() ? 1 : 0));
+        model.addAttribute("llmPlatformCount", LlmCatalog.PLATFORMS.size());
         model.addAttribute("llmModelPattern", LlmCatalog.MODEL_PATTERN);
         model.addAttribute("llmModelMaxLength", LlmCatalog.MAX_MODEL_LENGTH);
         model.addAttribute("llmVisionPlatformsLabel", platformsWith(LlmCatalog.Modality.VISION).stream()
@@ -69,8 +77,9 @@ public class LlmSettingsView {
         //   此前那个 checkbox 照样可勾,勾了必然存不下去(而且报的是「请选择平台」,
         //   指向一个他根本选不了的下拉)。现在直接禁用并说清去配哪家。
         model.addAttribute("visionCapableReady", !visionCapablePlatforms(fid).isEmpty());
-        model.addAttribute("platformReady", cards.stream().collect(java.util.stream.Collectors.toMap(
-                CredentialCard::code, CredentialCard::ready)));
+        var ready = cards.stream().collect(java.util.stream.Collectors.toMap(CredentialCard::code, CredentialCard::ready));
+        ready.put(LlmCatalog.P_CUSTOM, own != null && own.ready());
+        model.addAttribute("platformReady", ready);
         // 主选三元组
         model.addAttribute("llmPlatform",       s.primary().platform());
         model.addAttribute("llmFamily",         s.primary().family());
@@ -142,9 +151,10 @@ public class LlmSettingsView {
 
     /** v1.18.4 · 「已配密钥 且 有视觉能力」的平台 —— 截图识别能不能开,取决于它非空。 */
     public java.util.List<LlmCatalog.Platform> visionCapablePlatforms(long fid) {
+        var execution = targets == null ? null : targets.load(fid);
         return LlmCatalog.PLATFORMS.stream()
                 .filter(p -> !p.families(LlmCatalog.Modality.VISION).isEmpty())
-                .filter(p -> configService.isPrivateKeyConfigured(fid, p.keyName()))
+                .filter(p -> targets == null ? configService.isPrivateKeyConfigured(fid, p.keyName()) : targets.configured(execution, p.code()))
                 .toList();
     }
 }

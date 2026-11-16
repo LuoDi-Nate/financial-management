@@ -34,6 +34,9 @@ public class CustomLlmTransport {
     protected List<InetAddress> lookup(String host) throws Exception { return Arrays.asList(InetAddress.getAllByName(host)); }
 
     public Result open(ResolvedLlmTarget target, Object body, boolean stream) {
+        return open(target, body, stream, () -> { });
+    }
+    public Result open(ResolvedLlmTarget target, Object body, boolean stream, Runnable beforeWire) {
         gate.beforeSend(stream ? "CUSTOM_STREAM" : "CUSTOM_JSON");
         targets.assertCurrent(target);
         String host = target.endpoint().getHost();
@@ -61,6 +64,7 @@ public class CustomLlmTransport {
             gate.beforeSend(stream ? "CUSTOM_STREAM" : "CUSTOM_JSON");
             targets.assertCurrent(target);
             call = client.newCall(request.build());
+            beforeWire.run();
             LocalDateTime dispatched = LocalDateTime.now();
             Response response;
             try { response = call.execute(); }
@@ -116,6 +120,7 @@ public class CustomLlmTransport {
     }
     private static CustomLlmFailure safe(Exception e) {
         for (Throwable t = e; t != null; t = t.getCause()) {
+            if (t instanceof CustomLlmFailure custom) return custom;
             if (t instanceof javax.net.ssl.SSLException) return new CustomLlmFailure(TLS);
             if (t instanceof java.net.SocketTimeoutException || t instanceof java.io.InterruptedIOException) return new CustomLlmFailure(TIMEOUT);
             if (t instanceof java.net.ConnectException) return new CustomLlmFailure(CONNECT);

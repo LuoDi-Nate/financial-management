@@ -21,6 +21,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class AskMessage {
+    private String sourceJson;
 
     public static final String ROLE_USER = "user";
     public static final String ROLE_ASSISTANT = "assistant";

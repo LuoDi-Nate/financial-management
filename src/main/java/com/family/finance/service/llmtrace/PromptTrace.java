@@ -18,6 +18,7 @@ public final class PromptTrace {
     private Long recordId;
     private String rejectReason;
     private String failureMessage;
+    private String sourceJson;
 
     private PromptTrace(PromptSurface surface) {
         this.surface = surface;
@@ -46,6 +47,8 @@ public final class PromptTrace {
     public Map<String, String> legendMap() { return legend; }
 
     public String settingsNote() { return settingsNote; }
+    public void source(String sourceJson) { this.sourceJson = sourceJson; }
+    public String sourceJson() { return sourceJson; }
 
     public Long recordId() { return recordId; }
 

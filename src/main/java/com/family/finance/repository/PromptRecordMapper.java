@@ -27,6 +27,7 @@ public interface PromptRecordMapper {
         public String outcomeNote;
         public String settingsNote;
         public String legendJson;
+        public String sourceJson;
         public LocalDateTime createdAt;
     }
 
@@ -36,9 +37,9 @@ public interface PromptRecordMapper {
 
     @Insert("""
             INSERT INTO llm_prompt_record
-                   (family_id, surface, system_hash, user_text, vendor, outcome, outcome_note, settings_note, legend_json)
+                   (family_id, surface, system_hash, user_text, vendor, outcome, outcome_note, settings_note, legend_json, source_json)
             VALUES (#{familyId}, #{surface}, #{systemHash}, #{userText}, #{vendor}, #{outcome}, #{outcomeNote},
-                    #{settingsNote}, #{legendJson})
+                    #{settingsNote}, #{legendJson}, #{sourceJson})
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(Row row);
@@ -46,7 +47,7 @@ public interface PromptRecordMapper {
     @Select("""
             SELECT r.id, r.family_id AS familyId, r.surface, r.system_hash AS systemHash, s.text AS systemText,
                    r.user_text AS userText, r.vendor, r.outcome, r.outcome_note AS outcomeNote,
-                   r.settings_note AS settingsNote, r.legend_json AS legendJson, r.created_at AS createdAt
+                   r.settings_note AS settingsNote, r.legend_json AS legendJson, r.created_at AS createdAt, r.source_json AS sourceJson
               FROM llm_prompt_record r
               LEFT JOIN llm_system_prompt s ON s.family_id = r.family_id AND s.hash = r.system_hash
              WHERE r.id = #{id} AND r.family_id = #{familyId}

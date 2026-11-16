@@ -93,6 +93,7 @@ public class ReviewController {
         out.put("text", r.text());
         out.put("vendor", r.vendor());
         out.put("cached", r.cached());
+        out.put("historical", r.historical());
         // v1.28 · 这份复盘当时发给 AI 的是什么(老缓存 → 「那时还没开始记录」;开关关了 → null)
         out.put("peek", promptPeek.of(me.getFamilyId(), r.promptRecordId(),
                 com.family.finance.service.llmtrace.PromptSurface.REVIEW, r.generatedAt(), null));

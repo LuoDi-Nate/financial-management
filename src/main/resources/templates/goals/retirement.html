@@ -483,6 +483,8 @@
             <p th:if="${reportStale}" class="text-sm text-brass-deep mt-2">
               计划、资金或月结余依据已变化,以下为历史解读。
             </p>
+            <p class="text-xs text-ink-soft break-words mt-2" th:text="${reportSourceLabel}"></p>
+            <p th:if="${reportSourceStale == true}" class="text-sm text-brass-deep mt-2">模型服务或选型已变更,这是保留的历史解读。</p>
             <p
               class="text-sm whitespace-pre-line mt-3"
               th:utext="${@aiText.priv(report.content)}"

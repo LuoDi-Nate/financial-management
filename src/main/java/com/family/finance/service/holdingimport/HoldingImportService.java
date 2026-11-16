@@ -164,6 +164,7 @@ public class HoldingImportService {
         importMapper.markScanning(familyId, importId);
         try {
             List<Path> images = listImages(imp);
+            var frozenVision = vision.prepareScan(familyId);
             // 1. 逐图视觉转写 + 记来源图
             record Parsed(VisionLlmClient.ParsedRow row, String shot) {}
             List<Parsed> parsedAll = new ArrayList<>();
@@ -176,7 +177,7 @@ public class HoldingImportService {
                     byte[] b = Files.readAllBytes(p);
                     String mime = mimeOf(p.getFileName().toString());
                     String rel = relOf(imp, p);
-                    for (VisionLlmClient.ParsedRow r : vision.extract(b, mime)) parsedAll.add(new Parsed(r, rel));
+                    for (VisionLlmClient.ParsedRow r : vision.extract(b, mime, frozenVision, familyId)) parsedAll.add(new Parsed(r, rel));
                 } catch (Exception e) {
                     failedImages++;
                     lastError = e;
@@ -195,6 +196,10 @@ public class HoldingImportService {
                 return;
             }
             // 2. 合并去重(按 code 优先,否则归一化名称;保留第一条有市值的)
+            vision.checkCurrent(frozenVision);
+            if (frozenVision != null && frozenVision.sourceJson() != null)
+                importMapper.source(familyId,importId,frozenVision.sourceJson(),
+                    frozenVision.platform().equals("custom") ? "custom" : frozenVision.resolvedModel().length() <= 32 ? frozenVision.resolvedModel() : frozenVision.platform());
             Map<String, Parsed> merged = new LinkedHashMap<>();
             for (Parsed p : parsedAll) {
                 String key = dedupKey(p.row());

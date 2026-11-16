@@ -15,6 +15,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 public class RebalanceAdviceCache {
+    private String sourceJson;
     private Long id;
     private Long familyId;
     private String anchorCode;

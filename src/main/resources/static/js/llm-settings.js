@@ -48,12 +48,12 @@
         error(model, '');
         if (allowNone && !platform.value) return true;
         if (!platform.value || !platform.selectedOptions[0] || platform.selectedOptions[0].disabled) { error(model, '先为此平台保存密钥,再选择模型'); return false; }
-        var f = current(), raw = model.value.trim(), auto = !raw || raw.toLowerCase() === 'auto';
+        var f = current(), raw = model.value.trim(), auto = !raw || platform.value !== 'custom' && raw.toLowerCase() === 'auto';
         if (!f || auto && f.mustFillModel) { error(model, '此系列没有默认型号,请填写完整型号'); return false; }
         if (!auto && (raw.length > max || !pattern.test(raw))) { error(model, '型号格式不合法,请保留前缀和大小写,不填网址或密钥'); return false; }
         return true;
       }, strategy: function () {
-        var f = current(), raw = model.value.trim(), auto = !raw || raw.toLowerCase() === 'auto';
+        var f = current(), raw = model.value.trim(), auto = !raw || platform.value !== 'custom' && raw.toLowerCase() === 'auto';
         var p = platformDef(); return [platform.value, family.value, auto ? p && p.modelRotation && modality === 'TEXT' ? '@rotation' : f && f.defaultModel : raw].join('|');
       }};
     groups.push(group);
@@ -81,7 +81,38 @@
       if (!input.value.trim()) { event.preventDefault(); keyForm.querySelector('[data-llm-error]').textContent = '没有输入新密钥,原密钥未改动'; input.focus(); }
     });
   });
-  document.querySelectorAll('[data-llm-key], #llm-models, [data-llm-probe]').forEach(function (target) {
+  var own = document.getElementById('llm-custom-service');
+  if (own) {
+    var ownUrl = own.elements.baseUrl, ownAuth = own.elements.authMode, ownKey = own.elements.apiKey;
+    function customError(name, message) {
+      own.querySelector('[data-custom-error="' + name + '"]').textContent = message;
+      own.elements[name].setAttribute('aria-invalid', message ? 'true' : 'false');
+    }
+    function canonical(raw) { try { return new URL(raw.trim()).href.replace(/\/+$/, ''); } catch (e) { return ''; } }
+    function updateOwn() {
+      own.querySelector('[data-custom-key]').hidden = ownAuth.value === 'NONE';
+      own.querySelector('[data-custom-endpoint]').textContent = canonical(ownUrl.value) ? canonical(ownUrl.value) + '/chat/completions' : '—';
+    }
+    ownAuth.addEventListener('change', updateOwn); ownUrl.addEventListener('input', updateOwn); updateOwn();
+    own.noValidate = true;
+    own.addEventListener('submit', function (event) {
+      var first = null;
+      ['displayName','baseUrl','apiKey','allowLocalHttp'].forEach(function (name) { customError(name, ''); });
+      function bad(name, message) { customError(name, message); if (!first) first = own.elements[name]; }
+      var url;
+      try { url = new URL(ownUrl.value.trim()); } catch (e) { bad('baseUrl', '请填写绝对HTTP(S)基础地址'); }
+      if (url) {
+        if (!/^https?:$/.test(url.protocol) || url.username || url.password || url.search || url.hash || /\/(chat\/completions|responses)\/?$/i.test(url.pathname))
+          bad('baseUrl', '填写API前缀,不含认证信息、查询参数或完整调用路径');
+        if (url.protocol === 'http:' && !own.elements.allowLocalHttp.checked) bad('allowLocalHttp', 'HTTP或内网服务需要明确许可');
+      }
+      if (ownAuth.value === 'BEARER' && !ownKey.value.trim() && (own.dataset.ready !== 'true' || own.dataset.savedAuth !== 'BEARER' || canonical(ownUrl.value) !== canonical(own.dataset.savedUrl)))
+        bad('apiKey', '首次配置或更改地址/认证后,请重新输入此服务的密钥');
+      if (own.elements.displayName.value.length > 50) bad('displayName', '名称最长50字');
+      if (first) { event.preventDefault(); first.focus(); first.scrollIntoView({block:'center'}); }
+    });
+  }
+  document.querySelectorAll('[data-llm-key], #llm-custom-service, #llm-models, [data-llm-probe]').forEach(function (target) {
     target.addEventListener('submit', function (event) {
       if (event.defaultPrevented) return;
       if (target.dataset.submitting) { event.preventDefault(); return; }

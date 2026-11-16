@@ -54,6 +54,10 @@ public class VisionLlmClient {
 
     private final FamilyConfigService config;
     private final RestTemplate rt;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.family.finance.service.checkup.llm.LlmTargetResolver targets;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.family.finance.service.checkup.llm.CustomLlmTransport customTransport;
 
     public VisionLlmClient(FamilyConfigService config, RestTemplateBuilder builder) {
         this.config = config;
@@ -95,32 +99,52 @@ public class VisionLlmClient {
         if (!s.visionEnabled()) return false;
         LlmInvocation inv = s.vision();
         if (!inv.resolvable()) return false;
-        return !apiKey(inv).isBlank();
+        return targets == null ? !apiKey(inv).isBlank() : targets.configured(FAMILY_ID, inv.platform());
     }
+
+    public LlmInvocation prepareScan(long fid) {
+        if (targets == null || testGate != null && testGate.enabled()) return null;
+        var execution = targets.load(fid);
+        if (!execution.settings.visionEnabled()) throw new IllegalStateException("截图识别已在管理页关闭");
+        return targets.prepare(fid, execution.settings.vision(), execution);
+    }
+    public void checkCurrent(LlmInvocation inv) { if (targets != null && inv != null && inv.target() != null) targets.assertCurrent(inv.target()); }
 
     /** 一张图 → 若干持仓转写行。失败抛 RuntimeException(不泄 key)。 */
     public List<ParsedRow> extract(byte[] imageBytes, String mime) {
-        if (testGate != null && testGate.block(FAMILY_ID,
+        return extract(imageBytes, mime, null);
+    }
+
+    public List<ParsedRow> extract(byte[] imageBytes, String mime, LlmInvocation frozen) {
+        return extract(imageBytes,mime,frozen,frozen != null && frozen.target() != null ? frozen.target().familyId() : FAMILY_ID);
+    }
+    public List<ParsedRow> extract(byte[] imageBytes, String mime, LlmInvocation frozen, long fid) {
+        if (testGate != null && testGate.block(fid,
                 com.family.finance.service.llmtrace.PromptTrace.of(com.family.finance.service.llmtrace.PromptSurface.VISION_IMPORT),
                 SYS, PROMPT + "\n图片未发送"))
             throw new com.family.finance.service.checkup.llm.LlmTestGate.Blocked();
-        LlmSettings s = LlmSettings.load(config, FAMILY_ID);
-        if (!s.visionEnabled()) throw new IllegalStateException("截图识别已在管理页关闭");
-        LlmInvocation inv = s.vision();
+        LlmInvocation inv = frozen;
+        if (inv == null) {
+            var execution = targets == null ? null : targets.load(fid);
+            LlmSettings s = execution == null ? LlmSettings.load(config, fid) : execution.settings;
+            if (!s.visionEnabled()) throw new IllegalStateException("截图识别已在管理页关闭");
+            inv = execution == null ? s.vision() : targets.prepare(fid,s.vision(),execution);
+        }
+        checkCurrent(inv);
         LlmCatalog.Platform p = inv.platformDef()
                 .orElseThrow(() -> new IllegalStateException("视觉平台配置无效,请到管理页重新选择"));
         String model = inv.resolvedModel();
         if (model == null) {
             throw new IllegalStateException(p.label() + " 的视觉型号需要手工填写(控制台复制接入点/模型 ID)");
         }
-        String key = apiKey(inv);
-        if (key == null || key.isBlank()) throw new IllegalStateException(p.label() + " API key 未配置");
+        String key = inv.target() == null ? apiKey(inv) : inv.target().apiKey();
+        if (!p.code().equals(com.family.finance.service.checkup.llm.LlmCatalog.P_CUSTOM) && (key == null || key.isBlank())) throw new IllegalStateException(p.label() + " API key 未配置");
 
         String dataUrl = "data:" + (mime == null ? "image/jpeg" : mime) + ";base64,"
                 + java.util.Base64.getEncoder().encodeToString(imageBytes);
         String content;
         try {
-            content = callVision(p, key, model, dataUrl);
+            content = callVision(p, key, model, dataUrl, inv);
         } catch (com.family.finance.service.checkup.llm.LlmTestGate.Blocked e) {
             throw e;
         } catch (RuntimeException e) {
@@ -132,11 +156,11 @@ public class VisionLlmClient {
     }
 
     @SuppressWarnings("unchecked")
-    private String callVision(LlmCatalog.Platform p, String key, String model, String dataUrl) {
+    private String callVision(LlmCatalog.Platform p, String key, String model, String dataUrl, LlmInvocation invocation) {
         if (testGate != null) testGate.beforeSend("VISION_CLIENT");
         HttpHeaders h = new HttpHeaders();
         h.setContentType(MediaType.APPLICATION_JSON);
-        h.setBearerAuth(key);
+        if (!key.isBlank()) h.setBearerAuth(key);
         Map<String, Object> userMsg = Map.of("role", "user", "content", List.of(
                 Map.of("type", "text", "text", PROMPT),
                 Map.of("type", "image_url", "image_url", Map.of("url", dataUrl))
@@ -147,10 +171,13 @@ public class VisionLlmClient {
                 "temperature", 0.1,
                 "max_tokens", 1800
         );
+        if (p.code().equals(LlmCatalog.P_CUSTOM)) {
+            return com.family.finance.service.checkup.llm.AbstractOpenAiCompatibleClient.responseContent(customTransport.json(invocation.target(), body));
+        }
         if (testGate != null) testGate.beforeSend("VISION_CLIENT");
         java.time.LocalDateTime dispatched = java.time.LocalDateTime.now();
         Map<String, Object> resp;
-        try { resp = rt.postForObject(p.chatEndpoint(), new HttpEntity<>(body, h), Map.class); }
+        try { resp = rt.postForObject(invocation.target() == null ? java.net.URI.create(p.chatEndpoint()) : invocation.target().endpoint(), new HttpEntity<>(body, h), Map.class); }
         finally { if (testGate != null) testGate.observedSend("VISION_CLIENT", dispatched); }
         if (resp == null) throw new RuntimeException("视觉服务返回空");
         List<Map<String, Object>> choices = (List<Map<String, Object>>) resp.get("choices");

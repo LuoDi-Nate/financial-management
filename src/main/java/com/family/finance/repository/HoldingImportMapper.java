@@ -18,7 +18,7 @@ public interface HoldingImportMapper {
 
     String COLS = """
             id, family_id AS familyId, account_id AS accountId, period_id AS periodId, status,
-            vision_model AS visionModel, cost_est AS costEst, img_count AS imgCount, scan_error AS scanError,
+            vision_model AS visionModel, cost_est AS costEst, img_count AS imgCount, scan_error AS scanError, source_json AS sourceJson,
             created_at AS createdAt, updated_at AS updatedAt, confirmed_at AS confirmedAt
             """;
 
@@ -58,6 +58,9 @@ public interface HoldingImportMapper {
 
     @Update("UPDATE holding_import SET status = 'SCANNING', scan_error = NULL WHERE family_id = #{familyId} AND id = #{id}")
     int markScanning(@Param("familyId") long familyId, @Param("id") long id);
+
+    @Update("UPDATE holding_import SET source_json=#{sourceJson}, vision_model=#{model} WHERE family_id=#{familyId} AND id=#{id}")
+    int source(@Param("familyId") long familyId, @Param("id") long id, @Param("sourceJson") String sourceJson, @Param("model") String model);
 
     /**
      * v1.19.4 · 一张都没识别出来 → 进 {@code SCAN_ERROR},<b>不是 REVIEW</b>。

@@ -60,6 +60,7 @@ public class PromptRecorder {
             r.systemHash = hash;
             r.userText = user == null ? "" : user;
             r.vendor = cut(vendor, 80);
+            r.sourceJson = trace.sourceJson();
             r.outcome = outcome;
             r.outcomeNote = cut(note, 500);
             r.settingsNote = cut(trace.settingsNote(), 200);

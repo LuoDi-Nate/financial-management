@@ -94,7 +94,7 @@ public class CustomLlmConfigService {
                 "editToken", UUID.randomUUID().toString(), "displayName", label, "baseUrl", url,
                 "authMode", authMode, "apiKey", key, "allowLocalHttp", allowLocalHttp));
             mapper.upsert(fid, KEY, encoded);
-        } catch (com.fasterxml.jackson.core.JsonProcessingException e) { throw failure(); }
+        } catch (com.fasterxml.jackson.core.JsonProcessingException | org.springframework.dao.DataAccessException e) { throw failure(); }
     }
 
     private static Snapshot empty() { return new Snapshot("", "", "自有服务", "", "BEARER", "", false); }

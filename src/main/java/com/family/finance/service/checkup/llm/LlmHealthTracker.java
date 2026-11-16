@@ -45,6 +45,8 @@ public class LlmHealthTracker {
 
     private final Map<String, Outcome> last = new ConcurrentHashMap<>();
 
+    public void forget(String platform) { last.remove(platform); }
+
     public void recordOk(String platform) {
         last.put(platform, new Outcome(true, Instant.now(), false, null));
     }

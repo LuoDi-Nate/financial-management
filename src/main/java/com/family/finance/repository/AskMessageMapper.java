@@ -15,7 +15,11 @@ import java.util.List;
 public interface AskMessageMapper {
 
     String COLS = " m.id, m.conversation_id AS conversationId, m.role, m.content_text AS contentText,"
-                + " m.seq, m.created_at AS createdAt, m.prompt_record_id AS promptRecordId ";
+                + " m.seq, m.created_at AS createdAt, m.prompt_record_id AS promptRecordId, m.source_json AS sourceJson ";
+
+    @Update("UPDATE ask_message m JOIN ask_conversation v ON v.id=m.conversation_id"
+        + " SET m.source_json=#{sourceJson} WHERE v.family_id=#{familyId} AND m.id=#{id}")
+    int updateSource(@Param("familyId") long familyId, @Param("id") long id, @Param("sourceJson") String sourceJson);
 
     @Insert("INSERT INTO ask_message (conversation_id, role, content_text, seq)"
           + " SELECT #{m.conversationId}, #{m.role}, #{m.contentText}, #{m.seq}"

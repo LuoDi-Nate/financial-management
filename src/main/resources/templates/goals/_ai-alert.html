@@ -11,6 +11,8 @@
       </span>
     </div>
     <p th:if="${alertStale == true}" class="text-sm text-brass-deep mb-3">这是先前计划或资金状态的历史预警,请结合当前进度查看。</p>
+    <p class="text-xs text-ink-soft break-words mb-2" th:text="${alertSourceLabel}"></p>
+    <p th:if="${alertSourceStale == true}" class="text-sm text-brass-deep mb-3">模型服务或选型已变更,这是保留的历史预警。</p>
     <p class="text-sm text-ink-soft whitespace-pre-line leading-relaxed mb-3" th:utext="${@aiText.priv(aiAlert.content)}"></p>
     <form th:action="@{|/goals/${goal.id}/alert/dismiss|}" method="post">
       <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">

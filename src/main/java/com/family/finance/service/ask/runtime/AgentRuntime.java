@@ -51,6 +51,9 @@ public interface AgentRuntime {
     @FunctionalInterface
     interface PromptSent {
         void sent(String system, String input, String vendor, boolean managed);
+        default void sent(String system, String input, String vendor, boolean managed, String sourceJson) {
+            sent(system, input, vendor, managed);
+        }
     }
 
     record AskTurn(

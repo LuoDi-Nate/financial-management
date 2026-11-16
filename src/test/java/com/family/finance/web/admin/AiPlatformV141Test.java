@@ -18,7 +18,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.assertj.core.api.Assertions.*;
 
 class AiPlatformV141Test {
-    static Stream<LlmCatalog.Platform> platforms() { return LlmCatalog.PLATFORMS.stream(); }
+    static Stream<LlmCatalog.Platform> platforms() { return LlmCatalog.PLATFORMS.stream().filter(p -> !p.code().equals(LlmCatalog.P_CUSTOM)); }
     private final Map<String,String> values=new HashMap<>();
     private final FamilyConfigService cfg=mock(FamilyConfigService.class);
     private final AuditLogService audit=mock(AuditLogService.class);
@@ -43,7 +43,7 @@ class AiPlatformV141Test {
         assertThat(values).containsOnlyKeys(p.keyName());assertThat(flash.getFlashAttributes().toString()).doesNotContain("123456789");
         var model=new ExtendedModelMap();view.addLlmAttributes(1,model);
         var cards=(List<LlmSettingsView.CredentialCard>)model.get("llmCredentialCards");
-        assertThat(cards).hasSameSizeAs(LlmCatalog.PLATFORMS);
+        assertThat(cards).hasSize((int)platforms().count());
         assertThat(cards.stream().filter(LlmSettingsView.CredentialCard::ready).toList()).extracting(LlmSettingsView.CredentialCard::code).containsExactly(p.code());
         assertThat(model.get("llmKeyCount")).isEqualTo(1L);
     }

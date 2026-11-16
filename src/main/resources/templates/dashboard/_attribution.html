@@ -253,7 +253,7 @@
           .then(function (resp) {
             if (window.privText && resp.text) window.privText(body, resp.text); else body.textContent = resp.text || '暂无复盘。';
             if (window.peekSet) window.peekSet(document.getElementById('reviewAiPeek'), resp.peek);
-            document.getElementById('reviewAiMeta').textContent = resp.vendor ? ('· ' + resp.vendor + (resp.cached ? ' · 缓存' : '')) : '';
+            document.getElementById('reviewAiMeta').textContent = resp.vendor ? ('· ' + resp.vendor + (resp.historical ? ' · 模型配置已变更,保留历史解读' : resp.cached ? ' · 缓存' : '')) : '';
           })
           .catch(function (e) { body.textContent = '复盘失败:' + e.message + ' · 稍后再试'; })
           .finally(function () { btn.disabled = false; btn.textContent = 'AI 月度复盘'; });

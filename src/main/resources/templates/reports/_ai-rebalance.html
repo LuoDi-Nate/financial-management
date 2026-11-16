@@ -28,6 +28,8 @@
         </div>
       </div>
     </div>
+    <p class="text-xs text-ink-soft break-words mb-2" th:text="${rebalanceAdvice.sourceLabel()}"></p>
+    <p th:if="${rebalanceAdvice.historical()}" class="text-sm text-brass-deep mb-2">模型服务或选型已变更,这是保留的历史建议。</p>
     <p th:if="${rebalanceAdvice.narrative != null}"
        class="text-xs text-ink-soft leading-relaxed font-serif mb-3"
        th:utext="${@aiText.priv(rebalanceAdvice.narrative)}">叙事...</p>

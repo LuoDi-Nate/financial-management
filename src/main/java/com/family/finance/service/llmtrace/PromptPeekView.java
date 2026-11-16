@@ -105,7 +105,7 @@ public record PromptPeekView(
             tail.add("# 金额、备注、家庭名、你自己写的偏好和补充要求是原样发的;成员名和账户名换成了代号。");
         }
         String rawAll = "[system]\n" + system + "\n\n[user]\n" + user;
-        return new PromptPeekView(label, state, warns, r.vendor,
+        return new PromptPeekView(label, state, warns, LlmSource.label(r.sourceJson, r.vendor),
                 r.createdAt == null ? null : r.createdAt.format(AT), r.settingsNote,
                 system.length(), user.length(), sysSegs, segs, legendLines, tail, rawAll, user, mine);
     }

@@ -30,6 +30,8 @@ public class RetirementController {
     private final GoalAiReportMapper reports;
     private final NavService nav;
     private final com.family.finance.service.llmtrace.PromptPeekLinks promptPeek;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.family.finance.service.llmtrace.LlmSource sources;
     private final GoalForecastService forecasts;
 
     @InitBinder("plan")
@@ -190,8 +192,11 @@ public class RetirementController {
                     ? forecasts.evaluate(goal,snapshot.progressAssets(),snapshot.progressTarget(),snapshot.result().coverage(),
                         snapshot,null,forecasts.context(familyId,LocalDate.now())) : forecast;
             String fingerprint = GoalReportService.contextFingerprint(snapshot, savedForecast);
+            var sourceContext = sources == null ? null : sources.context(familyId);
             reports.findLatestByGoalAndType(familyId, goal.getId(), "MONTHLY").ifPresent(report -> {
                 model.addAttribute("report", report);
+                model.addAttribute("reportSourceLabel", com.family.finance.service.llmtrace.LlmSource.label(report.getSourceJson(),"旧版记录,未保存完整来源"));
+                model.addAttribute("reportSourceStale", sourceContext != null && sourceContext.historical(report.getSourceJson()));
                 model.addAttribute("reportStale", !fingerprint.equals(report.getContextFingerprint()));
                 model.addAttribute("reportPeekSrc", promptPeek.of(familyId, report.getPromptRecordId(),
                         com.family.finance.service.llmtrace.PromptSurface.GOAL_REPORT, report.getGeneratedAt(), null));
@@ -199,6 +204,8 @@ public class RetirementController {
             reports.findLatestByGoalAndType(familyId, goal.getId(), "ALERT")
                     .filter(report -> report.getDismissedAt() == null).ifPresent(report -> {
                 model.addAttribute("aiAlert", report);
+                model.addAttribute("alertSourceLabel", com.family.finance.service.llmtrace.LlmSource.label(report.getSourceJson(),"旧版记录,未保存完整来源"));
+                model.addAttribute("alertSourceStale", sourceContext != null && sourceContext.historical(report.getSourceJson()));
                 model.addAttribute("alertStale", !fingerprint.equals(report.getContextFingerprint()));
                 model.addAttribute("alertPeekSrc", promptPeek.of(familyId, report.getPromptRecordId(),
                         com.family.finance.service.llmtrace.PromptSurface.GOAL_ALERT, report.getGeneratedAt(), null));
