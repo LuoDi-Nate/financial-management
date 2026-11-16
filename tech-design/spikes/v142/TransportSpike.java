@@ -33,6 +33,8 @@ public class TransportSpike {
     static final List<Seen> SEEN = new ArrayList<>();
     static final String MODEL = "Org/Model:version";
     static int checks;
+    static String transport;
+    static javax.net.ssl.X509TrustManager fixtureTrust;
     record Seen(String path, String host, String sni, String auth, String body) {}
     record Reply(int status, String body) {}
 
@@ -44,6 +46,26 @@ public class TransportSpike {
 
     static Reply post(SSLContext tls, int port, String host, String path,
                       String auth, Map<String, Object> body) throws Exception {
+        if (transport.equals("okhttp")) {
+            var client = new okhttp3.OkHttpClient.Builder().proxy(java.net.Proxy.NO_PROXY)
+                .dns(name -> {
+                    if (!name.equals(host)) throw new UnknownHostException("unexpected host");
+                    DNS.incrementAndGet();
+                    return List.of(InetAddress.getByAddress(new byte[]{127, 0, 0, 1}));
+                })
+                .sslSocketFactory(tls.getSocketFactory(), fixtureTrust)
+                .protocols(List.of(okhttp3.Protocol.HTTP_1_1))
+                .followRedirects(false).followSslRedirects(false).retryOnConnectionFailure(false).build();
+            var request = new okhttp3.Request.Builder().url("https://" + host + ":" + port + path)
+                .post(okhttp3.RequestBody.create(JSON.writeValueAsString(body), okhttp3.MediaType.get("application/json")));
+            if (auth != null) request.header("Authorization", auth);
+            try (var response = client.newCall(request.build()).execute()) {
+                return new Reply(response.code(), response.body().string());
+            } finally {
+                client.connectionPool().evictAll();
+                client.dispatcher().executorService().shutdown();
+            }
+        }
         DnsResolver pinned = new DnsResolver() {
             public InetAddress[] resolve(String name) throws UnknownHostException {
                 if (!name.equals(host)) throw new UnknownHostException("unexpected host");
@@ -68,12 +90,14 @@ public class TransportSpike {
     }
 
     public static void main(String[] args) throws Exception {
+        transport = args[1];
         var store = KeyStore.getInstance("PKCS12");
         try (var in = Files.newInputStream(Path.of(args[0]))) { store.load(in, "fixture-only".toCharArray()); }
         var keys = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
         keys.init(store, "fixture-only".toCharArray());
         var trust = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
         trust.init(store);
+        fixtureTrust = (javax.net.ssl.X509TrustManager) trust.getTrustManagers()[0];
         var serverTls = SSLContext.getInstance("TLS");
         serverTls.init(keys.getKeyManagers(), trust.getTrustManagers(), null);
         var clientTls = SSLContext.getInstance("TLS");
@@ -148,7 +172,7 @@ public class TransportSpike {
             check(reply.body.contains("data: [DONE]"), "SSE bytes retained");
             check(JSON.readTree(SEEN.getLast().body).path("stream").asBoolean(), "stream request retained");
             check(JSON.readTree(SEEN.getLast().body).at("/tools/0/function/name").asText().equals("fixture"), "tool JSON retained");
-            System.out.println("RESULT " + checks + " PASS; loopback fixture only; business model sends=0");
+            System.out.println("RESULT " + transport + " " + checks + " PASS; loopback fixture only; business model sends=0");
         } finally { server.stop(0); }
     }
 }

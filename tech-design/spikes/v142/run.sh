@@ -11,6 +11,9 @@ for task_jar in \
   org/apache/httpcomponents/core5/httpcore5/5.2.4/httpcore5-5.2.4.jar \
   org/apache/httpcomponents/core5/httpcore5-h2/5.2.4/httpcore5-h2-5.2.4.jar \
   org/slf4j/slf4j-api/2.0.16/slf4j-api-2.0.16.jar \
+  com/squareup/okhttp3/okhttp/4.12.0/okhttp-4.12.0.jar \
+  com/squareup/okio/okio-jvm/3.6.0/okio-jvm-3.6.0.jar \
+  org/jetbrains/kotlin/kotlin-stdlib/1.9.25/kotlin-stdlib-1.9.25.jar \
   com/fasterxml/jackson/core/jackson-databind/2.17.2/jackson-databind-2.17.2.jar \
   com/fasterxml/jackson/core/jackson-core/2.17.2/jackson-core-2.17.2.jar \
   com/fasterxml/jackson/core/jackson-annotations/2.17.2/jackson-annotations-2.17.2.jar; do
@@ -21,4 +24,5 @@ keytool -genkeypair -alias fixture -keyalg RSA -storetype PKCS12 \
   -keystore "$task_tmp/fixture.p12" -storepass fixture-only -keypass fixture-only \
   -dname CN=gateway.invalid -ext SAN=dns:gateway.invalid -validity 2 >/dev/null 2>&1
 javac -cp "$task_cp" -d "$task_tmp" "$task_dir/TransportSpike.java"
-java -cp "$task_tmp:$task_cp" TransportSpike "$task_tmp/fixture.p12"
+java -cp "$task_tmp:$task_cp" TransportSpike "$task_tmp/fixture.p12" apache
+java -cp "$task_tmp:$task_cp" TransportSpike "$task_tmp/fixture.p12" okhttp
