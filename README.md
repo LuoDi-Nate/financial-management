@@ -94,11 +94,11 @@
 
 ## 近期更新 · Releases
 
+**[v1.42.0](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.42.0) · 自有兼容服务与硅基流动接入(发布准备)**
+在原AI接入页配置自己的Chat Completions服务,地址、认证和密钥一起保存,文字主备与截图型号独立选择;同时包含硅基流动平台。历史AI结果保留发送时来源,升级只增加来源元数据,原有模型和账目保持原样。见 [PRD](prd/v1.42.md)、[技术设计](tech-design/v1.42.md)与[验收记录](docs/beta-review-v1.42.md)。
+
 **[v1.40.1](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.40.1) · 补齐新目标 AI 洞察**
 新退休目标恢复清晰的AI洞察入口、月报与偏离预警,解读同步引用月结余达成时间及来源。生成失败保留旧报告,窄屏阅读无遮挡;无新增数据库迁移。见 [补丁PRD](prd/v1.40.1.md)与[验收及发布记录](docs/beta-review-v1.40.1.md)。
-
-**[v1.40.0](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.40.0) · 目标多指标与按月结余的达成时间**
-保留资金进度,增加按当前月结余估算的达成月份与剩余时长,支持家庭自动来源和本目标手填。仪表盘预计月份位于进度轴右下角,小i说明门槛组成、资金进度和达成月份的计算依据;独立保存估算不冲掉主计划草稿。见 [PRD](prd/v1.40.md)、[技术设计](tech-design/v1.40.md)与[验收及发布记录](docs/beta-review-v1.40.md)。
 
 > 完整发布记录与截图见 [Releases](https://github.com/LuoDi-Nate/financial-management/releases)(本段每版只留 2–4 行,细节不搬过来)。
 

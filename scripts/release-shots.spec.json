@@ -1,52 +1,45 @@
 {
-  "_comment": "v1.40.0:目标计算摘要、按月结余达成时间与独立估算设置。只读取beta已有退休计划,不固定本地目标编号;默认金额隐私,不保存配置或调用模型。",
+  "_comment": "v1.42.0:自有兼容服务、共同选型与硅基流动。只读取beta页面;地址、名称、型号与密钥掩码仅在截图DOM替换为示例,不保存配置。必须先开启服务端模型保护。",
   "pc": [
     {
-      "path": "/dashboard",
-      "name": "goal-summary",
-      "eval": "var c=Array.from(document.querySelectorAll('[data-goal-strip-card]')).find(e=>e.querySelector('[data-estimate-dashboard]'));if(!c)throw new Error('需要一个支持时间估算的目标');c.scrollIntoView({block:'center'});c.querySelector('[data-kpi-info]').click();",
-      "wait": 2000,
-      "clipUnion": ["[data-goal-strip-card]:has([data-goal-progress-summary]:not(.hidden))", "[data-goal-progress-summary]:not(.hidden)"]
+      "path": "/admin/ai-access#llm-custom-service",
+      "name": "custom-service",
+      "eval": "document.querySelector('#customName').value='自有服务';document.querySelector('#customBaseUrl').value='https://llm.example.com/v1';document.querySelector('#llm-custom-service .cred-name').textContent='自有服务 · OpenAI兼容';document.querySelector('[data-custom-key] .text-ink-soft').textContent='********';document.querySelector('[data-custom-endpoint]').textContent='https://llm.example.com/v1/chat/completions';document.querySelector('[data-custom-probe]').textContent='测试型号:Org/Text-Model';document.querySelector('#primaryModelId').value='Org/Text-Model';document.querySelector('[data-llm-effective]').textContent='当前生效 · 主选 自有服务 · Org/Text-Model · 备选 不设备选';document.querySelectorAll('.cred-mask').forEach(e=>e.textContent='********');document.querySelector('#customName').value='自有服务';document.querySelector('#customBaseUrl').value='https://llm.example.com/v1';document.querySelector('#llm-custom-service .cred-name').textContent='自有服务 · OpenAI兼容';document.querySelector('[data-custom-key] .text-ink-soft').textContent='********';document.querySelector('[data-custom-endpoint]').textContent='https://llm.example.com/v1/chat/completions';document.querySelector('[data-custom-probe]').textContent='测试型号:Org/Text-Model';",
+      "selector": "#llm-custom-service",
+      "afterEval": "document.querySelector('#llm-custom-service').scrollIntoView({block:'start'});window.scrollBy(0,-90);"
     },
     {
-      "path": "/goals",
-      "name": "goal-cashflow-time",
-      "eval": "var a=Array.from(document.querySelectorAll('a[href^=\"/goals/\"]')).find(a=>a.textContent.includes('退休生活账'));if(!a)throw new Error('需要一个已保存的退休计划');a.href+='/retirement#goal-estimate-result';a.click();",
-      "afterEval": "var e=document.querySelector('#goal-estimate-result');if(!e)throw new Error('缺少时间估算');window.scrollTo({top:Math.max(0,e.getBoundingClientRect().top+scrollY-96),behavior:'instant'});",
-      "wait": 3500,
-      "selector": "#goal-estimate-result"
+      "path": "/admin/ai-access#llm-models",
+      "name": "model-selection",
+      "eval": "document.querySelector('#customName').value='自有服务';document.querySelector('#customBaseUrl').value='https://llm.example.com/v1';document.querySelector('#llm-custom-service .cred-name').textContent='自有服务 · OpenAI兼容';document.querySelector('[data-custom-key] .text-ink-soft').textContent='********';document.querySelector('[data-custom-endpoint]').textContent='https://llm.example.com/v1/chat/completions';document.querySelector('[data-custom-probe]').textContent='测试型号:Org/Text-Model';document.querySelector('#primaryModelId').value='Org/Text-Model';document.querySelector('[data-llm-effective]').textContent='当前生效 · 主选 自有服务 · Org/Text-Model · 备选 不设备选';document.querySelectorAll('.cred-mask').forEach(e=>e.textContent='********');document.querySelector('#primaryModelId').value='Org/Text-Model';document.querySelector('[data-llm-effective]').textContent='当前生效 · 主选 自有服务 · Org/Text-Model · 备选 不设备选';",
+      "selector": "#llm-models",
+      "afterEval": "document.querySelector('#llm-models').scrollIntoView({block:'start'});window.scrollBy(0,-90);"
     },
     {
-      "path": "/goals",
-      "name": "goal-estimate-settings",
-      "eval": "var a=Array.from(document.querySelectorAll('a[href^=\"/goals/\"]')).find(a=>a.textContent.includes('退休生活账'));if(!a)throw new Error('需要一个已保存的退休计划');a.href+='/retirement?tab=plan#goal-estimate-settings';a.click();",
-      "afterEval": "var e=document.querySelector('#goal-estimate-settings');if(!e)throw new Error('缺少时间估算设置');window.scrollTo({top:Math.max(0,e.getBoundingClientRect().top+scrollY-96),behavior:'instant'});",
-      "wait": 3500,
-      "selector": "#goal-estimate-settings"
+      "path": "/admin/ai-access#llm-key-siliconflow",
+      "name": "siliconflow",
+      "eval": "document.querySelector('#customName').value='自有服务';document.querySelector('#customBaseUrl').value='https://llm.example.com/v1';document.querySelector('#llm-custom-service .cred-name').textContent='自有服务 · OpenAI兼容';document.querySelector('[data-custom-key] .text-ink-soft').textContent='********';document.querySelector('[data-custom-endpoint]').textContent='https://llm.example.com/v1/chat/completions';document.querySelector('[data-custom-probe]').textContent='测试型号:Org/Text-Model';document.querySelector('#primaryModelId').value='Org/Text-Model';document.querySelector('[data-llm-effective]').textContent='当前生效 · 主选 自有服务 · Org/Text-Model · 备选 不设备选';document.querySelectorAll('.cred-mask').forEach(e=>e.textContent='********');document.querySelectorAll('.cred-mask').forEach(e=>e.textContent='********');document.querySelector('#llm-key-siliconflow details').open=true;",
+      "selector": "#llm-key-siliconflow",
+      "afterEval": "document.querySelector('#llm-key-siliconflow').scrollIntoView({block:'start'});window.scrollBy(0,-90);"
     }
   ],
   "mobile": [
     {
-      "path": "/dashboard",
-      "name": "goal-summary",
-      "eval": "var c=Array.from(document.querySelectorAll('[data-goal-strip-card]')).find(e=>e.getBoundingClientRect().width>0&&e.querySelector('[data-estimate-dashboard]'));if(!c)throw new Error('需要一个支持时间估算的目标');c.scrollIntoView({block:'center'});c.querySelector('[data-kpi-info]').click();",
-      "wait": 2000,
+      "path": "/admin/ai-access#llm-custom-service",
+      "name": "custom-service",
+      "eval": "document.querySelector('#customName').value='自有服务';document.querySelector('#customBaseUrl').value='https://llm.example.com/v1';document.querySelector('#llm-custom-service .cred-name').textContent='自有服务 · OpenAI兼容';document.querySelector('[data-custom-key] .text-ink-soft').textContent='********';document.querySelector('[data-custom-endpoint]').textContent='https://llm.example.com/v1/chat/completions';document.querySelector('[data-custom-probe]').textContent='测试型号:Org/Text-Model';document.querySelector('#primaryModelId').value='Org/Text-Model';document.querySelector('[data-llm-effective]').textContent='当前生效 · 主选 自有服务 · Org/Text-Model · 备选 不设备选';document.querySelectorAll('.cred-mask').forEach(e=>e.textContent='********');document.querySelector('#customName').value='自有服务';document.querySelector('#customBaseUrl').value='https://llm.example.com/v1';document.querySelector('#llm-custom-service .cred-name').textContent='自有服务 · OpenAI兼容';document.querySelector('[data-custom-key] .text-ink-soft').textContent='********';document.querySelector('[data-custom-endpoint]').textContent='https://llm.example.com/v1/chat/completions';document.querySelector('[data-custom-probe]').textContent='测试型号:Org/Text-Model';document.querySelector('#llm-custom-service').scrollIntoView({block:'start'});window.scrollBy(0,-90);",
       "full": false
     },
     {
-      "path": "/goals",
-      "name": "goal-cashflow-time",
-      "eval": "var a=Array.from(document.querySelectorAll('a[href^=\"/goals/\"]')).find(a=>a.textContent.includes('退休生活账'));if(!a)throw new Error('需要一个已保存的退休计划');a.href+='/retirement#goal-estimate-result';a.click();",
-      "afterEval": "var e=document.querySelector('#goal-estimate-result');if(!e)throw new Error('缺少时间估算');window.scrollTo({top:Math.max(0,e.getBoundingClientRect().top+scrollY-96),behavior:'instant'});",
-      "wait": 3500,
+      "path": "/admin/ai-access#llm-models",
+      "name": "model-selection",
+      "eval": "document.querySelector('#customName').value='自有服务';document.querySelector('#customBaseUrl').value='https://llm.example.com/v1';document.querySelector('#llm-custom-service .cred-name').textContent='自有服务 · OpenAI兼容';document.querySelector('[data-custom-key] .text-ink-soft').textContent='********';document.querySelector('[data-custom-endpoint]').textContent='https://llm.example.com/v1/chat/completions';document.querySelector('[data-custom-probe]').textContent='测试型号:Org/Text-Model';document.querySelector('#primaryModelId').value='Org/Text-Model';document.querySelector('[data-llm-effective]').textContent='当前生效 · 主选 自有服务 · Org/Text-Model · 备选 不设备选';document.querySelectorAll('.cred-mask').forEach(e=>e.textContent='********');document.querySelector('#primaryModelId').value='Org/Text-Model';document.querySelector('[data-llm-effective]').textContent='当前生效 · 主选 自有服务 · Org/Text-Model · 备选 不设备选';document.querySelector('#llm-models').scrollIntoView({block:'start'});window.scrollBy(0,-90);",
       "full": false
     },
     {
-      "path": "/goals",
-      "name": "goal-estimate-settings",
-      "eval": "var a=Array.from(document.querySelectorAll('a[href^=\"/goals/\"]')).find(a=>a.textContent.includes('退休生活账'));if(!a)throw new Error('需要一个已保存的退休计划');a.href+='/retirement?tab=plan#goal-estimate-settings';a.click();",
-      "afterEval": "var e=document.querySelector('#goal-estimate-settings');if(!e)throw new Error('缺少时间估算设置');window.scrollTo({top:Math.max(0,e.getBoundingClientRect().top+scrollY-96),behavior:'instant'});",
-      "wait": 3500,
+      "path": "/admin/ai-access#llm-key-siliconflow",
+      "name": "siliconflow",
+      "eval": "document.querySelector('#customName').value='自有服务';document.querySelector('#customBaseUrl').value='https://llm.example.com/v1';document.querySelector('#llm-custom-service .cred-name').textContent='自有服务 · OpenAI兼容';document.querySelector('[data-custom-key] .text-ink-soft').textContent='********';document.querySelector('[data-custom-endpoint]').textContent='https://llm.example.com/v1/chat/completions';document.querySelector('[data-custom-probe]').textContent='测试型号:Org/Text-Model';document.querySelector('#primaryModelId').value='Org/Text-Model';document.querySelector('[data-llm-effective]').textContent='当前生效 · 主选 自有服务 · Org/Text-Model · 备选 不设备选';document.querySelectorAll('.cred-mask').forEach(e=>e.textContent='********');document.querySelectorAll('.cred-mask').forEach(e=>e.textContent='********');document.querySelector('#llm-key-siliconflow details').open=true;document.querySelector('#llm-key-siliconflow').scrollIntoView({block:'start'});window.scrollBy(0,-90);",
       "full": false
     }
   ]
