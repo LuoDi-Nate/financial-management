@@ -94,7 +94,7 @@
 
 ## 近期更新 · Releases
 
-**[v1.42.0](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.42.0) · 自有兼容服务与硅基流动接入(发布准备)**
+**[v1.42.0](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.42.0) · 自有兼容服务与硅基流动接入**
 在原AI接入页配置自己的Chat Completions服务,地址、认证和密钥一起保存,文字主备与截图型号独立选择;同时包含硅基流动平台。历史AI结果保留发送时来源,升级只增加来源元数据,原有模型和账目保持原样。见 [PRD](prd/v1.42.md)、[技术设计](tech-design/v1.42.md)与[验收记录](docs/beta-review-v1.42.md)。
 
 **[v1.40.1](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.40.1) · 补齐新目标 AI 洞察**
@@ -350,8 +350,8 @@ bash scripts/regression-data.sh # 数据层/口径回归(原 e2e.sh · curl 端�
 
 ## 文档
 
-- beta待验收:[v1.42 自有兼容服务](prd/v1.42.md) · [交互预览](preview/v1.42/custom-llm.html) · [技术设计](tech-design/v1.42.md) · [验收记录](docs/beta-review-v1.42.md)。同页原子服务配置、明确免认证与内网许可、文字/视觉/本地工具及来源留存;当前beta1.42.0包含#42,尚未发布。
-- 依赖待验收:[v1.41 硅基流动 AI 接入](prd/v1.41.md) · [交互预览](preview/v1.41/ai-access.html) · [技术设计](tech-design/v1.41.md) · [验收记录](docs/beta-review-v1.41.md)。四平台共同配置交互,文字/图片/本地工具SSE接入,旧配置与百炼轮询保留;由v1.42开发分支承接,尚未合并master或发布。
+- [v1.42 自有兼容服务](prd/v1.42.md) · [交互预览](preview/v1.42/custom-llm.html) · [技术设计](tech-design/v1.42.md) · [验收记录](docs/beta-review-v1.42.md)。同页原子服务配置、明确免认证与内网许可、文字/视觉/本地工具及来源留存,已随v1.42.0发布。
+- [v1.41 硅基流动 AI 接入](prd/v1.41.md) · [交互预览](preview/v1.41/ai-access.html) · [技术设计](tech-design/v1.41.md) · [验收记录](docs/beta-review-v1.41.md)。四平台共同配置交互,文字/图片/本地工具SSE接入,旧配置与百炼轮询保留;随v1.42.0一同发布。
 
 - 已发布补丁:[v1.40.1 新目标 AI 洞察修复](prd/v1.40.1.md),[技术方案附录](tech-design/v1.40.md)。
 

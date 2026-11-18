@@ -1,6 +1,6 @@
 # v1.42 · 自有兼容服务 · beta验收记录
 
-状态:2026-11-17已部署beta1.42.0;维护者授权的真实服务验收通过后要求“1.42上线吧”。#43及其#42依赖已合入私有master,准备发布预检与v1.42.0精确确认,尚未发布或推公开源码。[issue #43](https://github.com/LuoDi-Nate/financial-management/issues/43) · [PRD](../prd/v1.42.md) · [技术设计](../tech-design/v1.42.md)。
+状态:2026-11-17通过beta验收;维护者于2026-11-18精确确认后,已将#43及其#42依赖一起发布为v1.42.0。[issue #43](https://github.com/LuoDi-Nate/financial-management/issues/43) · [PRD](../prd/v1.42.md) · [技术设计](../tech-design/v1.42.md)。
 
 业务候选:`223e3491`。已部署jar与本工作区最终产物SHA-256一致(前缀`b335c4ee6314`);后续纯文档提交不改变该产物。
 
@@ -80,3 +80,9 @@ V81仅新增`llm_prompt_record`、`review_ai_cache`、`rebalance_advice_cache`�
 六张发布截图覆盖桌面与390触屏的自有服务、模型选型及硅基流动凭据/帮助。地址、名称、型号及密钥掩码仅在浏览器DOM替换为示例,每张图都先脱敏相邻内容;桌面按元素裁剪并避开固定顶栏,手机保持整屏。已逐张核对,运行配置摘要不变。截图窗口开启服务端模型保护且实际发送0,结束恢复维护者原开关状态,保留各保护窗口计数。
 
 目标发布v1.42.0,从v1.40.1升级时仅新增V81的六列可空来源元数据。旧jar回滚前须恢复其支持的主备及视觉平台。正式阶段0预检与精确版本确认完成前,不打tag、不推公开源码或操作prod。
+
+## 生产发布
+
+- 2026-11-18收到维护者的`release v1.42.0`确认。对应候选`7f9c6f40`通过正式预检:1634项测试,失败、错误、跳过均为0;39项静态守护通过。
+- 从同一标签在本机构建并校验JAR,生产先备份再应用V81,未在生产编译或复制beta配置。升级后`/health`报告`UP`和`1.42.0`,本机与公网的`/health`及`/login`均为HTTP 200。
+- [Docker CI](https://github.com/LuoDi-Nate/financial-management/actions/runs/44253980005)通过;GHCR的Linux `amd64`、`arm64`镜像版本与候选一致,`v1.42.0`和`latest`指向同一索引。[发布说明与六张脱敏截图](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.42.0)。
