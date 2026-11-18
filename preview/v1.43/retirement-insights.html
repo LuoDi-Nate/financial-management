@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>家庭账房 · 退休生活账预览</title>
+  <link rel="stylesheet" href="../assets/style.css">
+  <link rel="stylesheet" href="../../src/main/resources/static/css/style.css">
+  <style>
+    * { box-sizing:border-box; letter-spacing:0; }
+    body,h1,h2,h3,p,dl,dd { margin:0; }
+    [hidden] { display:none!important; }
+    :focus-visible { outline:2px solid var(--forest); outline-offset:3px; }
+    .wrap { max-width:920px; margin:auto; padding-inline:24px; }
+    .top { border-block:3px solid var(--ink); border-bottom-width:1px; position:relative; z-index:1; }
+    .top .wrap,.row,.head,.controls { display:flex; flex-wrap:wrap; align-items:center; gap:12px; }
+    .top .wrap { justify-content:space-between; padding-block:12px; }
+    .mark,h1,h2,.report-title { font-family:"Fraunces","Noto Serif SC",serif; }
+    .mark { font-size:22px; font-weight:600; }
+    .muted,.date { color:var(--ink-soft); }
+    .controls,.meta,.eyebrow-text,.muted { font-size:13px; }
+    .controls select,.controls input { margin-inline-start:4px; }
+    main { position:relative; z-index:1; padding-block:26px 60px; }
+    h1 { font-size:30px; font-weight:600; }
+    h2 { font-size:21px; font-weight:600; margin:0 0 12px; }
+    p { line-height:1.7; }
+    .head { justify-content:space-between; margin:6px 0 18px; }
+    .tabs { display:flex; gap:8px; border-bottom:1px solid var(--rule); margin-bottom:24px; }
+    .tab { border:0; border-bottom:2px solid transparent; background:none; color:var(--ink-soft); padding:10px 12px; cursor:pointer; }
+    .tab[aria-pressed=true] { border-bottom-color:var(--forest); color:var(--ink); font-weight:600; }
+    .funds { max-width:680px; padding-bottom:20px; }
+    .funds dl { margin:12px 0; }
+    .funds dl > div { display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:6px 20px; padding:8px 0; border-bottom:1px solid var(--rule-soft); }
+    .funds dl .total { border-bottom:3px double var(--rule); color:var(--forest); font-weight:600; }
+    dd,.metric b,.date { font-family:"JetBrains Mono",monospace; overflow-wrap:anywhere; }
+    #scope { width:100%; max-width:450px; height:auto; min-height:40px; margin:6px 0 12px; }
+    #account-options { margin:4px 0 12px; }
+    #account-options label { display:block; padding:6px 0; }
+    .meter { width:100%; height:7px; accent-color:var(--forest); }
+    .metric { display:flex; flex-wrap:wrap; gap:6px 16px; justify-content:space-between; }
+    .alert { border-inline-start:4px solid var(--rust); padding:12px 16px; margin:12px 0 18px; }
+    .alert .row,.report-body .row { justify-content:space-between; }
+    .alert p { margin:8px 0 12px; }
+    #ai-report { border-left:4px solid var(--brass-deep); overflow:hidden; border-radius:6px; scroll-margin-top:16px; }
+    .report-summary { list-style:none; display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px; padding:16px 20px; cursor:pointer; border-bottom:1px solid var(--rule-soft); }
+    .report-summary::-webkit-details-marker { display:none; }
+    .report-summary:hover { background:var(--card-soft); }
+    .report-summary > svg { color:var(--brass-deep); flex:none; }
+    .report-label { flex:1 1 176px; min-width:0; }
+    .eyebrow-text { color:var(--brass-deep); }
+    .report-title { font-size:18px; font-weight:600; }
+    .report-body { padding:16px 20px; }
+    .report-body p { margin:6px 0 12px; }
+    .report-actions { border-top:1px solid var(--rule-soft); padding-top:12px; margin-top:12px; }
+    .tool-btn { width:36px; height:32px; justify-content:center; flex:none; }
+    .error { color:var(--rust); }
+    .notice { color:var(--brass-deep); }
+    dialog { width:min(480px,calc(100% - 32px)); padding:20px; border:1px solid var(--rule); border-radius:8px; background:var(--card); color:var(--ink); }
+    dialog::backdrop { background:#171b1b6b; }
+    dialog .row { justify-content:space-between; }
+    @media(max-width:520px) {
+      .wrap { padding-inline:16px; }
+      .report-summary,.report-body { padding-inline:14px; }
+      .report-summary .date { flex-basis:100%; }
+      .controls { gap:8px 14px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="top">
+    <div class="wrap">
+      <span class="mark">家庭账房</span>
+      <div class="controls">
+        <span class="muted">预览 · 示例账本</span>
+        <label>目标 <select id="kind"><option value="retire">新退休目标</option><option value="legacy">旧目标</option></select></label>
+        <label>月报 <select id="fixture"><option value="ready">已生成</option><option value="empty">未生成</option><option value="stale">历史解读</option></select></label>
+        <label><input type="checkbox" id="privacy"> 隐私</label>
+      </div>
+    </div>
+  </header>
+  <main class="wrap">
+    <p class="muted">目标 / <span id="crumb">退休计划</span></p>
+    <div class="head"><h1 id="title">退休生活账</h1><a class="btn-paper btn-accent text-xs" id="go-insight" href="#ai-report">AI 洞察</a></div>
+    <nav class="tabs" aria-label="退休目标视图" id="tabs">
+      <button type="button" class="tab" data-view="life" aria-controls="life" aria-pressed="true">退休生活账</button>
+      <button type="button" class="tab" data-view="plan" aria-controls="plan" aria-pressed="false">调整计划</button>
+    </nav>
+    <section class="funds" id="life">
+      <h2>资金进度</h2>
+      <div class="metric"><span id="fund-label">净可支用资金 / 资金需求</span><b id="progress-amount"></b></div>
+      <progress class="meter" id="progress" max="100" value="50" aria-label="资金进度"></progress>
+      <div class="metric muted"><span id="ratio"></span><span id="gap"></span></div>
+    </section>
+    <section class="funds" id="plan" hidden>
+      <h2>家庭资金</h2>
+      <label for="scope" class="field-label">资金范围</label>
+      <select id="scope" class="field-input">
+        <option value="net">全家可支用金融资产（剔除负债）</option>
+        <option value="gross">全家可支用金融资产（原口径）</option>
+        <option value="custom">自行选择账户</option>
+      </select>
+      <div id="account-options" hidden>
+        <label><input type="checkbox" data-balance="1800000" checked> 现金与理财</label>
+        <label><input type="checkbox" data-balance="3200000" checked> 证券与基金</label>
+      </div>
+      <dl>
+        <div><dt>参与金融资产合计</dt><dd id="assets"></dd></div>
+        <div><dt>全家负债 · 房贷、信用卡及其他贷款</dt><dd id="debt"></dd></div>
+        <div class="total"><dt id="fund-total-label"></dt><dd id="fund-total"></dd></div>
+        <div><dt>资金需求</dt><dd id="need"></dd></div>
+        <div><dt>预留准备金后的可投资本金</dt><dd id="principal"></dd></div>
+      </dl>
+      <p class="muted" id="scope-note"></p>
+      <button type="button" class="btn-ink mt-4" id="save">保存计划</button>
+      <output class="muted" id="plan-status" aria-live="polite"></output>
+    </section>
+    <div id="insights">
+      <section id="alert" class="alert" aria-label="目标偏离预警">
+        <div class="row"><h3>目标偏离预警</h3><span class="date meta">2026-11-18 09:30 · 90 天内复用</span></div>
+        <p>按目前进度，距离目标仍有缺口。可在下一期复核实际结余和预留计划。</p>
+        <button type="button" class="btn-paper text-xs" id="dismiss">我知道了</button>
+      </section>
+      <section id="ai-report" class="paper-card">
+        <details id="report-details" open>
+          <summary class="report-summary">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2zM22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+            <span class="report-label"><span class="eyebrow-text">AI · 综 · 合 · 月 · 报</span><br><span class="report-title" id="report-title">本期周期叙事</span></span>
+            <span class="date meta" id="report-time">本期复用 · 渲染于 2026-11-18 09:30</span>
+          </summary>
+          <div class="report-body">
+            <p id="report-error" class="error" role="alert" hidden></p>
+            <div id="report-content">
+              <div class="row"><span class="muted">来源：示例模型</span><button type="button" class="btn-ghost tool-btn" id="peek" title="查看提示词" aria-label="查看提示词">&gt;_</button></div>
+              <p id="stale" class="notice" hidden>计划、资金或月结余依据已变化，以下为历史解读。</p>
+              <p>已为目标积累一部分资金。优先核对全家负债和大额支出准备金，再评估每月可投入金额。</p>
+              <p id="narrative-amount"></p>
+            </div>
+            <p id="report-empty" class="muted" hidden>周期关闭时系统会自动生成月报，也可立即手动触发。</p>
+            <div class="report-actions">
+              <button type="button" class="btn-paper btn-accent text-xs" id="generate">重新生成</button>
+            </div>
+          </div>
+        </details>
+      </section>
+    </div>
+  </main>
+  <dialog id="prompt-dialog" aria-labelledby="prompt-title">
+    <div class="row"><h2 id="prompt-title">提示词</h2><form method="dialog"><button class="btn-ghost tool-btn" aria-label="关闭提示词" title="关闭">×</button></form></div>
+    <p>示例：依据已计算的资金进度和缺口解释计划，不自行计算账目。</p>
+  </dialog>
+  <script>
+    const by = id => document.getElementById(id);
+    const cny = new Intl.NumberFormat('zh-CN',{style:'currency',currency:'CNY',maximumFractionDigits:0});
+    const accounts = [...document.querySelectorAll('[data-balance]')];
+    let savedScope = 'net';
+    let savedAccounts = accounts.map(a => a.checked);
+    let currentView = 'life';
+    const legacy = () => by('kind').value === 'legacy';
+    const money = amount => by('privacy').checked ? '••••' : cny.format(amount);
+    function figures(mode,balance) {
+      const debt = 1000000;
+      const current = mode === 'net' ? balance-debt : balance;
+      const need = mode === 'net' ? 8000000 : 9000000;
+      return {balance,debt,current,need,gap:Math.max(need-current,0),principal:balance-debt-500000,ratio:current/need*100};
+    }
+    function renderAmounts() {
+      const mode = by('scope').value;
+      const draft = accounts.reduce((sum,a) => sum+(mode!=='custom'||a.checked ? Number(a.dataset.balance) : 0),0);
+      const saved = accounts.reduce((sum,a,i) => sum+(savedScope!=='custom'||savedAccounts[i] ? Number(a.dataset.balance) : 0),0);
+      const d = figures(mode,draft);
+      const r = legacy() ? figures('gross',5000000) : figures(savedScope,saved);
+      by('account-options').hidden = mode !== 'custom';
+      by('fund-total-label').textContent = mode === 'net' ? '净可支用资金' : '可支用资产（扣债前）';
+      by('scope-note').textContent = mode === 'net' ? '负债已在资金端扣除，资金需求不再包含负债。' : '此处为扣债前的金额，资金需求包含全家负债。';
+      by('fund-label').textContent = !legacy()&&savedScope==='net' ? '净可支用资金 / 资金需求' : '已积累资金 / 资金需求';
+      for (const [id,value] of Object.entries({assets:d.balance,debt:d.debt,'fund-total':d.current,need:d.need,principal:d.principal})) by(id).textContent = money(value);
+      by('progress-amount').textContent = `${money(r.current)} / ${money(r.need)}`;
+      by('progress').value = Math.min(100,Math.max(0,r.ratio));
+      by('ratio').textContent = `完成度 ${r.ratio.toFixed(1)}%`;
+      by('gap').textContent = `资金缺口 ${money(r.gap)}`;
+      by('narrative-amount').textContent = `本期资金缺口：${money(4000000)}。`;
+    }
+    function view(name) {
+      currentView = name;
+      by('life').hidden = name !== 'life';
+      by('plan').hidden = name !== 'plan';
+      by('insights').hidden = name !== 'life';
+      document.querySelectorAll('[data-view]').forEach(b => b.setAttribute('aria-pressed',String(b.dataset.view===name)));
+    }
+    function showReport() {
+      view('life');
+      by('report-details').open = true;
+      by('ai-report').scrollIntoView({block:'start'});
+    }
+    function renderReport() {
+      const hasReport = by('fixture').value !== 'empty';
+      by('report-details').open = hasReport;
+      by('report-content').hidden = by('report-time').hidden = !hasReport;
+      by('report-empty').hidden = hasReport;
+      by('stale').hidden = by('fixture').value !== 'stale';
+      by('report-error').hidden = true;
+      by('report-title').textContent = hasReport ? '本期周期叙事' : '本期 AI 月报尚未生成';
+      by('generate').textContent = hasReport ? '重新生成' : '立即生成月报';
+      by('generate').className = hasReport ? 'btn-ghost text-xs' : 'btn-paper btn-accent text-xs';
+    }
+    document.querySelectorAll('[data-view]').forEach(button => button.addEventListener('click',() => view(button.dataset.view)));
+    by('kind').addEventListener('change',() => {
+      by('title').textContent = legacy() ? '长期储蓄目标' : '退休生活账';
+      by('crumb').textContent = legacy() ? '长期储蓄' : '退休计划';
+      by('tabs').hidden = legacy();
+      view(legacy() ? 'life' : currentView);
+      by('alert').hidden = false;
+      renderAmounts();
+      renderReport();
+    });
+    by('scope').addEventListener('change',renderAmounts);
+    accounts.forEach(input => input.addEventListener('change',renderAmounts));
+    by('privacy').addEventListener('change',renderAmounts);
+    by('fixture').addEventListener('change',renderReport);
+    by('go-insight').addEventListener('click',event => {
+      event.preventDefault();
+      if (location.hash !== '#ai-report') history.pushState(null,'','#ai-report');
+      showReport();
+    });
+    by('save').addEventListener('click',() => {
+      savedScope = by('scope').value;
+      savedAccounts = accounts.map(a => a.checked);
+      by('plan-status').textContent = '已保存';
+      renderAmounts();
+    });
+    by('generate').addEventListener('click',() => {
+      by('report-error').textContent = '测试环境 · 未调用模型。';
+      by('report-error').hidden = false;
+    });
+    by('dismiss').addEventListener('click',() => {by('alert').hidden = true;});
+    by('peek').addEventListener('click',() => by('prompt-dialog').showModal());
+    window.addEventListener('hashchange',() => {if(location.hash==='#ai-report') showReport();});
+    renderAmounts();
+    renderReport();
+    if (location.hash === '#ai-report') showReport();
+  </script>
+</body>
+</html>
