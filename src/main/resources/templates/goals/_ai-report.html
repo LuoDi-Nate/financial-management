@@ -12,7 +12,8 @@
           <div class="font-mono text-[10px] tracking-[0.18em] uppercase text-brass-deep">AI · 综 · 合 · 月 · 报</div>
           <div class="font-display text-lg font-medium" th:text="${aiMonthlyReport != null ? '本期周期叙事' : '本期 AI 月报尚未生成'}">本期周期叙事</div>
         </div>
-        <span class="font-mono text-[10px] text-ink-subtle"
+        <span class="w-full pl-8 sm:w-auto sm:pl-0 font-mono text-[10px] text-ink-subtle"
+              data-goal-report-time
               th:if="${aiMonthlyReport != null}"
               th:text="'本期复用 · 渲染于 ' + ${#temporals.format(aiMonthlyReport.generatedAt, 'yyyy-MM-dd HH:mm')}">本期复用 · 渲染于 2026-05-12</span>
       </summary>

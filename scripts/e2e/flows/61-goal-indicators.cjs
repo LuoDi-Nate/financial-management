@@ -65,6 +65,11 @@ async function insights(ui) {
         const r=el.getBoundingClientRect(),top=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
         return r.top>=38 && r.bottom<=innerHeight && (top===el||el.contains(top));
       }),'手机'+width+'AI标题在视口且未被顶栏遮挡');
+      await mobile.assert(await mobile.page.locator('#ai-report summary').evaluate(el=>{
+        const title=el.querySelector('.font-display').getBoundingClientRect();
+        const time=el.querySelector('[data-goal-report-time]').getBoundingClientRect();
+        return title.width>=110 && title.height<36 && time.top>=title.bottom;
+      }),'手机'+width+'时间换到下一行,标题没有被挤成竖排');
       await mobile.assert(await mobile.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'手机'+width+'洞察无横向溢出');
       await mobile.page.locator('#ai-report button[type=submit]').last().scrollIntoViewIfNeeded();
       await mobile.assert(await mobile.page.locator('#ai-report button[type=submit]').last().evaluate(el=>{
