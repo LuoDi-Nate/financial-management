@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<body>
+  <div th:fragment="metric(label, value, key, primary)" class="min-w-0">
+    <div class="font-mono text-xs text-ink-subtle mb-1" th:text="${label}"></div>
+    <div class="font-display tnum break-words"
+         th:classappend="${primary ? 'text-2xl sm:text-3xl' : 'text-xl sm:text-2xl'}"
+         data-priv="value" th:attr="data-retire-value=${key}" th:text="${value}"></div>
+  </div>
+
+  <div th:fragment="progress(percent)" data-goal-detail-progress
+       role="progressbar" aria-label="当前进度" aria-valuemin="0" aria-valuemax="100"
+       th:with="width=${percent < 0 ? 0 : (percent > 100 ? 100 : percent)}"
+       th:attr="aria-valuenow=${width},aria-valuetext=${percent + '%'}"
+       class="w-full bg-rule-soft h-2.5 rounded-full overflow-hidden mt-4">
+    <div class="h-full rounded-full bg-brass-deep" th:style="'width:' + ${width} + '%'"></div>
+  </div>
+</body>
+</html>

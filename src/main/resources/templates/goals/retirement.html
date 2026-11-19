@@ -121,129 +121,90 @@
         data-retire-panel="overview"
       >
         <div data-retire-live="result">
-          <p class="text-sm mb-3" data-retire-config-status role="status"
-             th:classappend="${view.configurationComplete() ? 'text-forest' : 'text-ink-soft'}"
-             th:text="${activePlan and !previewing and (view.active() or !upgrading) ? (view.configurationComplete() ? '配置已完成 · 已保存' : '配置已保存 · 有设置需要调整') : (view.configurationComplete() ? '配置已填齐 · 尚未保存' : '配置尚未填齐')}"></p>
-          <div class="retire-section-head">
-            <h2 class="font-display text-2xl" th:text="${r.message()}"></h2>
-            <div
-              class="retire-currencies"
-              th:if="${goal != null}"
-              aria-label="显示币种"
-            >
-              <a
-                th:each="ccy : ${ {'CNY','USD','HKD'} }"
-                th:href="@{|/goals/${goal.id}/retirement?ccy=${ccy}|}"
-                th:text="${ccy}"
-                th:attr="aria-current=${money.currency() == ccy ? 'true' : 'false'}"
+          <section class="paper-card p-5 sm:p-8 mb-6" data-goal-detail-overview>
+            <div class="flex flex-wrap items-start justify-between gap-3">
+              <div class="min-w-0">
+                <div class="eyebrow mb-1">目 · 标 · 进 · 度</div>
+                <h2 class="font-display text-xl sm:text-2xl font-medium" th:text="${r.message()}"></h2>
+              </div>
+              <div
+                class="retire-currencies"
+                th:if="${goal != null}"
+                aria-label="显示币种"
               >
-              </a>
+                <a
+                  th:each="ccy : ${ {'CNY','USD','HKD'} }"
+                  th:href="@{|/goals/${goal.id}/retirement?ccy=${ccy}|}"
+                  th:text="${ccy}"
+                  th:attr="aria-current=${money.currency() == ccy ? 'true' : 'false'}"
+                >
+                </a>
+              </div>
             </div>
-          </div>
-          <details class="retire-details" data-retire-reference th:if="${!view.dataReferences().isEmpty()}">
-            <summary>数据参考 <span th:text="${'· '+view.dataReferences().size()+' 项'}"></span></summary>
-            <p class="retire-field-hint">以下仅影响对应指标的可用性或精度,不影响配置保存。本期未关账时使用最近已知余额,历史收支和收益取已定稿月份。</p>
-            <ul class="retire-field-hint">
-              <li th:each="reference : ${view.dataReferences()}" th:text="${reference}"></li>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6 mt-4" data-goal-detail-kpis>
+              <th:block th:replace="~{goals/_detail-metrics :: metric('当前进度', ${r.coveragePct() == null ? '—' : r.coveragePct().toPlainString() + '%'}, 'coverage', true)}"></th:block>
+              <th:block th:replace="~{goals/_detail-metrics :: metric(${view.plan().version >= 2 ? '已积累' : '可生息本金'}, ${money.amount(view.progressAssets())}, 'assets', false)}"></th:block>
+              <th:block th:replace="~{goals/_detail-metrics :: metric(${view.plan().version >= 2 ? '所需总资金' : '生活本金门槛'}, ${view.progressTarget() == null ? (r.state().name() == 'NO_FINITE_TARGET' ? '无有限门槛' : '暂无结果') : money.amount(view.progressTarget())}, 'target', false)}"></th:block>
+              <th:block th:replace="~{goals/_detail-metrics :: metric('距离目标还差', ${money.amount(r.gap())}, 'gap', false)}"></th:block>
+            </div>
+            <th:block th:if="${r.coveragePct() != null}">
+              <th:block th:replace="~{goals/_detail-metrics :: progress(${r.coveragePct()})}"></th:block>
+            </th:block>
+            <p class="text-xs mt-4" data-retire-config-status role="status"
+               th:classappend="${view.configurationComplete() ? 'text-forest' : 'text-ink-soft'}"
+               th:text="${activePlan and !previewing and (view.active() or !upgrading) ? (view.configurationComplete() ? '配置已完成 · 已保存' : '配置已保存 · 有设置需要调整') : (view.configurationComplete() ? '配置已填齐 · 尚未保存' : '配置尚未填齐')}"></p>
+            <ul class="retire-field-hint" th:if="${!view.configurationComplete()}">
+              <li th:each="problem : ${view.configurationProblems()}" th:text="${problem}"></li>
             </ul>
-            <a th:href="@{/entry}" class="retire-text-link text-xs">查看账上数据</a>
-          </details>
-          <ul class="retire-field-hint" th:if="${!view.configurationComplete()}">
-            <li th:each="problem : ${view.configurationProblems()}" th:text="${problem}"></li>
-          </ul>
-          <div class="retire-kpis">
-            <div>
-              <span th:text="${view.plan().version>=2 ? '所选账户当前合计 A' : '可供生活生息的本金 P'}"></span>
-              <strong
-                data-priv
-                th:text="${money.amount(view.progressAssets())}"
-                data-retire-value="assets"
-              >
-              </strong>
-            </div>
-            <div>
-              <span th:text="${view.plan().version>=2 ? '财务自由所需资金 F' : '生活本金门槛 T'}"></span>
-              <strong
-                data-priv
-                th:text="${view.progressTarget() == null ? (r.state().name()=='NO_FINITE_TARGET' ? '无有限门槛' : '暂无结果') : money.amount(view.progressTarget())}"
-                data-retire-value="target"
-              >
-              </strong>
-              <small th:if="${view.usesPlanningReturn()}" data-retire-return-basis class="retire-field-hint text-brass-deep" th:text="${view.returnBasis()}"></small>
-              <small class="retire-field-hint" th:if="${r.target()==null and r.realRate()==null}">回报或通胀来源暂无可用年率</small>
-            </div>
-            <div>
-              <span>距离目标还差</span>
-              <strong
-                data-priv
-                th:text="${money.amount(r.gap())}"
-                data-retire-value="gap"
-              >
-              </strong>
-            </div>
-            <div>
-              <span th:text="${view.plan().version>=2 ? '目标进度 A ÷ F' : '覆盖率 P ÷ T'}"></span>
-              <strong
-                data-priv
-                th:text="${r.coveragePct() == null ? '—' : r.coveragePct().toPlainString() + '%'}"
-                data-retire-value="coverage"
-              >
-              </strong>
-            </div>
-          </div>
-          <th:block th:if="${forecast!=null and forecast.supported()}">
+          </section>
+
+          <th:block th:if="${forecast != null and forecast.supported()}">
             <section th:replace="~{goals/_estimate :: result(${forecast})}"></section>
           </th:block>
-          <div class="retire-bridge">
-            <div>
-              <span>生活本金需求 T</span>
-              <b data-priv th:text="${money.amount(r.target())}"> </b>
-            </div>
-            <div>
-              <span>+ 全家庭负债 D</span>
-              <b data-priv th:text="${money.amount(r.debt())}"> </b>
-            </div>
-            <div>
-              <span>+ 大额支出准备金 B</span>
-              <b data-priv th:text="${money.amount(r.reserves())}"> </b>
-            </div>
-            <div>
-              <span>= 所需总资金 F</span>
-              <b data-priv th:text="${money.amount(r.totalAssetNeed())}"> </b>
-            </div>
-          </div>
-          <div class="retire-summary">
-            <p>
-              每月生活费 X <b data-priv data-retire-value="expense" th:text="${money.amount(r.monthlyExpense())}"></b>
-              · 当前本金可支持月生活费
-              <b data-priv th:text="${money.amount(r.supportedExpense())}"> </b>
+
+          <section class="paper-card p-5 sm:p-8 mb-6" data-retire-metric-notes>
+            <div class="eyebrow mb-1">资 · 金 · 口 · 径</div>
+            <h2 class="font-display text-xl sm:text-2xl font-medium">资金构成</h2>
+            <p class="text-sm text-ink-soft mt-1" th:if="${view.plan().version >= 2}">
+              当前进度 = 所选账户当前合计 ÷ 所需总资金。准备金和负债各计一次。
             </p>
-            <p>
-              全家净资产
-              <b
-                data-priv
-                th:text="${money.amount(view.data().sources().householdNetWorth())}"
-              >
-              </b>
-              · 预留后生息本金 P <b data-priv data-retire-value="principal" th:text="${money.amount(r.principal())}"></b>
+            <p class="text-sm text-ink-soft mt-1" th:if="${view.plan().version == 1}">
+              当前进度 = 可生息本金 ÷ 生活本金门槛。原方案仍含持续月收入
+              <b data-priv th:text="${money.amount(r.monthlyIncome())}"></b>，确认升级后才移除。
             </p>
-            <p th:if="${view.plan().version>=2}">进度 = 所选账户当前合计 ÷ 所需总资金。准备金与负债计入资金需求,各计一次。</p>
-            <p th:if="${view.plan().version == 1}">
-              升级前方案仍保留持续月收入 J
-              <b data-priv th:text="${money.amount(r.monthlyIncome())}"> </b
-              >。在调整页确认升级后才移除。
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6 mt-4">
+              <th:block th:replace="~{goals/_detail-metrics :: metric('生活本金需求 T', ${money.amount(r.target())}, null, false)}"></th:block>
+              <th:block th:replace="~{goals/_detail-metrics :: metric('+ 全家庭负债 D', ${money.amount(r.debt())}, null, false)}"></th:block>
+              <th:block th:replace="~{goals/_detail-metrics :: metric('+ 大额支出准备金 B', ${money.amount(r.reserves())}, null, false)}"></th:block>
+              <th:block th:replace="~{goals/_detail-metrics :: metric('= 所需总资金 F', ${money.amount(r.totalAssetNeed())}, null, false)}"></th:block>
+            </div>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6 mt-4 pt-4 border-t border-rule-soft">
+              <th:block th:replace="~{goals/_detail-metrics :: metric('每月生活费 X', ${money.amount(r.monthlyExpense())}, 'expense', false)}"></th:block>
+              <th:block th:replace="~{goals/_detail-metrics :: metric('本金可支持月生活费', ${money.amount(r.supportedExpense())}, null, false)}"></th:block>
+              <th:block th:replace="~{goals/_detail-metrics :: metric('全家净资产', ${money.amount(view.data().sources().householdNetWorth())}, null, false)}"></th:block>
+              <th:block th:replace="~{goals/_detail-metrics :: metric('预留后生息本金 P', ${money.amount(r.principal())}, 'principal', false)}"></th:block>
+            </div>
+            <p th:if="${view.usesPlanningReturn()}" data-retire-return-basis class="text-xs text-brass-deep mt-4" th:text="${view.returnBasis()}"></p>
+            <p th:if="${r.target()==null and r.realRate()==null}" class="text-xs text-ink-soft mt-4">回报或通胀来源暂无可用年率。</p>
+            <p class="text-sm text-ink-soft mt-4">
+              金额按今天购买力显示。实际回报不大于零时，没有有限的永久本金门槛；历史收益和物价变化不保证未来结果。
             </p>
-          </div>
-          <p class="text-sm text-ink-soft mb-6">
-            今天购买力的长期基准。历史收益和物价变化不保证未来结果;实际回报不大于零时,不生成有限的永久本金门槛。
-          </p>
+            <details class="goal-estimate-reference" data-retire-reference th:if="${!view.dataReferences().isEmpty()}">
+              <summary>数据参考 <span th:text="${'· '+view.dataReferences().size()+' 项'}"></span></summary>
+              <p class="goal-estimate-caption">以下仅影响对应指标的可用性或精度,不影响配置保存。本期未关账时使用最近已知余额,历史收支和收益取已定稿月份。</p>
+              <ul class="goal-estimate-caption">
+                <li th:each="reference : ${view.dataReferences()}" th:text="${reference}"></li>
+              </ul>
+              <a th:href="@{/entry}" class="retire-text-link text-xs">查看账上数据</a>
+            </details>
+          </section>
         </div>
         <details
-          class="retire-details retire-future"
+          class="paper-card p-5 sm:p-8 mb-6 retire-future"
           th:object="${plan}"
           th:open="${plan.simulateFuture}"
         >
-          <summary>原有投资回报情景 · 按结余与回报积累</summary>
+          <summary class="cursor-pointer text-brass-deep font-display text-xl mb-3">投资回报情景</summary>
           <p class="retire-field-hint">
             结余只改变达到时间,不改变当前目标进度。预测将准备金与负债先留出,仅模拟剩余生活本金的积累;结余还需考虑偿清后的家庭安排。
           </p>
@@ -351,6 +312,8 @@
             </div>
           </details>
           <div class="retire-path-section" data-retire-live="projection">
+            <div class="eyebrow mb-1" th:if="${!r.scenarios().isEmpty()}">未 · 来 · 积 · 累</div>
+            <h2 class="font-display text-xl sm:text-2xl font-medium mb-3" th:if="${!r.scenarios().isEmpty()}">生活本金积累路径</h2>
             <p class="text-sm mb-3">
               本次每月结余
               <b data-priv th:text="${money.amount(r.monthlyContribution())}">

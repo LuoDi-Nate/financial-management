@@ -134,33 +134,18 @@
   </section>
 
   <!-- 顶部目标卡(预设三类)-->
-  <section th:unless="${progress.isCustom()}" class="paper-card p-5 sm:p-8 mb-6">
+  <section th:unless="${progress.isCustom()}" class="paper-card p-5 sm:p-8 mb-6" data-goal-detail-overview>
     <div class="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-4 lg:gap-6 items-start">
       <div>
         <div class="flex items-center gap-3 mb-3">
           <span class="font-mono text-[10px] tracking-[0.18em] uppercase text-brass-deep" th:text="${goal.goalType}">RETIREMENT</span>
         </div>
         <h1 class="font-display text-3xl sm:text-4xl lg:text-5xl font-medium tracking-tight mb-2 break-words" th:text="${goal.name}">自由生活</h1>
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6 mt-4">
-          <div>
-            <div class="font-mono text-[10px] uppercase text-ink-subtle mb-1">当前进度</div>
-            <div class="font-display text-2xl sm:text-3xl tnum tracking-tight" th:text="${progress.progressPct} + '%'">57%</div>
-          </div>
-          <div>
-            <div class="font-mono text-[10px] uppercase text-ink-subtle mb-1">已积累</div>
-            <div class="font-display text-xl sm:text-2xl tnum break-words"
-                 th:text="'¥' + ${#numbers.formatInteger(progress.pv, 0, 'COMMA')}">¥1,140,000</div>
-          </div>
-          <div>
-            <div class="font-mono text-[10px] uppercase text-ink-subtle mb-1">本金需求(通胀后)</div>
-            <div class="font-display text-xl sm:text-2xl tnum break-words"
-                 th:text="${progress.target != null} ? '¥' + ${#numbers.formatInteger(progress.target, 0, 'COMMA')} : '—'">¥2,000,000</div>
-          </div>
-          <div>
-            <div class="font-mono text-[10px] uppercase text-ink-subtle mb-1">月供能力 · 6 期中位</div>
-            <div class="font-display text-xl sm:text-2xl tnum break-words"
-                 th:text="'¥' + ${#numbers.formatInteger(progress.monthlyContribution, 0, 'COMMA')}">¥17,500</div>
-          </div>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6 mt-4" data-goal-detail-kpis>
+          <th:block th:replace="~{goals/_detail-metrics :: metric('当前进度', ${progress.progressPct + '%'}, null, true)}"></th:block>
+          <th:block th:replace="~{goals/_detail-metrics :: metric('已积累', ${'¥' + #numbers.formatInteger(progress.pv, 0, 'COMMA')}, null, false)}"></th:block>
+          <th:block th:replace="~{goals/_detail-metrics :: metric('本金需求(通胀后)', ${progress.target != null ? '¥' + #numbers.formatInteger(progress.target, 0, 'COMMA') : '—'}, null, false)}"></th:block>
+          <th:block th:replace="~{goals/_detail-metrics :: metric('月供能力 · 6 期中位', ${'¥' + #numbers.formatInteger(progress.monthlyContribution, 0, 'COMMA')}, null, false)}"></th:block>
         </div>
       </div>
       <div class="lg:text-right">
