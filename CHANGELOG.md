@@ -2,6 +2,10 @@
 
 按 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 风格记录。每个版本详细需求见对应 [`prd/vX.Y.md`](prd/),技术设计见 [`tech-design/vX.Y.md`](tech-design/),QA case 见 [`docs/qa-cases.md`](docs/qa-cases.md)。
 
+## [Unreleased]
+
+- 修复目标月报把完整的否定风险提示误判为担保性话术。实际担保和其他校验仍生效;未通过的回答不保存,已有报告保留。
+
 ## [v1.42.0] · 2026-11-18 · 自有 OpenAI 兼容服务
 
 - 维护者分别通过[PRD](prd/v1.42.md)、[预览](preview/v1.42/custom-llm.html)与[TDD](tech-design/v1.42.md);beta部署及授权的真实服务验收通过。精确确认后从`7f9c6f40`发布,生产备份及V81迁移完成,本机和公网健康与登录检查均为HTTP 200。Docker双架构版本与源码匹配,`latest`与版本标签指向同一索引。[Release](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.42.0)。

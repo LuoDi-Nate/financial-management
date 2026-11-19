@@ -4,6 +4,7 @@ import com.family.finance.domain.goal.Goal;
 import com.family.finance.domain.goal.GoalType;
 import com.family.finance.domain.member.Member;
 import com.family.finance.factview.FactViewService;
+import com.family.finance.repository.GoalAiReportMapper;
 import com.family.finance.service.member.MemberDirectory;
 import com.family.finance.service.FamilyService;
 import com.family.finance.service.checkup.llm.LlmCatalog;
@@ -20,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -91,7 +93,8 @@ class GoalLlmServiceTest {
                 "本月家庭资产保持稳健,投资收益较上期小幅回暖,整体风险敞口处于合理区间,流动性也较为充足。"
                 + "目标进度按计划稳步推进,储蓄节奏总体稳定。建议继续保持当前的储蓄与投资节奏,"
                 + "定期复盘资产配置是否与长期目标的时间表相匹配,必要时对部分仓位做再平衡,"
-                + "以巩固后续的收益质量与整体抗风险能力,稳步缩小与目标之间的差距。";
+                + "以巩固后续的收益质量与整体抗风险能力,稳步缩小与目标之间的差距。"
+                + "历史收益不保证未来收益。";
         LlmRouter stub = stubRouter(reply);
         MemberDirectory memberDirectory = mock(MemberDirectory.class);
         when(memberDirectory.listAll(1L)).thenReturn(List.of());
@@ -109,6 +112,32 @@ class GoalLlmServiceTest {
 
         assertThat(r.ok()).isTrue();
         assertThat(r.value()).isEqualTo(reply);
+    }
+
+    @Test
+    void monthlyReportDoesNotReturnPromissoryText() {
+        String reply = "保证按期退休。"
+                + "建议定期复盘资产配置与储蓄计划，核对家庭资金的稳定性和可用性。".repeat(6);
+        var router = stubRouter(reply);
+        var members = mock(MemberDirectory.class);
+        when(members.listAll(1L)).thenReturn(List.of());
+        var service = new GoalLlmService(router, mock(FamilyService.class), members,
+                mock(FactViewService.class), new ObjectMapper());
+        var goal = Goal.builder().id(1L).familyId(1L).goalType(GoalType.RETIREMENT).name("退休").build();
+        var progress = new GoalProgressService.GoalProgress(goal, null, new BigDecimal("100000"),
+                new BigDecimal("500000"), new BigDecimal("0.20"), null, null);
+
+        var goals = mock(GoalService.class);
+        when(goals.require(1L, 1L)).thenReturn(goal);
+        var progressService = mock(GoalProgressService.class);
+        when(progressService.compute(1L, goal)).thenReturn(progress);
+        var mapper = mock(GoalAiReportMapper.class);
+        var result = new GoalReportService(goals, progressService, service, mapper).generateNowResult(1L, 1L);
+
+        assertThat(result.ok()).isFalse();
+        assertThat(result.value()).isNull();
+        assertThat(result.error()).contains("未保存").doesNotContain("保证按期退休");
+        verifyNoInteractions(mapper);
     }
     @Test void monthlyReportUsesAvailableGoalProgressRatherThanTheLivingPrincipalState() {
         String reply="本月家庭资产保持稳健,投资收益较上期小幅回暖,整体风险敞口处于合理区间,流动性也较为充足。"

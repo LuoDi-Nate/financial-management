@@ -43,6 +43,14 @@ public final class OutputValidator {
             "肯定盈利", "绝对收益", "保底", "保收益"
     );
 
+    // 仅识别完整的月报风险提示。不能凭「保证」前有否定词放行整句。
+    private static final Pattern GOAL_REPORT_RISK_NOTE = Pattern.compile(
+            "(?m)(^|[。！？；])\\h*(?:(?:历史收益(?:和物价变化)?|历史回报|历史表现|"
+            + "本(?:报告|测算|结果)|(?:以上|上述)测算)(?:仅供参考[，,]\\h*)?)?"
+            + "(?:不|并不|不能|无法)保证(?:未来(?:收益|回报|结果|表现)|"
+            + "(?:按期|如期)(?:退休|达成目标)|退休安全)"
+            + "\\h*(?=$|[。！？；])");
+
     /**
      * v0.6 · 资产洞察额外禁词:预测涨跌 / 择时 / 买卖时点 —— 洞察是中立诊断,不做行情预测与择时。
      * 仅在 {@link #checkInsight} 路径生效,不影响既有体检综合诊断({@link #check})。
@@ -82,6 +90,15 @@ public final class OutputValidator {
      *                           (e.g. 用户有「支付宝-余额宝」账户 · LLM 说"从余额宝调出" 不算产品推荐)
      */
     public static Result check(String polished, Set<String> realNames, Set<String> accountWhitelist) {
+        return check(polished, realNames, accountWhitelist, false);
+    }
+
+    public static Result checkGoalMonthlyReport(String polished, Set<String> realNames) {
+        return check(polished, realNames, Set.of(), true);
+    }
+
+    private static Result check(String polished, Set<String> realNames, Set<String> accountWhitelist,
+                                boolean goalMonthlyReport) {
         if (polished == null || polished.isBlank()) {
             return Result.reject("空字符串");
         }
@@ -95,8 +112,10 @@ public final class OutputValidator {
         }
 
         // 1. 担保性话术(最严重 · 合规底线)
+        String guaranteeText = goalMonthlyReport
+                ? GOAL_REPORT_RISK_NOTE.matcher(trimmed).replaceAll("$1") : trimmed;
         for (String w : GUARANTEE_PHRASES) {
-            if (trimmed.contains(w)) {
+            if (guaranteeText.contains(w)) {
                 return Result.reject("含担保性话术: \"" + w + "\"");
             }
         }

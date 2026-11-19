@@ -130,6 +130,7 @@ public class GoalLlmService {
                 2. 不使用真名(用 成员A / 成员B 代号)· 不担保 · 不推荐具体产品
                 3. 聚焦本月进度变化 + 节奏点评 + 1 个可执行建议
                 4. 数字和日期只引用系统提供的结果,禁止自行计算或补全;没有历史对照时不编造进度变化
+                5. 如需提醒不确定性,用「实际结果可能偏离测算」,不写收益或达标承诺
                 """;
             String user = buildMonthlyReportPrompt(goal, progress) + forecastContext(progress.forecast()) + preferenceSuffix(familyId, mapping);
             PromptTrace trace = trace(PromptSurface.GOAL_REPORT, familyId, mapping);
@@ -137,11 +138,11 @@ public class GoalLlmService {
             if (raw == null) return AiResult.<String>unavailable(trace.failureMessage()).withRecord(trace.recordId());
 
             // 先在 raw(仍是代号)上过校验:不会因真名误判泄露
-            OutputValidator.Result valid = OutputValidator.check(raw, mapping.realToCodename().keySet());
+            OutputValidator.Result valid = OutputValidator.checkGoalMonthlyReport(raw, mapping.realToCodename().keySet());
             if (!valid.accepted()) {
                 log.warn("monthly report rejected by validator: {}", valid.reason());
                 rejected(familyId, trace, valid.reason());
-                return AiResult.<String>unavailable("AI 输出未通过校验:" + valid.reason()).withRecord(trace.recordId());
+                return AiResult.<String>unavailable("本次月报内容未通过校验,未保存。可重新生成。").withRecord(trace.recordId());
             }
             // v0.5.4 修 · 反向映射 成员A/成员B → 真名供用户阅读(原 v0.3 漏做 → 月报里出现「成员A与成员B」)
             String mapped = PromptBuilder.reverseMapping(raw.trim(), mapping.codenameToReal());
