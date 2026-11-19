@@ -27,8 +27,10 @@ async function compareOverview(ui,oldGoal,screen) {
   const notes=ui.page.locator('[data-retire-metric-notes]');
   await ui.assert((await notes.innerText()).includes('准备金和负债各计一次'),screen+'资金组成与进度口径在说明卡内');
   const reference=notes.locator('[data-retire-reference]');
+  await reference.waitFor({state:'visible'});
   await ui.assert(!await reference.evaluate(el=>el.open),screen+'数据参考默认收起');
   await reference.locator('summary').click();
+  await ui.assert((await reference.innerText()).includes('尚未登记余额'),screen+'数据参考解释缺失余额');
   await ui.assert(await reference.getByRole('link',{name:'查看账上数据'}).isVisible(),screen+'展开数据参考能看到来源入口');
   await reference.locator('summary').click();
   await ui.assert(await ui.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),screen+'指标与说明没有横向溢出');
@@ -36,6 +38,8 @@ async function compareOverview(ui,oldGoal,screen) {
   await notes.screenshot({path:`/tmp/finance-v140-review/overview-notes-${screen}.png`});
 }
 async function insights(ui) {
+  db.raw(`INSERT INTO account(family_id,display_name,type,currency) VALUES
+    (${state.family},'合成未填余额负债','LOAN','CNY')`);
   db.raw(`INSERT INTO family_goal(family_id,goal_type,name,target_date,params_json) VALUES
     (${state.family},'RETIREMENT','合成旧退休目标','2038-12-31',JSON_OBJECT('retire_age',60,'current_age',45,'monthly_expense',12000,'inflation_rate',0.02,'withdrawal_rate',0.04))`);
   const oldGoal=db.num(`SELECT id FROM family_goal WHERE family_id=${state.family} AND name='合成旧退休目标'`);
