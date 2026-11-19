@@ -2,9 +2,10 @@
 
 按 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 风格记录。每个版本详细需求见对应 [`prd/vX.Y.md`](prd/),技术设计见 [`tech-design/vX.Y.md`](tech-design/),QA case 见 [`docs/qa-cases.md`](docs/qa-cases.md)。
 
-## [Unreleased]
+## [v1.42.1] · 待验收 · 目标 AI 月报
 
 - 修复目标月报把完整的否定风险提示误判为担保性话术。实际担保和其他校验仍生效;未通过的回答不保存,已有报告保留。
+- 退休生活账共用旧目标详情的 AI 综合月报折叠卡与偏离预警,保留提示词面板及底部重新生成,锚点可直达操作。
 
 ## [v1.42.0] · 2026-11-18 · 自有 OpenAI 兼容服务
 

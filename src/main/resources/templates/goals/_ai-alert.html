@@ -2,22 +2,30 @@
 <html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
 <body>
 <th:block th:fragment="alert">
-  <section th:if="${aiAlert != null}" class="mb-6 border-l-4 border-rust pl-4 py-4" data-goal-ai-alert>
-    <div class="flex flex-wrap items-center justify-between gap-2 mb-3" data-peek-host>
-      <h2 class="font-display text-xl text-rust">AI · 偏离预警</h2>
-      <span class="flex items-center gap-2">
-        <span class="text-xs text-ink-soft" th:text="${#temporals.format(aiAlert.generatedAt, 'yyyy-MM-dd HH:mm')}"></span>
-        <th:block th:replace="~{fragments/_prompt-peek :: btn(${alertPeekSrc})}"></th:block>
-      </span>
+  <!-- v0.3 FR-53c · 偏离预警(朱印感)-->
+  <section th:if="${aiAlert != null}" class="paper-card mb-6 overflow-hidden" data-goal-ai-alert
+           style="border:1px solid var(--rust);border-left:6px solid var(--rust);background:linear-gradient(90deg, rgba(159,74,58,.06) 0%, var(--card) 35%)">
+    <div class="px-6 py-4 flex items-start gap-4">
+      <div class="text-2xl" style="color:var(--rust)"><svg class="inline-block align-[-2px]" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
+      <div class="flex-1">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-2" data-peek-host>
+          <span class="font-mono text-[10px] tracking-[0.18em] uppercase text-rust">AI · 偏 · 离 · 预 · 警</span>
+          <span class="flex items-center gap-2">
+            <span class="font-mono text-[10px] text-ink-subtle"
+                  th:text="${#temporals.format(aiAlert.generatedAt, 'yyyy-MM-dd HH:mm')} + ' · 90 天内复用'">2026-05-12 · 90 天内复用</span>
+            <th:block th:replace="~{fragments/_prompt-peek :: btn(${alertPeekSrc})}"></th:block>
+          </span>
+        </div>
+        <p th:if="${alertStale == true}" class="text-sm text-brass-deep mb-2">这是先前计划或资金状态的历史预警,请结合当前进度查看。</p>
+        <p class="text-xs text-ink-soft break-words mb-2" th:text="${alertSourceLabel}"></p>
+        <p th:if="${alertSourceStale == true}" class="text-sm text-brass-deep mb-2">模型服务或选型已变更,这是保留的历史预警。</p>
+        <p class="text-sm text-ink-soft leading-relaxed font-serif mb-3" th:utext="${@aiText.priv(aiAlert.content)}">预警内容...</p>
+        <form th:action="@{|/goals/${goal.id}/alert/dismiss|}" method="post">
+          <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+          <button type="submit" class="btn-paper text-xs">我知道了</button>
+        </form>
+      </div>
     </div>
-    <p th:if="${alertStale == true}" class="text-sm text-brass-deep mb-3">这是先前计划或资金状态的历史预警,请结合当前进度查看。</p>
-    <p class="text-xs text-ink-soft break-words mb-2" th:text="${alertSourceLabel}"></p>
-    <p th:if="${alertSourceStale == true}" class="text-sm text-brass-deep mb-3">模型服务或选型已变更,这是保留的历史预警。</p>
-    <p class="text-sm text-ink-soft whitespace-pre-line leading-relaxed mb-3" th:utext="${@aiText.priv(aiAlert.content)}"></p>
-    <form th:action="@{|/goals/${goal.id}/alert/dismiss|}" method="post">
-      <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
-      <button type="submit" class="btn-paper text-xs">我知道了</button>
-    </form>
   </section>
 </th:block>
 </body>

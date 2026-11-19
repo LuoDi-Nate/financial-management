@@ -452,54 +452,10 @@
             重新演算
           </button>
         </details>
-        <section
-          th:if="${activePlan}"
-          id="ai-report"
-          class="retire-source-section"
-        >
-          <h2 class="font-display text-2xl mb-3">AI 洞察</h2>
+        <th:block th:if="${activePlan}">
           <th:block th:replace="~{goals/_ai-alert :: alert}"></th:block>
-          <h3 class="font-display text-xl mb-3">目标月报</h3>
-          <p
-            th:if="${reportError != null}"
-            role="alert"
-            class="text-rust"
-            th:text="${reportError}"
-          ></p>
-          <p
-            th:if="${reportNote != null}"
-            role="status"
-            class="text-forest"
-            th:text="${reportNote}"
-          ></p>
-          <p th:if="${report == null}" class="text-sm text-ink-soft">
-            尚未生成目标月报。
-          </p>
-          <th:block th:if="${report != null}">
-            <div class="flex flex-wrap items-center gap-2" data-peek-host>
-              <span class="text-xs text-ink-soft" th:text="${#temporals.format(report.generatedAt, 'yyyy-MM-dd HH:mm')}"></span>
-              <th:block th:replace="~{fragments/_prompt-peek :: btn(${reportPeekSrc})}"></th:block>
-            </div>
-            <p th:if="${reportStale}" class="text-sm text-brass-deep mt-2">
-              计划、资金或月结余依据已变化,以下为历史解读。
-            </p>
-            <p class="text-xs text-ink-soft break-words mt-2" th:text="${reportSourceLabel}"></p>
-            <p th:if="${reportSourceStale == true}" class="text-sm text-brass-deep mt-2">模型服务或选型已变更,这是保留的历史解读。</p>
-            <p
-              class="text-sm whitespace-pre-line mt-3"
-              th:utext="${@aiText.priv(report.content)}"
-            ></p>
-          </th:block>
-          <form
-            th:action="@{|/goals/${goal.id}/report/generate|}"
-            method="post"
-            class="mt-4"
-          >
-            <button type="submit" class="btn-paper btn-accent text-xs">
-              <span th:text="${report == null ? '立即生成月报' : '重新生成'}">立即生成月报</span>
-            </button>
-          </form>
-        </section>
+          <th:block th:replace="~{goals/_ai-report :: report}"></th:block>
+        </th:block>
       </section>
 
       <section id="retire-plan" role="tabpanel" data-retire-panel="plan">

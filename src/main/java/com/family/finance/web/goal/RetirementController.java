@@ -194,7 +194,7 @@ public class RetirementController {
             String fingerprint = GoalReportService.contextFingerprint(snapshot, savedForecast);
             var sourceContext = sources == null ? null : sources.context(familyId);
             reports.findLatestByGoalAndType(familyId, goal.getId(), "MONTHLY").ifPresent(report -> {
-                model.addAttribute("report", report);
+                model.addAttribute("aiMonthlyReport", report);
                 model.addAttribute("reportSourceLabel", com.family.finance.service.llmtrace.LlmSource.label(report.getSourceJson(),"旧版记录,未保存完整来源"));
                 model.addAttribute("reportSourceStale", sourceContext != null && sourceContext.historical(report.getSourceJson()));
                 model.addAttribute("reportStale", !fingerprint.equals(report.getContextFingerprint()));

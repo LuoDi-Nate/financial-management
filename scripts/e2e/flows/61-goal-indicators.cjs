@@ -11,18 +11,43 @@ async function eta(ui,text){await ui.page.waitForFunction(s=>document.querySelec
 async function save(ui){await ui.click('[data-estimate-save]','保存本目标月结余');await ui.page.waitForFunction(()=>document.querySelector('[data-estimate-status]').textContent.includes('已保存'));}
 async function shot(ui,name){fs.mkdirSync('/tmp/finance-v140-review',{recursive:true});await ui.page.screenshot({path:'/tmp/finance-v140-review/'+name+'.png',fullPage:true});}
 async function insights(ui) {
+  const oldGoal=db.num(`SELECT id FROM family_goal WHERE family_id=${state.family} AND goal_type='CUSTOM' ORDER BY id DESC LIMIT 1`);
+  async function verifyEmpty(path) {
+    await ui.goto(path);
+    const card=ui.page.locator('#ai-report details');
+    const button=card.getByRole('button',{name:'立即生成月报'});
+    await ui.assert(!await card.evaluate(el=>el.open),'空月报默认收起');
+    await card.locator('summary').click();
+    await ui.assert(await button.isVisible(),'展开后可以立即生成');
+    await card.locator('summary').click();
+    await ui.goto(path+'#ai-report');
+    await button.waitFor({state:'visible'});
+  }
+  await verifyEmpty(`/goals/${oldGoal}`);
+  await verifyEmpty(`/goals/${state.goal}/retirement`);
   await ui.goto(`/goals/${state.goal}/retirement`);
   await ui.assert(await ui.page.locator('[data-retire-insights]').isVisible(),'退休页标题保留 AI 洞察入口');
   await ui.page.locator('[data-retire-insights]').click();
   await ui.assert((await ui.page.locator('#ai-report').innerText()).includes('立即生成月报'),'空态提供立即生成入口');
   // Historical AI output requires a paid model; only this isolated family's report fixtures are inserted.
-  db.raw(`INSERT INTO goal_ai_report(goal_id,period_id,report_type,content,validator_status)VALUES(${state.goal},0,'MONTHLY','合成月报:请结合当前资金完成度及月结余查看目标。','PASS'),(${state.goal},0,'ALERT','合成预警:请核对目标投入节奏。','PASS')`);
+  db.raw(`INSERT INTO goal_ai_report(goal_id,period_id,report_type,content,validator_status)
+    SELECT id,0,'MONTHLY','合成月报:请结合当前资金完成度及月结余查看目标。','PASS' FROM family_goal WHERE family_id=${state.family} AND id IN(${state.goal},${oldGoal})`);
+  db.raw(`INSERT INTO goal_ai_report(goal_id,period_id,report_type,content,validator_status)
+    SELECT id,0,'ALERT','合成预警:请核对目标投入节奏。','PASS' FROM family_goal WHERE family_id=${state.family} AND id IN(${state.goal},${oldGoal})`);
+  const layout = page => page.locator('#ai-report details summary').evaluate(el=>({
+    classes:el.className, title:el.querySelector('.font-display').textContent.trim(), border:getComputedStyle(el.closest('section')).borderLeftColor
+  }));
+  await ui.goto(`/goals/${oldGoal}#ai-report`);
+  const oldLayout=await layout(ui.page);
+  await ui.assert(await ui.page.getByRole('button',{name:'重新生成',exact:true}).isVisible(),'旧页保留底部重新生成');
+  await ui.page.locator('#ai-report').screenshot({path:'/tmp/finance-v140-review/ai-insights-legacy-desktop.png'});
   await ui.goto('/dashboard');
   await ui.page.locator(`a[href="/goals/${state.goal}/retirement#ai-report"]`).click();
   await ui.assert(ui.page.url().endsWith('/retirement#ai-report'),'仪表盘 AI 洞察直接进入新退休页');
   await ui.assert((await ui.page.locator('#ai-report').innerText()).includes('合成月报'),'已有月报可读');
   await ui.assert((await ui.page.locator('#ai-report').innerText()).includes('以下为历史解读'),'旧指纹报告明确标为历史解读');
   await ui.assert(await ui.page.locator('[data-goal-ai-alert]').isVisible(),'新退休页显示未确认偏离预警');
+  await ui.assert(JSON.stringify(await layout(ui.page))===JSON.stringify(oldLayout),'新旧月报标题、布局和左侧印色相同');
   await ui.assert(await ui.page.locator('#ai-report [data-peek-host]').count()>0,'报告有提示词来源面板宿主');
   for(const tab of ['plan','principle']) {
     await ui.page.locator(`[data-retire-tab=${tab}]`).click();
@@ -36,7 +61,7 @@ async function insights(ui) {
       await mobile.page.setViewportSize({width,height:844});
       await mobile.goto(`/goals/${state.goal}/retirement?tab=plan#ai-report`);
       await mobile.assert(await mobile.page.locator('#ai-report').isVisible(),'手机'+width+'直达隐藏页签内的AI正文');
-      await mobile.assert(await mobile.page.locator('#ai-report h2').first().evaluate(el=>{
+      await mobile.assert(await mobile.page.locator('#ai-report summary').evaluate(el=>{
         const r=el.getBoundingClientRect(),top=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
         return r.top>=38 && r.bottom<=innerHeight && (top===el||el.contains(top));
       }),'手机'+width+'AI标题在视口且未被顶栏遮挡');

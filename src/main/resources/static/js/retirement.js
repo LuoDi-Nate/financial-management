@@ -197,15 +197,18 @@
     if (name === 'overview') draw();
   }
   root.querySelectorAll('[data-retire-tab]').forEach(el => el.addEventListener('click', () => tab(el.dataset.retireTab)));
-  function showInsights() {
-    if (location.hash !== '#ai-report') return;
+  function openInsights() {
     tab('overview');
-    requestAnimationFrame(() => document.getElementById('ai-report')?.scrollIntoView({block:'start'}));
+    const report = document.getElementById('ai-report');
+    if (report) {
+      report.querySelector('details').open = true;
+      requestAnimationFrame(() => report.scrollIntoView({block:'start'}));
+    }
   }
-  root.querySelector('[data-retire-insights]')?.addEventListener('click', () => {
-    tab('overview');
-    requestAnimationFrame(() => document.getElementById('ai-report')?.scrollIntoView({block:'start'}));
-  });
+  function showInsights() {
+    if (location.hash === '#ai-report') openInsights();
+  }
+  root.querySelector('[data-retire-insights]')?.addEventListener('click', openInsights);
   window.addEventListener('hashchange', showInsights);
   root.querySelectorAll('[data-retire-goto]').forEach(el => el.addEventListener('click', () => {
     tab(el.dataset.retireGoto);
