@@ -2,11 +2,12 @@
 
 按 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 风格记录。每个版本详细需求见对应 [`prd/vX.Y.md`](prd/),技术设计见 [`tech-design/vX.Y.md`](tech-design/),QA case 见 [`docs/qa-cases.md`](docs/qa-cases.md)。
 
-## [v1.42.1] · 待验收 · 目标 AI 月报
+## [v1.42.1] · 2026-11-20 · 退休目标详情与旧版对齐
 
 - 修复目标月报把完整的否定风险提示误判为担保性话术。实际担保和其他校验仍生效;未通过的回答不保存,已有报告保留。
 - 退休生活账共用旧目标详情的 AI 综合月报折叠卡与偏离预警,保留提示词面板及底部重新生成,锚点可直达操作。
 - 退休生活账上方复用旧目标的指标样式,独立展示资金构成、口径说明与投资回报情景;计算口径不变。
+- 已从 `ee9dbb05` 发布，无新增数据库迁移；生产健康及登录检查通过。[Docker 构建](https://github.com/LuoDi-Nate/financial-management/actions/runs/44670994312)通过，双架构 `v1.42.1` 与 `latest` 指向同一镜像索引。[发布说明](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.42.1)。
 
 ## [v1.42.0] · 2026-11-18 · 自有 OpenAI 兼容服务
 
