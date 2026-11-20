@@ -29,6 +29,7 @@ if rg -q 'Math.ceil|new Date\(' src/main/resources/static/js/goal-estimate.js; t
 qa140_pass=$((qa140_pass+1))
 check rg -q 'data-retire-insights' src/main/resources/templates/goals/retirement.html
 check rg -q 'goals/_ai-alert :: alert' src/main/resources/templates/goals/retirement.html
+check bash -c 'for page in detail retirement; do rg -qF "goals/_ai-report :: report" "src/main/resources/templates/goals/$page.html" && rg -qF "goals/_ai-alert :: alert" "src/main/resources/templates/goals/$page.html" || exit 1; done'
 check rg -q 'contextFingerprint\(snapshot, savedForecast\)' "$java/web/goal/RetirementController.java"
 check rg -q 'forecastContext\(progress.forecast\(\)\)' "$java/service/goal/GoalLlmService.java"
 echo "PASS: v1.40 $qa140_pass 项只读静态守护(另含v1.39原53项)"

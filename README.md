@@ -94,11 +94,11 @@
 
 ## 近期更新 · Releases
 
+**[v1.42.1](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.42.1) · 退休目标详情与旧版对齐**
+统一退休目标详情的指标、资金说明和 AI 洞察，修复月报误拒风险提示。保留原有计算口径，无新增数据库迁移。见 [补丁 PRD](prd/v1.42.1.md)。
+
 **[v1.42.0](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.42.0) · 自有兼容服务与硅基流动接入**
 在原AI接入页配置自己的Chat Completions服务,地址、认证和密钥一起保存,文字主备与截图型号独立选择;同时包含硅基流动平台。历史AI结果保留发送时来源,升级只增加来源元数据,原有模型和账目保持原样。见 [PRD](prd/v1.42.md)、[技术设计](tech-design/v1.42.md)与[验收记录](docs/beta-review-v1.42.md)。
-
-**[v1.40.1](https://github.com/LuoDi-Nate/financial-management/releases/tag/v1.40.1) · 补齐新目标 AI 洞察**
-新退休目标恢复清晰的AI洞察入口、月报与偏离预警,解读同步引用月结余达成时间及来源。生成失败保留旧报告,窄屏阅读无遮挡;无新增数据库迁移。见 [补丁PRD](prd/v1.40.1.md)与[验收及发布记录](docs/beta-review-v1.40.1.md)。
 
 > 完整发布记录与截图见 [Releases](https://github.com/LuoDi-Nate/financial-management/releases)(本段每版只留 2–4 行,细节不搬过来)。
 
@@ -133,7 +133,7 @@
 | 前端 | Thymeleaf + HTMX 1.9 + Chart.js 4 + ECharts(无 SPA、无构建管线) |
 | 认证 | Spring Security + bcrypt + Session Cookie |
 | 部署 | **Docker compose 一键(v0.7,推荐)** · 或 Linux systemd + nginx 反代 :80 → :20000 · macOS launchd(可选)直连 :20000 |
-| 测试 | JUnit 5 · **1634 单元** / 44 条浏览器主线(真浏览器 + 真 DB,真实模型流程默认跳过)/ **1154 黑盒回归**护栏(含v1.39的53项、v1.40的24项、v1.41的29项及v1.42的10项只读静态守护) —— 每条护栏守的是哪个坑,见 [QA case 库](docs/qa-cases.md) |
+| 测试 | JUnit 5 · **1646 单元** / 44 条浏览器主线(真浏览器 + 真 DB,真实模型流程默认跳过)/ **1155 黑盒回归**护栏(含v1.39的53项、目标模块的25项、v1.41的29项及v1.42的10项只读静态守护) —— 每条护栏守的是哪个坑,见 [QA case 库](docs/qa-cases.md) |
 
 ## 快速开始(自托管部署)
 
@@ -341,7 +341,7 @@ mvn spring-boot:run
 测试:
 
 ```bash
-mvn test                       # JUnit 单元测试(1634)
+mvn test                       # JUnit 单元测试(1646)
 bash scripts/qa-run.sh         # 黑盒 endpoint + 模板渲染(见 README 上方测试行的黑盒回归数)
 bash scripts/qa-run.sh --static-v139 # v1.39 只读守护,不写数据库、不调模型
 node scripts/e2e/run.cjs       # 真 e2e:Playwright 开浏览器按用户路径点(失败自动截图)
@@ -350,6 +350,7 @@ bash scripts/regression-data.sh # 数据层/口径回归(原 e2e.sh · curl 端�
 
 ## 文档
 
+- [v1.42.1 退休目标详情与旧版对齐](prd/v1.42.1.md) · [技术方案附录](tech-design/v1.42.md#附录--v1421-目标-ai-月报)。统一进度、资金说明及 AI 月报的呈现，不改退休计算口径。
 - [v1.42 自有兼容服务](prd/v1.42.md) · [交互预览](preview/v1.42/custom-llm.html) · [技术设计](tech-design/v1.42.md) · [验收记录](docs/beta-review-v1.42.md)。同页原子服务配置、明确免认证与内网许可、文字/视觉/本地工具及来源留存,已随v1.42.0发布。
 - [v1.41 硅基流动 AI 接入](prd/v1.41.md) · [交互预览](preview/v1.41/ai-access.html) · [技术设计](tech-design/v1.41.md) · [验收记录](docs/beta-review-v1.41.md)。四平台共同配置交互,文字/图片/本地工具SSE接入,旧配置与百炼轮询保留;随v1.42.0一同发布。
 

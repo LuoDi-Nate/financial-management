@@ -10,19 +10,76 @@ async function login(page,user){await page.context().clearCookies();await page.g
 async function eta(ui,text){await ui.page.waitForFunction(s=>document.querySelector('[data-estimate-date]')?.textContent.trim()===s,text);await ui.assert((await ui.page.locator('[data-estimate-date]').innerText()).trim()===text,'时间指标:'+text);}
 async function save(ui){await ui.click('[data-estimate-save]','保存本目标月结余');await ui.page.waitForFunction(()=>document.querySelector('[data-estimate-status]').textContent.includes('已保存'));}
 async function shot(ui,name){fs.mkdirSync('/tmp/finance-v140-review',{recursive:true});await ui.page.screenshot({path:'/tmp/finance-v140-review/'+name+'.png',fullPage:true});}
+async function compareOverview(ui,oldGoal,screen) {
+  const card=ui.page.locator('[data-goal-detail-overview]');
+  const metrics=()=>card.locator('[data-goal-detail-kpis]').evaluate(grid=>({
+    columns:getComputedStyle(grid).gridTemplateColumns.split(' ').length,
+    labels:[...grid.children].map(el=>getComputedStyle(el.firstElementChild).fontSize),
+    values:[...grid.children].map(el=>getComputedStyle(el.lastElementChild).fontSize),
+    padding:getComputedStyle(grid.closest('[data-goal-detail-overview]')).padding
+  }));
+  await ui.goto(`/goals/${oldGoal}`);
+  const legacy=await metrics();
+  await card.screenshot({path:`/tmp/finance-v140-review/overview-legacy-${screen}.png`});
+  await ui.goto(`/goals/${state.goal}/retirement`);
+  await ui.assert(JSON.stringify(await metrics())===JSON.stringify(legacy),screen+'新旧详情主指标字号、列数和内边距一致');
+  await ui.assert(await card.locator('[data-goal-detail-progress]').isVisible(),screen+'主指标卡显示目标进度条');
+  const notes=ui.page.locator('[data-retire-metric-notes]');
+  await ui.assert((await notes.innerText()).includes('准备金和负债各计一次'),screen+'资金组成与进度口径在说明卡内');
+  const reference=notes.locator('[data-retire-reference]');
+  await reference.waitFor({state:'visible'});
+  await ui.assert(!await reference.evaluate(el=>el.open),screen+'数据参考默认收起');
+  await reference.locator('summary').click();
+  await ui.assert((await reference.innerText()).includes('尚未登记余额'),screen+'数据参考解释缺失余额');
+  await ui.assert(await reference.getByRole('link',{name:'查看账上数据'}).isVisible(),screen+'展开数据参考能看到来源入口');
+  await reference.locator('summary').click();
+  await ui.assert(await ui.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),screen+'指标与说明没有横向溢出');
+  await card.screenshot({path:`/tmp/finance-v140-review/overview-retirement-${screen}.png`});
+  await notes.screenshot({path:`/tmp/finance-v140-review/overview-notes-${screen}.png`});
+}
 async function insights(ui) {
+  db.raw(`INSERT INTO account(family_id,display_name,type,currency) VALUES
+    (${state.family},'合成未填余额负债','LOAN','CNY')`);
+  db.raw(`INSERT INTO family_goal(family_id,goal_type,name,target_date,params_json) VALUES
+    (${state.family},'RETIREMENT','合成旧退休目标','2038-12-31',JSON_OBJECT('retire_age',60,'current_age',45,'monthly_expense',12000,'inflation_rate',0.02,'withdrawal_rate',0.04))`);
+  const oldGoal=db.num(`SELECT id FROM family_goal WHERE family_id=${state.family} AND name='合成旧退休目标'`);
+  await compareOverview(ui,oldGoal,'desktop');
+  async function verifyEmpty(path) {
+    await ui.goto(path);
+    const card=ui.page.locator('#ai-report details');
+    const button=card.getByRole('button',{name:'立即生成月报'});
+    await ui.assert(!await card.evaluate(el=>el.open),'空月报默认收起');
+    await card.locator('summary').click();
+    await ui.assert(await button.isVisible(),'展开后可以立即生成');
+    await card.locator('summary').click();
+    await ui.goto(path+'#ai-report');
+    await button.waitFor({state:'visible'});
+  }
+  await verifyEmpty(`/goals/${oldGoal}`);
+  await verifyEmpty(`/goals/${state.goal}/retirement`);
   await ui.goto(`/goals/${state.goal}/retirement`);
   await ui.assert(await ui.page.locator('[data-retire-insights]').isVisible(),'退休页标题保留 AI 洞察入口');
   await ui.page.locator('[data-retire-insights]').click();
   await ui.assert((await ui.page.locator('#ai-report').innerText()).includes('立即生成月报'),'空态提供立即生成入口');
   // Historical AI output requires a paid model; only this isolated family's report fixtures are inserted.
-  db.raw(`INSERT INTO goal_ai_report(goal_id,period_id,report_type,content,validator_status)VALUES(${state.goal},0,'MONTHLY','合成月报:请结合当前资金完成度及月结余查看目标。','PASS'),(${state.goal},0,'ALERT','合成预警:请核对目标投入节奏。','PASS')`);
+  db.raw(`INSERT INTO goal_ai_report(goal_id,period_id,report_type,content,validator_status)
+    SELECT id,0,'MONTHLY','合成月报:请结合当前资金完成度及月结余查看目标。','PASS' FROM family_goal WHERE family_id=${state.family} AND id IN(${state.goal},${oldGoal})`);
+  db.raw(`INSERT INTO goal_ai_report(goal_id,period_id,report_type,content,validator_status)
+    SELECT id,0,'ALERT','合成预警:请核对目标投入节奏。','PASS' FROM family_goal WHERE family_id=${state.family} AND id IN(${state.goal},${oldGoal})`);
+  const layout = page => page.locator('#ai-report details summary').evaluate(el=>({
+    classes:el.className, title:el.querySelector('.font-display').textContent.trim(), border:getComputedStyle(el.closest('section')).borderLeftColor
+  }));
+  await ui.goto(`/goals/${oldGoal}#ai-report`);
+  const oldLayout=await layout(ui.page);
+  await ui.assert(await ui.page.getByRole('button',{name:'重新生成',exact:true}).isVisible(),'旧页保留底部重新生成');
+  await ui.page.locator('#ai-report').screenshot({path:'/tmp/finance-v140-review/ai-insights-legacy-desktop.png'});
   await ui.goto('/dashboard');
   await ui.page.locator(`a[href="/goals/${state.goal}/retirement#ai-report"]`).click();
   await ui.assert(ui.page.url().endsWith('/retirement#ai-report'),'仪表盘 AI 洞察直接进入新退休页');
   await ui.assert((await ui.page.locator('#ai-report').innerText()).includes('合成月报'),'已有月报可读');
   await ui.assert((await ui.page.locator('#ai-report').innerText()).includes('以下为历史解读'),'旧指纹报告明确标为历史解读');
   await ui.assert(await ui.page.locator('[data-goal-ai-alert]').isVisible(),'新退休页显示未确认偏离预警');
+  await ui.assert(JSON.stringify(await layout(ui.page))===JSON.stringify(oldLayout),'新旧月报标题、布局和左侧印色相同');
   await ui.assert(await ui.page.locator('#ai-report [data-peek-host]').count()>0,'报告有提示词来源面板宿主');
   for(const tab of ['plan','principle']) {
     await ui.page.locator(`[data-retire-tab=${tab}]`).click();
@@ -34,12 +91,18 @@ async function insights(ui) {
     await login(mobile.page,state.username);
     for(const width of [390,320]){
       await mobile.page.setViewportSize({width,height:844});
+      await compareOverview(mobile,oldGoal,'mobile-'+width);
       await mobile.goto(`/goals/${state.goal}/retirement?tab=plan#ai-report`);
       await mobile.assert(await mobile.page.locator('#ai-report').isVisible(),'手机'+width+'直达隐藏页签内的AI正文');
-      await mobile.assert(await mobile.page.locator('#ai-report h2').first().evaluate(el=>{
+      await mobile.assert(await mobile.page.locator('#ai-report summary').evaluate(el=>{
         const r=el.getBoundingClientRect(),top=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
         return r.top>=38 && r.bottom<=innerHeight && (top===el||el.contains(top));
       }),'手机'+width+'AI标题在视口且未被顶栏遮挡');
+      await mobile.assert(await mobile.page.locator('#ai-report summary').evaluate(el=>{
+        const title=el.querySelector('.font-display').getBoundingClientRect();
+        const time=el.querySelector('[data-goal-report-time]').getBoundingClientRect();
+        return title.width>=110 && title.height<36 && time.top>=title.bottom;
+      }),'手机'+width+'时间换到下一行,标题没有被挤成竖排');
       await mobile.assert(await mobile.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'手机'+width+'洞察无横向溢出');
       await mobile.page.locator('#ai-report button[type=submit]').last().scrollIntoViewIfNeeded();
       await mobile.assert(await mobile.page.locator('#ai-report button[type=submit]').last().evaluate(el=>{

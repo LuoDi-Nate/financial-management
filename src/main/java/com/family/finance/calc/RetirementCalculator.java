@@ -45,7 +45,7 @@ public final class RetirementCalculator {
                     + " · 大额支出准备金B=" + reserves + " · 负债D=" + debt
                     + " · 生活费/月=" + monthlyExpense + " · 计划投入/月=" + monthlyContribution
                     + " · 目标退休月=" + retirementDate + " · 中性首次达到=" + neutralDate()
-                    + "。数值均为系统计算,不得重算、补全缺失或把门槛说成保证退休。";
+                    + "。数值均为系统计算,不得重算或补全缺失。门槛仅为规划参考,实际结果可能偏离测算。";
         }
     }
 

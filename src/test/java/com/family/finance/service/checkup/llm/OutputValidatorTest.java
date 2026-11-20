@@ -1,6 +1,8 @@
 package com.family.finance.service.checkup.llm;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.Set;
 
@@ -70,6 +72,42 @@ class OutputValidatorTest {
         var r = OutputValidator.check(bad, NO_NAMES);
         assertThat(r.accepted()).isFalse();
         assertThat(r.reason()).contains("担保性");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "历史收益和物价变化不保证未来结果。",
+            "本测算仅供参考，不保证按期退休。",
+            "无法保证如期达成目标"
+    })
+    void onlyGoalMonthlyReportAcceptsCompleteNegativeRiskNotes(String note) {
+        String report = VALID_DIAGNOSE + note;
+        assertThat(OutputValidator.checkGoalMonthlyReport(report, NO_NAMES).accepted()).isTrue();
+        assertThat(OutputValidator.check(report, NO_NAMES).reason()).contains("担保性");
+        assertThat(OutputValidator.checkInsight(report, NO_NAMES).reason()).contains("担保性");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "保证未来收益。",
+            "并非不保证未来收益。",
+            "不能不保证如期退休。",
+            "不能保证未来收益低于预期。",
+            "历史收益不保证未来回报，但本金有保证。",
+            "保证按期退休。",
+            "本金保底。"
+    })
+    void goalMonthlyReportRejectsPromisesEvenBesideARiskNote(String claim) {
+        String report = "本报告不保证未来收益。\n" + VALID_DIAGNOSE + claim;
+        assertThat(OutputValidator.checkGoalMonthlyReport(report, NO_NAMES).reason()).contains("担保性");
+    }
+
+    @Test
+    void goalMonthlyReportStillChecksEntireOriginalTextForOtherViolations() {
+        String report = VALID_DIAGNOSE + "历史收益不保证未来收益。";
+        assertThat(OutputValidator.checkGoalMonthlyReport(report + "推荐余额宝。", NO_NAMES).reason()).contains("产品名");
+        assertThat(OutputValidator.checkGoalMonthlyReport(report + "向Alice说明。", NAMES_2).reason()).contains("真名");
+        assertThat(OutputValidator.checkGoalMonthlyReport("不保证未来收益。", NO_NAMES).reason()).contains("过短");
     }
 
     @Test
