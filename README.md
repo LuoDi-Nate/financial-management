@@ -350,6 +350,7 @@ bash scripts/regression-data.sh # 数据层/口径回归(原 e2e.sh · curl 端�
 
 ## 文档
 
+- [v1.42.1 退休目标详情与旧版对齐](prd/v1.42.1.md) · [技术方案附录](tech-design/v1.42.md#附录--v1421-目标-ai-月报)。统一进度、资金说明及 AI 月报的呈现，不改退休计算口径。
 - [v1.42 自有兼容服务](prd/v1.42.md) · [交互预览](preview/v1.42/custom-llm.html) · [技术设计](tech-design/v1.42.md) · [验收记录](docs/beta-review-v1.42.md)。同页原子服务配置、明确免认证与内网许可、文字/视觉/本地工具及来源留存,已随v1.42.0发布。
 - [v1.41 硅基流动 AI 接入](prd/v1.41.md) · [交互预览](preview/v1.41/ai-access.html) · [技术设计](tech-design/v1.41.md) · [验收记录](docs/beta-review-v1.41.md)。四平台共同配置交互,文字/图片/本地工具SSE接入,旧配置与百炼轮询保留;随v1.42.0一同发布。
 
