@@ -506,8 +506,8 @@ module.exports = {
     await ui.notSeesText('尚未登记余额','空账户提示默认折叠,不展开为保存错误');
     await coreProgress(ui,'所选账户中有空账户',{assets:'¥6,900,000.00'});
     await ui.assert((await ui.page.locator('[data-retire-value="principal"]').innerText()).trim()==='¥5,600,000.00','空账户不清空已有资产扣除负债与准备金后的本金');
-    await ui.assert((await ui.page.locator('.retire-bridge > div').nth(1).innerText()).includes('100,000.00'),'空账户不影响全家庭负债10万');
-    await ui.assert((await ui.page.locator('.retire-bridge > div').nth(2).innerText()).includes('1,200,000.00'),'空账户不影响准备金120万');
+    await ui.assert((await ui.page.getByText('+ 全家庭负债 D', {exact:true}).locator('..').innerText()).includes('100,000.00'),'空账户不影响全家庭负债10万');
+    await ui.assert((await ui.page.getByText('+ 大额支出准备金 B', {exact:true}).locator('..').innerText()).includes('1,200,000.00'),'空账户不影响准备金120万');
     await ui.assert(await ui.page.locator('[data-retire-known-assets]').count()===0,'现有账面合计直接作为主A,不另设已知账户小计');
     await ui.assert(db.num(unfilledSnapshotsQuery)===0,'保存与读取目标没有替空账户创建零余额快照');
     await ui.click('[data-retire-reference] > summary','按需查看运行数据参考');
