@@ -224,6 +224,34 @@ class RetirementDataServiceTest {
         when(row.endBalanceOrig()).thenReturn(new BigDecimal("600"));when(row.endBalanceBase()).thenReturn(new BigDecimal("600"));
         assertThat(service.load(1,p,today).selectedAssets()).isEqualByComparingTo("600");
     }
+    @Test void netFundingIncludesAllActiveDebtsAndDoesNotTreatUnknownAmountsAsZero() {
+        var p=setup();p.setVersion(2);p.setFundingScope("FAMILY_FINANCIAL_NET");
+        var cash=Account.builder().id(91L).familyId(1L).displayName("现金").type(AccountType.CASH).currency("CNY").build();
+        var loan=Account.builder().id(92L).familyId(1L).displayName("人民币贷款").type(AccountType.LOAN).currency("CNY").build();
+        var foreign=Account.builder().id(93L).familyId(1L).displayName("外币贷款").type(AccountType.LOAN).currency("USD").build();
+        when(accounts.findActiveByFamily(1)).thenReturn(List.of(cash,loan,foreign));
+        var usd=balance(93L,"-100");
+        when(usd.endBalanceBase()).thenReturn(new BigDecimal("-800"));
+        when(usd.fxToBase()).thenReturn(new BigDecimal("8"));
+        var rows=List.of(balance(91L,"5000"),balance(92L,"-200"),usd,balance(94L,"-9999"));
+        for (var row : rows) when(row.periodStart()).thenReturn(today.withDayOfMonth(1));
+        when(facts.load(null).rows()).thenReturn(rows);
+        var missing=service.load(1,p,today);
+        assertThat(missing.debt()).isEqualByComparingTo("200");
+        assertThat(missing.fundingComplete()).isFalse();
+        assertThat(missing.problems()).anyMatch(note -> note.contains("外币贷款:缺少 USD 换汇来源"));
+
+        when(rates.findRatesAsOf(1,today)).thenReturn(List.of(FxRate.builder().baseCurrency("CNY")
+                .quoteCurrency("USD").rate(new BigDecimal("0.125")).periodStart(today.withDayOfMonth(1)).build()));
+        var complete=service.load(1,p,today);
+        assertThat(complete.selectedAssets()).isEqualByComparingTo("5000");
+        assertThat(complete.debt()).isEqualByComparingTo("1000");
+        assertThat(complete.fundingComplete()).isTrue();
+        when(usd.endBalanceOrig()).thenReturn(BigDecimal.ZERO);
+        when(usd.endBalanceBase()).thenReturn(BigDecimal.ZERO);
+        assertThat(service.load(1,p,today).fundingComplete()).isTrue();
+    }
+
     @Test void missingActualSnapshotCannotBecomeACompleteReturnIntervalThroughCarryForward() {
         var p=setup();p.setVersion(2);p.setScopeMode("FAMILY_FINANCIAL");
         when(accounts.findActiveByFamily(1)).thenReturn(List.of(Account.builder().id(99L).familyId(1L)

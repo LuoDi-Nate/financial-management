@@ -42,7 +42,7 @@ public class RetirementController {
                 "nominalReturnPct", "inflationPct", "realReturnPct", "lowReturnPct", "middleReturnPct", "highReturnPct",
                 "contributionFollowsInflation", "budgetConfirmed", "reservesConfirmed", "noOverlapConfirmed", "assetsConfirmed",
                 "incomeConfirmed", "contributionConfirmed", "afterDebtConfirmed", "educationConfirmed",
-                "scopeMode", "returnSource", "inflationSource", "reserveMode", "cityTier", "dependentCount", "childPlanningYears[*]",
+                "scopeMode", "fundingScope", "returnSource", "inflationSource", "reserveMode", "cityTier", "dependentCount", "childPlanningYears[*]",
                 "housingPlan", "simulateFuture", "contributionSource", "advancedScenarios");
     }
 

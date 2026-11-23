@@ -1,6 +1,8 @@
 package com.family.finance.domain.goal;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -50,6 +52,23 @@ public class RetirementPlan {
     private boolean educationConfirmed;
     private String budgetFingerprint;
     private String scopeMode = "CUSTOM";
+    @JsonInclude(JsonInclude.Include.NON_DEFAULT)
+    private boolean netOfLiabilities;
+
+    public boolean usesNetFunding() {
+        return version >= 2 && "FAMILY_FINANCIAL".equals(scopeMode) && netOfLiabilities;
+    }
+
+    @JsonIgnore
+    public String getFundingScope() {
+        return usesNetFunding() ? "FAMILY_FINANCIAL_NET" : scopeMode;
+    }
+
+    @JsonIgnore
+    public void setFundingScope(String value) {
+        netOfLiabilities = "FAMILY_FINANCIAL_NET".equals(value);
+        scopeMode = netOfLiabilities ? "FAMILY_FINANCIAL" : value;
+    }
     private String returnSource = "MANUAL";
     private String inflationSource = "MANUAL";
     private String reserveMode = "CUSTOM";

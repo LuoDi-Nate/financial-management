@@ -133,7 +133,7 @@
 | 前端 | Thymeleaf + HTMX 1.9 + Chart.js 4 + ECharts(无 SPA、无构建管线) |
 | 认证 | Spring Security + bcrypt + Session Cookie |
 | 部署 | **Docker compose 一键(v0.7,推荐)** · 或 Linux systemd + nginx 反代 :80 → :20000 · macOS launchd(可选)直连 :20000 |
-| 测试 | JUnit 5 · **1646 单元** / 44 条浏览器主线(真浏览器 + 真 DB,真实模型流程默认跳过)/ **1155 黑盒回归**护栏(含v1.39的53项、目标模块的25项、v1.41的29项及v1.42的10项只读静态守护) —— 每条护栏守的是哪个坑,见 [QA case 库](docs/qa-cases.md) |
+| 测试 | JUnit 5 · **1651 单元** / 44 条浏览器主线(真浏览器 + 真 DB,真实模型流程默认跳过)/ **1162 黑盒回归**护栏(含v1.43的7项只读静态守护) —— 每条护栏守的是哪个坑,见 [QA case 库](docs/qa-cases.md) |
 
 ## 快速开始(自托管部署)
 
@@ -341,7 +341,7 @@ mvn spring-boot:run
 测试:
 
 ```bash
-mvn test                       # JUnit 单元测试(1646)
+mvn test                       # JUnit 单元测试(1651)
 bash scripts/qa-run.sh         # 黑盒 endpoint + 模板渲染(见 README 上方测试行的黑盒回归数)
 bash scripts/qa-run.sh --static-v139 # v1.39 只读守护,不写数据库、不调模型
 node scripts/e2e/run.cjs       # 真 e2e:Playwright 开浏览器按用户路径点(失败自动截图)
@@ -349,6 +349,8 @@ bash scripts/regression-data.sh # 数据层/口径回归(原 e2e.sh · curl 端�
 ```
 
 ## 文档
+
+- [v1.43 退休资金净额](prd/v1.43.md) · [技术设计](tech-design/v1.43.md)。
 
 - [v1.42.1 退休目标详情与旧版对齐](prd/v1.42.1.md) · [技术方案附录](tech-design/v1.42.md#附录--v1421-目标-ai-月报)。统一进度、资金说明及 AI 月报的呈现，不改退休计算口径。
 - [v1.42 自有兼容服务](prd/v1.42.md) · [交互预览](preview/v1.42/custom-llm.html) · [技术设计](tech-design/v1.42.md) · [验收记录](docs/beta-review-v1.42.md)。同页原子服务配置、明确免认证与内网许可、文字/视觉/本地工具及来源留存,已随v1.42.0发布。

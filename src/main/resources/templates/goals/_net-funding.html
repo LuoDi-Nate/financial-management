@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org"><body>
+<dl th:fragment="rows(r, money)" class="text-sm divide-y divide-rule-soft mt-4" data-retire-net-funds>
+  <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-2">
+    <dt th:text="${r.fundingComplete() ? '全家金融资产合计' : '已知金融资产小计'}"></dt>
+    <dd class="m-0 font-mono tnum break-words" data-retire-fund="gross" data-priv="amount" th:text="${money.amount(r.assets())}"></dd>
+  </div>
+  <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-2">
+    <dt th:text="${r.fundingComplete() ? '减：全家负债' : '已知负债小计'}"></dt>
+    <dd class="m-0 font-mono tnum break-words" data-retire-fund="debt" data-priv="amount" th:text="${money.amount(r.debt())}"></dd>
+  </div>
+  <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-2 font-medium">
+    <dt>净可支用资金</dt>
+    <dd class="m-0 font-mono tnum break-words" data-retire-fund="net" data-priv="amount"
+        th:text="${r.fundingComplete() ? money.amount(r.progressAssets()) : '待补齐'}"></dd>
+  </div>
+</dl>
+</body></html>

@@ -300,6 +300,63 @@ class RetirementCalculatorTest {
         assertThat(r.aiSummary()).contains("所选账户资产A=5000000.00", "所需总资金F=10000000.00",
                 "目标进度比率=0.5", "资金缺口=5000000.00", "生活本金P=2200000.00", "生活本金门槛T=7200000.00");
     }
+    @Test void netScopeChangesTheProgressPairButNotTheGapOrProjection() {
+        var p = revisionTwoPlan();
+        p.setMonthlyExpense(n("15000"));
+        p.setMedicalReserve(n("400000"));
+        p.setOtherReserve(BigDecimal.ZERO);
+        p.setFundingScope("FAMILY_FINANCIAL");
+        var gross = calculate(p, "5000000.004", "1000000.004");
+        p.setFundingScope("FAMILY_FINANCIAL_NET");
+        var net = calculate(p, "5000000.004", "1000000.004");
+        assertThat(gross.progressAssets()).isEqualByComparingTo("5000000");
+        assertThat(gross.progressTarget()).isEqualByComparingTo("9000000");
+        assertThat(net.progressAssets()).isEqualByComparingTo("4000000");
+        assertThat(net.progressTarget()).isEqualByComparingTo("8000000");
+        assertThat(net.coverage()).isEqualByComparingTo("0.5");
+        assertThat(net.gap()).isEqualByComparingTo("4000000").isEqualByComparingTo(gross.gap());
+        assertThat(net.principal()).isEqualByComparingTo(gross.principal());
+        assertThat(net.scenarios()).isNotEmpty().isEqualTo(gross.scenarios());
+        var before = GoalCashflowCalculator.calculate(today, gross.progressAssets(), gross.progressTarget(), n("40000"), null);
+        var after = GoalCashflowCalculator.calculate(today, net.progressAssets(), net.progressTarget(), n("40000"), null);
+        assertThat(after.date()).isEqualTo(before.date());
+        assertThat(net.aiSummary()).contains("净可支用资金=4000000.00", "不含债务的资金需求=8000000.00");
+    }
+
+    @Test void incompleteNetScopeKeepsKnownSubtotalsWithoutAProgressOrForecast() {
+        var p = revisionTwoPlan();
+        p.setFundingScope("FAMILY_FINANCIAL_NET");
+        var net = RetirementCalculator.calculate(p, today, n("5000000"), n("200000"),
+                null, List.of("缺少换汇来源"), false);
+        assertThat(net.assets()).isEqualByComparingTo("5000000");
+        assertThat(net.debt()).isEqualByComparingTo("200000");
+        assertThat(net.fundingComplete()).isFalse();
+        assertThat(net.state()).isEqualTo(RetirementCalculator.State.MISSING);
+        assertThat(net.progressAssets()).isNull();
+        assertThat(net.coverage()).isNull();
+        assertThat(net.gap()).isNull();
+        assertThat(net.principal()).isNull();
+        assertThat(net.reached()).isFalse();
+        assertThat(net.scenarios()).isEmpty();
+    }
+
+    @Test void negativeNetFundsAndAZeroThresholdRemainDifferentStates() {
+        var p = revisionTwoPlan();
+        p.setFundingScope("FAMILY_FINANCIAL_NET");
+        var negative = calculate(p, "100", "200");
+        assertThat(negative.progressAssets()).isEqualByComparingTo("-100");
+        assertThat(negative.coverage()).isNegative();
+        assertThat(negative.reached()).isFalse();
+        p.setMonthlyExpense(BigDecimal.ZERO);
+        p.setChildReserve(BigDecimal.ZERO); p.setMedicalReserve(BigDecimal.ZERO);
+        p.setHousingReserve(BigDecimal.ZERO); p.setOtherReserve(BigDecimal.ZERO);
+        var zero = calculate(p, "200", "200");
+        assertThat(zero.progressTarget()).isZero();
+        assertThat(zero.gap()).isZero();
+        assertThat(zero.coverage()).isNull();
+        assertThat(zero.reached()).isTrue();
+    }
+
     @Test void revisionTwoReachesTheGoalWhenAssetsCoverTheFullNeed() {
         var p = revisionTwoPlan(); p.setMonthlyExpense(n("15000"));
         var below = calculate(p, "9999999.99", "1600000");

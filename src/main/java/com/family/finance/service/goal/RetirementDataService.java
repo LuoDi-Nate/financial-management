@@ -41,6 +41,11 @@ public class RetirementDataService {
                        BigDecimal selectedAssets, BigDecimal debt, BigDecimal suggestedExpense,
                        BigDecimal suggestedContribution, String budgetFingerprint, List<String> problems,
                        List<String> budgetNotes, String cpiReference, Sources sources) {
+        public boolean fundingComplete() {
+            return selectedAssets != null && debt != null
+                    && assets.stream().noneMatch(a -> (a.selected() || a.liability()) && a.amount() == null);
+        }
+
         public Data(String baseCurrency, LocalDate balancePeriod, List<Asset> assets, List<Month> months,
                     BigDecimal selectedAssets, BigDecimal debt, BigDecimal suggestedExpense, BigDecimal suggestedContribution,
                     String budgetFingerprint, List<String> problems, List<String> budgetNotes, String cpiReference) {
@@ -95,6 +100,9 @@ public class RetirementDataService {
             if ((selected || liability) && fxMismatch)
                 problems.add(account.getDisplayName() + ":当前事实换汇与可追溯汇率不一致,请先核对汇率");
             if (original==null || factor==null || fxMismatch) amount=null;
+            if (plan.usesNetFunding() && (selected || liability) && original != null && factor != null
+                    && !fxMismatch && amount == null)
+                problems.add(account.getDisplayName() + ":暂无可核对的本位币余额");
             if (selected && !eligible && !revision2) {
                 amount = plan.getRealizableAmounts().get(account.getId());
                 if (amount == null || amount.signum() < 0) problems.add(account.getDisplayName() + ":需确认可变现金额(本位币)");

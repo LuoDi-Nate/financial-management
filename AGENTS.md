@@ -215,6 +215,8 @@ worktree 的工作目录里没有 `.githooks/`(那是 master 上的文件),hook 
 
 ## 7. 联动不变量登记表(改 X → 必须同步 Y,否则下游静默错)
 
+v1.43退休净额口径:保留旧资金范围JSON,全家模式以可选字段启用净额。资金缺口与投资积累不因毛净切换而变;数据不全只显示已知小计。详情、摘要、报表目标条、导出与解读读取同一结果。护栏 `qa-run.sh --static-v143` 和 flow 61。
+
 v1.42自有模型服务:地址/认证/Key/内网许可一行私密JSON原子保存,连接revision与编辑token分开。目录custom无默认型号,显式auto是型号原文。configured统一支持NONE,请求快照不可拆读;自有服务全部出口经同一DNS/IP策略与LlmTestGate,不跟跳转、不走代理、不绕TLS。来源元数据跟结果同寿命且无URL/Key;换服务只使旧结果标历史,不删或自动重算。FamilyRuntimeConfigMapper/PromptRecordMapper不得调试打印SQL参数。相关护栏与flow63随本版实施,本段不代表已发布。
 
 v1.41新增AI平台必须同时覆盖LlmCatalog/独立密钥fallback/文字Client/视觉/本地工具SSE/四平台共同配置交互/测试保护。凭据卡与计数由目录生成;完整Model ID保留前缀和大小写。百炼auto仍为原池轮询,连接探测单独固定一次型号,不要用统一外观改默认策略。页面与POST探测共用LlmProbeTarget,禁用视觉不参与;错误按实际平台给指引。保护下各出口零发送,工具可见产出后不重放。守护qa-run.sh --static-v141、LlmIntegrationV141Test、AiPlatformV141Test、LocalToolLoopSiliconflowTest及e2e62。

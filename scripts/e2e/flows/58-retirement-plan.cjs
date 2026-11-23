@@ -27,7 +27,7 @@ async function form(ui, name) {
   await ui.page.check('[name="autoExpense"][value="false"]');
   await ui.choose('reserveMode','CUSTOM');await ui.choose('returnSource','MANUAL');await ui.choose('inflationSource','MANUAL');
   if(!await ui.page.locator('#retire-scope').evaluate(el=>el.open)) await ui.click('#retire-scope > summary','展开资金范围');
-  await ui.choose('scopeMode','CUSTOM');
+  await ui.choose('fundingScope','CUSTOM');
   if(!await ui.page.locator('#retire-returns details[data-retire-when="manual-return"]').evaluate(el=>el.open)) await ui.click('#retire-returns details[data-retire-when="manual-return"] > summary','展开直接实际回报');
   for (const [key,value] of Object.entries({name,targetMonth:'2036-11',monthlyExpense:'10000',
     childReserve:'400000',medicalReserve:'300000',housingReserve:'0',otherReserve:'500000',inflationPct:'0',realReturnPct:'2.5'}))
@@ -489,7 +489,7 @@ module.exports = {
       await mobile.click('[data-retire-save]','手机恢复正回报');
     });
     await ui.goto('/goals/retirement/new');await form(ui,state.prefix+'-pending-data');
-    await ui.choose('scopeMode','FAMILY_FINANCIAL');await ui.choose('returnSource','AUTO');
+    await ui.choose('fundingScope','FAMILY_FINANCIAL');await ui.choose('returnSource','AUTO');
     db.raw(`INSERT INTO account(family_id,display_name,type,currency) VALUES(${state.family},${q(state.prefix+'-unfilled')},'FUND','CNY')`);
     const unfilled=db.num(`SELECT id FROM account WHERE family_id=${state.family} AND display_name=${q(state.prefix+'-unfilled')}`);
     const unfilledSnapshotsQuery=`SELECT COUNT(*) FROM period_snapshot s JOIN period p ON p.id=s.period_id
@@ -632,7 +632,7 @@ module.exports = {
     }
     await ui.goto(`/goals/${pendingGoal}/retirement?tab=plan`);
     await ui.click('#retire-scope > summary','展开当前默认折叠的资金范围');
-    await ui.choose('scopeMode','CUSTOM');
+    await ui.choose('fundingScope','CUSTOM');
     const home=db.num(`SELECT id FROM account WHERE family_id=${state.family} AND type='PROPERTY'`);
     await ui.page.check(`[name="accountIds"][value="${home}"]`);
     await ui.assert(await ui.page.locator('.retire-realizable').count()===0,'自定义范围只选账户,不要求另填估值');

@@ -10,6 +10,67 @@ async function login(page,user){await page.context().clearCookies();await page.g
 async function eta(ui,text){await ui.page.waitForFunction(s=>document.querySelector('[data-estimate-date]')?.textContent.trim()===s,text);await ui.assert((await ui.page.locator('[data-estimate-date]').innerText()).trim()===text,'时间指标:'+text);}
 async function save(ui){await ui.click('[data-estimate-save]','保存本目标月结余');await ui.page.waitForFunction(()=>document.querySelector('[data-estimate-status]').textContent.includes('已保存'));}
 async function shot(ui,name){fs.mkdirSync('/tmp/finance-v140-review',{recursive:true});await ui.page.screenshot({path:'/tmp/finance-v140-review/'+name+'.png',fullPage:true});}
+async function netFunding(ui, expectedDate) {
+  const path=`/goals/${state.goal}/retirement`;
+  const plan=()=>JSON.parse(db.one(`SELECT plan_json FROM retirement_plan WHERE goal_id=${state.goal} AND family_id=${state.family}`));
+  const value=key=>ui.page.locator(`[data-retire-value=${key}]`).innerText();
+  const funds=key=>ui.page.locator(`[data-retire-metric-notes] [data-retire-fund=${key}]`).innerText();
+  await ui.assert(plan().scopeMode==='FAMILY_FINANCIAL' && plan().netOfLiabilities===true,'新建默认净额且旧版可读原资金范围');
+  await ui.assert((await funds('gross')).includes('5,000,000.00') && (await funds('debt')).includes('2,000,000.00') &&
+    (await funds('net')).includes('3,000,000.00'),'同一账期的人民币和美元负债折算后各扣一次');
+  await ui.assert((await value('target')).includes('8,000,000.00') && (await value('coverage')).includes('37.50%'),'净额进度为300万÷800万');
+  await ui.assert((await value('gap')).includes('5,000,000.00'),'净额资金缺口500万');
+  await eta(ui,expectedDate);
+  await shot(ui,'v143-net-desktop');
+  const [exported]=await Promise.all([ui.page.waitForEvent('download'), ui.page.locator('a[href$="/retirement/export"]').click()]);
+  await ui.assert(fs.readFileSync(await exported.path(),'utf8').includes('净可支用资金=3000000.00'),'导出与详情共用净额');
+  await ui.goto('/goals');
+  await ui.assert((await ui.page.locator(`a[href="/goals/${state.goal}"]`).first().innerText()).includes('37.5%'),'目标列表使用同一净额进度');
+  for(const route of ['/dashboard','/reports']){
+    await ui.goto(route);
+    const card=ui.page.locator(`a[href="/goals/${state.goal}"]`).first();
+    await ui.assert((await card.innerText()).includes('37.5%'),route+'目标条使用净额进度');
+    await card.locator('[data-kpi-info]').click();
+    await ui.assert((await card.locator('[data-goal-progress-summary]').innerText()).includes('不含负债'),route+'目标条说明不重复扣债');
+  }
+  db.raw(`INSERT INTO account(family_id,display_name,type,currency) VALUES(${state.family},'净额测试无汇率贷款','LOAN','HKD')`);
+  const id=db.num(`SELECT id FROM account WHERE family_id=${state.family} AND display_name='净额测试无汇率贷款'`);
+  const period=db.num(`SELECT id FROM period WHERE family_id=${state.family} AND status='OPEN'`);
+  db.raw(`INSERT INTO period_snapshot(period_id,account_id,end_balance,submitted_by,source_tag) VALUES(${period},${id},-10000,${state.member},'MANUAL')`);
+  try {
+    await ui.goto(path);
+    await ui.assert(await ui.page.locator('[data-retire-funding-incomplete]').isVisible(),'外币负债缺汇率时明确标记资产负债小计');
+    await ui.assert((await funds('debt')).includes('2,000,000.00') && (await funds('net')).includes('待补齐'),'不把缺汇率负债当成零');
+    await ui.assert((await value('coverage')).trim()==='—' && (await value('gap')).trim()==='—','净额进度与缺口暂停');
+    await eta(ui,'暂不估算');
+    await ui.click('[data-retire-reference] > summary','打开资金来源');
+    await ui.assert((await ui.page.locator('[data-retire-reference]').innerText()).includes('缺少 HKD 换汇来源'),'逐项提示缺汇率原因');
+  } finally {
+    db.raw(`DELETE FROM period_snapshot WHERE account_id=${id} AND period_id=${period};DELETE FROM account WHERE id=${id} AND family_id=${state.family}`);
+  }
+  db.raw(`INSERT INTO fx_rate(family_id,period_id,base_currency,quote_currency,rate,source)
+    SELECT family_id,id,'CNY','HKD',1.1,'MANUAL' FROM period WHERE family_id=${state.family}`);
+  await ui.phone(async mobile=>{
+    await login(mobile.page,state.username);
+    for (const width of [390,320]) {
+      await mobile.page.setViewportSize({width,height:844});
+      await mobile.goto(path+'?tab=plan');
+      await mobile.click('#retire-scope > summary','展开手机资金范围');
+      await mobile.assert(await mobile.page.inputValue('[name=fundingScope]')==='FAMILY_FINANCIAL_NET','手机回读净额选项');
+      await mobile.assert(await mobile.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'手机净额选项和金额不横溢');
+      await mobile.page.locator('#retire-assets').screenshot({path:`/tmp/finance-v140-review/v143-net-funding-${width}.png`});
+    }
+  });
+  await ui.goto(path+'?tab=plan');
+  await ui.click('#retire-scope > summary','展开资金范围');
+  await ui.choose('fundingScope','FAMILY_FINANCIAL');
+  await ui.page.waitForFunction(()=>document.querySelector('[data-retire-value=coverage]')?.textContent.includes('50.00%'));
+  await ui.assert(plan().netOfLiabilities===true,'切换草稿不会重写已保存净额');
+  await ui.click('[data-retire-save]','保存原毛额口径');
+  await ui.page.waitForURL('**/retirement');
+  await ui.assert(plan().scopeMode==='FAMILY_FINANCIAL' && !('netOfLiabilities' in plan()),'切回毛额清除附加字段');
+  await eta(ui,expectedDate);
+}
 async function compareOverview(ui,oldGoal,screen) {
   const card=ui.page.locator('[data-goal-detail-overview]');
   const metrics=()=>card.locator('[data-goal-detail-kpis]').evaluate(grid=>({
@@ -176,14 +237,14 @@ module.exports={name:'61-goal-indicators',title:'目标多指标、家庭结余�
   db.raw(`INSERT INTO member(family_id,username,password_hash,display_name,must_change_pw)SELECT ${state.family},${q(state.username)},password_hash,'目标验收成员',0 FROM member WHERE username=${q(USER)}`);
   state.member=db.num(`SELECT id FROM member WHERE username=${q(state.username)}`);
   if(!state.member)throw Error('合成成员未建立');
-  db.raw(`INSERT INTO account(family_id,display_name,type,currency)VALUES(${state.family},'合成目标现金','CASH','CNY'),(${state.family},'合成目标贷款','LOAN','CNY')`);
+  db.raw(`INSERT INTO account(family_id,display_name,type,currency)VALUES(${state.family},'合成目标现金','CASH','CNY'),(${state.family},'合成目标贷款','LOAN','CNY'),(${state.family},'合成美元贷款','LOAN','USD')`);
   state.cash=db.num(`SELECT id FROM account WHERE family_id=${state.family} AND type='CASH'`);
   const current=db.one("SELECT DATE_FORMAT(CURDATE(),'%Y-%m-01')");
   for(let back=6;back>=0;back--){
     db.raw(`INSERT INTO period(family_id,period_type,period_start,period_end,status)VALUES(${state.family},'MONTHLY',DATE_SUB('${current}',INTERVAL ${back} MONTH),LAST_DAY(DATE_SUB('${current}',INTERVAL ${back} MONTH)),'${back?'CLOSED':'OPEN'}')`);
     const pid=db.num(`SELECT id FROM period WHERE family_id=${state.family} AND period_start=DATE_SUB('${current}',INTERVAL ${back} MONTH)`);
-    db.raw(`INSERT INTO period_snapshot(period_id,account_id,end_balance,submitted_by,source_tag)SELECT ${pid},id,IF(type='LOAN',-2000000,5000000),${state.member},'MANUAL' FROM account WHERE family_id=${state.family}`);
-    db.raw(`INSERT INTO fx_rate(family_id,period_id,base_currency,quote_currency,rate,source)VALUES(${state.family},${pid},'CNY','USD',0.125,'MANUAL'),(${state.family},${pid},'CNY','HKD',1.1,'MANUAL')`);
+    db.raw(`INSERT INTO period_snapshot(period_id,account_id,end_balance,submitted_by,source_tag)SELECT ${pid},id,CASE WHEN currency='USD' THEN -100000 WHEN type='LOAN' THEN -1200000 ELSE 5000000 END,${state.member},'MANUAL' FROM account WHERE family_id=${state.family}`);
+    db.raw(`INSERT INTO fx_rate(family_id,period_id,base_currency,quote_currency,rate,source)VALUES(${state.family},${pid},'CNY','USD',0.125,'MANUAL')`);
     if(back)db.raw(`INSERT INTO period_member_cashflow(family_id,period_id,member_id,total_income_input,total_expense_input)VALUES(${state.family},${pid},${state.member},80000,40000)`);
   }
   await login(ui.page,state.username);await ui.goto('/goals');await ui.click('a[href="/goals/new/retirement"]','从空目标页新建退休');
@@ -197,6 +258,7 @@ module.exports={name:'61-goal-indicators',title:'目标多指标、家庭结余�
   state.goal=db.num(`SELECT goal_id FROM retirement_plan WHERE family_id=${state.family} AND active=1`);
   await ui.assert(Boolean(state.goal),'新退休计划已保存');
   await ui.assert(db.num(`SELECT forecast_wish_override FROM family_goal WHERE id=${state.goal}`)===0,'未改估算月份时继承主计划');
+  await netFunding(ui,dateAfter(125));
   await ui.assert(await ui.page.evaluate(()=>document.querySelector('[data-retire-value=coverage]').textContent.includes('50')),'主资金仍为500万/1000万=50%');
   await eta(ui,dateAfter(125));await ui.assert((await ui.page.locator('[data-estimate-duration]').innerText()).includes('10年5个月'),'月结余4万还需125个月');
   const original=db.one(`SELECT plan_json FROM retirement_plan WHERE goal_id=${state.goal} AND family_id=${state.family}`);

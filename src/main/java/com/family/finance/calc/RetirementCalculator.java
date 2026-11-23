@@ -25,12 +25,15 @@ public final class RetirementCalculator {
                          BigDecimal reserves, BigDecimal principal, BigDecimal monthlyExpense,
                          BigDecimal monthlyIncome, BigDecimal monthlyContribution, BigDecimal realRate,
                          BigDecimal target, BigDecimal gap, BigDecimal supportedExpense, BigDecimal coverage,
-                         List<String> problems, List<Scenario> scenarios, LocalDate retirementDate) {
+                         List<String> problems, List<Scenario> scenarios, LocalDate retirementDate,
+                         boolean netFunding, boolean fundingComplete, BigDecimal progressAssets, BigDecimal progressTarget) {
         /** 当前运行可作有限门槛判断,不代表配置保存状态或预测是否可用。 */
         public boolean ready() { return state == State.READY || state == State.INCOME_COVERS; }
         public boolean reached() {
             BigDecimal requiredAssets = totalAssetNeed();
-            return ready() && assets != null && requiredAssets != null && assets.compareTo(requiredAssets) >= 0;
+            return ready() && (netFunding
+                    ? progressAssets != null && progressTarget != null && progressAssets.compareTo(progressTarget) >= 0
+                    : assets != null && requiredAssets != null && assets.compareTo(requiredAssets) >= 0);
         }
         public BigDecimal totalNeed() { return target == null || reserves == null ? null : target.add(reserves); }
         public BigDecimal totalAssetNeed() { return totalNeed()==null || debt==null?null:totalNeed().add(debt); }
@@ -39,7 +42,10 @@ public final class RetirementCalculator {
         public LocalDate neutralDate() { return scenarios.size()==1?scenarios.getFirst().firstReached():scenarios.size()==3?scenarios.get(1).firstReached():null; }
         public String aiSummary() {
             return "退休生活账 · 今天购买力(" + asOf + ") · 状态=" + message
-                    + " · 所选账户资产A=" + assets + " · 所需总资金F=" + totalAssetNeed()
+                    + (netFunding ? " · 剔除负债口径 · 已知金融资产合计A=" + assets
+                        + " · 净可支用资金=" + progressAssets + " · 不含债务的资金需求=" + progressTarget
+                        + " · 资金数据=" + (fundingComplete ? "完整" : "待补齐，已知金额仅为小计")
+                        : " · 所选账户资产A=" + assets + " · 所需总资金F=" + totalAssetNeed())
                     + " · 目标进度比率=" + coverage + " · 资金缺口=" + gap
                     + " · 生活本金P=" + principal + " · 生活本金门槛T=" + target
                     + " · 大额支出准备金B=" + reserves + " · 负债D=" + debt
@@ -51,8 +57,15 @@ public final class RetirementCalculator {
 
     public static Result calculate(RetirementPlan p, LocalDate today, BigDecimal assets, BigDecimal debt,
                                    BigDecimal autoExpenseToday, List<String> sourceProblems) {
+        return calculate(p, today, assets, debt, autoExpenseToday, sourceProblems, assets != null && debt != null);
+    }
+
+    public static Result calculate(RetirementPlan p, LocalDate today, BigDecimal assets, BigDecimal debt,
+                                   BigDecimal autoExpenseToday, List<String> sourceProblems, boolean balancesComplete) {
         List<String> problems = new ArrayList<>(sourceProblems);
         boolean revision2=p.getVersion()>=2;
+        boolean netFunding = p.usesNetFunding();
+        boolean fundingComplete = balancesComplete && assets != null && debt != null;
         if (!revision2 && !p.isBudgetConfirmed()) problems.add("生活预算尚未确认");
         if (!revision2 && !p.isReservesConfirmed()) problems.add("大额支出准备金尚未确认");
         if (!revision2 && !p.isNoOverlapConfirmed()) problems.add("生活费与预留的归属尚未核对");
@@ -85,7 +98,8 @@ public final class RetirementCalculator {
         LocalDate retirementDate = null;
         try { retirementDate = YearMonth.parse(p.getTargetMonth()).atEndOfMonth(); }
         catch (Exception e) { if (!revision2) problems.add("目标退休年月未填或无效"); }
-        BigDecimal principal = assets == null || debt == null || reserves == null ? null : assets.subtract(debt).subtract(reserves);
+        BigDecimal principal = assets == null || debt == null || reserves == null || (netFunding && !fundingComplete)
+                ? null : assets.subtract(debt).subtract(reserves);
         BigDecimal need = expense == null || income == null ? null : expense.subtract(income).max(BigDecimal.ZERO);
         BigDecimal target = null;
         if (need != null) {
@@ -94,9 +108,10 @@ public final class RetirementCalculator {
         }
         BigDecimal requiredAssets = target == null || reserves == null || debt == null ? null
                 : revision2 ? money(target).add(money(reserves)).add(money(debt)) : target.add(reserves).add(debt);
-        // R2 的目标进度是所选资产 A / 总资金需求 F;P / T 仅保留给旧版和生活本金预测。
-        BigDecimal progressFunds = revision2 ? money(assets) : principal;
-        BigDecimal progressNeed = revision2 ? requiredAssets : target;
+        BigDecimal progressFunds = netFunding ? (fundingComplete ? money(assets).subtract(money(debt)) : null)
+                : revision2 ? money(assets) : principal;
+        BigDecimal progressNeed = netFunding ? (target == null || reserves == null ? null : money(target).add(reserves))
+                : revision2 ? requiredAssets : target;
         BigDecimal gap = progressNeed == null || progressFunds == null ? null : progressNeed.subtract(progressFunds).max(BigDecimal.ZERO);
         BigDecimal coverage = progressNeed == null || progressNeed.signum() == 0 || progressFunds == null ? null : progressFunds.divide(progressNeed, MC);
         BigDecimal supported = real == null || real.signum() <= 0 || principal == null || principal.signum() < 0 || income == null ? null
@@ -106,13 +121,15 @@ public final class RetirementCalculator {
         // R2 的来源说明不是全局开关;只有当前判断真正依赖的数据缺失才影响运行状态。
         boolean missingCore = principal == null || need == null || (need.signum() > 0 && real == null);
         if (revision2 ? missingCore : !problems.isEmpty()) {
-            state = State.MISSING; message = revision2 ? "部分指标暂无数据" : "待补齐 / 核对";
+            state = State.MISSING; message = netFunding && !fundingComplete ? "资金数据待补齐"
+                    : revision2 ? "部分指标暂无数据" : "待补齐 / 核对";
             if (!revision2) { coverage = null; gap = null; supported = null; }
         }
         else if (principal.signum() < 0) { state = State.RESERVES_SHORT; message = "大额支出准备金仍有缺口"; }
         else if (target == null) { state = State.NO_FINITE_TARGET; message = "这组假设没有有限的永久本金门槛"; }
         else if (need.signum() == 0) { state = State.INCOME_COVERS; message = revision2?"生活费明确为零,仍需保留负债与预留":"计划退休起的收入覆盖生活费,仍需保留预留"; }
-        else { state = State.READY; message = assets.compareTo(requiredAssets) >= 0 ? "按当前假设达到门槛" : "按当前假设尚有缺口"; }
+        else { state = State.READY; message = (netFunding ? progressFunds.compareTo(progressNeed) : assets.compareTo(requiredAssets)) >= 0
+                ? "按当前假设达到门槛" : "按当前假设尚有缺口"; }
         List<Scenario> scenarios = List.of();
         boolean projectionRates = revision2 && !p.isAdvancedScenarios() ? p.getMiddleReturnPct()!=null
                 : p.getLowReturnPct()!=null && p.getMiddleReturnPct()!=null && p.getHighReturnPct()!=null;
@@ -125,7 +142,8 @@ public final class RetirementCalculator {
                     project("高回报", p.getHighReturnPct(), principal, contribution, inflation, p.isContributionFollowsInflation(), target, today, retirementDate));
         }
         return new Result(state, message, today, money(assets), money(debt), money(reserves), money(principal), money(expense), money(income),
-                money(contribution), real, money(target), money(gap), money(supported), coverage, List.copyOf(problems), scenarios, retirementDate);
+                money(contribution), real, money(target), money(gap), money(supported), coverage, List.copyOf(problems), scenarios, retirementDate,
+                netFunding, fundingComplete, money(progressFunds), money(progressNeed));
     }
 
     private static Scenario project(String label, BigDecimal pct, BigDecimal principal, BigDecimal contribution,

@@ -33,7 +33,14 @@ public record GoalProgressSummary(String basis, List<Section> sections, String a
                             : r.target() == null && r.realRate() != null && r.realRate().signum() <= 0 ? "无有限的永久本金门槛" : "生活本金需求:" + amount(currency,r.target()),
                     (retirement.plan().isAutoExpense() ? "生活费跟随家庭定稿支出。" : "生活费由本目标填写。")
                             + retirement.returnBasis() + realRateBasis(retirement), true));
-            sections.add(new Section("财务自由所需资金", "生活本金 + 大额支出准备金 + 全部负债",
+            if (r.netFunding()) {
+                sections.add(new Section("全家净可支用资金", "金融资产合计 − 全部负债",
+                        amount(currency,r.assets()) + " − " + amount(currency,r.debt()) + " = " + amount(currency,progress.pv()),
+                        r.fundingComplete() ? "负债已从可支用金额扣除。" : "资产或负债数据待补齐，已知金额仅为小计。", true));
+                sections.add(new Section("所需资金（不含负债）", "生活本金 + 大额支出准备金",
+                        amount(currency,r.target()) + " + " + amount(currency,r.reserves()) + " = " + amount(currency,progress.target()),
+                        "已在可支用金额扣除负债，不在此重复计入。", true));
+            } else sections.add(new Section("财务自由所需资金", "生活本金 + 大额支出准备金 + 全部负债",
                     progress.target() == null ? "生活本金:" + amount(currency,r.target()) + "\n准备金:" + amount(currency,r.reserves()) + " · 负债:" + amount(currency,r.debt())
                             : amount(currency,r.target()) + " + " + amount(currency,r.reserves()) + " + " + amount(currency,r.debt()) + " = " + amount(currency,progress.target()),
                     "准备金与负债各计一次。", true));
@@ -60,6 +67,7 @@ public record GoalProgressSummary(String basis, List<Section> sections, String a
         }
         boolean reducing = progress.isCustom() && progress.comparator() == GoalComparator.LTE;
         String progressFormula = reducing ? "当前值不高于目标即达成;否则按目标值 ÷ 当前值显示进度"
+                : retirement != null && retirement.result().netFunding() ? "净可支用资金 ÷ 所需资金（不含负债）"
                 : retirement != null && retirement.plan().getVersion() >= 2 ? "所选账户当前合计 ÷ 财务自由所需资金"
                 : retirement != null ? "可生息本金 ÷ 原计划生活本金目标"
                 : "当前值 ÷ 目标值";

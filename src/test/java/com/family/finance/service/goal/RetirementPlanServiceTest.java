@@ -16,6 +16,22 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 class RetirementPlanServiceTest {
+    @Test void fundingScopeKeepsOldJsonContractAndRoundTripsOnlyTheNetChoice() {
+        var old = service.parse("{\"version\":2,\"scopeMode\":\"FAMILY_FINANCIAL\",\"accountIds\":[7]}");
+        assertThat(old.getFundingScope()).isEqualTo("FAMILY_FINANCIAL");
+        String gross = service.encode(old);
+        assertThat(gross).doesNotContain("netOfLiabilities", "fundingScope");
+        old.setFundingScope("FAMILY_FINANCIAL_NET");
+        String net = service.encode(old);
+        assertThat(net).contains("\"scopeMode\":\"FAMILY_FINANCIAL\"", "\"netOfLiabilities\":true")
+                .doesNotContain("fundingScope", "FAMILY_FINANCIAL_NET");
+        assertThat(service.parse(net).usesNetFunding()).isTrue();
+        old.setFundingScope("FAMILY_FINANCIAL");
+        assertThat(service.encode(old)).isEqualTo(gross);
+        old.setFundingScope("CUSTOM");
+        assertThat(old.isNetOfLiabilities()).isFalse();
+        assertThat(old.getAccountIds()).containsExactly(7L);
+    }
     private final RetirementPlanMapper mapper = mock(RetirementPlanMapper.class);
     private final GoalMapper goalMapper = mock(GoalMapper.class);
     private final GoalService goals = mock(GoalService.class);

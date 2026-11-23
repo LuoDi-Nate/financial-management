@@ -73,7 +73,7 @@ public class GoalProgressService {
                 org.springframework.beans.BeanUtils.copyProperties(goal, displayed);
                 displayed.setName(view.plan().getName()); displayed.setTargetDate(r.retirementDate());
                 return new GoalProgress(displayed, goalService.parseParams(goal), view.progressAssets(), view.progressTarget(),
-                        r.coverage() == null ? BigDecimal.ZERO : r.coverage(), r.monthlyContribution(), null,
+                        r.coverage() == null && !r.netFunding() ? BigDecimal.ZERO : r.coverage(), r.monthlyContribution(), null,
                         goal.metricOrDefault(), goal.comparatorOrDefault(), goal.timeModeOrDefault(), null,
                         view.plan().getVersion()>=2 ? view.data().sources().accountIds().size() : view.plan().getAccountIds().size(), view);
             }

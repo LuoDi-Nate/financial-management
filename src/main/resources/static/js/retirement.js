@@ -32,7 +32,7 @@
   }
   function modes() {
     const conditions = {
-      'manual-expense': value('autoExpense') !== 'true', 'custom-scope': value('scopeMode') === 'CUSTOM',
+      'manual-expense': value('autoExpense') !== 'true', 'custom-scope': value('fundingScope') === 'CUSTOM',
       'city-reserves': value('reserveMode') === 'CITY', 'custom-reserves': value('reserveMode') === 'CUSTOM',
       housing: value('reserveMode') === 'CUSTOM' || value('housingPlan') === 'CHANGE',
       'manual-return': value('returnSource') === 'MANUAL', 'manual-inflation': value('inflationSource') === 'MANUAL',

@@ -143,8 +143,8 @@
             </div>
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6 mt-4" data-goal-detail-kpis>
               <th:block th:replace="~{goals/_detail-metrics :: metric('当前进度', ${r.coveragePct() == null ? '—' : r.coveragePct().toPlainString() + '%'}, 'coverage', true)}"></th:block>
-              <th:block th:replace="~{goals/_detail-metrics :: metric(${view.plan().version >= 2 ? '已积累' : '可生息本金'}, ${money.amount(view.progressAssets())}, 'assets', false)}"></th:block>
-              <th:block th:replace="~{goals/_detail-metrics :: metric(${view.plan().version >= 2 ? '所需总资金' : '生活本金门槛'}, ${view.progressTarget() == null ? (r.state().name() == 'NO_FINITE_TARGET' ? '无有限门槛' : '暂无结果') : money.amount(view.progressTarget())}, 'target', false)}"></th:block>
+              <th:block th:replace="~{goals/_detail-metrics :: metric(${r.netFunding() ? '净可支用资金' : (view.plan().version >= 2 ? '已积累' : '可生息本金')}, ${money.amount(view.progressAssets())}, 'assets', false)}"></th:block>
+              <th:block th:replace="~{goals/_detail-metrics :: metric(${r.netFunding() ? '所需资金（不含负债）' : (view.plan().version >= 2 ? '所需总资金' : '生活本金门槛')}, ${view.progressTarget() == null ? (r.state().name() == 'NO_FINITE_TARGET' ? '无有限门槛' : '暂无结果') : money.amount(view.progressTarget())}, 'target', false)}"></th:block>
               <th:block th:replace="~{goals/_detail-metrics :: metric('距离目标还差', ${money.amount(r.gap())}, 'gap', false)}"></th:block>
             </div>
             <th:block th:if="${r.coveragePct() != null}">
@@ -165,18 +165,27 @@
           <section class="paper-card p-5 sm:p-8 mb-6" data-retire-metric-notes>
             <div class="eyebrow mb-1">资 · 金 · 口 · 径</div>
             <h2 class="font-display text-xl sm:text-2xl font-medium">资金构成</h2>
-            <p class="text-sm text-ink-soft mt-1" th:if="${view.plan().version >= 2}">
+            <p class="text-sm text-ink-soft mt-1" th:if="${view.plan().version >= 2 and !r.netFunding()}">
               当前进度 = 所选账户当前合计 ÷ 所需总资金。准备金和负债各计一次。
             </p>
+            <th:block th:if="${r.netFunding()}">
+              <p class="text-sm text-ink-soft mt-1">当前进度 = 净可支用资金 ÷ 所需资金。负债已从可支用资金扣除，不再计入资金需求。</p>
+              <p th:unless="${r.fundingComplete()}" class="text-sm text-brass-deep mt-2" data-retire-funding-incomplete>
+                资产或负债数据待补齐，以下为已知小计，进度及预测暂不计算。
+              </p>
+              <th:block th:replace="~{goals/_net-funding :: rows(${r}, ${money})}"></th:block>
+            </th:block>
             <p class="text-sm text-ink-soft mt-1" th:if="${view.plan().version == 1}">
               当前进度 = 可生息本金 ÷ 生活本金门槛。原方案仍含持续月收入
               <b data-priv th:text="${money.amount(r.monthlyIncome())}"></b>，确认升级后才移除。
             </p>
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6 mt-4">
               <th:block th:replace="~{goals/_detail-metrics :: metric('生活本金需求 T', ${money.amount(r.target())}, null, false)}"></th:block>
-              <th:block th:replace="~{goals/_detail-metrics :: metric('+ 全家庭负债 D', ${money.amount(r.debt())}, null, false)}"></th:block>
+              <th:block th:unless="${r.netFunding()}">
+                <th:block th:replace="~{goals/_detail-metrics :: metric('+ 全家庭负债 D', ${money.amount(r.debt())}, null, false)}"></th:block>
+              </th:block>
               <th:block th:replace="~{goals/_detail-metrics :: metric('+ 大额支出准备金 B', ${money.amount(r.reserves())}, null, false)}"></th:block>
-              <th:block th:replace="~{goals/_detail-metrics :: metric('= 所需总资金 F', ${money.amount(r.totalAssetNeed())}, null, false)}"></th:block>
+              <th:block th:replace="~{goals/_detail-metrics :: metric(${r.netFunding() ? '= 所需资金（不含负债）' : '= 所需总资金 F'}, ${money.amount(r.netFunding() ? r.progressTarget() : r.totalAssetNeed())}, null, false)}"></th:block>
             </div>
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6 mt-4 pt-4 border-t border-rule-soft">
               <th:block th:replace="~{goals/_detail-metrics :: metric('每月生活费 X', ${money.amount(r.monthlyExpense())}, 'expense', false)}"></th:block>
@@ -473,6 +482,16 @@
                   <span class="retire-section-no">01</span>家庭资金
                 </legend>
                 <div data-retire-live="funds">
+                  <th:block th:if="${r.netFunding()}">
+                    <th:block th:replace="~{goals/_net-funding :: rows(${r}, ${money})}"></th:block>
+                    <details th:unless="${r.fundingComplete()}" class="retire-details">
+                      <summary>资金数据待补齐 · 查看来源</summary>
+                      <ul class="retire-field-hint">
+                        <li th:each="reference : ${view.dataReferences()}" th:text="${reference}"></li>
+                      </ul>
+                    </details>
+                  </th:block>
+                  <th:block th:unless="${r.netFunding()}">
                   <div class="retire-reference-head">
                     <span>可支用资产</span>
                     <b
@@ -495,9 +514,10 @@
                     >
                     </b>
                   </p>
+                  </th:block>
                 </div>
                 <p class="retire-field-hint">
-                  默认纳入全家可支用金融资产,新增同类账户也会跟随。自住房、保单与其他实物不直接用来支付生活费。
+                  两种全家口径都随新增金融账户更新。自住房、保单与其他实物不在默认范围内。
                 </p>
                 <p class="retire-field-hint">保存的是参与账户与计算方式。余额、支出、收益和汇率在每次演算时读取,数据待补齐不影响保存。</p>
                 <details
@@ -506,11 +526,12 @@
                   th:open="${plan.scopeMode=='CUSTOM'}"
                 >
                   <summary>调整参与账户</summary>
-                  <label class="field-label mt-3" for="scopeMode"
+                  <label class="field-label mt-3" for="fundingScope"
                     >资金范围</label
                   >
-                  <select data-lsel class="field-input" th:field="*{scopeMode}">
-                    <option value="FAMILY_FINANCIAL">全家可支用金融资产</option>
+                  <select data-lsel class="field-input" th:field="*{fundingScope}">
+                    <option value="FAMILY_FINANCIAL_NET">全家可支用金融资产（剔除负债）</option>
+                    <option value="FAMILY_FINANCIAL">全家可支用金融资产（未扣负债）</option>
                     <option value="CUSTOM">自行选择账户</option>
                   </select>
                   <div
@@ -1289,9 +1310,15 @@
             T = <b data-priv th:text="${r.target()==null?r.message():money.amount(r.target())}"></b>
           </p>
           <p th:if="${view.plan().version==1}">原持续收入 J = <b data-priv th:text="${money.amount(r.monthlyIncome())}"></b> / 月</p>
-          <p th:if="${view.plan().version>=2}">所需总资金 F = 生活本金 T + 大额支出准备金 B + 全家庭负债 D</p>
-          <p th:if="${view.plan().version>=2}" data-priv th:text="${'本次 F = '+money.amount(r.target())+' + '+money.amount(r.reserves())+' + '+money.amount(r.debt())+' = '+money.amount(view.progressTarget())}"></p>
-          <p th:text="${view.plan().version>=2 ? '缺口 = max(F − A, 0); 目标进度 = A ÷ F' : '升级前口径:缺口 = max(T − P, 0); 覆盖率 = P ÷ T'}"></p>
+          <th:block th:if="${r.netFunding()}">
+            <p>净可支用资金 = 金融资产 A − 全家负债 D；所需资金 = 生活本金 T + 大额支出准备金 B。</p>
+            <p>缺口 = max(所需资金 − 净可支用资金, 0)；当前进度 = 净可支用资金 ÷ 所需资金。</p>
+          </th:block>
+          <th:block th:unless="${r.netFunding()}">
+            <p th:if="${view.plan().version>=2}">所需总资金 F = 生活本金 T + 大额支出准备金 B + 全家庭负债 D</p>
+            <p th:if="${view.plan().version>=2}" data-priv th:text="${'本次 F = '+money.amount(r.target())+' + '+money.amount(r.reserves())+' + '+money.amount(r.debt())+' = '+money.amount(view.progressTarget())}"></p>
+            <p th:text="${view.plan().version>=2 ? '缺口 = max(F − A, 0); 目标进度 = A ÷ F' : '升级前口径:缺口 = max(T − P, 0); 覆盖率 = P ÷ T'}"></p>
+          </th:block>
           <p>本次缺口 <b data-priv th:text="${money.amount(r.gap())}"></b> · 进度
             <b data-priv th:text="${r.coveragePct()==null?'—':r.coveragePct().toPlainString()+'%'}"></b>
           </p>

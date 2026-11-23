@@ -34,8 +34,8 @@ public class RetirementPlanService {
                        LocalDateTime updatedAt, boolean createdForPlan, boolean active, String fingerprint,
                        RetirementPlan effective, List<String> configurationProblems) {
         public boolean configurationComplete() { return configurationProblems.isEmpty(); }
-        public BigDecimal progressAssets() { return plan.getVersion()>=2 ? result.assets() : result.principal(); }
-        public BigDecimal progressTarget() { return plan.getVersion()>=2 ? result.totalAssetNeed() : result.target(); }
+        public BigDecimal progressAssets() { return result.progressAssets(); }
+        public BigDecimal progressTarget() { return result.progressTarget(); }
         public boolean usesPlanningReturn() {
             return plan.getVersion()>=2 && "AUTO".equals(plan.getReturnSource()) && data.sources().investment().percent()==null;
         }
@@ -90,7 +90,7 @@ public class RetirementPlanService {
         BigDecimal assets=p.getVersion()>=2 ? data.selectedAssets() : data.problems().isEmpty()?data.selectedAssets():null;
         BigDecimal debt=p.getVersion()>=2 ? data.debt() : data.problems().isEmpty()?data.debt():null;
         var result = RetirementCalculator.calculate(effective, today, currencyMatches && accountsValid ? assets : null,
-                currencyMatches ? debt : null, data.suggestedExpense(), problems);
+                currencyMatches ? debt : null, data.suggestedExpense(), problems, data.fundingComplete());
         String fingerprint = com.family.finance.service.llmtrace.PromptRecorder.sha256(encode(p) + "|" + encode(effective) + "|" + data.sources() + "|" + data.assets() + "|" + result.aiSummary());
         return new View(p, result, data, updatedAt, created, active, fingerprint,effective,List.copyOf(configurationProblems));
     }
@@ -165,7 +165,7 @@ public class RetirementPlanService {
             }
         }
         var p = new RetirementPlan();
-        p.setVersion(2);p.setScopeMode("FAMILY_FINANCIAL");p.setReserveMode("CITY");
+        p.setVersion(2);p.setScopeMode("FAMILY_FINANCIAL");p.setNetOfLiabilities(goal == null);p.setReserveMode("CITY");
         p.setReturnSource("AUTO");p.setInflationSource("AUTO");p.setContributionSource("AUTO");
         p.setBaseCurrency(families.findById(familyId).orElseThrow().getBaseCurrency());
         p.setPriceDate(LocalDate.now());
@@ -319,6 +319,7 @@ public class RetirementPlanService {
     private void validateRevision2(RetirementPlan p) {
         if(p.getName()==null || p.getName().isBlank() || p.getName().length()>64) throw new IllegalArgumentException("目标名称须为1–64字");
         choice(p.getScopeMode(),"资金范围","FAMILY_FINANCIAL","CUSTOM");
+        if (p.isNetOfLiabilities() && !p.usesNetFunding()) throw new IllegalArgumentException("净额口径仅适用于全家金融资产");
         choice(p.getReturnSource(),"回报来源","AUTO","MANUAL");choice(p.getInflationSource(),"通胀来源","AUTO","MANUAL");
         choice(p.getReserveMode(),"预留来源","CITY","CUSTOM");choice(p.getContributionSource(),"结余来源","AUTO","MANUAL");
         if(!p.isAutoExpense()) nonnegative(p.getMonthlyExpense(),"每月生活费");
