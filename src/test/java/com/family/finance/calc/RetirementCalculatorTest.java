@@ -401,6 +401,18 @@ class RetirementCalculatorTest {
         assertThat(funded.coverage()).isEqualByComparingTo("1"); assertThat(funded.gap()).isZero();
         assertThat(funded.state()).isEqualTo(RetirementCalculator.State.INCOME_COVERS); assertThat(funded.reached()).isTrue();
     }
+    @Test void netFundingDistinguishesNoFiniteTargetFromMissingDataEvenWhenReservesAreShort() {
+        var p = revisionTwoPlan();
+        p.setFundingScope("FAMILY_FINANCIAL_NET");
+        p.setDirectRealRate(true); p.setRealReturnPct(BigDecimal.ZERO);
+        var r = calculate(p, "100000", "200000");
+        assertThat(r.netFunding()).isTrue();
+        assertThat(r.principal()).isNegative();
+        assertThat(r.progressTarget()).isNull(); assertThat(r.coverage()).isNull();
+        assertThat(r.state()).isEqualTo(RetirementCalculator.State.NO_FINITE_TARGET);
+        p.setFundingScope("FAMILY_FINANCIAL");
+        assertThat(calculate(p, "100000", "200000").state()).isEqualTo(RetirementCalculator.State.RESERVES_SHORT);
+    }
     @Test void revisionTwoZeroTotalNeedDoesNotDivideByZero() {
         var p = revisionTwoPlan(); p.setMonthlyExpense(BigDecimal.ZERO);
         p.setChildReserve(BigDecimal.ZERO); p.setMedicalReserve(BigDecimal.ZERO);

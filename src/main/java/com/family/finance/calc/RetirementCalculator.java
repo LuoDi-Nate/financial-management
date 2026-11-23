@@ -125,7 +125,7 @@ public final class RetirementCalculator {
                     : revision2 ? "部分指标暂无数据" : "待补齐 / 核对";
             if (!revision2) { coverage = null; gap = null; supported = null; }
         }
-        else if (principal.signum() < 0) { state = State.RESERVES_SHORT; message = "大额支出准备金仍有缺口"; }
+        else if (principal.signum() < 0 && (!netFunding || target != null)) { state = State.RESERVES_SHORT; message = "大额支出准备金仍有缺口"; }
         else if (target == null) { state = State.NO_FINITE_TARGET; message = "这组假设没有有限的永久本金门槛"; }
         else if (need.signum() == 0) { state = State.INCOME_COVERS; message = revision2?"生活费明确为零,仍需保留负债与预留":"计划退休起的收入覆盖生活费,仍需保留预留"; }
         else { state = State.READY; message = (netFunding ? progressFunds.compareTo(progressNeed) : assets.compareTo(requiredAssets)) >= 0
